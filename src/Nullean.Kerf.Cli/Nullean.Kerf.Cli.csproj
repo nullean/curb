@@ -1,0 +1,50 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Nullean.Kerf.Cli</RootNamespace>
+    <AssemblyName>Nullean.Kerf.Cli</AssemblyName>
+
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>kerf</ToolCommandName>
+    <PackageId>Nullean.Kerf</PackageId>
+    <Title>kerf: a C# formatter driven by your .editorconfig</Title>
+    <Description>Formats C# with width-aware reflow while honouring the full IDE0055 .editorconfig option surface.</Description>
+    <PackageTags>csharp;formatter;editorconfig;ide0055;dotnet-tool;cli</PackageTags>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+
+    <!-- Native-AOT tool packaging: one package per RID plus an 'any' framework-dependent fallback.
+         The root package's DotnetToolSettings.xml (v2) maps each RID to its per-RID package.
+         Installing requires the .NET 10 SDK. -->
+    <RuntimeIdentifiers>linux-x64;linux-arm64;win-x64;win-arm64;osx-arm64;any</RuntimeIdentifiers>
+    <RollForward>Major</RollForward>
+  </PropertyGroup>
+
+  <!-- AOT settings apply only when a specific RID is targeted (dotnet pack -r <rid>). Without this
+       guard, IsDynamicCodeSupported=false and InvariantGlobalization=true get baked into the
+       runtimeconfig.json of the framework-dependent build, which changes runtime behaviour for the
+       portable fallback. -->
+  <PropertyGroup Condition="'$(RuntimeIdentifier)' != ''">
+    <PublishAot>true</PublishAot>
+    <PublishSelfContained>true</PublishSelfContained>
+    <StripSymbols>true</StripSymbols>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <EventSourceSupport>false</EventSourceSupport>
+    <MetadataUpdaterSupport>false</MetadataUpdaterSupport>
+    <TrimmerSingleWarn>false</TrimmerSingleWarn>
+    <!-- See Nullean.Kerf.Core.csproj: Roslyn's command-line-compiler path reads Assembly.Location.
+         Kerf only ever parses, so this is unreachable. Narrow suppression, not a blanket one. -->
+    <NoWarn>$(NoWarn);IL3000</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Nullean.Kerf.Core/Nullean.Kerf.Core.csproj" />
+    <ProjectReference Include="../Nullean.Kerf.EditorConfig/Nullean.Kerf.EditorConfig.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="README.md" />
+    <None Include="..\..\nuget-icon.png" Pack="true" PackagePath="nuget-icon.png" />
+  </ItemGroup>
+
+</Project>

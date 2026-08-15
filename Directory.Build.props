@@ -1,0 +1,51 @@
+<Project>
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <IsPackable>false</IsPackable>
+    <UseArtifactsOutput>true</UseArtifactsOutput>
+    <ArtifactsPath>$(MSBuildThisFileDirectory).artifacts</ArtifactsPath>
+    <SolutionRoot>$([MSBuild]::GetDirectoryNameOfFileAbove($(MSBuildThisFileDirectory), build.sh))</SolutionRoot>
+    <CheckEolTargetFramework>false</CheckEolTargetFramework>
+    <TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport>
+    <MinVerDefaultPreReleaseIdentifiers>canary.0</MinVerDefaultPreReleaseIdentifiers>
+    <MinVerMinimumMajorMinor>0.1</MinVerMinimumMajorMinor>
+  </PropertyGroup>
+
+  <!-- src/ projects: packable, documented, signed -->
+  <PropertyGroup Condition="$(MSBuildProjectDirectory.Replace('\','/').Contains('/src/'))">
+    <IsPackable>true</IsPackable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <IsAotCompatible>true</IsAotCompatible>
+    <SignAssembly>true</SignAssembly>
+    <AssemblyOriginatorKeyFile>$(MSBuildThisFileDirectory)build/keys/keypair.snk</AssemblyOriginatorKeyFile>
+    <Authors>Nullean and contributors</Authors>
+    <Copyright>Nullean</Copyright>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/nullean/kerf</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/nullean/kerf</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageIcon>nuget-icon.png</PackageIcon>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <!-- tests/ projects -->
+  <PropertyGroup Condition="$(MSBuildProjectDirectory.Replace('\','/').Contains('/tests/'))">
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <IsTestProject>true</IsTestProject>
+    <IsPackable>false</IsPackable>
+    <!-- IDE0005 needs a doc file to run on build; we don't ship docs for tests or examples. -->
+    <NoWarn>$(NoWarn);EnableGenerateDocumentationFile</NoWarn>
+  </PropertyGroup>
+
+  <!-- examples/ projects -->
+  <PropertyGroup Condition="$(MSBuildProjectDirectory.Replace('\','/').Contains('/examples/'))">
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <IsPackable>false</IsPackable>
+    <NoWarn>$(NoWarn);EnableGenerateDocumentationFile</NoWarn>
+  </PropertyGroup>
+</Project>

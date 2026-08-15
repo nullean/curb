@@ -1,0 +1,170 @@
+name: Always be deploying
+
+on:
+  pull_request:
+    paths-ignore:
+      - 'README.md'
+      - 'NOTICE'
+  push:
+    paths-ignore:
+      - 'README.md'
+      - 'NOTICE'
+    branches:
+      - main
+    tags:
+      - "*.*.*"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+permissions:
+  contents: read
+
+jobs:
+
+  # ── AOT pack matrix ─────────────────────────────────────────────────────────
+  # Native AOT can only compile for the OS/arch it runs on, so each leg compiles
+  # its own RID, smoke-tests the binary, and packs the per-RID tool package.
+  aot-pack:
+    strategy:
+      fail-fast: false   # a preempted arm runner must not cancel the whole matrix
+      matrix:
+        include:
+          - rid: linux-x64
+            runner: ubuntu-latest
+          - rid: linux-arm64
+            runner: ubuntu-24.04-arm
+          - rid: win-x64
+            runner: windows-latest
+          - rid: win-arm64
+            runner: windows-11-arm
+          - rid: osx-arm64
+            runner: macos-latest
+
+    runs-on: ${{ matrix.runner }}
+    name: AOT pack (${{ matrix.rid }})
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - run: git fetch --prune --tags
+        shell: bash
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      # Gate: the engine must link and run under AOT before anything gets packed.
+      - name: AOT smoke test — ${{ matrix.rid }}
+        shell: bash
+        run: |
+          dotnet publish examples/kerf-aot-smoketest -c Release -r ${{ matrix.rid }}
+          EXT=""
+          [[ "$RUNNER_OS" == "Windows" ]] && EXT=".exe"
+          BINARY=".artifacts/publish/kerf-aot-smoketest/release_${{ matrix.rid }}/kerf-aot-smoketest${EXT}"
+          OUTPUT=$("$BINARY")
+          echo "$OUTPUT"
+          echo "$OUTPUT" | grep -q "^OK:" || (echo "ERROR: AOT smoke test failed" && exit 1)
+
+      # Packing WITH -r emits only this RID's package. The root package and the portable 'any'
+      # fallback come from the coordinating build job instead — see generatePackages in
+      # build/scripts/Targets.fs for why the per-RID packages must be built here, on a matching
+      # runner, rather than all at once on one machine.
+      - name: Pack native-AOT tool for ${{ matrix.rid }}
+        run: dotnet pack src/Nullean.Kerf.Cli/Nullean.Kerf.Cli.csproj -c Release -r ${{ matrix.rid }} -o build/output
+        shell: bash
+
+      - name: Report native binary size
+        shell: bash
+        run: |
+          EXT=""
+          [[ "$RUNNER_OS" == "Windows" ]] && EXT=".exe"
+          BINARY=$(find .artifacts -name "Nullean.Kerf.Cli${EXT}" -type f | head -1)
+          [[ -n "$BINARY" ]] && ls -la "$BINARY" || echo "(no native binary found)"
+
+      - name: Upload per-RID package
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@v7
+        with:
+          name: nupkg-${{ matrix.rid }}
+          path: build/output/*.nupkg
+          if-no-files-found: error
+
+  # ── Managed build / test / pack / publish ───────────────────────────────────
+  build:
+    runs-on: ubuntu-latest
+    needs: aot-pack
+    permissions:
+      contents: write   # create GitHub release
+      packages: write   # push to GitHub Packages
+      issues: write     # release-notes creates labels for its categories
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      # MinVer derives the version from tags, so the full tag list must be present.
+      - run: git fetch --prune --tags
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+          source-url: https://nuget.pkg.github.com/nullean/index.json
+        env:
+          NUGET_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build
+        run: ./build.sh build -s true
+
+      - name: Test
+        run: ./build.sh test -s true
+
+      - name: Generate managed packages
+        if: github.event_name == 'push'
+        run: ./build.sh generatepackages -s true
+
+      - name: Download all per-RID AOT packages
+        if: github.event_name == 'push'
+        uses: actions/download-artifact@v8
+        with:
+          pattern: nupkg-*
+          path: build/output
+          merge-multiple: true
+
+      - name: Validate managed packages
+        if: github.event_name == 'push'
+        run: ./build.sh validatepackages -s true
+
+      - name: Inspect public API changes
+        if: github.event_name == 'push'
+        run: ./build.sh generateapichanges -s true
+
+      - name: Publish canary to GitHub Packages (branch push)
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads')
+        shell: bash
+        run: |
+          until dotnet nuget push 'build/output/*.nupkg' \
+            -k ${{ secrets.GITHUB_TOKEN }} \
+            --skip-duplicate \
+            --no-symbols; do echo "Retrying"; sleep 1; done
+
+      - name: Generate release notes (tag push)
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags')
+        run: ./build.sh generatereleasenotes -s true
+
+      - name: Create GitHub release (tag push)
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags')
+        run: ./build.sh createreleaseongithub -s true --token ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish to nuget.org (tag push)
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags')
+        run: |
+          dotnet nuget push 'build/output/*.nupkg' \
+            -k ${{ secrets.NUGET_ORG_API_KEY }} \
+            -s https://api.nuget.org/v3/index.json \
+            --skip-duplicate \
+            --no-symbols

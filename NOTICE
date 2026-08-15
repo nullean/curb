@@ -1,0 +1,30 @@
+Kerf
+Copyright (c) Nullean and contributors
+
+This product includes software design derived from the following projects.
+
+--------------------------------------------------------------------------------
+CSharpier — https://github.com/belav/csharpier
+Licensed under the MIT License.
+
+Kerf is an independent implementation, not a fork: no CSharpier source is copied
+into this repository. However, several algorithms and models in Kerf are
+recognisably derived from CSharpier's approach, and that debt is acknowledged here:
+
+  - The document-layout algorithm (group break propagation, the flat/break fits
+    measurement, and the conditional-group construct).
+  - The syntax-trivia model: how leading and trailing trivia, comments, blank-line
+    collapsing, preprocessor directives, disabled `#if` text and regions are
+    attached to tokens and printed.
+  - The golden-file testing convention in which a fixture with no companion
+    expectation file must format to itself.
+
+--------------------------------------------------------------------------------
+Prettier — https://github.com/prettier/prettier
+Licensed under the MIT License.
+
+The underlying document intermediate representation (concat/group/line/indent/
+if-break) originates with Prettier, which in turn builds on Philip Wadler's
+"A prettier printer" (1997) and Derek Oppen's "Prettyprinting" (1980).
+
+--------------------------------------------------------------------------------

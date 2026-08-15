@@ -1,0 +1,22 @@
+* text=auto eol=lf
+*.cs text diff=csharp
+*.fs text diff=fsharp
+*.sln text eol=crlf
+*.slnx text eol=lf
+*.csproj text eol=lf
+*.fsproj text eol=lf
+*.props text eol=lf
+*.targets text eol=lf
+*.json text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.md text eol=lf
+*.sh text eol=lf
+*.bat text eol=crlf
+*.snk binary
+*.png binary
+*.ico binary
+
+# Formatter fixtures are byte-exact golden files: never normalise them.
+*.test -text
+*.verified.* -text

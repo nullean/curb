@@ -1,0 +1,46 @@
+<Project>
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <GlobalPackageReference Include="MinVer" Version="7.0.0" PrivateAssets="All" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Runtime dependencies.
+
+         Microsoft.CodeAnalysis.CSharp is EXACT-pinned on purpose: Roslyn version bumps change parse
+         trees for new language features and therefore change formatting output. Treat a bump as a
+         behaviour change requiring a corpus diff review, not a routine dependency update.
+
+         Validated 5.6.0 under native AOT: links, 10.7 MB binary, ~27 MB/s parse. -->
+    <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="[5.6.0]" />
+    <PackageVersion Include="editorconfig" Version="0.17.0" />
+    <PackageVersion Include="System.IO.Abstractions" Version="22.2.0" />
+    <PackageVersion Include="Nullean.Argh" Version="0.17.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Test dependencies -->
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.9.0" />
+    <PackageVersion Include="TUnit" Version="1.65.0" />
+    <PackageVersion Include="AwesomeAssertions" Version="9.5.0" />
+    <PackageVersion Include="Verify.TUnit" Version="31.28.0" />
+    <PackageVersion Include="System.IO.Abstractions.TestingHelpers" Version="22.2.0" />
+    <PackageVersion Include="GitHubActionsTestLogger" Version="3.0.5" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Benchmarks -->
+    <PackageVersion Include="BenchmarkDotNet" Version="0.15.8" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Build script dependencies -->
+    <PackageVersion Include="Argu" Version="6.2.5" />
+    <PackageVersion Include="Bullseye" Version="6.1.0" />
+    <PackageVersion Include="Proc" Version="0.14.0" />
+    <PackageVersion Include="Fake.Tools.Git" Version="6.1.4" />
+  </ItemGroup>
+</Project>

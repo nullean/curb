@@ -1,0 +1,15 @@
+<Project>
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+  <PropertyGroup>
+    <!-- Test assemblies are strong-named too, purely so InternalsVisibleTo public-key matching works. -->
+    <SignAssembly>true</SignAssembly>
+    <AssemblyOriginatorKeyFile>$(MSBuildThisFileDirectory)../build/keys/keypair.snk</AssemblyOriginatorKeyFile>
+    <NoWarn>$(NoWarn);CA1707;CS1591</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- GitHubActionsTestLogger 3.x targets Microsoft.Testing.Platform and self-registers through
+         generated code, so it needs its compile assets. (The 2.x vstest logger did not — do not
+         re-add PrivateAssets/IncludeAssets here.) -->
+    <PackageReference Include="GitHubActionsTestLogger" />
+  </ItemGroup>
+</Project>
