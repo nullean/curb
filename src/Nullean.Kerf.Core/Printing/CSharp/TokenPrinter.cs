@@ -1,0 +1,207 @@
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Nullean.Kerf.Documents;
+
+namespace Nullean.Kerf.Printing.CSharp;
+
+/// <summary>
+/// Emits a token together with the trivia attached to it.
+/// </summary>
+/// <remarks>
+/// <para>
+/// All trivia handling lives here rather than being sprinkled through the node printers. That is the
+/// single most important structural decision in a formatter: comments, blank lines and preprocessor
+/// directives attach to tokens, and every formatter that handles them ad hoc in node printers ends
+/// up losing or duplicating them somewhere.
+/// </para>
+/// <para>
+/// Whitespace trivia is dropped, because layout is the printer's job. Everything else is preserved:
+/// comments keep their text, disabled <c>#if</c> branches pass through untouched, and directives are
+/// emitted but excluded from width measurement so they cannot push real code into wrapping.
+/// </para>
+/// </remarks>
+internal static class TokenPrinter
+{
+	public static void Print(SyntaxToken token, PrintContext context)
+	{
+		PrintLeadingTrivia(token, context);
+
+		if (token.Span.Length > 0)
+			context.Arena.SourceText(token.Span.Start, token.Span.Length);
+
+		PrintTrailingTrivia(token, context);
+		context.PrintedTokens++;
+	}
+
+	/// <summary>Emits a token only if it is actually present, for optional syntax like a trailing semicolon.</summary>
+	public static void PrintIfPresent(SyntaxToken token, PrintContext context)
+	{
+		if (token.RawKind != 0)
+			Print(token, context);
+	}
+
+	internal static void PrintLeadingTrivia(SyntaxToken token, PrintContext context)
+	{
+		var leading = token.LeadingTrivia;
+		if (leading.Count == 0)
+			return;
+
+		var arena = context.Arena;
+
+		// Blank lines are only preserved *between* things, never introduced at the start of a run,
+		// and never more than one however many the source had.
+		var pendingNewLines = 0;
+		var emittedAnything = false;
+
+		foreach (var trivia in leading)
+		{
+			switch (trivia.Kind())
+			{
+				case SyntaxKind.WhitespaceTrivia:
+					break;
+
+				case SyntaxKind.EndOfLineTrivia:
+					pendingNewLines++;
+					break;
+
+				case SyntaxKind.SingleLineCommentTrivia:
+				case SyntaxKind.MultiLineCommentTrivia:
+				case SyntaxKind.SingleLineDocumentationCommentTrivia:
+				case SyntaxKind.MultiLineDocumentationCommentTrivia:
+					FlushBlankLine(arena, ref pendingNewLines, emittedAnything);
+					EmitTriviaText(trivia, context, DocFlags.None);
+					arena.HardLine();
+					emittedAnything = true;
+					pendingNewLines = 0;
+					break;
+
+				case SyntaxKind.DisabledTextTrivia:
+					// Code inside a false #if branch is never reformatted; it is not even parsed.
+					FlushBlankLine(arena, ref pendingNewLines, emittedAnything);
+					arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
+					EmitVerbatimBlock(trivia, context);
+					emittedAnything = true;
+					pendingNewLines = 0;
+					break;
+
+				default:
+					if (!trivia.IsDirective)
+						break;
+
+					// A directive must be the first non-whitespace on its line, so break first unless
+					// we are already at a line start. It is emitted but never counted against the
+					// width of the code around it.
+					FlushBlankLine(arena, ref pendingNewLines, emittedAnything);
+					arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
+					EmitTriviaText(trivia, context, DocFlags.IsDirective);
+					arena.HardLine();
+					emittedAnything = true;
+					pendingNewLines = 0;
+					break;
+			}
+		}
+
+		// Blank lines immediately before the token itself.
+		FlushBlankLine(arena, ref pendingNewLines, emittedAnything);
+	}
+
+	internal static void PrintTrailingTrivia(SyntaxToken token, PrintContext context)
+	{
+		var trailing = token.TrailingTrivia;
+		if (trailing.Count == 0)
+			return;
+
+		foreach (var trivia in trailing)
+		{
+			switch (trivia.Kind())
+			{
+				case SyntaxKind.SingleLineCommentTrivia:
+				case SyntaxKind.MultiLineCommentTrivia:
+					// A trailing comment always eats the rest of its physical line, so whatever
+					// follows has to start on a new one.
+					context.Arena.Synthetic(SyntheticText.Space);
+					EmitTriviaText(trivia, context, DocFlags.None);
+					if (trivia.IsKind(SyntaxKind.SingleLineCommentTrivia))
+						context.Arena.HardLine();
+					break;
+
+				default:
+					break;
+			}
+		}
+	}
+
+	/// <summary>Emits at most one blank line, and never before anything has been written.</summary>
+	private static void FlushBlankLine(DocArena arena, ref int pendingNewLines, bool emittedAnything)
+	{
+		if (pendingNewLines > 1 && emittedAnything)
+			arena.HardLine();
+		pendingNewLines = 0;
+	}
+
+	/// <summary>Emits trivia text, less any line ending it carries — the printer supplies those.</summary>
+	/// <remarks>
+	/// Uses <c>FullSpan</c>, not <c>Span</c>. Documentation comments are structured trivia: the
+	/// <c>///</c> and <c>/**</c> markers are exterior trivia inside the structure, so <c>Span</c>
+	/// begins after them and emitting it would silently strip the marker off every doc comment.
+	/// </remarks>
+	private static void EmitTriviaText(SyntaxTrivia trivia, PrintContext context, DocFlags flags)
+	{
+		var span = trivia.FullSpan;
+		var length = TrimTrailingNewLines(context, span.Start, span.Length);
+		if (length > 0)
+			context.Arena.SourceText(span.Start, length, flags);
+	}
+
+	/// <summary>
+	/// Emits a multi-line run verbatim, keeping its own line structure and its own indentation.
+	/// </summary>
+	private static void EmitVerbatimBlock(SyntaxTrivia trivia, PrintContext context)
+	{
+		var span = trivia.FullSpan;
+		var length = TrimTrailingNewLines(context, span.Start, span.Length);
+		if (length <= 0)
+			return;
+
+		EmitVerbatimRange(context, span.Start, length);
+	}
+
+	/// <summary>
+	/// Emits <paramref name="length"/> characters from <paramref name="start"/> exactly as written,
+	/// splitting on newlines so that the printer does not re-indent them.
+	/// </summary>
+	internal static void EmitVerbatimRange(PrintContext context, int start, int length)
+	{
+		var source = context.Text;
+		var arena = context.Arena;
+		var lineStart = start;
+		var end = start + length;
+
+		for (var i = start; i < end; i++)
+		{
+			if (source[i] != '\n')
+				continue;
+
+			var lineLength = i - lineStart;
+			// Drop a \r that belongs to this \n; the printer emits the configured line ending.
+			if (lineLength > 0 && source[lineStart + lineLength - 1] == '\r')
+				lineLength--;
+
+			if (lineLength > 0)
+				arena.SourceText(lineStart, lineLength);
+			arena.LiteralLine();
+			lineStart = i + 1;
+		}
+
+		if (end > lineStart)
+			arena.SourceText(lineStart, end - lineStart);
+	}
+
+	private static int TrimTrailingNewLines(PrintContext context, int start, int length)
+	{
+		var source = context.Text;
+		while (length > 0 && source[start + length - 1] is '\n' or '\r')
+			length--;
+		return length;
+	}
+}

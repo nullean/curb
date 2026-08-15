@@ -84,6 +84,17 @@ internal enum DocFlags : byte
 
 	/// <summary>Collapse consecutive equivalent breaks into one.</summary>
 	Squash = 1 << 3,
+
+	/// <summary>
+	/// Emit this break only if the output is not already at the start of a line.
+	/// </summary>
+	/// <remarks>
+	/// Preprocessor directives must be the first non-whitespace on their line, but whether anything
+	/// precedes them depends on what the enclosing printer already emitted. Emitting a break
+	/// unconditionally would insert blank lines; not emitting one glues <c>#endif</c> onto the end of
+	/// the previous statement and produces source that no longer compiles.
+	/// </remarks>
+	OnlyIfNotAtLineStart = 1 << 4,
 }
 
 /// <summary>

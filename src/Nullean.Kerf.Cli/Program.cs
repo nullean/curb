@@ -1,26 +1,27 @@
 using System.Globalization;
 using System.IO.Abstractions;
 using Nullean.Kerf;
+using Nullean.Kerf.Cli;
 using Nullean.Kerf.EditorConfig;
 using Nullean.Kerf.Options;
 
-// M0 scaffolding. The real command surface (format / check / print-config / doc-tree) arrives in M1
-// on top of Nullean.Argh; this exists so the AOT publish path is exercised end to end from day one.
+// M1 command surface. Nullean.Argh replaces this hand-rolled parsing once the shape settles.
 
 if (args.Length == 0 || args[0] is "-h" or "--help")
 {
 	Console.WriteLine("kerf — a C# formatter driven by your .editorconfig");
 	Console.WriteLine();
-	Console.WriteLine("  kerf print-config <file>   show the resolved .editorconfig settings for a file");
-	Console.WriteLine("  kerf parse <path>          parse C# files and report token counts (M0 smoke command)");
-	Console.WriteLine("  kerf --version             print the version");
+	Console.WriteLine("  kerf format <path>         format files in place");
+	Console.WriteLine("  kerf check <path>          exit non-zero if anything would change");
+	Console.WriteLine("  kerf print-config <file>   show the resolved options and any diagnostics");
+	Console.WriteLine("  kerf doc-tree <file>       dump the document IR for a file");
+	Console.WriteLine("  kerf --version");
 	return 0;
 }
 
 if (args[0] is "--version" or "-v")
 {
-	var version = typeof(CSharpSource).Assembly.GetName().Version;
-	Console.WriteLine(version?.ToString() ?? "0.0.0");
+	Console.WriteLine(typeof(CSharpFormatter).Assembly.GetName().Version?.ToString() ?? "0.0.0");
 	return 0;
 }
 
@@ -28,6 +29,21 @@ var fileSystem = new FileSystem();
 
 switch (args[0])
 {
+	case "format" when args.Length > 1:
+		return FormattingRun.Execute(fileSystem, args[1], write: true);
+
+	case "check" when args.Length > 1:
+		return FormattingRun.Execute(fileSystem, args[1], write: false, expandUnhandled: args.Contains("--expand-unhandled"));
+
+	case "doc-tree" when args.Length > 1:
+		{
+			var path = fileSystem.Path.GetFullPath(args[1]);
+			var options = EditorConfigOptionsBinder.Bind(new KerfEditorConfig(fileSystem).For(path));
+			using var formatter = new CSharpFormatter();
+			Console.WriteLine(formatter.DumpDocumentTree(fileSystem.File.ReadAllText(path), options));
+			return 0;
+		}
+
 	case "print-config" when args.Length > 1:
 		{
 			var path = fileSystem.Path.GetFullPath(args[1]);
@@ -56,36 +72,6 @@ switch (args[0])
 			}
 
 			return 0;
-		}
-
-	case "parse" when args.Length > 1:
-		{
-			var target = fileSystem.Path.GetFullPath(args[1]);
-			var files = fileSystem.Directory.Exists(target)
-				? fileSystem.Directory.EnumerateFiles(target, "*.cs", SearchOption.AllDirectories)
-				: [target];
-
-			long tokens = 0;
-			var parsed = 0;
-			var failed = 0;
-
-			foreach (var file in files)
-			{
-				var source = fileSystem.File.ReadAllText(file);
-				if (!CSharpSource.TryParse(source, out var csharp, out var errors))
-				{
-					failed++;
-					Console.Error.WriteLine($"{file}: {errors[0].GetMessage(CultureInfo.InvariantCulture)}");
-					continue;
-				}
-
-				parsed++;
-				foreach (var _ in csharp.Root.DescendantTokens())
-					tokens++;
-			}
-
-			Console.WriteLine($"parsed {parsed} file(s), {failed} failed, {tokens:N0} tokens");
-			return failed > 0 ? 1 : 0;
 		}
 
 	default:

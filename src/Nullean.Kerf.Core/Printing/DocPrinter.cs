@@ -206,6 +206,9 @@ internal sealed class DocPrinter
 			return;
 		}
 
+		if (doc.Flags.HasFlag(DocFlags.OnlyIfNotAtLineStart) && _output.AtLineStart())
+			return;
+
 		if (options.TrimTrailingWhitespace && !doc.Flags.HasFlag(DocFlags.NoTrim))
 			_output.TrimTrailingWhitespace();
 

@@ -43,6 +43,18 @@ internal sealed class OutputBuffer : IDisposable
 		_buffer[_length++] = value;
 	}
 
+	/// <summary>True when only spaces and tabs separate the end of the buffer from a line start.</summary>
+	public bool AtLineStart()
+	{
+		for (var i = _length - 1; i >= 0; i--)
+		{
+			if (_buffer[i] is ' ' or '\t')
+				continue;
+			return _buffer[i] is '\n';
+		}
+		return true;
+	}
+
 	/// <summary>Removes spaces and tabs from the end of the buffer, returning how many were removed.</summary>
 	public int TrimTrailingWhitespace()
 	{
