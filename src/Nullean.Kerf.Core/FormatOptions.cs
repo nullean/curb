@@ -53,7 +53,7 @@ public readonly record struct FormatOptions
 	public bool TrimTrailingWhitespace { get; init; } = true;
 
 	/// <summary>True when reflow is disabled, which lets the printer skip fit measurement entirely.</summary>
-	internal bool ReflowDisabled => MaxLineLength == Off;
+	public bool ReflowDisabled => MaxLineLength == Off;
 
 	/// <summary>Resolves <see cref="EndOfLine.Auto"/> by sniffing the source.</summary>
 	internal string ResolveEndOfLine(ReadOnlySpan<char> source)

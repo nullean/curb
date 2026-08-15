@@ -2,6 +2,7 @@ using System.Globalization;
 using System.IO.Abstractions;
 using Nullean.Kerf;
 using Nullean.Kerf.EditorConfig;
+using Nullean.Kerf.Options;
 
 // M0 scaffolding. The real command surface (format / check / print-config / doc-tree) arrives in M1
 // on top of Nullean.Argh; this exists so the AOT publish path is exercised end to end from day one.
@@ -31,9 +32,29 @@ switch (args[0])
 		{
 			var path = fileSystem.Path.GetFullPath(args[1]);
 			var config = new KerfEditorConfig(fileSystem).For(path);
-			Console.WriteLine($"# resolved .editorconfig for {path}");
-			foreach (var (key, value) in config.Properties.OrderBy(p => p.Key, StringComparer.Ordinal))
-				Console.WriteLine($"{key} = {value}");
+
+			var diagnostics = new List<KerfDiagnostic>();
+			var options = EditorConfigOptionsBinder.Bind(config, diagnostics);
+
+			Console.WriteLine($"# {path}");
+			Console.WriteLine();
+			Console.WriteLine("# resolved");
+			Console.WriteLine($"indent_style             = {(options.UseTabs ? "tab" : "space")}");
+			Console.WriteLine($"indent_size              = {options.IndentSize}");
+			Console.WriteLine($"tab_width                = {options.TabWidth}");
+			Console.WriteLine($"max_line_length          = {(options.ReflowDisabled ? "off" : options.MaxLineLength.ToString(CultureInfo.InvariantCulture))}");
+			Console.WriteLine($"end_of_line              = {options.EndOfLine.ToString().ToLowerInvariant()}");
+			Console.WriteLine($"insert_final_newline     = {options.InsertFinalNewLine.ToString().ToLowerInvariant()}");
+			Console.WriteLine($"trim_trailing_whitespace = {options.TrimTrailingWhitespace.ToString().ToLowerInvariant()}");
+
+			if (diagnostics.Count > 0)
+			{
+				Console.WriteLine();
+				Console.WriteLine($"# {diagnostics.Count} diagnostic(s)");
+				foreach (var diagnostic in diagnostics.OrderBy(d => d.Id, StringComparer.Ordinal))
+					Console.WriteLine(diagnostic.ToString());
+			}
+
 			return 0;
 		}
 

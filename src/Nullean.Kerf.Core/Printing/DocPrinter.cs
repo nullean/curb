@@ -174,8 +174,10 @@ internal sealed class DocPrinter
 					}
 
 				default:
-					i++;
-					break;
+					// Every DocKind is handled above, so this is unreachable today. It throws rather
+					// than skipping so that a kind added later fails loudly here instead of being
+					// silently dropped from the output.
+					throw new InvalidOperationException($"doc {i} has unhandled kind {doc.Kind}");
 			}
 		}
 	}
