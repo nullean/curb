@@ -92,23 +92,17 @@ public class OptionsBindingTests
 	}
 
 	[Test]
-	public async Task A_known_but_unimplemented_option_is_reported_not_ignored()
+	public async Task Every_catalogued_option_is_implemented()
 	{
-		// Whichever key is still outstanding, rather than a name that has to be swapped every time
-		// an option is onboarded. Once the catalog is fully implemented this test has nothing left
-		// to assert and should be deleted along with the KERF1003 diagnostic.
+		// KERF1003 — "Kerf knows this key but does not act on it yet" — has nothing left to report.
+		// The diagnostic stays wired up for whenever Microsoft adds an option and the catalog grows
+		// ahead of the printers; this asserts the gap is currently empty rather than untested.
 		var outstanding = OptionCatalog.FormattingKeys
 			.Where(key => !OptionCatalog.IsImplemented(key))
 			.Order(StringComparer.Ordinal)
-			.FirstOrDefault();
+			.ToArray();
 
-		outstanding.Should().NotBeNull("every catalogued option is implemented — delete this test and KERF1003");
-
-		var options = Bind($"root = true\n\n[*.cs]\n{outstanding} = true\n", out var diagnostics);
-
-		options.Should().NotBeNull();
-		diagnostics.Should().ContainSingle().Which.Id.Should().Be("KERF1003");
-		diagnostics[0].Message.Should().Contain(outstanding).And.Contain("does not implement it yet");
+		outstanding.Should().BeEmpty();
 		await Task.CompletedTask;
 	}
 

@@ -95,10 +95,15 @@ public readonly record struct FormatOptions
 
 	/// <summary>
 	/// Spaces around binary and assignment operators. <c>csharp_space_around_binary_operators</c>,
-	/// default <c>before_and_after</c>; <c>none</c> sets this false. The third value, <c>ignore</c>,
-	/// is not implemented.
+	/// default <c>before_and_after</c>.
 	/// </summary>
-	public bool SpaceAroundBinaryOperators { get; init; } = true;
+	public BinaryOperatorSpacing SpaceAroundBinaryOperators { get; init; } = BinaryOperatorSpacing.BeforeAndAfter;
+
+	/// <summary>
+	/// Spacing within a declaration statement. <c>csharp_space_around_declaration_statements</c>,
+	/// default <c>false</c>, which means "normalise" rather than "no spaces".
+	/// </summary>
+	public DeclarationSpacing SpaceAroundDeclarationStatements { get; init; } = DeclarationSpacing.Normalise;
 
 	/// <summary><c>csharp_space_after_comma</c>, default true.</summary>
 	public bool SpaceAfterComma { get; init; } = true;

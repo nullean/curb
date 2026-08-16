@@ -165,18 +165,40 @@ public static class EditorConfigOptionsBinder
 			switch (binaryOperators.ToLowerInvariant())
 			{
 				case "before_and_after":
-					options = options with { SpaceAroundBinaryOperators = true };
+					options = options with { SpaceAroundBinaryOperators = BinaryOperatorSpacing.BeforeAndAfter };
 					break;
 				case "none":
-					options = options with { SpaceAroundBinaryOperators = false };
+					options = options with { SpaceAroundBinaryOperators = BinaryOperatorSpacing.None };
+					break;
+				case "ignore":
+					options = options with { SpaceAroundBinaryOperators = BinaryOperatorSpacing.Ignore };
 					break;
 				default:
-					// `ignore` means reproduce the author's own whitespace verbatim, which is a
-					// different mechanism from a spacing flag and is not built yet.
 					diagnostics?.Add(KerfDiagnostic.UnrecognisedValue(
 						"csharp_space_around_binary_operators",
 						binaryOperators,
-						"before_and_after or none; ignore is not implemented yet"));
+						"before_and_after, none or ignore"));
+					break;
+			}
+		}
+
+		if (properties.TryGetValue("csharp_space_around_declaration_statements", out var declarationSpacing))
+		{
+			switch (declarationSpacing.ToLowerInvariant())
+			{
+				case "false":
+					options = options with { SpaceAroundDeclarationStatements = DeclarationSpacing.Normalise };
+					break;
+				case "ignore":
+					options = options with { SpaceAroundDeclarationStatements = DeclarationSpacing.Ignore };
+					break;
+				default:
+					// `true` is not a value this option takes: the choice is between normalising the
+					// spacing and reproducing it, not between adding and removing spaces.
+					diagnostics?.Add(KerfDiagnostic.UnrecognisedValue(
+						"csharp_space_around_declaration_statements",
+						declarationSpacing,
+						"false or ignore"));
 					break;
 			}
 		}

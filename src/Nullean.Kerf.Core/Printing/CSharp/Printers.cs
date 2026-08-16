@@ -738,6 +738,30 @@ internal static partial class Printers
 	}
 
 
+	/// <summary>
+	/// Emits a construct exactly as the author wrote it, for the two <c>= ignore</c> settings.
+	/// </summary>
+	/// <remarks>
+	/// The same verbatim path an unknown syntax kind takes, which is the honest reading of
+	/// <c>ignore</c>: reproduce the whitespace, do not reflow, and leave alignment the author put in
+	/// alone. Leading and trailing trivia still print normally, so a comment above the construct is
+	/// laid out like any other.
+	/// </remarks>
+	internal static void PrintVerbatim(SyntaxNode node, PrintContext context)
+	{
+		var first = node.GetFirstToken();
+		var last = node.GetLastToken();
+
+		if (first.RawKind != 0)
+			TokenPrinter.PrintLeadingTrivia(first, context);
+
+		var span = node.Span;
+		TokenPrinter.EmitVerbatimRange(context, span.Start, span.Length);
+
+		if (last.RawKind != 0)
+			TokenPrinter.PrintTrailingTrivia(last, context);
+	}
+
 	private static void PrintModifiers(SyntaxTokenList modifiers, PrintContext context)
 	{
 		foreach (var modifier in modifiers)

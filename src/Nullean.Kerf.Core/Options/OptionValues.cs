@@ -73,7 +73,15 @@ public static class OptionValues
 		"csharp_space_after_keywords_in_control_flow_statements" => Bool(options.SpaceAfterKeywordsInControlFlowStatements),
 		"csharp_space_before_colon_in_inheritance_clause" => Bool(options.SpaceBeforeColonInInheritanceClause),
 		"csharp_space_after_colon_in_inheritance_clause" => Bool(options.SpaceAfterColonInInheritanceClause),
-		"csharp_space_around_binary_operators" => options.SpaceAroundBinaryOperators ? "before_and_after" : "none",
+		"csharp_space_around_binary_operators" => options.SpaceAroundBinaryOperators switch
+		{
+			BinaryOperatorSpacing.None => "none",
+			BinaryOperatorSpacing.Ignore => "ignore",
+			BinaryOperatorSpacing.BeforeAndAfter => "before_and_after",
+			_ => "before_and_after",
+		},
+		"csharp_space_around_declaration_statements" =>
+			options.SpaceAroundDeclarationStatements == DeclarationSpacing.Ignore ? "ignore" : "false",
 		"csharp_space_after_comma" => Bool(options.SpaceAfterComma),
 		"csharp_space_before_comma" => Bool(options.SpaceBeforeComma),
 		"csharp_space_after_dot" => Bool(options.SpaceAfterDot),

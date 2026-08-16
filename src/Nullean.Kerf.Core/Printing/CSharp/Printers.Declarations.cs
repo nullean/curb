@@ -9,6 +9,12 @@ internal static partial class Printers
 {
 	public static void FieldDeclaration(BaseFieldDeclarationSyntax node, PrintContext context)
 	{
+		if (context.Options.SpaceAroundDeclarationStatements == DeclarationSpacing.Ignore)
+		{
+			PrintVerbatim(node, context);
+			return;
+		}
+
 		PrintAttributeLists(node.AttributeLists, context);
 		PrintModifiers(node.Modifiers, context);
 
@@ -26,6 +32,12 @@ internal static partial class Printers
 
 	public static void LocalDeclarationStatement(LocalDeclarationStatementSyntax node, PrintContext context)
 	{
+		if (context.Options.SpaceAroundDeclarationStatements == DeclarationSpacing.Ignore)
+		{
+			PrintVerbatim(node, context);
+			return;
+		}
+
 		PrintAttributeLists(node.AttributeLists, context);
 
 		if (node.AwaitKeyword.RawKind != 0)

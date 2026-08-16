@@ -56,7 +56,7 @@ internal static partial class Printers
 		using (arena.Indent())
 		{
 			// A Line is a space when flat; under `none` the break must not bring one back.
-			if (context.Options.SpaceAroundBinaryOperators)
+			if (context.Options.SpaceAroundBinaryOperators == BinaryOperatorSpacing.BeforeAndAfter)
 				arena.Line();
 			else
 				arena.SoftLine();
@@ -66,6 +66,12 @@ internal static partial class Printers
 
 	public static void BinaryExpression(BinaryExpressionSyntax node, PrintContext context)
 	{
+		if (context.Options.SpaceAroundBinaryOperators == BinaryOperatorSpacing.Ignore)
+		{
+			PrintVerbatim(node, context);
+			return;
+		}
+
 		Node.Print(node.Left, context);
 		Spacing.BeforeOperator(context);
 		TokenPrinter.Print(node.OperatorToken, context);
@@ -76,6 +82,12 @@ internal static partial class Printers
 	{
 		// dotnet format applies csharp_space_around_binary_operators to assignment too — `y=y+1`,
 		// though the `=` of a declarator keeps its spaces, since that is not an operator.
+		if (context.Options.SpaceAroundBinaryOperators == BinaryOperatorSpacing.Ignore)
+		{
+			PrintVerbatim(node, context);
+			return;
+		}
+
 		Node.Print(node.Left, context);
 		Spacing.BeforeOperator(context);
 		TokenPrinter.Print(node.OperatorToken, context);

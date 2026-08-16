@@ -276,7 +276,7 @@ internal static class Spacing
 	/// </remarks>
 	public static void BeforeOperator(PrintContext context)
 	{
-		if (context.Options.SpaceAroundBinaryOperators)
+		if (context.Options.SpaceAroundBinaryOperators == BinaryOperatorSpacing.BeforeAndAfter)
 			context.Arena.Synthetic(SyntheticText.Space);
 	}
 }
