@@ -14,7 +14,7 @@ namespace Nullean.Kerf.Printing.CSharp;
 /// directly — layout choices that an option will eventually govern go through a helper, so wiring
 /// that option up later touches one place rather than every call site.
 /// </remarks>
-internal static class Printers
+internal static partial class Printers
 {
 	public static void CompilationUnit(CompilationUnitSyntax node, PrintContext context)
 	{

@@ -65,6 +65,59 @@ internal static class Node
 				Printers.ParameterList((ParameterListSyntax)node, context);
 				break;
 
+			case SyntaxKind.FieldDeclaration:
+			case SyntaxKind.EventFieldDeclaration:
+				Printers.FieldDeclaration((BaseFieldDeclarationSyntax)node, context);
+				break;
+
+			case SyntaxKind.LocalDeclarationStatement:
+				Printers.LocalDeclarationStatement((LocalDeclarationStatementSyntax)node, context);
+				break;
+
+			case SyntaxKind.VariableDeclaration:
+				Printers.VariableDeclaration((VariableDeclarationSyntax)node, context);
+				break;
+
+			case SyntaxKind.VariableDeclarator:
+				Printers.VariableDeclarator((VariableDeclaratorSyntax)node, context);
+				break;
+
+			case SyntaxKind.EqualsValueClause:
+				Printers.EqualsValueClause((EqualsValueClauseSyntax)node, context);
+				break;
+
+			case SyntaxKind.PropertyDeclaration:
+				Printers.PropertyDeclaration((PropertyDeclarationSyntax)node, context);
+				break;
+
+			case SyntaxKind.AccessorList:
+				Printers.AccessorList((AccessorListSyntax)node, context);
+				break;
+
+			case SyntaxKind.GetAccessorDeclaration:
+			case SyntaxKind.SetAccessorDeclaration:
+			case SyntaxKind.InitAccessorDeclaration:
+			case SyntaxKind.AddAccessorDeclaration:
+			case SyntaxKind.RemoveAccessorDeclaration:
+				Printers.AccessorDeclaration((AccessorDeclarationSyntax)node, context);
+				break;
+
+			case SyntaxKind.ConstructorDeclaration:
+				Printers.ConstructorDeclaration((ConstructorDeclarationSyntax)node, context);
+				break;
+
+			case SyntaxKind.AttributeList:
+				Printers.AttributeList((AttributeListSyntax)node, context);
+				break;
+
+			case SyntaxKind.Attribute:
+				Printers.Attribute((AttributeSyntax)node, context);
+				break;
+
+			case SyntaxKind.AttributeArgument:
+				Printers.AttributeArgument((AttributeArgumentSyntax)node, context);
+				break;
+
 			case SyntaxKind.TypeParameterList:
 				Printers.TypeParameterList((TypeParameterListSyntax)node, context);
 				break;
