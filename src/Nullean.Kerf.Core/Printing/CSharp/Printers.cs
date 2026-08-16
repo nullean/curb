@@ -469,7 +469,11 @@ internal static partial class Printers
 					continue;
 				}
 
-				arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
+				// Reindent rather than OnlyIfNotAtLineStart. A trailing `// note` on a braceless `if`
+				// body ends its own line from inside that body's indent, so the next statement
+				// started already indented and came out a level too deep. Reindent trims whatever
+				// was left and re-emits this block's own indent, whoever wrote the line ending.
+				arena.HardLine(DocFlags.Reindent);
 				if (context.BlankLinesBetween(previousEnd, EffectiveStart(statement)) > 0)
 					arena.HardLine();
 				Node.Print(statement, context);

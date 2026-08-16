@@ -242,6 +242,8 @@ internal static partial class Printers
 			return;
 		}
 
+		var trailingTrivia = false;
+
 		using (arena.Group())
 		{
 			if (leadingLine)
@@ -286,10 +288,28 @@ internal static partial class Printers
 						if (i < node.Expressions.Count - 1)
 							Separator(node.Expressions[i].Span.End, node.Expressions[i + 1].SpanStart);
 					}
+
+					// A comment sitting above the closing brace belongs with the members, not with
+					// the brace — the same rule Block already follows. Printed here, inside the
+					// indent, it keeps their level instead of dropping back to the construct's.
+					if (TokenPrinter.HasLeadingContent(node.CloseBraceToken))
+					{
+						arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
+						TokenPrinter.PrintLeadingTrivia(node.CloseBraceToken, context, trailingBreak: false);
+						trailingTrivia = true;
+					}
 				}
 
 				using (arena.IndentIf(context.Options.IndentBraces))
-					InsideBrace(node.Expressions[^1].Span.End, node.CloseBraceToken.SpanStart);
+				{
+					// Trivia has already ended its own line, and a directive ends two. Reindent
+					// reuses whatever line is open instead of adding another, which is what stopped
+					// a `#pragma restore` above the brace growing a blank line on every run.
+					if (trailingTrivia)
+						arena.HardLine(DocFlags.Reindent);
+					else
+						InsideBrace(node.Expressions[^1].Span.End, node.CloseBraceToken.SpanStart);
+				}
 			}
 			else
 			{
@@ -297,7 +317,7 @@ internal static partial class Printers
 				arena.Synthetic(SyntheticText.Space);
 			}
 
-			TokenPrinter.Print(node.CloseBraceToken, context);
+			TokenPrinter.PrintWithoutLeadingTrivia(node.CloseBraceToken, context);
 		}
 
 		// Between two members: a hard line, or the ordinary comma separator.
