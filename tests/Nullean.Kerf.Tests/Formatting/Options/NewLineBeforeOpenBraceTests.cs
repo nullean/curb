@@ -657,14 +657,14 @@ public class NewLineBeforeOpenBraceTests : FormattingTest
 		    public event EventHandler Changed { add { } remove { } }
 		}
 		""",
+		// The accessor bodies were written on one line, so csharp_preserve_single_line_blocks
+		// keeps them there; only the list itself breaks.
 		"""
 		public class C
 		{
 		    public event EventHandler Changed {
-		        add {
-		        }
-		        remove {
-		        }
+		        add { }
+		        remove { }
 		    }
 		}
 		""",

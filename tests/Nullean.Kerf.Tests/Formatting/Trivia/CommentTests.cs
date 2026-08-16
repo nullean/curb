@@ -353,7 +353,6 @@ public class CommentTests : FormattingTest
 		""");
 
 	[Test]
-	[Skip("csharp_preserve_single_line_blocks is not implemented — blocks always expand")]
 	public Task A_comment_above_a_single_line_block_leaves_it_on_one_line() => Unchanged(
 		"""
 		public class C

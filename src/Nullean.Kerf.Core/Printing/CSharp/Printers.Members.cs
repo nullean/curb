@@ -23,7 +23,22 @@ internal static partial class Printers
 			Node.Print(node.BaseList, context);
 		}
 
-		BeforeOpenBrace(BraceStyle.Types, context);
+		var oneLine = KeepsOneLine(node.OpenBraceToken, node.CloseBraceToken, context);
+
+		using (arena.ForceFlatIf(oneLine))
+		{
+			if (oneLine)
+				arena.Synthetic(SyntheticText.Space);
+			else
+				BeforeOpenBrace(BraceStyle.Types, context);
+
+			PrintEnumBody(node, context);
+		}
+	}
+
+	private static void PrintEnumBody(EnumDeclarationSyntax node, PrintContext context)
+	{
+		var arena = context.Arena;
 		TokenPrinter.Print(node.OpenBraceToken, context);
 
 		using (arena.Indent())
@@ -72,8 +87,7 @@ internal static partial class Printers
 
 		if (node.Body is not null)
 		{
-			BeforeOpenBrace(BraceStyle.Methods, context);
-			Node.Print(node.Body, context);
+			PrintBody(node.Body, BraceStyle.Methods, context);
 			return;
 		}
 
@@ -102,8 +116,7 @@ internal static partial class Printers
 
 		if (node.Body is not null)
 		{
-			BeforeOpenBrace(BraceStyle.Methods, context);
-			Node.Print(node.Body, context);
+			PrintBody(node.Body, BraceStyle.Methods, context);
 			return;
 		}
 
@@ -169,7 +182,22 @@ internal static partial class Printers
 		TokenPrinter.Print(node.NamespaceKeyword, context);
 		arena.Synthetic(SyntheticText.Space);
 		Node.Print(node.Name, context);
-		BeforeOpenBrace(BraceStyle.Types, context);
+		var oneLine = KeepsOneLine(node.OpenBraceToken, node.CloseBraceToken, context);
+
+		using (arena.ForceFlatIf(oneLine))
+		{
+			if (oneLine)
+				arena.Synthetic(SyntheticText.Space);
+			else
+				BeforeOpenBrace(BraceStyle.Types, context);
+
+			PrintNamespaceBody(node, context);
+		}
+	}
+
+	private static void PrintNamespaceBody(NamespaceDeclarationSyntax node, PrintContext context)
+	{
+		var arena = context.Arena;
 		TokenPrinter.Print(node.OpenBraceToken, context);
 
 		using (arena.Indent())

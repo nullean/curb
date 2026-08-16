@@ -44,6 +44,8 @@ public static class OptionValues
 		"csharp_new_line_before_members_in_anonymous_types" => Bool(options.NewLineBeforeMembersInAnonymousTypes),
 		"csharp_new_line_between_query_expression_clauses" => Bool(options.NewLineBetweenQueryExpressionClauses),
 
+		"csharp_preserve_single_line_blocks" => Bool(options.PreserveSingleLineBlocks),
+
 		"csharp_indent_case_contents" => Bool(options.IndentCaseContents),
 		"csharp_indent_case_contents_when_block" => Bool(options.IndentCaseContentsWhenBlock),
 		"csharp_indent_switch_labels" => Bool(options.IndentSwitchLabels),

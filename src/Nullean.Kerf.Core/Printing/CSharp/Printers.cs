@@ -152,7 +152,22 @@ internal static partial class Printers
 			return;
 		}
 
-		BeforeOpenBrace(BraceStyle.Types, context);
+		var oneLine = KeepsOneLine(node.OpenBraceToken, node.CloseBraceToken, context);
+
+		using (arena.ForceFlatIf(oneLine))
+		{
+			if (oneLine)
+				arena.Synthetic(SyntheticText.Space);
+			else
+				BeforeOpenBrace(BraceStyle.Types, context);
+
+			PrintTypeBody(node, context);
+		}
+	}
+
+	private static void PrintTypeBody(TypeDeclarationSyntax node, PrintContext context)
+	{
+		var arena = context.Arena;
 		TokenPrinter.Print(node.OpenBraceToken, context);
 
 		using (arena.Indent())
@@ -212,8 +227,7 @@ internal static partial class Printers
 
 		if (node.Body is not null)
 		{
-			BeforeOpenBrace(BraceStyle.Methods, context);
-			Node.Print(node.Body, context);
+			PrintBody(node.Body, BraceStyle.Methods, context);
 			return;
 		}
 
@@ -538,6 +552,35 @@ internal static partial class Printers
 		// by emitting the break from a deeper scope rather than by moving the token afterwards.
 		using (context.Arena.IndentIf(context.Options.IndentBraces))
 			context.Arena.HardLine();
+	}
+
+	/// <summary>
+	/// Emits a construct's braced body, keeping it on one line when the author wrote it on one.
+	/// </summary>
+	/// <remarks>
+	/// <c>csharp_preserve_single_line_blocks</c> beats <c>csharp_new_line_before_open_brace</c>: a
+	/// preserved body keeps its brace on the header line rather than taking one of its own. The
+	/// source span is a sufficient test on its own — a line comment inside the braces would end the
+	/// line, so a body that occupies one line cannot contain one.
+	/// </remarks>
+	/// <summary>True when the author wrote this brace pair on a single line and asked to keep it.</summary>
+	internal static bool KeepsOneLine(SyntaxToken openBrace, SyntaxToken closeBrace, PrintContext context) =>
+		context.Options.PreserveSingleLineBlocks
+		&& openBrace.RawKind != 0
+		&& context.OnSameLine(openBrace.SpanStart, closeBrace.Span.End);
+
+	internal static void PrintBody(SyntaxNode body, BraceStyle construct, PrintContext context)
+	{
+		if (context.Options.PreserveSingleLineBlocks && context.OnSameLine(body.SpanStart, body.Span.End))
+		{
+			context.Arena.Synthetic(SyntheticText.Space);
+			using (context.Arena.ForceFlat())
+				Node.Print(body, context);
+			return;
+		}
+
+		BeforeOpenBrace(construct, context);
+		Node.Print(body, context);
 	}
 
 	/// <summary>

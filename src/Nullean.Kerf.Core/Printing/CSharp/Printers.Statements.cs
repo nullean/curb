@@ -25,8 +25,7 @@ internal static partial class Printers
 
 		if (statement is BlockSyntax)
 		{
-			BeforeOpenBrace(BraceStyle.ControlBlocks, context);
-			Node.Print(statement, context);
+			PrintBody(statement, BraceStyle.ControlBlocks, context);
 			return;
 		}
 
@@ -193,8 +192,7 @@ internal static partial class Printers
 		var arena = context.Arena;
 
 		TokenPrinter.Print(node.TryKeyword, context);
-		BeforeOpenBrace(BraceStyle.ControlBlocks, context);
-		Node.Print(node.Block, context);
+		PrintBody(node.Block, BraceStyle.ControlBlocks, context);
 
 		foreach (var catchClause in node.Catches)
 		{
@@ -230,8 +228,7 @@ internal static partial class Printers
 				TokenPrinter.Print(catchClause.Filter.CloseParenToken, context);
 			}
 
-			BeforeOpenBrace(BraceStyle.ControlBlocks, context);
-			Node.Print(catchClause.Block, context);
+			PrintBody(catchClause.Block, BraceStyle.ControlBlocks, context);
 		}
 
 		if (node.Finally is null)
@@ -239,8 +236,7 @@ internal static partial class Printers
 
 		BeforeContinuation(context.Options.NewLineBeforeFinally, true, context);
 		TokenPrinter.Print(node.Finally.FinallyKeyword, context);
-		BeforeOpenBrace(BraceStyle.ControlBlocks, context);
-		Node.Print(node.Finally.Block, context);
+		PrintBody(node.Finally.Block, BraceStyle.ControlBlocks, context);
 	}
 
 	public static void UsingStatement(UsingStatementSyntax node, PrintContext context)
@@ -308,8 +304,7 @@ internal static partial class Printers
 	public static void UnsafeStatement(UnsafeStatementSyntax node, PrintContext context)
 	{
 		TokenPrinter.Print(node.UnsafeKeyword, context);
-		BeforeOpenBrace(BraceStyle.ControlBlocks, context);
-		Node.Print(node.Block, context);
+		PrintBody(node.Block, BraceStyle.ControlBlocks, context);
 	}
 
 	public static void LockStatement(LockStatementSyntax node, PrintContext context)
@@ -338,7 +333,22 @@ internal static partial class Printers
 			Node.Print(node.Expression, context);
 		}
 
-		BeforeOpenBrace(BraceStyle.ControlBlocks, context);
+		var oneLine = KeepsOneLine(node.OpenBraceToken, node.CloseBraceToken, context);
+
+		using (arena.ForceFlatIf(oneLine))
+		{
+			if (oneLine)
+				arena.Synthetic(SyntheticText.Space);
+			else
+				BeforeOpenBrace(BraceStyle.ControlBlocks, context);
+
+			PrintSwitchBody(node, context);
+		}
+	}
+
+	private static void PrintSwitchBody(SwitchStatementSyntax node, PrintContext context)
+	{
+		var arena = context.Arena;
 		TokenPrinter.Print(node.OpenBraceToken, context);
 
 		foreach (var section in node.Sections)
@@ -426,8 +436,7 @@ internal static partial class Printers
 
 		if (node.Body is not null)
 		{
-			BeforeOpenBrace(BraceStyle.LocalFunctions, context);
-			Node.Print(node.Body, context);
+			PrintBody(node.Body, BraceStyle.LocalFunctions, context);
 			return;
 		}
 

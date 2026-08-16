@@ -104,6 +104,9 @@ internal sealed class DocArena
 
 	public DocScope ForceFlat() => Open(new Doc(DocKind.ForceFlat));
 
+	/// <summary>Opens a force-flat scope only when <paramref name="condition"/> holds.</summary>
+	public DocScope ForceFlatIf(bool condition) => condition ? ForceFlat() : default;
+
 	public DocScope AlwaysFits() => Open(new Doc(DocKind.AlwaysFits));
 
 	/// <summary>

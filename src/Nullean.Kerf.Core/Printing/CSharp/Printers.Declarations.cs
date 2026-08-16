@@ -215,8 +215,7 @@ internal static partial class Printers
 
 		if (node.Body is not null)
 		{
-			BeforeOpenBrace(BraceStyle.Accessors, context);
-			Node.Print(node.Body, context);
+			PrintBody(node.Body, BraceStyle.Accessors, context);
 			return;
 		}
 
@@ -255,8 +254,7 @@ internal static partial class Printers
 
 		if (node.Body is not null)
 		{
-			BeforeOpenBrace(BraceStyle.Methods, context);
-			Node.Print(node.Body, context);
+			PrintBody(node.Body, BraceStyle.Methods, context);
 			return;
 		}
 

@@ -190,6 +190,26 @@ public readonly record struct FormatOptions
 	/// </remarks>
 	public bool NewLineBetweenQueryExpressionClauses { get; init; }
 
+	/// <summary>
+	/// Keep a brace pair the author wrote on one line on one line.
+	/// <c>csharp_preserve_single_line_blocks</c>, default true.
+	/// </summary>
+	/// <remarks>
+	/// <para>
+	/// This is the option that makes Kerf's output depend on its input, and it is on by default
+	/// because that is what dotnet format does. <c>void M() { }</c> stays as written rather than
+	/// being expanded to three lines, which is the difference between a formatter you can adopt on
+	/// an existing repository and one that rewrites all of it.
+	/// </para>
+	/// <para>
+	/// Preserving wins over both <see cref="NewLineBeforeOpenBrace"/> and
+	/// <see cref="MaxLineLength"/>: a preserved block keeps its brace on the header line and is not
+	/// reflowed. Kerf stays idempotent — running it twice changes nothing — but it is deliberately
+	/// not canonicalising, which is correct IDE0055 behaviour.
+	/// </para>
+	/// </remarks>
+	public bool PreserveSingleLineBlocks { get; init; } = true;
+
 	/// <summary>Indent the statements under a <c>case</c> label. <c>csharp_indent_case_contents</c>, default true.</summary>
 	public bool IndentCaseContents { get; init; } = true;
 

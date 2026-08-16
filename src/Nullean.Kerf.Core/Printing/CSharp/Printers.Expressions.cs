@@ -317,8 +317,7 @@ internal static partial class Printers
 
 		if (block is not null)
 		{
-			BeforeOpenBrace(BraceStyle.Lambdas, context);
-			Node.Print(block, context);
+			PrintBody(block, BraceStyle.Lambdas, context);
 			return;
 		}
 
@@ -351,8 +350,7 @@ internal static partial class Printers
 			Node.Print(node.ParameterList, context);
 		}
 
-		BeforeOpenBrace(BraceStyle.AnonymousMethods, context);
-		Node.Print(node.Block, context);
+		PrintBody(node.Block, BraceStyle.AnonymousMethods, context);
 	}
 
 	public static void AnonymousObjectCreationExpression(AnonymousObjectCreationExpressionSyntax node, PrintContext context)
