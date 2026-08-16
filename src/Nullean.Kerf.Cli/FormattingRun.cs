@@ -18,17 +18,41 @@ internal static class FormattingRun
 	private static string SkippedText(int skipped) =>
 		skipped == 0 ? "" : string.Create(CultureInfo.InvariantCulture, $"{skipped} skipped, ");
 
-	public static int Execute(IFileSystem fileSystem, string target, bool write, bool expandUnhandled = false, bool? verify = null, bool coverageReport = false)
+	/// <param name="fileSystem">Abstracted so a run can be driven entirely in memory by a test.</param>
+	/// <param name="target">A file or directory to walk. Ignored when <paramref name="explicitFiles"/> is given.</param>
+	/// <param name="write">Format in place, rather than only reporting what would change.</param>
+	/// <param name="expandUnhandled">Benchmark-only cost model; see <c>PrintContext.ExpandUnhandled</c>.</param>
+	/// <param name="verify">Re-parse output to prove the token stream is unchanged. On by default.</param>
+	/// <param name="coverageReport">Report which syntax kinds are still emitted verbatim.</param>
+	/// <param name="explicitFiles">
+	/// The exact files to work on, instead of walking <paramref name="target"/>. What the MSBuild
+	/// integration passes: a project's compile set is not the same thing as the C# files under its
+	/// folder — it can exclude some, and link others in from outside — so formatting the directory
+	/// would reach files belonging to another project, or to none.
+	/// </param>
+	public static int Execute(
+		IFileSystem fileSystem,
+		string target,
+		bool write,
+		bool expandUnhandled = false,
+		bool? verify = null,
+		bool coverageReport = false,
+		string[]? explicitFiles = null)
 	{
-		var root = fileSystem.Path.GetFullPath(target);
-
 		// On by default for both commands: the printer tracks whether it actually put a token
 		// boundary at risk, so on code that does not, the second parse never happens.
 		var verifyRoundTrip = verify ?? true;
 
-		var files = fileSystem.Directory.Exists(root)
-			? fileSystem.Directory.EnumerateFiles(root, "*.cs", SearchOption.AllDirectories).Where(IsFormattable).ToArray()
-			: [root];
+		string[] files;
+		if (explicitFiles is not null)
+			files = explicitFiles;
+		else
+		{
+			var root = fileSystem.Path.GetFullPath(target);
+			files = fileSystem.Directory.Exists(root)
+				? [.. fileSystem.Directory.EnumerateFiles(root, "*.cs", SearchOption.AllDirectories).Where(IsFormattable)]
+				: [root];
+		}
 
 		var editorConfig = new KerfEditorConfig(fileSystem);
 

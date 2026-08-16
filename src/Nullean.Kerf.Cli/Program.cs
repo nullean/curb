@@ -12,6 +12,7 @@ if (args.Length == 0 || args[0] is "-h" or "--help")
 	Console.WriteLine();
 	Console.WriteLine("  kerf format <path>         format files in place");
 	Console.WriteLine("  kerf check <path>          exit non-zero if anything would change");
+	Console.WriteLine("  --files <list>             work on the paths listed in a file, one per line");
 	Console.WriteLine("  kerf print-config <file>   show the resolved options and any diagnostics");
 	Console.WriteLine("  kerf doc-tree <file>       dump the document IR for a file");
 	Console.WriteLine("  kerf --version");
@@ -28,17 +29,37 @@ if (args[0] is "--version" or "-v")
 
 var fileSystem = new FileSystem();
 
+// `--files <list>` names a file holding one path per line. The MSBuild integration writes one from
+// @(Compile) rather than handing over a folder, and a command line long enough to hold a real
+// project's compile set is a command line some shells refuse.
+string[]? explicitFiles = null;
+var filesFlag = Array.IndexOf(args, "--files");
+if (filesFlag >= 0)
+{
+	if (filesFlag + 1 >= args.Length)
+	{
+		Console.Error.WriteLine("--files needs the path of a file listing one source path per line");
+		return 3;
+	}
+
+	explicitFiles = [.. fileSystem.File.ReadAllLines(args[filesFlag + 1])
+		.Select(line => line.Trim())
+		.Where(line => line.Length > 0)];
+}
+
 switch (args[0])
 {
-	case "format" when args.Length > 1:
-		return FormattingRun.Execute(fileSystem, args[1], write: true,
-			verify: !args.Contains("--no-verify"));
+	case "format" when args.Length > 1 || explicitFiles is not null:
+		return FormattingRun.Execute(fileSystem, explicitFiles is null ? args[1] : ".", write: true,
+			verify: !args.Contains("--no-verify"),
+			explicitFiles: explicitFiles);
 
-	case "check" when args.Length > 1:
-		return FormattingRun.Execute(fileSystem, args[1], write: false,
+	case "check" when args.Length > 1 || explicitFiles is not null:
+		return FormattingRun.Execute(fileSystem, explicitFiles is null ? args[1] : ".", write: false,
 			expandUnhandled: args.Contains("--expand-unhandled"),
 			verify: !args.Contains("--no-verify"),
-			coverageReport: args.Contains("--coverage"));
+			coverageReport: args.Contains("--coverage"),
+			explicitFiles: explicitFiles);
 
 	case "doc-tree" when args.Length > 1:
 		{

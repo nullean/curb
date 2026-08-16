@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    A build-only package: no library, no lib/ folder, nothing that ends up in a consumer's output.
+    All it carries is the props and targets, plus a runtime.json so NuGet resolves the one native
+    binary matching the machine doing the build rather than all five.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+    <DevelopmentDependency>true</DevelopmentDependency>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+
+    <!-- Nothing here is compiled, so the AOT analyser has nothing to analyse. -->
+    <IsAotCompatible>false</IsAotCompatible>
+    <EnableAotAnalyzer>false</EnableAotAnalyzer>
+
+    <PackageId>Nullean.Kerf.MSBuild</PackageId>
+    <Title>kerf for MSBuild: format before the compiler runs</Title>
+    <Description>Runs kerf before CoreCompile, so EnforceCodeStyleInBuild only reports what a formatter cannot fix.</Description>
+    <PackageTags>csharp;formatter;editorconfig;msbuild;ide0055</PackageTags>
+    <NoWarn>$(NoWarn);NU5128</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="build/**" Pack="true" PackagePath="build/" />
+    <None Include="../../README.md" Pack="true" PackagePath="README.md" />
+    <None Include="../../nuget-icon.png" Pack="true" PackagePath="nuget-icon.png" />
+  </ItemGroup>
+
+</Project>

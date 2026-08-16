@@ -31,6 +31,7 @@ let mapProjectToNuget =
     Map.empty
         .Add("Nullean.Kerf.Core", "Nullean.Kerf.Core")
         .Add("Nullean.Kerf.EditorConfig", "Nullean.Kerf.EditorConfig")
+        .Add("Nullean.Kerf.MSBuild", "Nullean.Kerf.MSBuild")
 
 let mapNugetToTFM = Map.empty<string, string>
 

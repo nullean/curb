@@ -19,6 +19,7 @@
     <Project Path="src/Nullean.Kerf.Core/Nullean.Kerf.Core.csproj" />
     <Project Path="src/Nullean.Kerf.EditorConfig/Nullean.Kerf.EditorConfig.csproj" />
     <Project Path="src/Nullean.Kerf.Cli/Nullean.Kerf.Cli.csproj" />
+    <Project Path="src/Nullean.Kerf.MSBuild/Nullean.Kerf.MSBuild.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <File Path="tests/Directory.Build.props" />

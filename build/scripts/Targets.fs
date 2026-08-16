@@ -211,6 +211,65 @@ let private perf (arguments:ParseResults<Arguments>) =
         failwithf "allocated %.1fx the source size, above the permitted %.1fx" ratio ceiling
     | _ -> printfn "allocated %.1fx the source size" ratio
 
+/// Proves the MSBuild integration does the one thing it exists for: format before the compiler.
+///
+/// The assertion is deliberately two-sided. Building the sample with Kerf must succeed even though
+/// IDE0055 is escalated to an error and the source is deliberately misformatted; building it with
+/// Kerf bypassed must fail with those same errors. Only the pair proves anything — the first alone
+/// would pass just as well if the analysers were never running.
+let private msbuildSmoketest (arguments:ParseResults<Arguments>) =
+    let rid =
+        let os =
+            if OperatingSystem.IsWindows() then "win"
+            elif OperatingSystem.IsMacOS() then "osx"
+            else "linux"
+        let arch =
+            match Runtime.InteropServices.RuntimeInformation.ProcessArchitecture with
+            | Runtime.InteropServices.Architecture.Arm64 -> "arm64"
+            | Runtime.InteropServices.Architecture.X64 -> "x64"
+            | other -> failwithf "no RID mapping for %O" other
+        sprintf "%s-%s" os arch
+
+    exec "dotnet" ["publish"; "src/Nullean.Kerf.Cli"; "-c"; "Release"; "-r"; rid] |> ignore
+
+    let binary =
+        let name = if OperatingSystem.IsWindows() then "Nullean.Kerf.Cli.exe" else "Nullean.Kerf.Cli"
+        Path.GetFullPath(Path.Combine(".artifacts", "publish", "Nullean.Kerf.Cli", sprintf "release_%s" rid, name))
+
+    let sample = Path.Combine("examples", "kerf-msbuild-smoketest")
+    let source = Path.Combine(sample, "Program.cs")
+    let pristine = Path.Combine(sample, "Program.unformatted")
+
+    let build (extra: string list) =
+        File.Copy(pristine, source, true)
+        // File.Copy carries the source's timestamp across, which can leave the restored file looking
+        // older than the incremental stamp from a previous run — so the target would skip and the
+        // assertion below would blame the formatter for the harness's mistake.
+        File.SetLastWriteTimeUtc(source, DateTime.UtcNow)
+        let args = ["build"; sample; "-c"; "Debug"; "--nologo"] @ extra
+        let result = Proc.Start("dotnet", List.toArray args)
+        let output = result.ConsoleOut |> Seq.map (fun l -> l.Line) |> String.concat "\n"
+        result.ExitCode, output
+
+    printfn "building the sample with Kerf"
+    let withKerfCode, withKerfOutput = build [sprintf "-p:Kerf_Exe=%s" binary]
+    if withKerfCode <> 0 then
+        failwithf "the sample must build with Kerf in the way, but it failed:\n%s" withKerfOutput
+    if not (File.ReadAllText(source).Contains("public static int Run(int x)")) then
+        failwithf "Kerf did not reformat the sample before the compiler read it"
+
+    printfn "building the sample with Kerf bypassed"
+    let bypassedCode, bypassedOutput = build ["-p:Kerf_Bypass=true"]
+    if bypassedCode = 0 then
+        failwith "the sample built clean without Kerf, so the check proves nothing — is EnforceCodeStyleInBuild still on?"
+    if not (bypassedOutput.Contains "IDE0055") then
+        failwithf "expected IDE0055 errors without Kerf, got:\n%s" bypassedOutput
+
+    // Leave the sample misformatted, which is how it is checked in.
+    File.Copy(pristine, source, true)
+    printfn ""
+    printfn "MSBuild integration verified: formatted before CoreCompile, and IDE0055 fails without it"
+
 let private generatePackages (arguments:ParseResults<Arguments>) =
     let output = Paths.RootRelative Paths.Output.FullName
     if not Paths.Output.Exists then Paths.Output.Create()
@@ -341,6 +400,7 @@ let Setup (parsed:ParseResults<Arguments>) (subCommand:Arguments) =
     cmd Benchmark.Name (Some [Build.Name]) None <| fun _ -> benchmark parsed
     cmd Conformance.Name (Some [Build.Name]) None <| fun _ -> conformance parsed
     cmd Perf.Name (Some [Build.Name]) None <| fun _ -> perf parsed
+    cmd MsbuildSmoketest.Name (Some [Build.Name]) None <| fun _ -> msbuildSmoketest parsed
 
     step PristineCheck.Name pristineCheck
     step GeneratePackages.Name generatePackages

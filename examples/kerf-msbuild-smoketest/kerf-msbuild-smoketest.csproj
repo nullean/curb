@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Proves the claim the MSBuild integration is built on: Kerf runs early enough that
+    EnforceCodeStyleInBuild has nothing left to report. The source next to this file is deliberately
+    misformatted, IDE0055 is escalated to an error, and the build is expected to succeed — which it
+    only can if Kerf rewrote the file before CoreCompile read it.
+
+    Excluded from the solution build; driven by ./build.sh msbuild-smoketest, which points Kerf_Exe
+    at the freshly published binary.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <IsPackable>false</IsPackable>
+    <IsAotCompatible>false</IsAotCompatible>
+    <EnableAotAnalyzer>false</EnableAotAnalyzer>
+  </PropertyGroup>
+
+  <Import Project="../../src/Nullean.Kerf.MSBuild/build/Nullean.Kerf.MSBuild.props" />
+  <Import Project="../../src/Nullean.Kerf.MSBuild/build/Nullean.Kerf.MSBuild.targets" />
+
+</Project>
