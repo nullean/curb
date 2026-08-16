@@ -2,6 +2,16 @@ using Nullean.Kerf.Options;
 
 namespace Nullean.Kerf;
 
+/// <summary>What <c>csharp_style_namespace_declarations</c> asks for.</summary>
+public enum NamespaceStyle
+{
+	/// <summary>Leave the declaration in whichever form it was written. The default.</summary>
+	AsWritten,
+
+	/// <summary>Turn an eligible block namespace into a file-scoped one.</summary>
+	FileScoped,
+}
+
 /// <summary>What <c>csharp_prefer_braces</c> asks for.</summary>
 public enum BraceRequirement
 {
@@ -382,6 +392,29 @@ public readonly record struct FormatOptions
 	/// </para>
 	/// </remarks>
 	public BraceRequirement PreferBraces { get; init; } = BraceRequirement.AsWritten;
+
+	/// <summary>
+	/// Whether a block namespace should be rewritten as a file-scoped one.
+	/// </summary>
+	/// <remarks>
+	/// <para>
+	/// <c>csharp_style_namespace_declarations</c>, code style rule IDE0161. Another real key that
+	/// <c>dotnet format style</c> can only apply with a workspace behind it, and the one with the
+	/// largest visible effect: the whole file comes back an indent level.
+	/// </para>
+	/// <para>
+	/// One direction only. <c>file_scoped</c> converts; <c>block</c> is accepted and does nothing,
+	/// because a file-scoped namespace is already the form the compiler and every modern template
+	/// prefer, and putting the braces back would indent an entire file to no end.
+	/// </para>
+	/// <para>
+	/// Conversion is refused unless the file is eligible: the namespace has to be the compilation
+	/// unit's only member and contain no namespace of its own. A file-scoped namespace takes
+	/// everything after it, so a type declared beside the namespace, or a second namespace, changes
+	/// what the code means rather than how it looks.
+	/// </para>
+	/// </remarks>
+	public NamespaceStyle NamespaceStyle { get; init; }
 
 	/// <summary>True when either trailing-comma option asked for anything.</summary>
 	/// <remarks>

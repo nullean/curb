@@ -125,12 +125,12 @@ public sealed class CSharpFormatter : IDisposable
 
 		if (!ContentVerifier.Verify(
 			source.AsSpan(), written, out var failure, context.ReorderedSpans, options.RewritesTrailingCommas,
-			context.BracesAdded))
+			context.BracesAdded, context.NamespaceUnwrapped))
 			return new FormatResult(FormatStatus.VerificationFailed, false, null, context.Coverage, failure);
 
 		// The second parse only ever finds a moved token boundary, and the printer already knows
 		// whether it created that risk. Where it did not, the check is provably redundant.
-		var reordered = context.ReorderedSpans is not null || context.BracesAdded;
+		var reordered = context.ReorderedSpans is not null || context.BracesAdded || context.NamespaceUnwrapped;
 		verifyRoundTrip = verifyRoundTrip && (forceRoundTrip || reordered || _printer.RoundTripAtRisk);
 
 		var changed = !written.SequenceEqual(source.AsSpan());
@@ -142,7 +142,7 @@ public sealed class CSharpFormatter : IDisposable
 			if (!TokenStreamComparer.Verify(
 				parsed.Root, source.AsSpan(), text!, out var roundTripFailure,
 				context.UsingsReordered, options.RewritesTrailingCommas, context.ModifiersReordered,
-				context.BracesAdded))
+				context.BracesAdded, context.NamespaceUnwrapped))
 				return new FormatResult(FormatStatus.VerificationFailed, false, null, context.Coverage, roundTripFailure);
 		}
 

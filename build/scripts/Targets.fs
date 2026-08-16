@@ -188,17 +188,23 @@ let private perf (arguments:ParseResults<Arguments>) =
             let result = Proc.Start(binary, "check", corpus.FullName)
             started.Stop()
             let output = result.ConsoleOut |> Seq.map (fun l -> l.Line) |> String.concat "\n"
-            started.Elapsed.TotalMilliseconds, output ]
+            let ratio =
+                let matched = Text.RegularExpressions.Regex.Match(output, @"\(([0-9.]+)x source\)")
+                if matched.Success then Double.Parse(matched.Groups.[1].Value, Globalization.CultureInfo.InvariantCulture)
+                else failwithf "could not read the allocation ratio from:\n%s" output
+            started.Elapsed.TotalMilliseconds, ratio, output ]
 
-    let elapsed, output = runs |> List.minBy fst
+    let elapsed, _, output = runs |> List.minBy (fun (ms, _, _) -> ms)
     printfn ""
     printfn "%s" output
     printfn "best of %d runs: %.0f ms wall" runs.Length elapsed
 
-    let ratio =
-        let matched = Text.RegularExpressions.Regex.Match(output, @"\(([0-9.]+)x source\)")
-        if matched.Success then Double.Parse(matched.Groups.[1].Value, Globalization.CultureInfo.InvariantCulture)
-        else failwithf "could not read the allocation ratio from:\n%s" output
+    // Best of the runs on the gated measurement too. This used to read the ratio out of whichever
+    // run happened to be *fastest*, which pairs the two measurements arbitrarily — and allocation is
+    // not quite as deterministic as the note above claims, since `check` partitions the corpus across
+    // threads and the partitioning varies. On this machine the spread is about 0.4x, which was enough
+    // to make a gate at 30x pass or fail on the same code depending on which run won the stopwatch.
+    let ratio = runs |> List.map (fun (_, r, _) -> r) |> List.min
 
     match arguments.TryGetResult MaxAllocationRatio with
     | Some ceiling when ratio > ceiling ->

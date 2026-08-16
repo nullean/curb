@@ -50,6 +50,9 @@ internal sealed class PrintContext(DocArena arena, SourceText text, FormatOption
 	/// <summary>True when a body was given braces the source did not have.</summary>
 	public bool BracesAdded { get; set; }
 
+	/// <summary>True when a block namespace was rewritten as a file-scoped one.</summary>
+	public bool NamespaceUnwrapped { get; set; }
+
 	/// <summary>
 	/// Regions the file suppressed with <c>#pragma warning disable IDE0055</c>, or null for none.
 	/// </summary>

@@ -45,7 +45,8 @@ internal static class TokenStreamComparer
 		bool usingsReordered = false,
 		bool trailingCommas = false,
 		bool modifiersReordered = false,
-		bool bracesAdded = false)
+		bool bracesAdded = false,
+		bool namespaceUnwrapped = false)
 	{
 		if (!CSharpSource.TryParse(formatted, out var reparsed, out var errors))
 		{
@@ -82,6 +83,9 @@ internal static class TokenStreamComparer
 		// Braces the output has and the source does not, counted so they have to balance.
 		var braceDebt = 0;
 
+		// The block namespace's closing brace, owed once its opening brace became a semicolon.
+		var namespaceBraceOwed = false;
+
 		while (true)
 		{
 			// The using block has been checked as a set; walking it in order would only re-discover
@@ -90,11 +94,26 @@ internal static class TokenStreamComparer
 			var hasProduced = carryProduced || Next(produced, producedUsings, out after);
 			carryOriginal = carryProduced = false;
 
+			// The owed closing brace, when it is the last thing in the file and the output has already
+			// finished.
+			if (namespaceUnwrapped && namespaceBraceOwed && hasOriginal && !hasProduced
+				&& before.RawKind == (int)SyntaxKind.CloseBraceToken)
+			{
+				namespaceBraceOwed = false;
+				continue;
+			}
+
 			if (!hasOriginal && !hasProduced)
 			{
 				if (braceDebt != 0)
 				{
 					failure = $"formatting left {braceDebt} added brace(s) unbalanced";
+					return false;
+				}
+
+				if (namespaceBraceOwed)
+				{
+					failure = "formatting opened a file-scoped namespace but left its block's brace unaccounted for";
 					return false;
 				}
 
@@ -121,6 +140,29 @@ internal static class TokenStreamComparer
 			{
 				failure = $"formatting lost the token at position {index}: '{Text(originalText, before)}'";
 				return false;
+			}
+
+			// The namespace conversion: `{` became `;`, and the matching `}` is then owed. Permitted
+			// once, so a brace lost anywhere else is still a lost brace.
+			if (namespaceUnwrapped && hasOriginal && hasProduced)
+			{
+				if (!namespaceBraceOwed
+					&& before.RawKind == (int)SyntaxKind.OpenBraceToken
+					&& after.RawKind == (int)SyntaxKind.SemicolonToken)
+				{
+					namespaceBraceOwed = true;
+					index++;
+					continue;
+				}
+
+				if (namespaceBraceOwed
+					&& before.RawKind == (int)SyntaxKind.CloseBraceToken
+					&& after.RawKind != (int)SyntaxKind.CloseBraceToken)
+				{
+					namespaceBraceOwed = false;
+					carryProduced = true;
+					continue;
+				}
 			}
 
 			// A brace the output added, held to balancing for the same reason as in the content check.

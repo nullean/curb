@@ -97,6 +97,7 @@ public static class OptionCatalog
 			// IDE0036 and IDE0011, which dotnet format can only apply with a full compilation.
 			"csharp_preferred_modifier_order",
 			"csharp_prefer_braces",
+			"csharp_style_namespace_declarations",
 
 			// Not IDE0055 options: the two native ways a file says it should not be formatted.
 			"generated_code",

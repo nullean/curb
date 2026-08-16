@@ -234,6 +234,24 @@ public static class EditorConfigOptionsBinder
 
 		// IDE0036. Presence is the ask: the key has a documented default value, so binding it whether
 		// or not it was written would reorder a repository that never mentioned it.
+		if (properties.TryGetValue("csharp_style_namespace_declarations", out var namespaceStyle))
+		{
+			var colon = namespaceStyle.LastIndexOf(':');
+			switch ((colon >= 0 ? namespaceStyle[..colon] : namespaceStyle).Trim().ToLowerInvariant())
+			{
+				case "file_scoped":
+					options = options with { NamespaceStyle = NamespaceStyle.FileScoped };
+					break;
+				case "block":
+					// Accepted, and deliberately inert: see FormatOptions.NamespaceStyle.
+					break;
+				default:
+					diagnostics?.Add(KerfDiagnostic.UnrecognisedValue(
+						"csharp_style_namespace_declarations", namespaceStyle, "file_scoped or block"));
+					break;
+			}
+		}
+
 		if (properties.TryGetValue("csharp_prefer_braces", out var preferBraces))
 		{
 			var colon = preferBraces.LastIndexOf(':');

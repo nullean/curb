@@ -41,6 +41,10 @@ internal static class ContentVerifier
 	/// The trailing-comma options are on, so a <c>,</c> immediately before a closing brace or bracket
 	/// may appear on one side and not the other.
 	/// </param>
+	/// <param name="namespaceUnwrapped">
+	/// A block namespace was rewritten as a file-scoped one, so its <c>{</c> reads as <c>;</c> in the
+	/// output and its <c>}</c> is not there at all. Permitted once, and the two halves have to agree.
+	/// </param>
 	/// <param name="bracesAdded">
 	/// A control-flow body was given braces, so the output carries <c>{</c> and <c>}</c> the source
 	/// does not. They are counted rather than merely allowed: an opening brace with no closing one, or
@@ -52,7 +56,8 @@ internal static class ContentVerifier
 		out string? failure,
 		IReadOnlyList<TextSpan>? reordered = null,
 		bool trailingCommas = false,
-		bool bracesAdded = false)
+		bool bracesAdded = false,
+		bool namespaceUnwrapped = false)
 	{
 		var sourceIndex = 0;
 		var outputIndex = 0;
@@ -60,6 +65,9 @@ internal static class ContentVerifier
 
 		// Braces the output has and the source does not, counted so they have to balance.
 		var braceDebt = 0;
+
+		// The block namespace's closing brace, owed once its opening brace became a semicolon.
+		var namespaceBraceOwed = false;
 
 		while (true)
 		{
@@ -91,6 +99,29 @@ internal static class ContentVerifier
 			var sourceDone = sourceIndex >= source.Length;
 			var outputDone = outputIndex >= output.Length;
 
+			// The namespace conversion, which is a substitution and a deletion rather than an
+			// insertion: `namespace N {` became `namespace N;`, and the matching `}` is then owed.
+			// Both halves are permitted exactly once, so a stray brace elsewhere is still damage.
+			if (namespaceUnwrapped)
+			{
+				if (!sourceDone && !outputDone
+					&& source[sourceIndex] == '{' && output[outputIndex] == ';' && !namespaceBraceOwed)
+				{
+					namespaceBraceOwed = true;
+					sourceIndex++;
+					outputIndex++;
+					continue;
+				}
+
+				if (!sourceDone && source[sourceIndex] == '}' && namespaceBraceOwed
+					&& (outputDone || output[outputIndex] != '}'))
+				{
+					namespaceBraceOwed = false;
+					sourceIndex++;
+					continue;
+				}
+			}
+
 			// A brace the output added. Stepping over it is safe only because everything else still
 			// has to match exactly and the pair has to balance: `if (a) Foo();` printed as `if (a) {}`
 			// fails, since after the braces the source still has `Foo();` and the output has nothing.
@@ -120,6 +151,12 @@ internal static class ContentVerifier
 				if (braceDebt != 0)
 				{
 					failure = $"formatting left {braceDebt} added brace(s) unbalanced";
+					return false;
+				}
+
+				if (namespaceBraceOwed)
+				{
+					failure = "formatting opened a file-scoped namespace but left its block's brace unaccounted for";
 					return false;
 				}
 

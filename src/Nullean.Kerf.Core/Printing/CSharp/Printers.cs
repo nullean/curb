@@ -185,6 +185,12 @@ internal static partial class Printers
 		TokenPrinter.Print(node.SemicolonToken, context);
 
 		var previousEnd = node.SemicolonToken.Span.End;
+
+		// Usings may sit inside a file-scoped namespace, and this printer used to walk only the
+		// members — so every such file was refused by the content verifier rather than formatted. None
+		// of the 1,196 corpus files puts a using there, which is why it went unnoticed.
+		PrintUsings(node, node.Usings, context, ref previousEnd);
+
 		foreach (var member in node.Members)
 		{
 			Separate(context, ref previousEnd, member);

@@ -37,6 +37,9 @@ public static class OptionValues
 
 		"csharp_trailing_comma_in_multiline_lists" => Bool(options.TrailingCommaInMultilineLists),
 		"csharp_trailing_comma_in_singleline_lists" => Bool(options.TrailingCommaInSinglelineLists),
+		"csharp_style_namespace_declarations" => options.NamespaceStyle == NamespaceStyle.FileScoped
+			? "file_scoped"
+			: "block   # namespaces are left as written; Kerf never adds the braces back",
 		"csharp_prefer_braces" => options.PreferBraces switch
 		{
 			BraceRequirement.Always => "true",
