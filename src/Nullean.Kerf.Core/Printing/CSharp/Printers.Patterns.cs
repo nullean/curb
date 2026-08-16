@@ -125,6 +125,7 @@ internal static partial class Printers
 	{
 		var arena = context.Arena;
 		TokenPrinter.Print(node.OpenBracketToken, context);
+		Spacing.InsideBrackets(context);
 
 		for (var i = 0; i < node.Patterns.Count; i++)
 		{
@@ -136,6 +137,7 @@ internal static partial class Printers
 			Spacing.AfterComma(context);
 		}
 
+		Spacing.InsideBrackets(context);
 		TokenPrinter.Print(node.CloseBracketToken, context);
 
 		if (node.Designation is null)
@@ -289,9 +291,15 @@ internal static partial class Printers
 	public static void ImplicitArrayCreationExpression(ImplicitArrayCreationExpressionSyntax node, PrintContext context)
 	{
 		TokenPrinter.Print(node.NewKeyword, context);
+		Spacing.BeforeOpenBracket(context);
 		TokenPrinter.Print(node.OpenBracketToken, context);
+		Spacing.InsideEmptyBrackets(context);
 		foreach (var comma in node.Commas)
+		{
 			TokenPrinter.Print(comma, context);
+			Spacing.InsideEmptyBrackets(context);
+		}
+
 		TokenPrinter.Print(node.CloseBracketToken, context);
 		InitializerExpression(node.Initializer, context, leadingLine: true);
 	}

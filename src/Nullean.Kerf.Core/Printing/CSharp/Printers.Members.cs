@@ -140,7 +140,9 @@ internal static partial class Printers
 
 	public static void BracketedParameterList(BracketedParameterListSyntax node, PrintContext context)
 	{
+		Spacing.BeforeOpenBracket(context);
 		TokenPrinter.Print(node.OpenBracketToken, context);
+		Spacing.InsideBrackets(context);
 
 		for (var i = 0; i < node.Parameters.Count; i++)
 		{
@@ -152,6 +154,7 @@ internal static partial class Printers
 			Spacing.AfterComma(context);
 		}
 
+		Spacing.InsideBrackets(context);
 		TokenPrinter.Print(node.CloseBracketToken, context);
 	}
 

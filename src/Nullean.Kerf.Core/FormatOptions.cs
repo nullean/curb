@@ -106,6 +106,15 @@ public readonly record struct FormatOptions
 	/// <summary><c>csharp_space_before_comma</c>, default false.</summary>
 	public bool SpaceBeforeComma { get; init; }
 
+	/// <summary><c>csharp_space_before_open_square_brackets</c>, default false.</summary>
+	public bool SpaceBeforeOpenSquareBrackets { get; init; }
+
+	/// <summary><c>csharp_space_between_empty_square_brackets</c>, default false.</summary>
+	public bool SpaceBetweenEmptySquareBrackets { get; init; }
+
+	/// <summary><c>csharp_space_between_square_brackets</c>, default false.</summary>
+	public bool SpaceBetweenSquareBrackets { get; init; }
+
 	/// <summary><c>csharp_space_before_dot</c>, default false.</summary>
 	public bool SpaceBeforeDot { get; init; }
 

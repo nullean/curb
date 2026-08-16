@@ -108,6 +108,15 @@ public static class EditorConfigOptionsBinder
 		if (TryBool(properties, "csharp_space_before_comma", diagnostics, out var spaceBeforeComma))
 			options = options with { SpaceBeforeComma = spaceBeforeComma };
 
+		if (TryBool(properties, "csharp_space_before_open_square_brackets", diagnostics, out var spaceBeforeBracket))
+			options = options with { SpaceBeforeOpenSquareBrackets = spaceBeforeBracket };
+
+		if (TryBool(properties, "csharp_space_between_empty_square_brackets", diagnostics, out var spaceInEmptyBrackets))
+			options = options with { SpaceBetweenEmptySquareBrackets = spaceInEmptyBrackets };
+
+		if (TryBool(properties, "csharp_space_between_square_brackets", diagnostics, out var spaceInBrackets))
+			options = options with { SpaceBetweenSquareBrackets = spaceInBrackets };
+
 		if (TryBool(properties, "csharp_space_before_dot", diagnostics, out var spaceBeforeDot))
 			options = options with { SpaceBeforeDot = spaceBeforeDot };
 

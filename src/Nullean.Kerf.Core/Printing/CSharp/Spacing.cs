@@ -122,6 +122,54 @@ internal static class Spacing
 	}
 
 	/// <summary>
+	/// Before an opening square bracket.
+	/// </summary>
+	/// <remarks>
+	/// Array types and creations, element access and indexer declarations only. An attribute list,
+	/// a collection expression and a list pattern all keep their bracket where it is, since the
+	/// thing before it is not something a bracket attaches to.
+	/// </remarks>
+	public static void BeforeOpenBracket(PrintContext context)
+	{
+		if (context.Options.SpaceBeforeOpenSquareBrackets)
+			context.Arena.Synthetic(SyntheticText.Space);
+	}
+
+	/// <summary>
+	/// Just inside a pair of brackets holding nothing — <c>int[ ]</c>.
+	/// </summary>
+	/// <remarks>
+	/// A rank specifier of a multi-dimensional array counts as empty even though it holds commas:
+	/// <c>int[,]</c> becomes <c>int[ , ]</c>, one space per slot. The comma options do not reach
+	/// those commas — there is nothing on either side of them for a comma to separate — so this
+	/// spaces them itself.
+	/// </remarks>
+	public static void InsideEmptyBrackets(PrintContext context)
+	{
+		if (context.Options.SpaceBetweenEmptySquareBrackets)
+			context.Arena.Synthetic(SyntheticText.Space);
+	}
+
+	/// <summary>Just inside a pair of brackets holding something — <c>a[ 0 ]</c>.</summary>
+	public static void InsideBrackets(PrintContext context)
+	{
+		if (context.Options.SpaceBetweenSquareBrackets)
+			context.Arena.Synthetic(SyntheticText.Space);
+	}
+
+	/// <summary>
+	/// Just inside a pair of brackets whose contents break one per line when they do not fit.
+	/// </summary>
+	/// <remarks>Same soft-versus-normal line reasoning as <see cref="AfterCommaBreakable"/>.</remarks>
+	public static void InsideBracketsBreakable(PrintContext context)
+	{
+		if (context.Options.SpaceBetweenSquareBrackets)
+			context.Arena.Line();
+		else
+			context.Arena.SoftLine();
+	}
+
+	/// <summary>
 	/// Before a binary or assignment operator.
 	/// </summary>
 	/// <remarks>

@@ -1,3 +1,4 @@
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Nullean.Kerf.Documents;
@@ -226,7 +227,7 @@ internal static partial class Printers
 			{
 				using (arena.Indent())
 				{
-					arena.SoftLine();
+					Spacing.InsideBracketsBreakable(context);
 					for (var i = 0; i < node.Elements.Count; i++)
 					{
 						Node.Print(node.Elements[i], context);
@@ -241,7 +242,8 @@ internal static partial class Printers
 							Spacing.AfterCommaBreakable(context);
 					}
 				}
-				arena.SoftLine();
+
+				Spacing.InsideBracketsBreakable(context);
 			}
 		}
 
@@ -369,7 +371,9 @@ internal static partial class Printers
 
 	public static void BracketedArgumentList(BracketedArgumentListSyntax node, PrintContext context)
 	{
+		Spacing.BeforeOpenBracket(context);
 		TokenPrinter.Print(node.OpenBracketToken, context);
+		Spacing.InsideBrackets(context);
 
 		for (var i = 0; i < node.Arguments.Count; i++)
 		{
@@ -381,6 +385,7 @@ internal static partial class Printers
 			Spacing.AfterComma(context);
 		}
 
+		Spacing.InsideBrackets(context);
 		TokenPrinter.Print(node.CloseBracketToken, context);
 	}
 
@@ -479,8 +484,27 @@ internal static partial class Printers
 
 	public static void ArrayRankSpecifier(ArrayRankSpecifierSyntax node, PrintContext context)
 	{
+		Spacing.BeforeOpenBracket(context);
 		TokenPrinter.Print(node.OpenBracketToken, context);
 
+		// `int[]` and `int[,]` alike declare a rank without sizing it, so both count as empty
+		// brackets: `int[ ]` and `int[ , ]`. Only `new int[2, 3]` holds expressions.
+		var declaresRankOnly = node.Sizes.All(size => size.IsKind(SyntaxKind.OmittedArraySizeExpression));
+
+		if (declaresRankOnly)
+		{
+			Spacing.InsideEmptyBrackets(context);
+			for (var i = 0; i < node.Sizes.SeparatorCount; i++)
+			{
+				TokenPrinter.Print(node.Sizes.GetSeparator(i), context);
+				Spacing.InsideEmptyBrackets(context);
+			}
+
+			TokenPrinter.Print(node.CloseBracketToken, context);
+			return;
+		}
+
+		Spacing.InsideBrackets(context);
 		for (var i = 0; i < node.Sizes.Count; i++)
 		{
 			Node.Print(node.Sizes[i], context);
@@ -491,6 +515,7 @@ internal static partial class Printers
 			Spacing.AfterComma(context);
 		}
 
+		Spacing.InsideBrackets(context);
 		TokenPrinter.Print(node.CloseBracketToken, context);
 	}
 
