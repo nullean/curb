@@ -148,6 +148,11 @@ internal sealed class DocPrinter
 					i++;
 					break;
 
+				case DocKind.ExternalText:
+					Emit(_arena.ExternalTexts[doc.A], doc.Flags, scope.SuppressWidth);
+					i++;
+					break;
+
 				case DocKind.Anchor:
 					_anchors[doc.A] = _column;
 					i++;
@@ -443,6 +448,10 @@ internal sealed class DocPrinter
 
 				case DocKind.SynText:
 					remaining -= TextWidth(SyntheticText.Get(doc.A));
+					break;
+
+				case DocKind.ExternalText:
+					remaining -= TextWidth(_arena.ExternalTexts[doc.A]);
 					break;
 
 				case DocKind.Line:

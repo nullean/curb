@@ -39,6 +39,7 @@ internal sealed class DocArena
 	{
 		_count = 0;
 		_nextGroupId = 1;
+		_externalTexts?.Clear();
 
 		var wanted = (int)(sourceLength * SlotsPerSourceChar);
 		if (wanted > _docs.Length)
@@ -59,6 +60,22 @@ internal sealed class DocArena
 
 	/// <summary>Emits one of the fixed <see cref="SyntheticText"/> strings.</summary>
 	public void Synthetic(int id) => Add(new Doc(DocKind.SynText, a: id));
+
+	/// <summary>Text the configuration supplied, such as a <c>file_header_template</c> line.</summary>
+	public void ExternalText(string text)
+	{
+		_externalTexts ??= [];
+		_externalTexts.Add(text);
+		Add(new Doc(DocKind.ExternalText, a: _externalTexts.Count - 1));
+	}
+
+	/// <summary>Emits a header comment line: <c>// </c> and the text, or a bare <c>//</c> when empty.</summary>
+	public void HeaderLine(string text) => ExternalText(text.Length == 0 ? "//" : "// " + text);
+
+	private List<string>? _externalTexts;
+
+	/// <summary>The configuration-supplied strings this document references.</summary>
+	public IReadOnlyList<string> ExternalTexts => (IReadOnlyList<string>?)_externalTexts ?? [];
 
 	/// <summary>A space when flat, a newline when broken.</summary>
 	public void Line(DocFlags flags = DocFlags.None) => AddLine(LineType.Normal, flags);

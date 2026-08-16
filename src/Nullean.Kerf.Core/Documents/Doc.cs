@@ -14,6 +14,18 @@ internal enum DocKind : byte
 	/// <summary>Text Kerf inserts itself. <c>A</c> = index into <see cref="SyntheticText"/>.</summary>
 	SynText,
 
+	/// <summary>
+	/// Text supplied by the configuration rather than by the source or the synthetic table.
+	/// <c>A</c> indexes <see cref="DocArena.ExternalTexts"/>.
+	/// </summary>
+	/// <remarks>
+	/// One user today: the <c>file_header_template</c> lines. Kept apart from
+	/// <see cref="SynText"/> because that table is a closed whitelist of the strings Kerf may invent,
+	/// and a licence header is not one of them — it is something the repository asked for by name,
+	/// and the verifier is told exactly what it was.
+	/// </remarks>
+	ExternalText,
+
 	/// <summary>A break opportunity. <c>A</c> = <see cref="LineType"/>.</summary>
 	Line,
 

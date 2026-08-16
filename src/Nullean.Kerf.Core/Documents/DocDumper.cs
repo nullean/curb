@@ -40,6 +40,10 @@ internal static class DocDumper
 					output.Append("syn ").Append(Quote(SyntheticText.Get(doc.A))).AppendLine();
 					break;
 
+				case DocKind.ExternalText:
+					output.Append("ext ").Append(Quote(arena.ExternalTexts[doc.A])).AppendLine();
+					break;
+
 				case DocKind.Line:
 					output.Append(doc.LineType switch
 					{

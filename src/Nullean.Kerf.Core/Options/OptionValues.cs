@@ -44,6 +44,7 @@ public static class OptionValues
 		"csharp_style_expression_bodied_accessors" => Expression(options.ExpressionBodiedAccessors),
 		"csharp_style_expression_bodied_properties" => Expression(options.ExpressionBodiedProperties),
 		"csharp_style_expression_bodied_indexers" => Expression(options.ExpressionBodiedIndexers),
+		"file_header_template" => options.FileHeaderTemplate ?? "   # no header is required",
 		"csharp_using_directive_placement" => options.UsingPlacement switch
 		{
 			UsingPlacement.InsideNamespace => "inside_namespace",

@@ -245,6 +245,11 @@ public static class EditorConfigOptionsBinder
 			ExpressionBodiedIndexers = ExpressionBody(properties, "indexers", diagnostics),
 		};
 
+		if (properties.TryGetValue("file_header_template", out var header)
+			&& !string.IsNullOrWhiteSpace(header)
+			&& !string.Equals(header, "unset", StringComparison.OrdinalIgnoreCase))
+			options = options with { FileHeaderTemplate = header };
+
 		if (properties.TryGetValue("csharp_using_directive_placement", out var usingPlacement))
 		{
 			var colon = usingPlacement.LastIndexOf(':');

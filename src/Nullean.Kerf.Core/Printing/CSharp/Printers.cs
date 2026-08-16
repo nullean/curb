@@ -24,6 +24,8 @@ internal static partial class Printers
 		var arena = context.Arena;
 		var previousEnd = -1;
 
+		PrintFileHeader(node, context);
+
 		// Source order is externs, then usings, then assembly-level attributes, then members.
 		// Emitting the attributes first reorders the file, which the content verifier rightly
 		// rejects -- and it moves the licence header that is attached to whatever comes first.
@@ -1296,6 +1298,54 @@ internal static partial class Printers
 			else
 				arena.HardLine();
 		}
+	}
+
+	/// <summary>
+	/// Emits <c>file_header_template</c> at the top of a file that has no header yet.
+	/// </summary>
+	/// <remarks>
+	/// Added, never replaced. Roslyn's fixer rewrites a header that differs from the template, but
+	/// telling "the wrong header" from "a comment that happens to lead the file" needs more than the
+	/// template to compare against, and deleting somebody's copyright notice because it was worded
+	/// differently is not a mistake worth risking. A file that already opens with a comment is left
+	/// alone.
+	/// </remarks>
+	private static void PrintFileHeader(CompilationUnitSyntax node, PrintContext context)
+	{
+		if (context.Options.FileHeaderTemplate is not { } template)
+			return;
+
+		var first = node.GetFirstToken(includeZeroWidth: true);
+		if (OpensWithAComment(first))
+			return;
+
+		var arena = context.Arena;
+
+		foreach (var line in template.Split("\\n"))
+		{
+			arena.HeaderLine(line);
+			arena.HardLine();
+		}
+
+		// The blank line under the block, which is what Roslyn's fixer writes.
+		arena.HardLine();
+		context.FileHeaderAdded = true;
+	}
+
+	private static bool OpensWithAComment(SyntaxToken first)
+	{
+		foreach (var trivia in first.LeadingTrivia)
+		{
+			if (trivia.Kind() is SyntaxKind.WhitespaceTrivia or SyntaxKind.EndOfLineTrivia)
+				continue;
+
+			// A directive at the top is not a header, so a file opening with `#if` can still get one.
+			return trivia.Kind() is SyntaxKind.SingleLineCommentTrivia
+				or SyntaxKind.MultiLineCommentTrivia
+				or SyntaxKind.SingleLineDocumentationCommentTrivia;
+		}
+
+		return false;
 	}
 
 	/// <summary>

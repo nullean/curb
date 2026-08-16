@@ -50,6 +50,11 @@ internal static class ContentVerifier
 	/// block's braces and its <c>return</c>; naming the spans keeps the rest of the file under the
 	/// strict compare instead of excusing the whole of it.
 	/// </param>
+	/// <param name="headerAdded">
+	/// A <c>file_header_template</c> the output opens with and the source did not have. Given as the
+	/// exact text, so the check is that the output starts with precisely this and nothing else was
+	/// invented — not a licence to prepend anything.
+	/// </param>
 	/// <param name="arrowsAdded">
 	/// How many <c>=&gt;</c> the output carries that the source does not. Exact rather than a flag,
 	/// so an extra arrow is still damage.
@@ -68,11 +73,16 @@ internal static class ContentVerifier
 		bool bracesAdded = false,
 		bool namespaceUnwrapped = false,
 		IReadOnlyList<TextSpan>? dropped = null,
-		int arrowsAdded = 0)
+		int arrowsAdded = 0,
+		string? headerAdded = null)
 	{
 		var sourceIndex = 0;
 		var outputIndex = 0;
 		var nextReordered = 0;
+
+		// The header, matched exactly and only at the start, before the two are walked together.
+		if (headerAdded is not null && !TakeHeader(output, headerAdded, ref outputIndex, out failure))
+			return false;
 
 		// Braces the output has and the source does not, counted so they have to balance.
 		var braceDebt = 0;
@@ -241,6 +251,36 @@ internal static class ContentVerifier
 			sourceIndex++;
 			outputIndex++;
 		}
+	}
+
+	/// <summary>
+	/// Consumes an inserted file header from the front of the output.
+	/// </summary>
+	/// <remarks>
+	/// Compared character for character against what the configuration asked for, ignoring only
+	/// whitespace, so this permits exactly the header the repository named and nothing else.
+	/// </remarks>
+	private static bool TakeHeader(ReadOnlySpan<char> output, string header, ref int outputIndex, out string? failure)
+	{
+		foreach (var expected in header)
+		{
+			if (IsSkippable(expected))
+				continue;
+
+			while (outputIndex < output.Length && IsSkippable(output[outputIndex]))
+				outputIndex++;
+
+			if (outputIndex >= output.Length || output[outputIndex] != expected)
+			{
+				failure = "the file header written does not match file_header_template";
+				return false;
+			}
+
+			outputIndex++;
+		}
+
+		failure = null;
+		return true;
 	}
 
 	/// <summary>

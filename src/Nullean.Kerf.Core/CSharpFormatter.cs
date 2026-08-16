@@ -126,7 +126,7 @@ public sealed class CSharpFormatter : IDisposable
 		if (!ContentVerifier.Verify(
 			source.AsSpan(), written, out var failure, context.ReorderedSpans, options.RewritesTrailingCommas,
 			context.BracesAdded, context.NamespaceUnwrapped,
-			context.DroppedSpans, context.ArrowsAdded))
+			context.DroppedSpans, context.ArrowsAdded, HeaderFor(context, options)))
 			return new FormatResult(FormatStatus.VerificationFailed, false, null, context.Coverage, failure);
 
 		// The second parse only ever finds a moved token boundary, and the printer already knows
@@ -155,6 +155,16 @@ public sealed class CSharpFormatter : IDisposable
 			context.Coverage,
 			null);
 	}
+
+	/// <summary>The header text the printer inserted, or null when it inserted none.</summary>
+	/// <remarks>
+	/// The comment markers and the newlines the printer put between the template's lines, since the
+	/// verifier compares what was written rather than what was configured.
+	/// </remarks>
+	private static string? HeaderFor(PrintContext context, in FormatOptions options) =>
+		context.FileHeaderAdded && options.FileHeaderTemplate is { } template
+			? string.Concat(template.Split("\\n").Select(line => line.Length == 0 ? "//" : "// " + line))
+			: null;
 
 	/// <summary>Returns the pooled buffers this formatter holds.</summary>
 	public void Dispose() => _output.Dispose();

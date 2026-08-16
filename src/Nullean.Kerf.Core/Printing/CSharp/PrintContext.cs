@@ -102,6 +102,9 @@ internal sealed class PrintContext(DocArena arena, SourceText text, FormatOption
 		return held;
 	}
 
+	/// <summary>True when a file header was inserted that the source did not have.</summary>
+	public bool FileHeaderAdded { get; set; }
+
 	/// <summary>True when a block namespace was rewritten as a file-scoped one.</summary>
 	public bool NamespaceUnwrapped { get; set; }
 

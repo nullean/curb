@@ -48,6 +48,11 @@ internal static class DocValidator
 						throw new DocArenaCorruptException($"doc {i} references synthetic text {doc.A}, which is not in the table");
 					break;
 
+				case DocKind.ExternalText:
+					if (doc.A < 0 || doc.A >= arena.ExternalTexts.Count)
+						throw new DocArenaCorruptException($"doc {i} references external text {doc.A}, which was never supplied");
+					break;
+
 				case DocKind.Line or DocKind.BreakParent or DocKind.Trim or DocKind.Null:
 					if (doc.Length != 1)
 						throw new DocArenaCorruptException($"doc {i} is a leaf ({doc.Kind}) but claims {doc.Length} slots");

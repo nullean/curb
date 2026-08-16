@@ -513,6 +513,28 @@ public readonly record struct FormatOptions
 	/// </remarks>
 	public UsingPlacement UsingPlacement { get; init; }
 
+	/// <summary>
+	/// <c>file_header_template</c>, code style rule IDE0073, or null when no header is required.
+	/// </summary>
+	/// <remarks>
+	/// <para>
+	/// The template's own lines are separated by a literal <c>\n</c> in the value, since an
+	/// EditorConfig value cannot span lines. Each becomes a <c>//</c> comment, and a blank line
+	/// follows the block — which is what Roslyn's fixer writes.
+	/// </para>
+	/// <para>
+	/// Kerf adds a missing header and never replaces one that is already there. Roslyn's fixer will
+	/// rewrite a header that differs from the template; telling "the wrong header" from "a comment
+	/// that happens to lead the file" needs more than the template to compare against, and deleting
+	/// somebody's copyright notice because it was worded differently is not a mistake worth risking.
+	/// </para>
+	/// <para>
+	/// An empty value means "no header", which Roslyn documents as the way to turn the rule off. It
+	/// is not the same as the key being absent, but it means the same thing here.
+	/// </para>
+	/// </remarks>
+	public string? FileHeaderTemplate { get; init; }
+
 	/// <summary>True when either trailing-comma option asked for anything.</summary>
 	/// <remarks>
 	/// Gates both the printer work and the verifier's allowance for a comma that appears or vanishes,
