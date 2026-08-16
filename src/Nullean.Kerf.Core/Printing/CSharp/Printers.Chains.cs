@@ -39,11 +39,16 @@ internal static partial class Printers
 		// Count before collecting. Most expressions that reach here are not chains at all, and the
 		// ones that are are usually two links; allocating a list and an array per call site to find
 		// that out costs more than the whole chain printer saves.
-		if (CountLinks(node) < MinimumLinksToBreak)
+		//
+		// The minimum governs whether Kerf *introduces* breaks, never whether it keeps the author's.
+		// Declining a two-link chain outright joined `x.SynonymGraph()\n.Synonyms(y)` back onto one
+		// line, and joining anything risks a line too long to break, which is what stopped a file
+		// settling after two runs.
+		if (CountLinks(node) < MinimumLinksToBreak && !SpansLines(node, context))
 			return false;
 
 		var links = CollectLinks(node, out var receiver);
-		if (links is null || links.Count < MinimumLinksToBreak)
+		if (links is null || (links.Count < MinimumLinksToBreak && !SpansLines(node, context)))
 			return false;
 
 		var arena = context.Arena;

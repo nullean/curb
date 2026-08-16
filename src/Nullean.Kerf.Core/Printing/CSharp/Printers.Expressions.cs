@@ -77,13 +77,21 @@ internal static partial class Printers
 		}
 
 		Node.Print(node.Left, context);
-		Spacing.BeforeOperator(context);
+
+		// A chain the author broke stays broken, with its operands level rather than gaining a
+		// continuation indent — that is where dotnet format leaves them.
+		//
+		// The break can be on either side of the operator, and both shapes are common: `a &&` at the
+		// end of a line, or `|| b` at the start of the next. Checking only after the operator missed
+		// the operator-first style entirely and joined those chains, which is what left two corpus
+		// files still reformatting themselves on a second run.
+		if (!context.OnSameLine(node.Left.Span.End, node.OperatorToken.SpanStart))
+			context.Arena.HardLine();
+		else
+			Spacing.BeforeOperator(context);
+
 		TokenPrinter.Print(node.OperatorToken, context);
 
-		// A condition the author broke across lines stays broken, and its operands stay level with
-		// each other rather than gaining a continuation indent — that is where dotnet format leaves
-		// them. Joining these was the last thing making Kerf non-idempotent: a three-line condition
-		// came back as one 162-column line, which the next run then broke somewhere else entirely.
 		if (!context.OnSameLine(node.OperatorToken.Span.End, node.Right.SpanStart))
 		{
 			context.Arena.HardLine();
