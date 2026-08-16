@@ -143,15 +143,23 @@ public class NamespaceStyleTests : FormattingTest
 		editorConfig: FileScoped);
 
 	[Test]
-	public Task A_namespace_that_is_already_file_scoped_is_untouched() => Unchanged(
-		// And its spacing is the author's: only a conversion introduces the blank line below.
+	public Task A_declaration_with_nothing_under_it_gains_the_blank_line() => Formats(
+		// dotnet format inserts this, so Kerf does too — with or without the key, since it is
+		// agreement rather than an opinion. Missing it was a real gap: the first project to consume
+		// the MSBuild package still failed IDE0055 on exactly this line after Kerf had run.
 		"""
 		namespace Alpha;
 		public class C
 		{
 		}
 		""",
-		editorConfig: FileScoped);
+		"""
+		namespace Alpha;
+
+		public class C
+		{
+		}
+		""");
 
 	// ---- what it refuses --------------------------------------------------------------------------
 

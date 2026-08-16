@@ -186,6 +186,20 @@ internal static partial class Printers
 
 		var previousEnd = node.SemicolonToken.Span.End;
 
+		// A blank line under the declaration, which dotnet format inserts and Kerf used to leave to
+		// the author. Every file in the corpus already had one, so nothing there disagreed; the first
+		// real project to consume the MSBuild package had a file that did not, and IDE0055 survived
+		// the build — which is precisely the thing that integration exists to make impossible.
+		if (node.Usings.Count > 0 || node.Members.Count > 0)
+		{
+			var arena = context.Arena;
+			arena.HardLine();
+			arena.HardLine();
+
+			// Negative means "nothing precedes this", so the separator below adds nothing on top.
+			previousEnd = -1;
+		}
+
 		// Usings may sit inside a file-scoped namespace, and this printer used to walk only the
 		// members — so every such file was refused by the content verifier rather than formatted. None
 		// of the 1,196 corpus files puts a using there, which is why it went unnoticed.

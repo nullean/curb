@@ -24,6 +24,42 @@
     <NoWarn>$(NoWarn);NU5128</NoWarn>
   </PropertyGroup>
 
+  <!--
+    The payload is a framework-dependent build of the CLI, run on the SDK the consumer already has.
+
+    Not the RID graph the plan called for. A runtime.json only resolves its RID-specific package when
+    a RuntimeIdentifier is selected, and a plain library build never selects one — measured, with a
+    local feed: zero mentions in project.assets.json without a RID, three with. So that mechanism
+    would have delivered nothing to almost every consumer. Bundling all five native binaries instead
+    is ~60 MB of which any machine needs a fifth.
+
+    What it costs is process start: about 100 ms against the native binary's nothing, on a step
+    Inputs/Outputs skip entirely unless the project's sources actually changed. Kerf_Exe still takes
+    a native binary for anyone who wants to supply one.
+  -->
+  <PropertyGroup>
+    <TargetsForTfmSpecificContentInPackage>
+      $(TargetsForTfmSpecificContentInPackage);PackCliPayload
+    </TargetsForTfmSpecificContentInPackage>
+  </PropertyGroup>
+
+  <Target Name="PackCliPayload">
+    <!-- Built here rather than declared as a wildcard, because a wildcard is expanded when the
+         project is evaluated and these files do not exist until this runs. -->
+    <MSBuild Projects="../Nullean.Kerf.Cli/Nullean.Kerf.Cli.csproj"
+             Targets="Publish"
+             Properties="Configuration=$(Configuration);TargetFramework=net10.0;PublishDir=$(BaseIntermediateOutputPath)cli/;RuntimeIdentifier=;PublishAot=false;SelfContained=false;PublishSelfContained=false" />
+
+    <ItemGroup>
+      <TfmSpecificPackageFile Include="$(BaseIntermediateOutputPath)cli/**/*" Exclude="$(BaseIntermediateOutputPath)cli/**/*.pdb">
+        <PackagePath>tools/net10.0/</PackagePath>
+      </TfmSpecificPackageFile>
+    </ItemGroup>
+
+    <Error Condition="'@(TfmSpecificPackageFile)' == ''"
+           Text="The CLI payload is missing, so the package would install a formatter it cannot run." />
+  </Target>
+
   <ItemGroup>
     <None Include="build/**" Pack="true" PackagePath="build/" />
     <None Include="../../README.md" Pack="true" PackagePath="README.md" />

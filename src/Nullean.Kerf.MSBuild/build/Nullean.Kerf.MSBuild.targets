@@ -49,11 +49,10 @@
       <Kerf_StampFile Condition="'$(Kerf_StampFile)' == ''">$(IntermediateOutputPath)kerf.stamp</Kerf_StampFile>
       <Kerf_FileList Condition="'$(Kerf_FileList)' == ''">$(IntermediateOutputPath)kerf.files</Kerf_FileList>
 
-      <!-- The native binary, resolved from the RID-specific package NuGet picked through the runtime
-           graph: a consumer references one small meta-package and gets the binary for the machine
-           doing the build rather than all five. -->
-      <Kerf_Exe Condition="'$(Kerf_Exe)' == '' and '$(OS)' == 'Windows_NT'">$(MSBuildThisFileDirectory)../tools/kerf.exe</Kerf_Exe>
-      <Kerf_Exe Condition="'$(Kerf_Exe)' == '' and '$(OS)' != 'Windows_NT'">$(MSBuildThisFileDirectory)../tools/kerf</Kerf_Exe>
+      <!-- The framework-dependent build that ships in this package, run on the SDK doing the build.
+           See the package project for why this is not a per-RID native binary. Kerf_Exe overrides it
+           with a native one, which starts in about a hundredth of the time. -->
+      <Kerf_Dll Condition="'$(Kerf_Dll)' == ''">$(MSBuildThisFileDirectory)../tools/net10.0/Nullean.Kerf.Cli.dll</Kerf_Dll>
     </PropertyGroup>
   </Target>
 
@@ -88,7 +87,12 @@
                       Overwrite="true"
                       WriteOnlyWhenDifferent="true" />
 
-    <Exec Command="&quot;$(Kerf_Exe)&quot; $(_KerfCommand) --files &quot;$(Kerf_FileList)&quot;"
+    <PropertyGroup>
+      <_KerfInvocation Condition="'$(Kerf_Exe)' != ''">&quot;$(Kerf_Exe)&quot;</_KerfInvocation>
+      <_KerfInvocation Condition="'$(Kerf_Exe)' == ''">&quot;$(DOTNET_HOST_PATH)&quot; &quot;$(Kerf_Dll)&quot;</_KerfInvocation>
+    </PropertyGroup>
+
+    <Exec Command="$(_KerfInvocation) $(_KerfCommand) --files &quot;$(Kerf_FileList)&quot;"
           StandardOutputImportance="$(Kerf_LogLevel)"
           ContinueOnError="true"
           IgnoreExitCode="true">
