@@ -48,8 +48,16 @@ internal static partial class Printers
 			Node.Print(member, context);
 		}
 
+		// Trivia hanging off the end-of-file token is not a member, so no separator ran for it and
+		// the blank line above a trailing comment would be dropped. Treat it like an item.
+		if (previousEnd >= 0 && TokenPrinter.HasLeadingContent(node.EndOfFileToken))
+		{
+			arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
+			if (context.BlankLinesBetween(previousEnd, EffectiveTriviaStart(node.EndOfFileToken)) > 0)
+				arena.HardLine();
+		}
+
 		TokenPrinter.PrintIfPresent(node.EndOfFileToken, context);
-		_ = arena;
 	}
 
 	public static void UsingDirective(UsingDirectiveSyntax node, PrintContext context)
@@ -157,11 +165,13 @@ internal static partial class Printers
 			if (TokenPrinter.HasLeadingContent(node.CloseBraceToken))
 			{
 				arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
+				if (context.BlankLinesBetween(previousEnd, EffectiveTriviaStart(node.CloseBraceToken)) > 0)
+					arena.HardLine();
 				TokenPrinter.PrintLeadingTrivia(node.CloseBraceToken, context, trailingBreak: false);
 			}
 		}
 
-		arena.HardLine();
+		arena.HardLine(DocFlags.Reindent);
 		TokenPrinter.PrintWithoutLeadingTrivia(node.CloseBraceToken, context);
 		TokenPrinter.PrintIfPresent(node.SemicolonToken, context);
 	}
@@ -313,16 +323,19 @@ internal static partial class Printers
 				previousEnd = statement.Span.End;
 			}
 
-			// A trailing comment belongs with the statements it follows, not with the brace. The
-			// brace's own break below returns to the outer indent.
+			// Trivia attached to the closing brace belongs with the statements it follows, not with
+			// the brace, and the blank line above it is preserved like any other separator. A whole
+			// `#if` block whose branch is disabled arrives here too, since none of it is parsed.
 			if (TokenPrinter.HasLeadingContent(node.CloseBraceToken))
 			{
 				arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
+				if (context.BlankLinesBetween(previousEnd, EffectiveTriviaStart(node.CloseBraceToken)) > 0)
+					arena.HardLine();
 				TokenPrinter.PrintLeadingTrivia(node.CloseBraceToken, context, trailingBreak: false);
 			}
 		}
 
-		arena.HardLine();
+		arena.HardLine(DocFlags.Reindent);
 		TokenPrinter.PrintWithoutLeadingTrivia(node.CloseBraceToken, context);
 	}
 
@@ -475,6 +488,17 @@ internal static partial class Printers
 	/// has one, otherwise the node itself. Measuring to the node would count a comment's own line as
 	/// a blank one.
 	/// </summary>
+	/// <summary>Where a token's first comment or directive begins, for blank-line measurement.</summary>
+	private static int EffectiveTriviaStart(SyntaxToken token)
+	{
+		foreach (var trivia in token.LeadingTrivia)
+		{
+			if (trivia.Kind() is not (SyntaxKind.WhitespaceTrivia or SyntaxKind.EndOfLineTrivia))
+				return trivia.SpanStart;
+		}
+		return token.SpanStart;
+	}
+
 	private static int EffectiveStart(SyntaxNode node)
 	{
 		foreach (var trivia in node.GetLeadingTrivia())

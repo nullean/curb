@@ -244,6 +244,19 @@ internal sealed class DocPrinter
 		if (options.TrimTrailingWhitespace && !doc.Flags.HasFlag(DocFlags.NoTrim))
 			_output.TrimTrailingWhitespace();
 
+		if (doc.Flags.HasFlag(DocFlags.Reindent))
+		{
+			// Reuse the current line when nothing has been written to it, so trivia that already
+			// broke does not turn into a blank line.
+			_output.TrimTrailingWhitespace();
+			if (!_output.AtLineStart())
+				_output.Append(_endOfLine);
+			_output.Append(_indenter.For(scope.Indent));
+			_column = _indenter.ColumnsFor(scope.Indent);
+			_insideLineComment = false;
+			return;
+		}
+
 		_output.Append(_endOfLine);
 		_output.Append(_indenter.For(scope.Indent));
 		_column = _indenter.ColumnsFor(scope.Indent);

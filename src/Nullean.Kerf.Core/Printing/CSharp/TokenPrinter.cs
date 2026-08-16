@@ -110,11 +110,10 @@ internal static class TokenPrinter
 					// back as trailing trivia — so the output never settles.
 					FlushBlankLine(arena, ref pendingNewLines, emittedAnything);
 					arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
-					EmitTriviaText(trivia, context, CommentFlags(trivia));
+					pendingNewLines = EmitTriviaText(trivia, context, CommentFlags(trivia));
 					if (trailingBreak)
 						arena.HardLine();
 					emittedAnything = true;
-					pendingNewLines = 0;
 					break;
 
 				case SyntaxKind.DisabledTextTrivia:
@@ -148,10 +147,9 @@ internal static class TokenPrinter
 						arena.LiteralLine(DocFlags.OnlyIfNotAtLineStart);
 					}
 
-					EmitTriviaText(trivia, context, DocFlags.IsDirective);
+					pendingNewLines = EmitTriviaText(trivia, context, DocFlags.IsDirective);
 					arena.HardLine();
 					emittedAnything = true;
-					pendingNewLines = 0;
 					break;
 			}
 		}
@@ -166,15 +164,24 @@ internal static class TokenPrinter
 		if (trailing.Count == 0)
 			return;
 
+		// Only separate a trailing comment from the token before it if the source did. Otherwise
+		// `Call(/* c */ arg)` gains a space after the parenthesis that it never had, while
+		// `Call(); // why` still keeps the one it did.
+		var separated = false;
+
 		foreach (var trivia in trailing)
 		{
 			switch (trivia.Kind())
 			{
+				case SyntaxKind.WhitespaceTrivia:
+					separated = true;
+					continue;
+
 				case SyntaxKind.SingleLineCommentTrivia:
 				case SyntaxKind.MultiLineCommentTrivia:
-					// A trailing comment always eats the rest of its physical line, so whatever
-					// follows has to start on a new one.
-					context.Arena.Synthetic(SyntheticText.Space);
+					if (separated)
+						context.Arena.Synthetic(SyntheticText.Space);
+					separated = false;
 					EmitTriviaText(trivia, context, CommentFlags(trivia));
 
 					if (trivia.IsKind(SyntaxKind.SingleLineCommentTrivia))
@@ -217,12 +224,32 @@ internal static class TokenPrinter
 	/// <c>///</c> and <c>/**</c> markers are exterior trivia inside the structure, so <c>Span</c>
 	/// begins after them and emitting it would silently strip the marker off every doc comment.
 	/// </remarks>
-	private static void EmitTriviaText(SyntaxTrivia trivia, PrintContext context, DocFlags flags)
+	/// <returns>
+	/// The number of line endings the trivia carried and this method trimmed. Directives and
+	/// documentation comments hold their own terminating newline inside the span, whereas a <c>//</c>
+	/// comment is followed by a separate end-of-line trivia. Blank-line counting has to know which,
+	/// or a blank line after a directive is silently swallowed.
+	/// </returns>
+	private static int EmitTriviaText(SyntaxTrivia trivia, PrintContext context, DocFlags flags)
 	{
 		var span = trivia.FullSpan;
 		var length = TrimTrailingNewLines(context, span.Start, span.Length);
 		if (length > 0)
 			context.Arena.SourceText(span.Start, length, flags);
+
+		return CountNewLines(context, span.Start + length, span.Length - length);
+	}
+
+	/// <summary>Counts the line endings in a range, treating CRLF as one.</summary>
+	private static int CountNewLines(PrintContext context, int start, int length)
+	{
+		var newLines = 0;
+		for (var i = start; i < start + length; i++)
+		{
+			if (context.Text[i] == '\n')
+				newLines++;
+		}
+		return newLines;
 	}
 
 	/// <summary>

@@ -98,6 +98,17 @@ internal enum DocFlags : byte
 
 	/// <summary>A <c>//</c> comment: everything after it on the same line is swallowed.</summary>
 	LineComment = 1 << 5,
+
+	/// <summary>
+	/// Break to this scope's indent, but reuse the current line if nothing has been written to it.
+	/// </summary>
+	/// <remarks>
+	/// A closing brace has to reach the outer indent, so it cannot simply skip its break when trivia
+	/// already ended the line — that would leave it at the inner indent. Nor can it break
+	/// unconditionally, which inserts a blank line. This does neither: it trims whatever indent is
+	/// pending and writes the correct one, adding a newline only if the line has content.
+	/// </remarks>
+	Reindent = 1 << 6,
 }
 
 /// <summary>
