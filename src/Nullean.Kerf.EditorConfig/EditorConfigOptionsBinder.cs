@@ -181,6 +181,15 @@ public static class EditorConfigOptionsBinder
 			}
 		}
 
+		if (TryBool(properties, "csharp_new_line_before_members_in_object_initializers", diagnostics, out var newLineInInitializers))
+			options = options with { NewLineBeforeMembersInObjectInitializers = newLineInInitializers };
+
+		if (TryBool(properties, "csharp_new_line_before_members_in_anonymous_types", diagnostics, out var newLineInAnonymous))
+			options = options with { NewLineBeforeMembersInAnonymousTypes = newLineInAnonymous };
+
+		if (TryBool(properties, "csharp_new_line_between_query_expression_clauses", diagnostics, out var newLineBetweenClauses))
+			options = options with { NewLineBetweenQueryExpressionClauses = newLineBetweenClauses };
+
 		if (TryBool(properties, "csharp_indent_case_contents", diagnostics, out var indentCaseContents))
 			options = options with { IndentCaseContents = indentCaseContents };
 

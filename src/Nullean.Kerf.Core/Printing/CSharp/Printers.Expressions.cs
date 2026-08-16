@@ -187,10 +187,17 @@ internal static partial class Printers
 	{
 		var arena = context.Arena;
 
+		var oneMemberPerLine = context.Options.NewLineBeforeMembersInObjectInitializers;
+
 		using (arena.Group())
 		{
 			if (leadingLine)
-				BeforeOpenBraceWhenBroken(BraceStyle.ObjectCollectionArrayInitializers, context);
+			{
+				if (oneMemberPerLine)
+					BeforeOpenBrace(BraceStyle.ObjectCollectionArrayInitializers, context);
+				else
+					BeforeOpenBraceWhenBroken(BraceStyle.ObjectCollectionArrayInitializers, context);
+			}
 
 			TokenPrinter.Print(node.OpenBraceToken, context);
 
@@ -198,7 +205,7 @@ internal static partial class Printers
 			{
 				using (arena.Indent())
 				{
-					arena.Line();
+					InsideBrace();
 					for (var i = 0; i < node.Expressions.Count; i++)
 					{
 						Node.Print(node.Expressions[i], context);
@@ -210,12 +217,12 @@ internal static partial class Printers
 
 						// A trailing separator is followed by the closing line, not by another one.
 						if (i < node.Expressions.Count - 1)
-							Spacing.AfterCommaBreakable(context);
+							Separator();
 					}
 				}
 
 				using (arena.IndentIf(context.Options.IndentBraces))
-					arena.Line();
+					InsideBrace();
 			}
 			else
 			{
@@ -224,6 +231,24 @@ internal static partial class Printers
 			}
 
 			TokenPrinter.Print(node.CloseBraceToken, context);
+		}
+
+		// Between two members: a hard line, or the ordinary comma separator.
+		void Separator()
+		{
+			if (oneMemberPerLine)
+				arena.HardLine();
+			else
+				Spacing.AfterCommaBreakable(context);
+		}
+
+		// Just inside the braces, where no comma sits and the comma options do not reach.
+		void InsideBrace()
+		{
+			if (oneMemberPerLine)
+				arena.HardLine();
+			else
+				arena.Line();
 		}
 	}
 
@@ -334,16 +359,22 @@ internal static partial class Printers
 	{
 		var arena = context.Arena;
 
+		var oneMemberPerLine = context.Options.NewLineBeforeMembersInAnonymousTypes;
+
 		TokenPrinter.Print(node.NewKeyword, context);
 
 		using (arena.Group())
 		{
-			BeforeOpenBraceWhenBroken(BraceStyle.AnonymousTypes, context);
+			if (oneMemberPerLine)
+				BeforeOpenBrace(BraceStyle.AnonymousTypes, context);
+			else
+				BeforeOpenBraceWhenBroken(BraceStyle.AnonymousTypes, context);
+
 			TokenPrinter.Print(node.OpenBraceToken, context);
 
 			using (arena.Indent())
 			{
-				arena.Line();
+				InsideBrace();
 				for (var i = 0; i < node.Initializers.Count; i++)
 				{
 					Node.Print(node.Initializers[i], context);
@@ -353,13 +384,30 @@ internal static partial class Printers
 					Spacing.BeforeComma(context);
 					TokenPrinter.Print(node.Initializers.GetSeparator(i), context);
 					if (i < node.Initializers.Count - 1)
-						Spacing.AfterCommaBreakable(context);
+						Separator();
 				}
 			}
+
 			using (arena.IndentIf(context.Options.IndentBraces))
-				arena.Line();
+				InsideBrace();
 
 			TokenPrinter.Print(node.CloseBraceToken, context);
+		}
+
+		void Separator()
+		{
+			if (oneMemberPerLine)
+				arena.HardLine();
+			else
+				Spacing.AfterCommaBreakable(context);
+		}
+
+		void InsideBrace()
+		{
+			if (oneMemberPerLine)
+				arena.HardLine();
+			else
+				arena.Line();
 		}
 	}
 

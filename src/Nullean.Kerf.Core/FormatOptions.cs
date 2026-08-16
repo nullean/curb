@@ -151,6 +151,45 @@ public readonly record struct FormatOptions
 	/// <summary><c>csharp_space_after_semicolon_in_for_statement</c>, default true.</summary>
 	public bool SpaceAfterSemicolonInForStatement { get; init; } = true;
 
+	/// <summary>
+	/// Put every member of an object, collection or array initializer on its own line.
+	/// <c>csharp_new_line_before_members_in_object_initializers</c>.
+	/// </summary>
+	/// <remarks>
+	/// See <see cref="NewLineBetweenQueryExpressionClauses"/> for why this defaults to false rather
+	/// than to Roslyn's documented true.
+	/// </remarks>
+	public bool NewLineBeforeMembersInObjectInitializers { get; init; }
+
+	/// <summary>
+	/// Put every member of an anonymous type on its own line.
+	/// <c>csharp_new_line_before_members_in_anonymous_types</c>.
+	/// </summary>
+	public bool NewLineBeforeMembersInAnonymousTypes { get; init; }
+
+	/// <summary>
+	/// Put every clause of a query expression on its own line.
+	/// <c>csharp_new_line_between_query_expression_clauses</c>.
+	/// </summary>
+	/// <remarks>
+	/// <para>
+	/// These three options are documented with a default of true, and Kerf defaults all three to
+	/// false anyway. The reason is evidence rather than preference: <c>dotnet format whitespace</c>
+	/// never acts on any of them. Setting all three to true and handing it
+	/// <c>new Point{X=1,Y=2}</c>, <c>new{First=1}</c> and a one-line query — so that it has to
+	/// rewrite the whitespace regardless — it normalises the spacing and inserts no line break at
+	/// all. Roslyn applies these only where its formatter is already placing a newline, which the
+	/// whitespace formatter never is.
+	/// </para>
+	/// <para>
+	/// So there is no observable behaviour to match, and the choice falls to Kerf. Defaulting to
+	/// true would explode every one-line initializer in a repository the first time Kerf ran, on
+	/// the strength of an option no other tool honours. Defaulting to false keeps Kerf a fixed
+	/// point of dotnet format and leaves the expanded layout one line of config away.
+	/// </para>
+	/// </remarks>
+	public bool NewLineBetweenQueryExpressionClauses { get; init; }
+
 	/// <summary>Indent the statements under a <c>case</c> label. <c>csharp_indent_case_contents</c>, default true.</summary>
 	public bool IndentCaseContents { get; init; } = true;
 

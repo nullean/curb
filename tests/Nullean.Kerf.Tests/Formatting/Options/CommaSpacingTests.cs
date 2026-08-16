@@ -282,7 +282,6 @@ public class CommaSpacingTests : FormattingTest
 		editorConfig: Swapped);
 
 	[Test]
-	[Skip("Kerf always splits a query onto one clause per line; dotnet format leaves a one-liner alone")]
 	public Task Orderby_is_left_alone() => Unchanged(
 		"""
 		public class C

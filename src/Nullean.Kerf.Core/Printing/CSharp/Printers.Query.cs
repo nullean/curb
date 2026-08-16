@@ -3,38 +3,53 @@ using Nullean.Kerf.Documents;
 
 namespace Nullean.Kerf.Printing.CSharp;
 
-/// <summary>LINQ query syntax. Clause layout is what csharp_new_line_between_query_expression_clauses will govern.</summary>
+/// <summary>LINQ query syntax.</summary>
 internal static partial class Printers
 {
-	/// <summary>LINQ query syntax: one clause per line once it breaks.</summary>
+	/// <summary>
+	/// A query expression, one clause per line or flowing until the line runs out.
+	/// </summary>
 	/// <remarks>
-	/// The separator here is what <c>csharp_new_line_between_query_expression_clauses</c> will
-	/// govern; its default is true, which is a hard line between clauses.
+	/// Under <c>csharp_new_line_between_query_expression_clauses</c> every clause takes a line of
+	/// its own. Otherwise the clauses sit in a group and break only when they do not fit, which is
+	/// what leaves a one-line query on one line — the shape dotnet format produces.
 	/// </remarks>
 	public static void QueryExpression(QueryExpressionSyntax node, PrintContext context)
 	{
 		var arena = context.Arena;
+		var oneClausePerLine = context.Options.NewLineBetweenQueryExpressionClauses;
 
-		QueryFromClause(node.FromClause, context);
-
-		using (arena.Indent())
+		using (arena.Group())
 		{
-			foreach (var clause in node.Body.Clauses)
+			QueryFromClause(node.FromClause, context);
+
+			using (arena.Indent())
 			{
-				arena.HardLine();
-				Node.Print(clause, context);
+				foreach (var clause in node.Body.Clauses)
+				{
+					Separator();
+					Node.Print(clause, context);
+				}
+
+				Separator();
+				Node.Print(node.Body.SelectOrGroup, context);
+
+				if (node.Body.Continuation is null)
+					return;
+
+				Separator();
+				TokenPrinter.Print(node.Body.Continuation.IntoKeyword, context);
+				arena.Synthetic(SyntheticText.Space);
+				TokenPrinter.Print(node.Body.Continuation.Identifier, context);
 			}
+		}
 
-			arena.HardLine();
-			Node.Print(node.Body.SelectOrGroup, context);
-
-			if (node.Body.Continuation is null)
-				return;
-
-			arena.HardLine();
-			TokenPrinter.Print(node.Body.Continuation.IntoKeyword, context);
-			arena.Synthetic(SyntheticText.Space);
-			TokenPrinter.Print(node.Body.Continuation.Identifier, context);
+		void Separator()
+		{
+			if (oneClausePerLine)
+				arena.HardLine();
+			else
+				arena.Line();
 		}
 	}
 
