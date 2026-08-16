@@ -60,6 +60,9 @@ public sealed class CSharpFormatter : IDisposable
 	/// <summary>How many files this formatter actually re-parsed, for reporting how often it was needed.</summary>
 	public int RoundTripsChecked { get; private set; }
 
+	/// <summary>Set to collect which syntax kinds are still falling through to verbatim emission.</summary>
+	public Dictionary<int, int>? UnhandledByKind { get; set; }
+
 	/// <param name="source">The C# text to format.</param>
 	/// <param name="options">Layout settings, normally bound from <c>.editorconfig</c>.</param>
 	/// <param name="expandUnhandled">Benchmark-only cost model; see <c>PrintContext.ExpandUnhandled</c>.</param>
@@ -92,7 +95,11 @@ public sealed class CSharpFormatter : IDisposable
 		_arena.Reset(source.Length);
 		_output.Reset(source.Length + 64);
 
-		var context = new PrintContext(_arena, parsed.Text, options) { ExpandUnhandled = expandUnhandled };
+		var context = new PrintContext(_arena, parsed.Text, options)
+		{
+			ExpandUnhandled = expandUnhandled,
+			UnhandledByKind = UnhandledByKind,
+		};
 
 		try
 		{
@@ -121,13 +128,12 @@ public sealed class CSharpFormatter : IDisposable
 		var changed = !written.SequenceEqual(source.AsSpan());
 		var text = produceText || verifyRoundTrip ? _output.ToString() : null;
 
-		if (verifyRoundTrip
-			&& !TokenStreamComparer.Verify(parsed.Root, source.AsSpan(), text!, out var roundTripFailure))
+		if (verifyRoundTrip)
 		{
-			return new FormatResult(FormatStatus.VerificationFailed, false, null, context.Coverage, roundTripFailure);
+			RoundTripsChecked++;
+			if (!TokenStreamComparer.Verify(parsed.Root, source.AsSpan(), text!, out var roundTripFailure))
+				return new FormatResult(FormatStatus.VerificationFailed, false, null, context.Coverage, roundTripFailure);
 		}
-
-		RoundTripsChecked += verifyRoundTrip ? 1 : 0;
 
 		return new FormatResult(
 			FormatStatus.Formatted,

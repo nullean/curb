@@ -38,6 +38,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
     <ProjectReference Include="../Nullean.Kerf.Core/Nullean.Kerf.Core.csproj" />
     <ProjectReference Include="../Nullean.Kerf.EditorConfig/Nullean.Kerf.EditorConfig.csproj" />
   </ItemGroup>

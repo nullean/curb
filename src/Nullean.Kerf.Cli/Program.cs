@@ -39,7 +39,8 @@ switch (args[0])
 		return FormattingRun.Execute(fileSystem, args[1], write: false,
 			expandUnhandled: args.Contains("--expand-unhandled"),
 			verify: !args.Contains("--no-verify"),
-			forceVerify: args.Contains("--verify-all"));
+			forceVerify: args.Contains("--verify-all"),
+			coverageReport: args.Contains("--coverage"));
 
 	case "doc-tree" when args.Length > 1:
 		{

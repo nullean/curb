@@ -112,7 +112,8 @@ internal static partial class Printers
 			arena.Synthetic(SyntheticText.Space);
 		}
 
-		TokenPrinter.Print(node.Identifier, context);
+		// An extension block is shaped like a type declaration but has no name.
+		TokenPrinter.PrintIfPresent(node.Identifier, context);
 
 		if (node.TypeParameterList is not null)
 			Node.Print(node.TypeParameterList, context);
@@ -284,11 +285,8 @@ internal static partial class Printers
 
 		TokenPrinter.Print(node.Identifier, context);
 
-		if (node.Default is not null)
-		{
-			context.Arena.Synthetic(SyntheticText.Space);
-			Node.Print(node.Default, context);
-		}
+		// EqualsValueClause supplies its own leading space.
+		Node.Print(node.Default, context);
 	}
 
 	public static void Block(BlockSyntax node, PrintContext context)

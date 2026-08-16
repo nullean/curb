@@ -14,7 +14,7 @@ namespace Nullean.Kerf.Cli;
 /// </remarks>
 internal static class FormattingRun
 {
-	public static int Execute(IFileSystem fileSystem, string target, bool write, bool expandUnhandled = false, bool? verify = null, bool forceVerify = false)
+	public static int Execute(IFileSystem fileSystem, string target, bool write, bool expandUnhandled = false, bool? verify = null, bool forceVerify = false, bool coverageReport = false)
 	{
 		var root = fileSystem.Path.GetFullPath(target);
 
@@ -49,6 +49,7 @@ internal static class FormattingRun
 		long printedTokens = 0;
 		long totalTokens = 0;
 		var reparsed = 0;
+		var unhandled = new Dictionary<int, int>();
 		var messages = new System.Collections.Concurrent.ConcurrentBag<string>();
 
 		var allocatedBefore = GC.GetTotalAllocatedBytes(precise: true);
@@ -57,7 +58,7 @@ internal static class FormattingRun
 		Parallel.ForEach(
 			work,
 			new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount },
-			() => new CSharpFormatter(),
+			() => new CSharpFormatter { UnhandledByKind = coverageReport ? [] : null },
 			(item, _, formatter) =>
 			{
 				var source = fileSystem.File.ReadAllText(item.Path);
@@ -95,6 +96,17 @@ internal static class FormattingRun
 			formatter =>
 			{
 				Interlocked.Add(ref reparsed, formatter.RoundTripsChecked);
+				if (formatter.UnhandledByKind is { } byKind)
+				{
+					lock (unhandled)
+					{
+						foreach (var (kind, count) in byKind)
+						{
+							unhandled.TryGetValue(kind, out var existing);
+							unhandled[kind] = existing + count;
+						}
+					}
+				}
 				formatter.Dispose();
 			});
 
@@ -116,6 +128,18 @@ internal static class FormattingRun
 		Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
 			$"  {sourceBytes / 1024.0 / 1024.0:F2} MB source, allocated {allocated / 1024.0 / 1024.0:F1} MB "
 			+ $"({allocated / (double)Math.Max(1, sourceBytes):F1}x source){costModel}"));
+
+		if (coverageReport && unhandled.Count > 0)
+		{
+			Console.WriteLine();
+			Console.WriteLine("# tokens still emitted verbatim, by syntax kind");
+			foreach (var (kind, count) in unhandled.OrderByDescending(p => p.Value).Take(25))
+			{
+				Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
+					$"  {count,8}  {(Microsoft.CodeAnalysis.CSharp.SyntaxKind)kind}"));
+			}
+			Console.WriteLine();
+		}
 
 		if (verifyRoundTrip)
 		{

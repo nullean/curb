@@ -41,6 +41,12 @@ internal sealed class PrintContext(DocArena arena, SourceText text, FormatOption
 	/// </remarks>
 	public bool ExpandUnhandled { get; init; }
 
+	/// <summary>
+	/// When set, records how many tokens each unhandled <c>SyntaxKind</c> accounted for, so printer
+	/// work can be aimed at whatever is actually costing coverage rather than guessed at.
+	/// </summary>
+	public Dictionary<int, int>? UnhandledByKind { get; init; }
+
 	/// <summary>Share of tokens that went through a real printer. The number M2 exists to drive up.</summary>
 	public double Coverage =>
 		PrintedTokens + VerbatimTokens == 0 ? 1 : (double)PrintedTokens / (PrintedTokens + VerbatimTokens);
