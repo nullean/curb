@@ -34,7 +34,8 @@ internal static class ContentVerifier
 	/// <param name="output">What was printed.</param>
 	/// <param name="failure">Set when verification fails.</param>
 	/// <param name="reordered">
-	/// Source span whose content was deliberately permuted, or default when nothing was.
+	/// Source spans whose content was deliberately permuted, in source order, or null when nothing
+	/// was.
 	/// </param>
 	/// <param name="trailingCommas">
 	/// The trailing-comma options are on, so a <c>,</c> immediately before a closing brace or bracket
@@ -44,30 +45,39 @@ internal static class ContentVerifier
 		ReadOnlySpan<char> source,
 		ReadOnlySpan<char> output,
 		out string? failure,
-		TextSpan reordered = default,
+		IReadOnlyList<TextSpan>? reordered = null,
 		bool trailingCommas = false)
 	{
 		var sourceIndex = 0;
 		var outputIndex = 0;
-		var reorderedLength = reordered.Length == 0 ? 0 : CountContent(source[reordered.Start..reordered.End]);
+		var nextReordered = 0;
 
 		while (true)
 		{
-			// The permuted region: take the same number of content characters from each side and
-			// compare them as multisets, then carry on in order from where both left off.
-			if (reorderedLength > 0 && sourceIndex >= reordered.Start)
-			{
-				if (!VerifyPermutation(source, output, ref sourceIndex, ref outputIndex, reorderedLength, out failure))
-					return false;
-
-				reorderedLength = 0;
-				continue;
-			}
-
 			while (sourceIndex < source.Length && IsSkippable(source[sourceIndex]))
 				sourceIndex++;
 			while (outputIndex < output.Length && IsSkippable(output[outputIndex]))
 				outputIndex++;
+
+			// A permuted region: take the same number of content characters from each side and compare
+			// them as multisets, then carry on in order from where both left off. Regions arrive in
+			// source order, so one cursor through them is enough.
+			//
+			// Tested after the whitespace skip, not before. A region starts at its first content
+			// character, and the cursor steps over the run of whitespace in front of it in one go — so
+			// testing first meant the cursor could jump from before the region to inside it without
+			// ever comparing equal, and the permutation was then read as damage.
+			if (reordered is not null && nextReordered < reordered.Count && sourceIndex >= reordered[nextReordered].Start)
+			{
+				var span = reordered[nextReordered++];
+				var length = CountContent(source[span.Start..span.End]);
+
+				if (length > 0
+					&& !VerifyPermutation(source, output, ref sourceIndex, ref outputIndex, length, out failure))
+					return false;
+
+				continue;
+			}
 
 			var sourceDone = sourceIndex >= source.Length;
 			var outputDone = outputIndex >= output.Length;
@@ -158,7 +168,7 @@ internal static class ContentVerifier
 
 		if (!Take(source, ref sourceIndex, expected) || !Take(output, ref outputIndex, actual))
 		{
-			failure = "formatting lost content while reordering using directives";
+			failure = "formatting lost content while reordering";
 			return false;
 		}
 
@@ -167,7 +177,7 @@ internal static class ContentVerifier
 
 		if (!expected.AsSpan().SequenceEqual(actual))
 		{
-			failure = "reordering using directives changed their content, not just their order";
+			failure = "reordering changed content, not just order";
 			return false;
 		}
 

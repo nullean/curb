@@ -43,7 +43,8 @@ internal static class TokenStreamComparer
 		string formatted,
 		out string? failure,
 		bool usingsReordered = false,
-		bool trailingCommas = false)
+		bool trailingCommas = false,
+		bool modifiersReordered = false)
 	{
 		if (!CSharpSource.TryParse(formatted, out var reparsed, out var errors))
 		{
@@ -72,22 +73,18 @@ internal static class TokenStreamComparer
 
 		var index = 0;
 
+		// A step that consumed a token past the run it was checking leaves it here, so the next turn
+		// of the loop compares that token instead of skipping over it.
+		SyntaxToken before = default, after = default;
+		bool carryOriginal = false, carryProduced = false;
+
 		while (true)
 		{
 			// The using block has been checked as a set; walking it in order would only re-discover
 			// the reordering it was asked for.
-			bool hasOriginal, hasProduced;
-			do
-			{
-				hasOriginal = original.MoveNext();
-			}
-			while (hasOriginal && originalUsings.Contains(original.Current.SpanStart));
-
-			do
-			{
-				hasProduced = produced.MoveNext();
-			}
-			while (hasProduced && producedUsings.Contains(produced.Current.SpanStart));
+			var hasOriginal = carryOriginal || Next(original, originalUsings, out before);
+			var hasProduced = carryProduced || Next(produced, producedUsings, out after);
+			carryOriginal = carryProduced = false;
 
 			if (!hasOriginal && !hasProduced)
 			{
@@ -97,18 +94,34 @@ internal static class TokenStreamComparer
 
 			if (!hasOriginal)
 			{
-				failure = $"formatting introduced an extra token at position {index}: '{Text(formattedText, produced.Current)}'";
+				failure = $"formatting introduced an extra token at position {index}: '{Text(formattedText, after)}'";
 				return false;
 			}
 
 			if (!hasProduced)
 			{
-				failure = $"formatting lost the token at position {index}: '{Text(originalText, original.Current)}'";
+				failure = $"formatting lost the token at position {index}: '{Text(originalText, before)}'";
 				return false;
 			}
 
-			var before = original.Current;
-			var after = produced.Current;
+			// A permuted modifier run. Both sides start one at the same place, so collecting the
+			// maximal run from each and comparing them as multisets is exact and needs no spans —
+			// `public static` against `static public` passes, `public static` against `public` does
+			// not. Modifiers are always parted by a space, so no boundary can move here.
+			if (modifiersReordered
+				&& Mismatch(originalText, before, formattedText, after)
+				&& IsModifier(before)
+				&& IsModifier(after))
+			{
+				if (!SameModifierRun(
+					original, originalUsings, originalText, ref before, ref carryOriginal,
+					produced, producedUsings, formattedText, ref after, ref carryProduced,
+					out failure))
+					return false;
+
+				// Both runs are accounted for; whatever follows them is compared on the next turn.
+				continue;
+			}
 
 			// The declared token delta. A trailing comma that appeared or vanished shows up here as a
 			// `,` on one side against the closer on the other, which needs no lookahead to spot: the
@@ -163,6 +176,75 @@ internal static class TokenStreamComparer
 
 		token = default;
 		return false;
+	}
+
+	private static bool IsModifier(SyntaxToken token) =>
+		SyntaxFacts.IsAccessibilityModifier((SyntaxKind)token.RawKind)
+		|| ModifierKinds.Contains((SyntaxKind)token.RawKind);
+
+	private static readonly HashSet<SyntaxKind> ModifierKinds =
+	[
+		SyntaxKind.StaticKeyword, SyntaxKind.ExternKeyword, SyntaxKind.NewKeyword, SyntaxKind.VirtualKeyword,
+		SyntaxKind.AbstractKeyword, SyntaxKind.SealedKeyword, SyntaxKind.OverrideKeyword, SyntaxKind.ReadOnlyKeyword,
+		SyntaxKind.UnsafeKeyword, SyntaxKind.VolatileKeyword, SyntaxKind.AsyncKeyword, SyntaxKind.PartialKeyword,
+		SyntaxKind.RequiredKeyword, SyntaxKind.FileKeyword, SyntaxKind.RefKeyword, SyntaxKind.ConstKeyword,
+		SyntaxKind.FixedKeyword, SyntaxKind.ExplicitKeyword, SyntaxKind.ImplicitKeyword,
+	];
+
+	/// <summary>
+	/// Consumes the run of modifiers on each side and checks they are the same multiset.
+	/// </summary>
+	/// <remarks>
+	/// Leaves each cursor on the first token past its run, which the caller then compares normally,
+	/// so a run that matches costs nothing downstream and a run that does not fails here.
+	/// </remarks>
+	private static bool SameModifierRun(
+		IEnumerator<SyntaxToken> original,
+		TextSpan originalSkip,
+		ReadOnlySpan<char> originalText,
+		ref SyntaxToken before,
+		ref bool carryOriginal,
+		IEnumerator<SyntaxToken> produced,
+		TextSpan producedSkip,
+		ReadOnlySpan<char> formattedText,
+		ref SyntaxToken after,
+		ref bool carryProduced,
+		out string? failure)
+	{
+		var expected = new List<string>();
+		var actual = new List<string>();
+
+		while (IsModifier(before))
+		{
+			expected.Add(Text(originalText, before).ToString());
+			if (!Next(original, originalSkip, out before))
+				break;
+
+			carryOriginal = true;
+		}
+
+		while (IsModifier(after))
+		{
+			actual.Add(Text(formattedText, after).ToString());
+			if (!Next(produced, producedSkip, out after))
+				break;
+
+			carryProduced = true;
+		}
+
+		expected.Sort(StringComparer.Ordinal);
+		actual.Sort(StringComparer.Ordinal);
+
+		if (!expected.SequenceEqual(actual))
+		{
+			failure =
+				$"reordering modifiers changed them: '{string.Join(' ', expected)}' "
+				+ $"became '{string.Join(' ', actual)}'";
+			return false;
+		}
+
+		failure = null;
+		return true;
 	}
 
 	/// <summary>Compares the two using lists as multisets of their text.</summary>

@@ -24,11 +24,28 @@ internal sealed class PrintContext(DocArena arena, SourceText text, FormatOption
 	/// Source span whose content was reordered, or default if nothing was.
 	/// </summary>
 	/// <remarks>
+	/// <para>
 	/// Reordering breaks the content verifier's linear compare, which is the point of it. Recording
-	/// the span lets the verifier switch to a multiset compare over exactly that region and stay
+	/// the spans lets the verifier switch to a multiset compare over exactly those regions and stay
 	/// strict everywhere else, rather than being switched off for the file.
+	/// </para>
+	/// <para>
+	/// A list rather than a single span because modifier ordering permutes a run per declaration,
+	/// where using sorting permutes one block per file. Null in every file that reorders nothing,
+	/// which is nearly all of them; entries arrive in source order, since printing walks the tree
+	/// that way.
+	/// </para>
 	/// </remarks>
-	public TextSpan ReorderedSpan { get; set; }
+	public List<TextSpan>? ReorderedSpans { get; private set; }
+
+	/// <summary>Records a region whose content was deliberately permuted.</summary>
+	public void Reordered(TextSpan span) => (ReorderedSpans ??= []).Add(span);
+
+	/// <summary>True when the using block was sorted, which the token comparer handles specially.</summary>
+	public bool UsingsReordered { get; set; }
+
+	/// <summary>True when any declaration's modifiers were put in the configured order.</summary>
+	public bool ModifiersReordered { get; set; }
 
 	/// <summary>
 	/// Regions the file suppressed with <c>#pragma warning disable IDE0055</c>, or null for none.

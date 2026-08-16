@@ -94,6 +94,9 @@ public static class OptionCatalog
 			"csharp_trailing_comma_in_multiline_lists",
 			"csharp_trailing_comma_in_singleline_lists",
 
+			// IDE0036, which dotnet format can only apply with a full compilation.
+			"csharp_preferred_modifier_order",
+
 			// Not IDE0055 options: the two native ways a file says it should not be formatted.
 			"generated_code",
 			"dotnet_diagnostic.ide0055.severity",

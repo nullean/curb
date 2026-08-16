@@ -37,6 +37,9 @@ public static class OptionValues
 
 		"csharp_trailing_comma_in_multiline_lists" => Bool(options.TrailingCommaInMultilineLists),
 		"csharp_trailing_comma_in_singleline_lists" => Bool(options.TrailingCommaInSinglelineLists),
+		"csharp_preferred_modifier_order" => options.PreferredModifierOrder is { } order
+			? string.Join(",", order)
+			: "   # modifiers are left as written; the key is the opt-in",
 		"generated_code" => Bool(options.Excluded),
 		"dotnet_diagnostic.ide0055.severity" => options.Excluded ? "none" : "default",
 

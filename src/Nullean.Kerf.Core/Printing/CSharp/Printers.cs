@@ -126,7 +126,8 @@ internal static partial class Printers
 		// To the end of the last directive's *full* span, so a trailing comment is inside the region
 		// the verifier treats as permuted. Ending at Span.End leaves `using X; // note` half in and
 		// half out, and the comment then fails a comparison it was never meant to be part of.
-		context.ReorderedSpan = TextSpan.FromBounds(firstInSource.FullSpan.Start, usings[^1].FullSpan.End);
+		context.Reordered(TextSpan.FromBounds(firstInSource.FullSpan.Start, usings[^1].FullSpan.End));
+		context.UsingsReordered = true;
 	}
 
 	public static void UsingDirective(UsingDirectiveSyntax node, PrintContext context) =>
@@ -843,11 +844,141 @@ internal static partial class Printers
 
 	private static void PrintModifiers(SyntaxTokenList modifiers, PrintContext context)
 	{
+		if (CanOrderModifiers(modifiers, context))
+		{
+			PrintOrderedModifiers(modifiers, context);
+			return;
+		}
+
 		foreach (var modifier in modifiers)
 		{
 			TokenPrinter.Print(modifier, context);
+
+			// A modifier followed by a comment has already been parted from the next one by the
+			// trivia; adding the usual space as well doubled it.
+			if (!EndsInWhitespace(modifier))
+				context.Arena.Synthetic(SyntheticText.Space);
+		}
+	}
+
+	/// <summary>True when a token's trailing trivia already supplies the space after it.</summary>
+	/// <remarks>
+	/// Plain whitespace after a token is not emitted — the caller's synthetic space is what parts it
+	/// from the next one. A comment is emitted, with its own space on each side, so there the caller's
+	/// space is one too many.
+	/// </remarks>
+	private static bool EndsInWhitespace(SyntaxToken token)
+	{
+		foreach (var trivia in token.TrailingTrivia)
+		{
+			if (trivia.Kind() is not (SyntaxKind.WhitespaceTrivia or SyntaxKind.EndOfLineTrivia))
+				return true;
+		}
+
+		return false;
+	}
+
+	/// <summary>
+	/// Whether this run of modifiers may be put in the configured order.
+	/// </summary>
+	/// <remarks>
+	/// Declines whenever a modifier past the first carries a comment or directive. Reordering the
+	/// tokens takes their trivia along, so a comment written between two modifiers would follow the
+	/// wrong one — and the leading trivia of the first modifier is the declaration's doc comment,
+	/// which must stay at the front whatever happens to the keywords after it.
+	/// </remarks>
+	private static bool CanOrderModifiers(SyntaxTokenList modifiers, PrintContext context)
+	{
+		if (context.Options.PreferredModifierOrder is null || modifiers.Count < 2)
+			return false;
+
+		for (var i = 0; i < modifiers.Count; i++)
+		{
+			if (i > 0 && TokenPrinter.HasLeadingContent(modifiers[i]))
+				return false;
+
+			foreach (var trivia in modifiers[i].TrailingTrivia)
+			{
+				if (trivia.Kind() is not (SyntaxKind.WhitespaceTrivia or SyntaxKind.EndOfLineTrivia))
+					return false;
+			}
+		}
+
+		return true;
+	}
+
+	/// <summary>
+	/// Emits modifiers in the configured order, keeping the first one's leading trivia in front.
+	/// </summary>
+	/// <remarks>
+	/// A stable sort by rank, so modifiers the configuration does not name keep their order relative
+	/// to each other and land after the ones it does. The declaration's own leading trivia belongs to
+	/// whichever modifier came first in the source, so it is emitted before the sort rather than
+	/// travelling with that keyword.
+	/// </remarks>
+	private static void PrintOrderedModifiers(SyntaxTokenList modifiers, PrintContext context)
+	{
+		var order = context.Options.PreferredModifierOrder!;
+
+		Span<int> indices = stackalloc int[modifiers.Count];
+		for (var i = 0; i < modifiers.Count; i++)
+			indices[i] = i;
+
+		// Insertion sort: a declaration has a handful of modifiers, and this keeps it stable and
+		// allocation-free.
+		for (var i = 1; i < indices.Length; i++)
+		{
+			var current = indices[i];
+			var rank = RankOf(modifiers[current], order);
+			var j = i - 1;
+
+			while (j >= 0 && RankOf(modifiers[indices[j]], order) > rank)
+			{
+				indices[j + 1] = indices[j];
+				j--;
+			}
+
+			indices[j + 1] = current;
+		}
+
+		// With the break, not without it. A line comment runs to the end of its line, so emitting the
+		// declaration's doc comment and then the keyword on the same line makes the whole declaration
+		// part of the comment — which the re-parse check caught, being exactly what it is for.
+		TokenPrinter.PrintLeadingTrivia(modifiers[0], context);
+
+		var moved = false;
+		for (var i = 0; i < indices.Length; i++)
+		{
+			if (indices[i] != i)
+				moved = true;
+
+			TokenPrinter.PrintWithoutLeadingTrivia(modifiers[indices[i]], context);
 			context.Arena.Synthetic(SyntheticText.Space);
 		}
+
+		// Only when the sort actually moved something. Declaring a delta that did not happen is not
+		// wrong, but it costs the whole file a second parse, and most declarations are already in the
+		// configured order — on the corpus, declaring it unconditionally took the re-parse rate from
+		// 1.3% of files to 77%.
+		if (!moved)
+			return;
+
+		// The keywords only. Their leading trivia is printed above and is not permuted, so leaving it
+		// outside the region keeps it under the strict linear compare.
+		context.Reordered(TextSpan.FromBounds(modifiers[0].Span.Start, modifiers[^1].Span.End));
+		context.ModifiersReordered = true;
+	}
+
+	private static int RankOf(SyntaxToken modifier, string[] order)
+	{
+		for (var i = 0; i < order.Length; i++)
+		{
+			if (order[i].Equals(modifier.Text, StringComparison.Ordinal))
+				return i;
+		}
+
+		// Not named in the configuration, so it sorts after everything that is.
+		return int.MaxValue;
 	}
 
 	/// <summary>Emits a comma-separated list, breaking one-per-line when the group does not fit.</summary>

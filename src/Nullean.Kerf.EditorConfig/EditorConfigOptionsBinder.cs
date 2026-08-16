@@ -232,6 +232,27 @@ public static class EditorConfigOptionsBinder
 		if (TryPrefixedBool(properties, "trailing_comma_in_singleline_lists", diagnostics, out var singleline))
 			options = options with { TrailingCommaInSinglelineLists = singleline };
 
+		// IDE0036. Presence is the ask: the key has a documented default value, so binding it whether
+		// or not it was written would reorder a repository that never mentioned it.
+		if (properties.TryGetValue("csharp_preferred_modifier_order", out var modifierOrder))
+		{
+			// Code style options carry an optional `:severity` suffix — `public,...,async:error` — and
+			// it belongs to the rule, not to the last modifier in the list. Left on, it makes that
+			// modifier match nothing and sort as though it were unnamed, which is silent and wrong.
+			// Real repositories write it: the corpus does.
+			var colon = modifierOrder.LastIndexOf(':');
+			var value = colon >= 0 ? modifierOrder[..colon] : modifierOrder;
+
+			var order = value
+				.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+			if (order.Length > 0)
+				options = options with { PreferredModifierOrder = order };
+			else
+				diagnostics?.Add(KerfDiagnostic.UnrecognisedValue(
+					"csharp_preferred_modifier_order", modifierOrder, "a comma-separated list of modifiers"));
+		}
+
 		// The two native ways of saying "do not format this file".
 		if (TryBool(properties, "generated_code", diagnostics, out var generatedCode) && generatedCode)
 			options = options with { Excluded = true };

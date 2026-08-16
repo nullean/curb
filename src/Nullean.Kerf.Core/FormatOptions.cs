@@ -320,6 +320,31 @@ public readonly record struct FormatOptions
 	/// </remarks>
 	public bool TrailingCommaInSinglelineLists { get; init; }
 
+	/// <summary>
+	/// The order to write modifiers in, or null to leave them as the author wrote them.
+	/// </summary>
+	/// <remarks>
+	/// <para>
+	/// <c>csharp_preferred_modifier_order</c>, code style rule IDE0036 — a real .NET key, not a Kerf
+	/// invention, and one <c>dotnet format style</c> already implements. What Kerf adds is doing it
+	/// without a compilation: the rule is decidable from the token list alone, so it runs on a bare
+	/// folder in the same pass as everything else rather than costing the 40-odd seconds a workspace
+	/// load does.
+	/// </para>
+	/// <para>
+	/// Null unless the key is present. The key carries a documented default value, so a repository
+	/// that has never mentioned it would otherwise be reordered on first contact — the same reason
+	/// using sorting treats the presence of the key as the ask. Writing it, even as the default value,
+	/// opts in.
+	/// </para>
+	/// <para>
+	/// Modifiers not named in the value keep their position relative to each other. Stored as the
+	/// keyword texts in preference order; ranking compares against a token's interned text, so it
+	/// allocates nothing.
+	/// </para>
+	/// </remarks>
+	public string[]? PreferredModifierOrder { get; init; }
+
 	/// <summary>True when either trailing-comma option asked for anything.</summary>
 	/// <remarks>
 	/// Gates both the printer work and the verifier's allowance for a comma that appears or vanishes,
