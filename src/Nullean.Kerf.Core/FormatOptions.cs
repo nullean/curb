@@ -1,3 +1,5 @@
+using Nullean.Kerf.Options;
+
 namespace Nullean.Kerf;
 
 /// <summary>Line ending to emit.</summary>
@@ -51,6 +53,12 @@ public readonly record struct FormatOptions
 
 	/// <summary><c>trim_trailing_whitespace</c>.</summary>
 	public bool TrimTrailingWhitespace { get; init; } = true;
+
+	/// <summary>
+	/// Which constructs put their opening brace on a new line.
+	/// <c>csharp_new_line_before_open_brace</c>, default <see cref="BraceStyle.All"/> (Allman).
+	/// </summary>
+	public BraceStyle NewLineBeforeOpenBrace { get; init; } = BraceStyle.All;
 
 	/// <summary>True when reflow is disabled, which lets the printer skip fit measurement entirely.</summary>
 	public bool ReflowDisabled => MaxLineLength == Off;

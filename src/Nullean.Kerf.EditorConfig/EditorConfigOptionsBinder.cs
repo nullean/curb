@@ -81,6 +81,19 @@ public static class EditorConfigOptionsBinder
 		if (TryBool(properties, "trim_trailing_whitespace", diagnostics, out var trimTrailing))
 			options = options with { TrimTrailingWhitespace = trimTrailing };
 
+		if (properties.TryGetValue("csharp_new_line_before_open_brace", out var braceStyle))
+		{
+			if (BraceStyleParser.TryParse(braceStyle, out var style))
+				options = options with { NewLineBeforeOpenBrace = style };
+			else
+			{
+				diagnostics?.Add(KerfDiagnostic.UnrecognisedValue(
+					"csharp_new_line_before_open_brace",
+					braceStyle,
+					"all, none, or a comma-separated list of " + string.Join(", ", BraceStyleParser.Names[2..])));
+			}
+		}
+
 		if (diagnostics is not null)
 			ReportUnhandledKeys(properties, diagnostics);
 

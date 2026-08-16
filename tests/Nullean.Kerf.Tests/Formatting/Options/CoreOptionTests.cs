@@ -1,11 +1,12 @@
 namespace Nullean.Kerf.Tests.Formatting.Options;
 
 /// <summary>
-/// The eight core EditorConfig keys — the only ones Kerf implements today.
+/// The eight core EditorConfig keys.
 /// </summary>
 /// <remarks>
-/// The other 39 IDE0055 options are catalogued and reported as unimplemented rather than silently
-/// ignored; see <c>OptionsBindingTests</c>. As each is wired up it gains a file here.
+/// The IDE0055 options are onboarded one at a time and each gains a file of its own alongside this
+/// one — see <c>NewLineBeforeOpenBraceTests</c>. Those not yet reached are catalogued and reported
+/// as unimplemented rather than silently ignored; see <c>OptionsBindingTests</c>.
 /// </remarks>
 public class CoreOptionTests : FormattingTest
 {

@@ -2,6 +2,7 @@ using System.Diagnostics;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Nullean.Kerf.Options;
 using Nullean.Kerf.Documents;
 
 namespace Nullean.Kerf.Printing.CSharp;
@@ -146,9 +147,7 @@ internal static partial class Printers
 			return;
 		}
 
-		// Brace placement is csharp_new_line_before_open_brace's job; Allman is the Roslyn default
-		// and is hard-coded until that option is wired up.
-		arena.HardLine();
+		BeforeOpenBrace(BraceStyle.Types, context);
 		TokenPrinter.Print(node.OpenBraceToken, context);
 
 		using (arena.Indent())
@@ -203,7 +202,7 @@ internal static partial class Printers
 
 		if (node.Body is not null)
 		{
-			arena.HardLine();
+			BeforeOpenBrace(BraceStyle.Methods, context);
 			Node.Print(node.Body, context);
 			return;
 		}
@@ -484,6 +483,40 @@ internal static partial class Printers
 			Node.Print(attributeList, context);
 			context.Arena.HardLine();
 		}
+	}
+
+	/// <summary>
+	/// Emits whatever separates a construct's header from its opening brace.
+	/// </summary>
+	/// <remarks>
+	/// The one place <c>csharp_new_line_before_open_brace</c> is consulted. Its default is
+	/// <c>all</c> — Allman — and <c>none</c> gives K&amp;R; a comma-separated list lets the two be
+	/// mixed per construct. Printers call this rather than emitting a break of their own, so wiring
+	/// a new construct into the option is a one-line change here rather than a hunt.
+	/// </remarks>
+	internal static void BeforeOpenBrace(BraceStyle construct, PrintContext context)
+	{
+		if (context.Options.NewLineBeforeOpenBrace.HasFlag(construct))
+			context.Arena.HardLine();
+		else
+			context.Arena.Synthetic(SyntheticText.Space);
+	}
+
+	/// <summary>
+	/// The <see cref="BeforeOpenBrace"/> variant for braces that only move to their own line when
+	/// their group breaks — accessor lists, initializers, anonymous types.
+	/// </summary>
+	/// <remarks>
+	/// A flat <c>{ get; set; }</c> keeps its brace on the line either way; the flag only decides what
+	/// happens once the contents no longer fit. With the flag off the brace can never break away, so
+	/// the separator degrades to a plain space.
+	/// </remarks>
+	internal static void BeforeOpenBraceWhenBroken(BraceStyle construct, PrintContext context)
+	{
+		if (context.Options.NewLineBeforeOpenBrace.HasFlag(construct))
+			context.Arena.Line();
+		else
+			context.Arena.Synthetic(SyntheticText.Space);
 	}
 
 	private static void PrintModifiers(SyntaxTokenList modifiers, PrintContext context)

@@ -1,5 +1,6 @@
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Nullean.Kerf.Documents;
+using Nullean.Kerf.Options;
 
 namespace Nullean.Kerf.Printing.CSharp;
 
@@ -98,6 +99,8 @@ internal static partial class Printers
 	internal static bool BringsOwnBlock(ExpressionSyntax? value) =>
 		value switch
 		{
+			// A lambda or delegate with a block body; an expression-bodied one is a plain value.
+			AnonymousFunctionExpressionSyntax function => function.Block is not null,
 			ObjectCreationExpressionSyntax creation => creation.Initializer is not null,
 			ImplicitObjectCreationExpressionSyntax creation => creation.Initializer is not null,
 			ArrayCreationExpressionSyntax creation => creation.Initializer is not null,
@@ -152,9 +155,16 @@ internal static partial class Printers
 
 		using (arena.Group())
 		{
-			// csharp_new_line_before_open_brace covers accessors and properties; its default puts
-			// the brace on its own line, but only where the list actually breaks.
-			arena.Line();
+			// The accessor list belongs to whatever declares it. An indexer's list answers to the
+			// indexers flag, everything else's to properties — an event's accessor list included,
+			// since Roslyn has no separate slot for it.
+			var construct = node.Parent switch
+			{
+				IndexerDeclarationSyntax => BraceStyle.Indexers,
+				EventDeclarationSyntax => BraceStyle.Events,
+				_ => BraceStyle.Properties,
+			};
+			BeforeOpenBraceWhenBroken(construct, context);
 			TokenPrinter.Print(node.OpenBraceToken, context);
 
 			using (arena.Indent())
@@ -171,6 +181,29 @@ internal static partial class Printers
 		TokenPrinter.Print(node.CloseBraceToken, context);
 	}
 
+	/// <summary>The <c>event T Name { add { } remove { } }</c> form; the field form is a FieldDeclaration.</summary>
+	public static void EventDeclaration(EventDeclarationSyntax node, PrintContext context)
+	{
+		var arena = context.Arena;
+
+		PrintAttributeLists(node.AttributeLists, context);
+		PrintModifiers(node.Modifiers, context);
+		TokenPrinter.Print(node.EventKeyword, context);
+		arena.Synthetic(SyntheticText.Space);
+		Node.Print(node.Type, context);
+		arena.Synthetic(SyntheticText.Space);
+
+		if (node.ExplicitInterfaceSpecifier is not null)
+			Tokens(node.ExplicitInterfaceSpecifier, context);
+
+		TokenPrinter.Print(node.Identifier, context);
+
+		if (node.AccessorList is not null)
+			Node.Print(node.AccessorList, context);
+
+		TokenPrinter.PrintIfPresent(node.SemicolonToken, context);
+	}
+
 	public static void AccessorDeclaration(AccessorDeclarationSyntax node, PrintContext context)
 	{
 		var arena = context.Arena;
@@ -181,7 +214,7 @@ internal static partial class Printers
 
 		if (node.Body is not null)
 		{
-			arena.HardLine();
+			BeforeOpenBrace(BraceStyle.Accessors, context);
 			Node.Print(node.Body, context);
 			return;
 		}
@@ -219,7 +252,7 @@ internal static partial class Printers
 
 		if (node.Body is not null)
 		{
-			arena.HardLine();
+			BeforeOpenBrace(BraceStyle.Methods, context);
 			Node.Print(node.Body, context);
 			return;
 		}

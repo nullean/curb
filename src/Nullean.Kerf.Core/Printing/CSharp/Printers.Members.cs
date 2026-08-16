@@ -1,5 +1,6 @@
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Nullean.Kerf.Documents;
+using Nullean.Kerf.Options;
 
 namespace Nullean.Kerf.Printing.CSharp;
 
@@ -22,7 +23,7 @@ internal static partial class Printers
 			Node.Print(node.BaseList, context);
 		}
 
-		arena.HardLine();
+		BeforeOpenBrace(BraceStyle.Types, context);
 		TokenPrinter.Print(node.OpenBraceToken, context);
 
 		using (arena.Indent())
@@ -68,7 +69,7 @@ internal static partial class Printers
 
 		if (node.Body is not null)
 		{
-			arena.HardLine();
+			BeforeOpenBrace(BraceStyle.Methods, context);
 			Node.Print(node.Body, context);
 			return;
 		}
@@ -97,7 +98,7 @@ internal static partial class Printers
 
 		if (node.Body is not null)
 		{
-			arena.HardLine();
+			BeforeOpenBrace(BraceStyle.Methods, context);
 			Node.Print(node.Body, context);
 			return;
 		}
@@ -161,7 +162,7 @@ internal static partial class Printers
 		TokenPrinter.Print(node.NamespaceKeyword, context);
 		arena.Synthetic(SyntheticText.Space);
 		Node.Print(node.Name, context);
-		arena.HardLine();
+		BeforeOpenBrace(BraceStyle.Types, context);
 		TokenPrinter.Print(node.OpenBraceToken, context);
 
 		using (arena.Indent())

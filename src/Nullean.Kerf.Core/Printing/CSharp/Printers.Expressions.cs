@@ -1,6 +1,7 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Nullean.Kerf.Documents;
+using Nullean.Kerf.Options;
 
 namespace Nullean.Kerf.Printing.CSharp;
 
@@ -175,7 +176,7 @@ internal static partial class Printers
 		using (arena.Group())
 		{
 			if (leadingLine)
-				arena.Line();
+				BeforeOpenBraceWhenBroken(BraceStyle.ObjectCollectionArrayInitializers, context);
 
 			TokenPrinter.Print(node.OpenBraceToken, context);
 
@@ -271,7 +272,7 @@ internal static partial class Printers
 
 		if (block is not null)
 		{
-			arena.HardLine();
+			BeforeOpenBrace(BraceStyle.Lambdas, context);
 			Node.Print(block, context);
 			return;
 		}
@@ -284,6 +285,31 @@ internal static partial class Printers
 		}
 	}
 
+	/// <summary>The <c>delegate (T x) { }</c> form that predates lambdas.</summary>
+	public static void AnonymousMethodExpression(AnonymousMethodExpressionSyntax node, PrintContext context)
+	{
+		var arena = context.Arena;
+
+		foreach (var modifier in node.Modifiers)
+		{
+			TokenPrinter.Print(modifier, context);
+			arena.Synthetic(SyntheticText.Space);
+		}
+
+		TokenPrinter.Print(node.DelegateKeyword, context);
+
+		if (node.ParameterList is not null)
+		{
+			// `delegate (int x)`, with the space — dotnet format normalises to that shape, and the
+			// delegate keyword is not a method name, so the method-paren spacing keys do not apply.
+			arena.Synthetic(SyntheticText.Space);
+			Node.Print(node.ParameterList, context);
+		}
+
+		BeforeOpenBrace(BraceStyle.AnonymousMethods, context);
+		Node.Print(node.Block, context);
+	}
+
 	public static void AnonymousObjectCreationExpression(AnonymousObjectCreationExpressionSyntax node, PrintContext context)
 	{
 		var arena = context.Arena;
@@ -292,7 +318,7 @@ internal static partial class Printers
 
 		using (arena.Group())
 		{
-			arena.Line();
+			BeforeOpenBraceWhenBroken(BraceStyle.AnonymousTypes, context);
 			TokenPrinter.Print(node.OpenBraceToken, context);
 
 			using (arena.Indent())

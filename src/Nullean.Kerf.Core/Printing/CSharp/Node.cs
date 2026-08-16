@@ -66,6 +66,10 @@ internal static class Node
 				Printers.ParameterList((ParameterListSyntax)node, context);
 				break;
 
+			case SyntaxKind.EventDeclaration:
+				Printers.EventDeclaration((EventDeclarationSyntax)node, context);
+				break;
+
 			case SyntaxKind.FieldDeclaration:
 			case SyntaxKind.EventFieldDeclaration:
 				Printers.FieldDeclaration((BaseFieldDeclarationSyntax)node, context);
@@ -362,6 +366,9 @@ internal static class Node
 				break;
 			case SyntaxKind.ParenthesizedLambdaExpression:
 				Printers.ParenthesizedLambdaExpression((ParenthesizedLambdaExpressionSyntax)node, context);
+				break;
+			case SyntaxKind.AnonymousMethodExpression:
+				Printers.AnonymousMethodExpression((AnonymousMethodExpressionSyntax)node, context);
 				break;
 			case SyntaxKind.AnonymousObjectCreationExpression:
 				Printers.AnonymousObjectCreationExpression((AnonymousObjectCreationExpressionSyntax)node, context);

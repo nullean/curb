@@ -1,6 +1,7 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Nullean.Kerf.Documents;
+using Nullean.Kerf.Options;
 
 namespace Nullean.Kerf.Printing.CSharp;
 
@@ -24,7 +25,7 @@ internal static partial class Printers
 
 		if (statement is BlockSyntax)
 		{
-			arena.HardLine();
+			BeforeOpenBrace(BraceStyle.ControlBlocks, context);
 			Node.Print(statement, context);
 			return;
 		}
@@ -186,7 +187,7 @@ internal static partial class Printers
 		var arena = context.Arena;
 
 		TokenPrinter.Print(node.TryKeyword, context);
-		arena.HardLine();
+		BeforeOpenBrace(BraceStyle.ControlBlocks, context);
 		Node.Print(node.Block, context);
 
 		foreach (var catchClause in node.Catches)
@@ -218,7 +219,7 @@ internal static partial class Printers
 				TokenPrinter.Print(catchClause.Filter.CloseParenToken, context);
 			}
 
-			arena.HardLine();
+			BeforeOpenBrace(BraceStyle.ControlBlocks, context);
 			Node.Print(catchClause.Block, context);
 		}
 
@@ -228,7 +229,7 @@ internal static partial class Printers
 		// csharp_new_line_before_finally, default true.
 		arena.HardLine();
 		TokenPrinter.Print(node.Finally.FinallyKeyword, context);
-		arena.HardLine();
+		BeforeOpenBrace(BraceStyle.ControlBlocks, context);
 		Node.Print(node.Finally.Block, context);
 	}
 
@@ -282,7 +283,7 @@ internal static partial class Printers
 			Node.Print(node.Expression, context);
 		}
 
-		arena.HardLine();
+		BeforeOpenBrace(BraceStyle.ControlBlocks, context);
 		TokenPrinter.Print(node.OpenBraceToken, context);
 
 		foreach (var section in node.Sections)
@@ -362,7 +363,7 @@ internal static partial class Printers
 
 		if (node.Body is not null)
 		{
-			arena.HardLine();
+			BeforeOpenBrace(BraceStyle.LocalFunctions, context);
 			Node.Print(node.Body, context);
 			return;
 		}
