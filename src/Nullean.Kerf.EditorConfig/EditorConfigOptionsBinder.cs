@@ -224,6 +224,9 @@ public static class EditorConfigOptionsBinder
 				options = options with { SortUsings = UsingOrder.SystemFirst };
 		}
 
+		if (TryBool(properties, "kerf_opinionated", diagnostics, out var opinionated))
+			options = options with { Opinionated = opinionated };
+
 		// The two native ways of saying "do not format this file".
 		if (TryBool(properties, "generated_code", diagnostics, out var generatedCode) && generatedCode)
 			options = options with { Excluded = true };

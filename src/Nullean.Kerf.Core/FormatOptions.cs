@@ -273,6 +273,29 @@ public readonly record struct FormatOptions
 	public LabelIndent IndentLabels { get; init; } = LabelIndent.OneLessThanCurrent;
 
 	/// <summary>
+	/// Apply the formatting opinions <c>dotnet format</c> declines to hold.
+	/// </summary>
+	/// <remarks>
+	/// <para>
+	/// <c>kerf_opinionated</c>, default false. The one key Kerf invents, because .NET has no concept
+	/// of "be more opinionated than <c>dotnet format</c>" and so offers nothing to borrow.
+	/// </para>
+	/// <para>
+	/// Everything it enables is still a fixed point of <c>dotnet format</c> — that is the admission
+	/// test, and it is the same number <c>./build.sh conformance</c> already reports. A repository
+	/// formatted this way stays put when anyone runs <c>dotnet format</c>, hits Format Document, or
+	/// builds with <c>EnforceCodeStyleInBuild</c>. What it costs is one diff at the point of opting
+	/// in, which is why the default is off: onboarding should be undramatic.
+	/// </para>
+	/// <para>
+	/// Rules that have a real EditorConfig key of their own — the IDE2000 series — are honoured
+	/// whether or not this is set, and an explicit setting of one of those wins over this switch in
+	/// both directions.
+	/// </para>
+	/// </remarks>
+	public bool Opinionated { get; init; }
+
+	/// <summary>
 	/// The file asked not to be formatted at all.
 	/// </summary>
 	/// <remarks>

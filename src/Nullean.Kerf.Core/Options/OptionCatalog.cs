@@ -88,6 +88,10 @@ public static class OptionCatalog
 	/// <summary>Keys Kerf actually acts on today. Everything else in the catalog reports KERF1003.</summary>
 	public static readonly FrozenSet<string> ImplementedKeys =
 		CoreKeys.Concat([
+			// Kerf's own switch. The only invented key, and the only one that can be: nothing in
+			// .NET expresses "hold the opinions dotnet format declines to hold".
+			"kerf_opinionated",
+
 			// Not IDE0055 options: the two native ways a file says it should not be formatted.
 			"generated_code",
 			"dotnet_diagnostic.ide0055.severity",

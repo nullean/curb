@@ -74,6 +74,39 @@ public abstract class FormattingTest
 		Formats(source, source, editorConfig);
 
 	/// <summary>
+	/// Asserts what an opinion does when it is on and, just as importantly, that it does nothing
+	/// when it is off.
+	/// </summary>
+	/// <remarks>
+	/// <para>
+	/// Everything <c>kerf_opinionated</c> enables is a change <c>dotnet format</c> declines to make
+	/// and will not undo, so the opinion is safe to hold — but the default has to stay minimal-churn
+	/// or adopting Kerf stops being undramatic. Asserting both halves in one place is what stops an
+	/// opinion leaking into the default: <paramref name="asDefault"/> fails the moment it does.
+	/// </para>
+	/// <para>
+	/// Pass the source unchanged as <paramref name="asDefault"/> for the usual case, where the
+	/// default leaves the construct exactly as the author wrote it.
+	/// </para>
+	/// </remarks>
+	/// <param name="source">The input.</param>
+	/// <param name="asDefault">What it formats to with the switch off.</param>
+	/// <param name="asOpinionated">What it formats to with <c>kerf_opinionated = true</c>.</param>
+	/// <param name="editorConfig">Extra settings, applied to both halves.</param>
+	protected static Task Opinionated(
+		[LanguageInjection("csharp")][StringSyntax("C#")] string source,
+		[LanguageInjection("csharp")][StringSyntax("C#")] string asDefault,
+		[LanguageInjection("csharp")][StringSyntax("C#")] string asOpinionated,
+		[StringSyntax("ini")] string? editorConfig = null)
+	{
+		Formats(source, asDefault, editorConfig);
+		return Formats(source, asOpinionated, JoinConfig(editorConfig, "kerf_opinionated = true"));
+	}
+
+	private static string JoinConfig(string? editorConfig, string extra) =>
+		string.IsNullOrEmpty(editorConfig) ? extra : editorConfig + "\n" + extra;
+
+	/// <summary>
 	/// Asserts a byte-exact result, trailing newline and line endings included.
 	/// </summary>
 	/// <remarks>

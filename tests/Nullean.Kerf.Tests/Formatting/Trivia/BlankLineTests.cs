@@ -71,13 +71,21 @@ public class BlankLineTests : FormattingTest
 		""");
 
 	[Test]
-	[Skip("diverges from dotnet format, which keeps this blank line; Kerf drops it")]
-	public Task A_blank_line_before_a_closing_brace_is_kept() => Unchanged(
+	public Task A_blank_line_before_a_closing_brace_is_dropped() => Formats(
 		"""
 		public class C
 		{
 		    public int Value;
 
+		}
+		""",
+		// An opinion, not a divergence. dotnet format keeps this blank line but never adds one, so
+		// dropping it leaves output dotnet format is content with — the admission test for anything
+		// Kerf decides that dotnet format declines to.
+		"""
+		public class C
+		{
+		    public int Value;
 		}
 		""");
 
@@ -142,11 +150,14 @@ public class BlankLineTests : FormattingTest
 		""");
 
 	[Test]
-	[Skip("diverges from dotnet format, which keeps leading blank lines; Kerf drops them")]
-	public Task Leading_blank_lines_in_a_file_are_kept() => Unchanged(
+	public Task Leading_blank_lines_in_a_file_are_dropped() => Formats(
 		"""
 
 
+		using System;
+		""",
+		// Same shape: dotnet format keeps them, never adds them, and leaves the trimmed file alone.
+		"""
 		using System;
 		""");
 

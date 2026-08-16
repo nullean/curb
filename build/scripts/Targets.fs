@@ -76,11 +76,28 @@ let private conformance (arguments:ParseResults<Arguments>) =
     printfn "copying corpus from %s" corpus.FullName
     copyTree corpus.FullName work
 
-    // Any difference should be an option disagreement, not a wrap we chose to make.
+    let opinionated = arguments.Contains Opinionated
+    let keepWidths = arguments.Contains Reflow
+
+    // What this measures is dotnet_format(kerf(x)) = kerf(x) — that Kerf's output is a *fixed point*
+    // of dotnet format, not that the two agree on the same input. That is the stronger property and
+    // the one that matters: a repository formatted by Kerf stays put when anyone runs dotnet format,
+    // hits Format Document, or builds with EnforceCodeStyleInBuild.
+    //
+    // It is also what makes opinionated mode admissible. dotnet format declines to decide almost
+    // everything about layout, and anything it declines to decide Kerf may decide while staying a
+    // fixed point. So --opinionated is gated by this same number: it may change many files, it may
+    // not change this.
+    //
+    // Reflow is forced off by default so a difference is an option disagreement rather than a wrap
+    // Kerf chose; --reflow keeps the corpus's own widths, which is the configuration people run.
     for config in Directory.GetFiles(work, ".editorconfig", SearchOption.AllDirectories) do
         let text = File.ReadAllText config
         // A config with no max_line_length already gets the default, which is off.
-        let rewritten = Text.RegularExpressions.Regex.Replace(text, @"max_line_length\s*=\s*\S+", "max_line_length = off")
+        let widths =
+            if keepWidths then text
+            else Text.RegularExpressions.Regex.Replace(text, @"max_line_length\s*=\s*\S+", "max_line_length = off")
+        let rewritten = if opinionated then widths + "\n[*.cs]\nkerf_opinionated = true\n" else widths
         File.WriteAllText(config, rewritten)
 
     exec "dotnet" ["run"; "--project"; "src/Nullean.Kerf.Cli"; "-c"; "Release"; "--"; "format"; work] |> ignore
@@ -98,7 +115,13 @@ let private conformance (arguments:ParseResults<Arguments>) =
     let agreeing = total - differing.Length
     let percentage = 100.0 * float agreeing / float total
     printfn ""
-    printfn "conformance with dotnet format: %d/%d files (%.2f%%)" agreeing total percentage
+    let mode =
+        match arguments.Contains Opinionated, arguments.Contains Reflow with
+        | false, false -> ""
+        | true, false -> " (opinionated)"
+        | false, true -> " (reflow)"
+        | true, true -> " (opinionated, reflow)"
+    printfn "conformance with dotnet format%s: %d/%d files (%.2f%%)" mode agreeing total percentage
     if differing.Length > 0 then
         printfn ""
         printfn "first differing files:"
