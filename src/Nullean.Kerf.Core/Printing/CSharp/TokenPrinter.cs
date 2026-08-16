@@ -109,7 +109,16 @@ internal static class TokenPrinter
 					// onto whatever the enclosing printer emitted last, and the next run then reads it
 					// back as trailing trivia — so the output never settles.
 					FlushBlankLine(arena, ref pendingNewLines, emittedAnything);
-					arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
+
+					// dotnet format aligns a comment sitting directly under a trailing comment to
+					// that comment's column, and normalises every other comment to the statement
+					// indent. Kerf used to normalise both, which pulled hand-aligned continuations
+					// back to the left.
+					if (!emittedAnything && pendingNewLines == 0 && AlignsUnderTrailingComment(token, trivia, context))
+						arena.AlignedLine(TrailingCommentAnchor);
+					else
+						arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
+
 					pendingNewLines = EmitTriviaText(trivia, context, CommentFlags(trivia));
 					if (trailingBreak)
 						arena.HardLine();
@@ -158,6 +167,43 @@ internal static class TokenPrinter
 		FlushBlankLine(arena, ref pendingNewLines, emittedAnything);
 	}
 
+	/// <summary>Register holding the column of the most recent trailing comment.</summary>
+	private const int TrailingCommentAnchor = 0;
+
+	/// <summary>
+	/// True when this comment sits on the line directly below one that ended in a trailing comment.
+	/// </summary>
+	/// <remarks>
+	/// Walking to the previous token allocates, so it is asked only of a token that actually carries
+	/// a leading comment — which is uncommon, and never in the middle of an expression.
+	/// </remarks>
+	private static bool AlignsUnderTrailingComment(SyntaxToken token, SyntaxTrivia comment, PrintContext context)
+	{
+		var previous = token.GetPreviousToken();
+		if (previous.RawKind == 0)
+			return false;
+
+		var trailing = previous.TrailingTrivia;
+		if (trailing.Count == 0)
+			return false;
+
+		var last = trailing[^1];
+		if (!last.IsKind(SyntaxKind.SingleLineCommentTrivia) && !last.IsKind(SyntaxKind.MultiLineCommentTrivia))
+		{
+			// A line ending stays in the trailing trivia after the comment, so look past one.
+			if (trailing.Count < 2)
+				return false;
+
+			last = trailing[^2];
+			if (!last.IsKind(SyntaxKind.SingleLineCommentTrivia) && !last.IsKind(SyntaxKind.MultiLineCommentTrivia))
+				return false;
+		}
+
+		var lines = context.Text.Lines;
+		return lines.GetLineFromPosition(comment.SpanStart).LineNumber
+			== lines.GetLineFromPosition(last.SpanStart).LineNumber + 1;
+	}
+
 	internal static void PrintTrailingTrivia(SyntaxToken token, PrintContext context)
 	{
 		var trailing = token.TrailingTrivia;
@@ -182,6 +228,9 @@ internal static class TokenPrinter
 					if (separated)
 						context.Arena.Synthetic(SyntheticText.Space);
 					separated = false;
+
+					// Where this comment starts is where a comment on the next line aligns to.
+					context.Arena.Anchor(TrailingCommentAnchor);
 					EmitTriviaText(trivia, context, CommentFlags(trivia));
 
 					if (trivia.IsKind(SyntaxKind.SingleLineCommentTrivia))

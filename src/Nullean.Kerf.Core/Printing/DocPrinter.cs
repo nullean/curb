@@ -46,6 +46,10 @@ internal sealed class DocPrinter
 	private int _width;
 	private int _column;
 	private int _tabWidth = 4;
+	private bool _useTabs;
+
+	/// <summary>Columns captured by <see cref="DocKind.Anchor"/>, read back by an aligned break.</summary>
+	private readonly int[] _anchors = new int[4];
 
 	// --- round-trip risk tracking ------------------------------------------------------------
 	private int _lastSourceEnd;
@@ -71,6 +75,7 @@ internal sealed class DocPrinter
 		_output = output;
 		_indenter = new Indenter(options.UseTabs, options.IndentSize, options.TabWidth);
 		_tabWidth = Math.Max(1, options.TabWidth);
+		_useTabs = options.UseTabs;
 		_endOfLine = options.ResolveEndOfLine(source.Span);
 		_width = options.MaxLineLength;
 		_column = 0;
@@ -140,6 +145,11 @@ internal sealed class DocPrinter
 
 				case DocKind.SynText:
 					Emit(SyntheticText.Get(doc.A), doc.Flags, scope.SuppressWidth);
+					i++;
+					break;
+
+				case DocKind.Anchor:
+					_anchors[doc.A] = _column;
 					i++;
 					break;
 
@@ -257,6 +267,34 @@ internal sealed class DocPrinter
 				_output.Append(_endOfLine);
 			_output.Append(_indenter.For(scope.Indent));
 			_column = _indenter.ColumnsFor(scope.Indent);
+			_insideLineComment = false;
+			return;
+		}
+
+		if (doc.Flags.HasFlag(DocFlags.AlignToAnchor))
+		{
+			// The comment above has already ended its own line, so reuse it rather than opening
+			// another — the same reason Reindent exists.
+			_output.TrimTrailingWhitespace();
+			if (!_output.AtLineStart())
+				_output.Append(_endOfLine);
+
+			// Tabs as far as they reach, then spaces for the remainder — what dotnet format writes,
+			// and the only way to land on a column no tab stop falls on while still honouring
+			// indent_style. Under `indent_style = space` the loop simply never fires.
+			var target = Math.Max(0, _anchors[doc.B]);
+			var at = 0;
+
+			while (_useTabs && at + _tabWidth <= target)
+			{
+				_output.Append('\t');
+				at += _tabWidth;
+			}
+
+			for (; at < target; at++)
+				_output.Append(' ');
+
+			_column = target;
 			_insideLineComment = false;
 			return;
 		}

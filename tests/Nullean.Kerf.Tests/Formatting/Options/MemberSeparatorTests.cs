@@ -218,8 +218,8 @@ public class MemberSeparatorTests : FormattingTest
 		    public void M()
 		    {
 		        var q = from x in items
-		            where x > 1
-		            select x;
+		                where x > 1
+		                select x;
 		    }
 		}
 		""",
@@ -290,7 +290,7 @@ public class MemberSeparatorTests : FormattingTest
 		            First = 1
 		        };
 		        var q = from x in items
-		            select x;
+		                select x;
 		    }
 		}
 		""",

@@ -102,6 +102,13 @@ internal sealed class DocArena
 	/// </remarks>
 	public DocScope IndentIf(bool condition, int levels = 1) => condition ? Indent(levels) : default;
 
+	/// <summary>Captures the current output column into <paramref name="register"/>.</summary>
+	public void Anchor(int register) => Add(new Doc(DocKind.Anchor, a: register));
+
+	/// <summary>A hard break that indents to a column captured by <see cref="Anchor"/>.</summary>
+	public void AlignedLine(int register) =>
+		Add(new Doc(DocKind.Line, a: (int)LineType.Hard, b: register, flags: DocFlags.AlignToAnchor));
+
 	public DocScope ForceFlat() => Open(new Doc(DocKind.ForceFlat));
 
 	/// <summary>Opens a force-flat scope only when <paramref name="condition"/> holds.</summary>

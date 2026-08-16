@@ -427,9 +427,13 @@ internal static partial class Printers
 
 	public static void Parameter(ParameterSyntax node, PrintContext context)
 	{
-		foreach (var attributeList in node.AttributeLists)
+		// Consecutive attribute lists are never separated — `[A][property: B] int x`, not `[A] [B]`.
+		// Only the last is followed by a space, to part it from what it decorates.
+		if (node.AttributeLists.Count > 0)
 		{
-			Node.Print(attributeList, context);
+			foreach (var attributeList in node.AttributeLists)
+				Node.Print(attributeList, context);
+
 			context.Arena.Synthetic(SyntheticText.Space);
 		}
 

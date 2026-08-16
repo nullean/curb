@@ -43,6 +43,17 @@ internal enum DocKind : byte
 
 	/// <summary>Trims whitespace already written to the output.</summary>
 	Trim,
+
+	/// <summary>
+	/// Records the column the output has reached, for a later line to align to. <c>A</c> = register.
+	/// </summary>
+	/// <remarks>
+	/// Roslyn aligns some things to a column rather than to an indent level — a comment under the
+	/// trailing comment above it, a query's clauses under its <c>from</c>. Neither can be expressed
+	/// as a level, so the column is captured where it occurs and read back where it is needed.
+	/// Emits nothing and occupies no width.
+	/// </remarks>
+	Anchor,
 }
 
 /// <summary>What a <see cref="DocKind.Line"/> does in each mode.</summary>
@@ -109,6 +120,12 @@ internal enum DocFlags : byte
 	/// pending and writes the correct one, adding a newline only if the line has content.
 	/// </remarks>
 	Reindent = 1 << 6,
+
+	/// <summary>
+	/// Indent this break to a column captured by a <see cref="DocKind.Anchor"/> rather than to the
+	/// enclosing scope's level. The line's <c>B</c> names the register.
+	/// </summary>
+	AlignToAnchor = 1 << 7,
 }
 
 /// <summary>

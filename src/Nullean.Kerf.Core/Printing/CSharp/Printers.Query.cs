@@ -6,6 +6,9 @@ namespace Nullean.Kerf.Printing.CSharp;
 /// <summary>LINQ query syntax.</summary>
 internal static partial class Printers
 {
+	/// <summary>Register holding the column a query expression starts at.</summary>
+	private const int QueryAnchor = 1;
+
 	/// <summary>
 	/// A query expression, one clause per line or flowing until the line runs out.
 	/// </summary>
@@ -18,6 +21,10 @@ internal static partial class Printers
 	{
 		var arena = context.Arena;
 		var oneClausePerLine = context.Options.NewLineBetweenQueryExpressionClauses;
+
+		// Clauses line up under the `from`, not at an indent level — `var x = from a in b` puts the
+		// following `where` under the `f`, wherever that lands. Capture the column before printing.
+		arena.Anchor(QueryAnchor);
 
 		using (arena.Group())
 		{
@@ -47,7 +54,7 @@ internal static partial class Printers
 		void Separator()
 		{
 			if (oneClausePerLine)
-				arena.HardLine();
+				arena.AlignedLine(QueryAnchor);
 			else
 				arena.Line();
 		}
