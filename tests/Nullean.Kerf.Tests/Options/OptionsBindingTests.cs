@@ -94,11 +94,12 @@ public class OptionsBindingTests
 	[Test]
 	public async Task A_known_but_unimplemented_option_is_reported_not_ignored()
 	{
-		var options = Bind("root = true\n\n[*.cs]\ncsharp_space_after_cast = true\n", out var diagnostics);
+		// Any catalogued key Kerf has not reached yet will do; swap this as options are onboarded.
+		var options = Bind("root = true\n\n[*.cs]\ncsharp_indent_case_contents = true\n", out var diagnostics);
 
 		options.Should().NotBeNull();
 		diagnostics.Should().ContainSingle().Which.Id.Should().Be("KERF1003");
-		diagnostics[0].Message.Should().Contain("csharp_space_after_cast").And.Contain("does not implement it yet");
+		diagnostics[0].Message.Should().Contain("csharp_indent_case_contents").And.Contain("does not implement it yet");
 		await Task.CompletedTask;
 	}
 

@@ -78,6 +78,40 @@ public readonly record struct FormatOptions
 	/// </summary>
 	public bool NewLineBeforeFinally { get; init; } = true;
 
+	/// <summary>Space between a cast and its operand. <c>csharp_space_after_cast</c>, default false.</summary>
+	public bool SpaceAfterCast { get; init; }
+
+	/// <summary>
+	/// Space between a control-flow keyword and its parenthesis.
+	/// <c>csharp_space_after_keywords_in_control_flow_statements</c>, default true.
+	/// </summary>
+	public bool SpaceAfterKeywordsInControlFlowStatements { get; init; } = true;
+
+	/// <summary><c>csharp_space_before_colon_in_inheritance_clause</c>, default true.</summary>
+	public bool SpaceBeforeColonInInheritanceClause { get; init; } = true;
+
+	/// <summary><c>csharp_space_after_colon_in_inheritance_clause</c>, default true.</summary>
+	public bool SpaceAfterColonInInheritanceClause { get; init; } = true;
+
+	/// <summary>
+	/// Spaces around binary and assignment operators. <c>csharp_space_around_binary_operators</c>,
+	/// default <c>before_and_after</c>; <c>none</c> sets this false. The third value, <c>ignore</c>,
+	/// is not implemented.
+	/// </summary>
+	public bool SpaceAroundBinaryOperators { get; init; } = true;
+
+	/// <summary><c>csharp_space_before_dot</c>, default false.</summary>
+	public bool SpaceBeforeDot { get; init; }
+
+	/// <summary><c>csharp_space_after_dot</c>, default false.</summary>
+	public bool SpaceAfterDot { get; init; }
+
+	/// <summary><c>csharp_space_before_semicolon_in_for_statement</c>, default false.</summary>
+	public bool SpaceBeforeSemicolonInForStatement { get; init; }
+
+	/// <summary><c>csharp_space_after_semicolon_in_for_statement</c>, default true.</summary>
+	public bool SpaceAfterSemicolonInForStatement { get; init; } = true;
+
 	/// <summary>True when reflow is disabled, which lets the printer skip fit measurement entirely.</summary>
 	public bool ReflowDisabled => MaxLineLength == Off;
 

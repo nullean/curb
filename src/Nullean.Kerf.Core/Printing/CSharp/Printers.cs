@@ -132,7 +132,7 @@ internal static partial class Printers
 			Node.Print(node.ParameterList, context);
 		if (node.BaseList is not null)
 		{
-			arena.Synthetic(SyntheticText.Space);
+			Spacing.BeforeInheritanceColon(context);
 			Node.Print(node.BaseList, context);
 		}
 		foreach (var constraint in node.ConstraintClauses)
@@ -365,7 +365,9 @@ internal static partial class Printers
 	public static void MemberAccessExpression(MemberAccessExpressionSyntax node, PrintContext context)
 	{
 		Node.Print(node.Expression, context);
+		Spacing.BeforeDot(context);
 		TokenPrinter.Print(node.OperatorToken, context);
+		Spacing.AfterDot(context);
 		Node.Print(node.Name, context);
 	}
 

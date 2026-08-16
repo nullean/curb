@@ -19,7 +19,7 @@ internal static partial class Printers
 
 		if (node.BaseList is not null)
 		{
-			arena.Synthetic(SyntheticText.Space);
+			Spacing.BeforeInheritanceColon(context);
 			Node.Print(node.BaseList, context);
 		}
 

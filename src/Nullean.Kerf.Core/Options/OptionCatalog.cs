@@ -92,6 +92,15 @@ public static class OptionCatalog
 			"csharp_new_line_before_else",
 			"csharp_new_line_before_catch",
 			"csharp_new_line_before_finally",
+			"csharp_space_after_cast",
+			"csharp_space_after_keywords_in_control_flow_statements",
+			"csharp_space_before_colon_in_inheritance_clause",
+			"csharp_space_after_colon_in_inheritance_clause",
+			"csharp_space_around_binary_operators",
+			"csharp_space_before_dot",
+			"csharp_space_after_dot",
+			"csharp_space_before_semicolon_in_for_statement",
+			"csharp_space_after_semicolon_in_for_statement",
 		]).ToFrozenSet(StringComparer.Ordinal);
 
 	/// <summary>True for a key Kerf knows about, whether or not it is implemented yet.</summary>

@@ -48,8 +48,7 @@ internal static partial class Printers
 		var arena = context.Arena;
 
 		TokenPrinter.Print(keyword, context);
-		// csharp_space_after_keywords_in_control_flow_statements, default true.
-		arena.Synthetic(SyntheticText.Space);
+		Spacing.AfterControlFlowKeyword(context);
 		TokenPrinter.Print(openParen, context);
 
 		using (arena.Group())
@@ -104,31 +103,32 @@ internal static partial class Printers
 
 	public static void ForStatement(ForStatementSyntax node, PrintContext context)
 	{
-		var arena = context.Arena;
-
 		TokenPrinter.Print(node.ForKeyword, context);
-		arena.Synthetic(SyntheticText.Space);
+		Spacing.AfterControlFlowKeyword(context);
 		TokenPrinter.Print(node.OpenParenToken, context);
 
 		Node.Print(node.Declaration, context);
 		foreach (var initializer in node.Initializers)
 			Node.Print(initializer, context);
 
+		// The spacing goes around the semicolon whether or not a clause follows it, which is what
+		// gives an empty header the `for (; ; )` shape dotnet format produces.
+		Spacing.BeforeForSemicolon(context);
 		TokenPrinter.Print(node.FirstSemicolonToken, context);
+		Spacing.AfterForSemicolon(context);
 		if (node.Condition is not null)
-		{
-			// csharp_space_after_semicolon_in_for_statement, default true.
-			arena.Synthetic(SyntheticText.Space);
 			Node.Print(node.Condition, context);
-		}
 
+		Spacing.BeforeForSemicolon(context);
 		TokenPrinter.Print(node.SecondSemicolonToken, context);
+		Spacing.AfterForSemicolon(context);
 		for (var i = 0; i < node.Incrementors.Count; i++)
 		{
-			arena.Synthetic(SyntheticText.Space);
 			Node.Print(node.Incrementors[i], context);
-			if (i < node.Incrementors.SeparatorCount)
-				TokenPrinter.Print(node.Incrementors.GetSeparator(i), context);
+			if (i >= node.Incrementors.SeparatorCount)
+				continue;
+			TokenPrinter.Print(node.Incrementors.GetSeparator(i), context);
+			context.Arena.Synthetic(SyntheticText.Space);
 		}
 
 		TokenPrinter.Print(node.CloseParenToken, context);
@@ -144,7 +144,7 @@ internal static partial class Printers
 			arena.Synthetic(SyntheticText.Space);
 
 		TokenPrinter.Print(node.ForEachKeyword, context);
-		arena.Synthetic(SyntheticText.Space);
+		Spacing.AfterControlFlowKeyword(context);
 		TokenPrinter.Print(node.OpenParenToken, context);
 
 		Node.Print(node.Type, context);
@@ -168,7 +168,7 @@ internal static partial class Printers
 			arena.Synthetic(SyntheticText.Space);
 
 		TokenPrinter.Print(node.ForEachKeyword, context);
-		arena.Synthetic(SyntheticText.Space);
+		Spacing.AfterControlFlowKeyword(context);
 		TokenPrinter.Print(node.OpenParenToken, context);
 
 		Node.Print(node.Variable, context);
@@ -197,7 +197,7 @@ internal static partial class Printers
 
 			if (catchClause.Declaration is not null)
 			{
-				arena.Synthetic(SyntheticText.Space);
+				Spacing.AfterControlFlowKeyword(context);
 				TokenPrinter.Print(catchClause.Declaration.OpenParenToken, context);
 				Node.Print(catchClause.Declaration.Type, context);
 				if (catchClause.Declaration.Identifier.RawKind != 0)
@@ -212,7 +212,7 @@ internal static partial class Printers
 			{
 				arena.Synthetic(SyntheticText.Space);
 				TokenPrinter.Print(catchClause.Filter.WhenKeyword, context);
-				arena.Synthetic(SyntheticText.Space);
+				Spacing.AfterControlFlowKeyword(context);
 				TokenPrinter.Print(catchClause.Filter.OpenParenToken, context);
 				Node.Print(catchClause.Filter.FilterExpression, context);
 				TokenPrinter.Print(catchClause.Filter.CloseParenToken, context);
@@ -240,7 +240,7 @@ internal static partial class Printers
 			arena.Synthetic(SyntheticText.Space);
 
 		TokenPrinter.Print(node.UsingKeyword, context);
-		arena.Synthetic(SyntheticText.Space);
+		Spacing.AfterControlFlowKeyword(context);
 		TokenPrinter.Print(node.OpenParenToken, context);
 		Node.Print(node.Declaration, context);
 		Node.Print(node.Expression, context);
@@ -257,6 +257,23 @@ internal static partial class Printers
 		EmbeddedStatement(node.Statement, context);
 	}
 
+	public static void FixedStatement(FixedStatementSyntax node, PrintContext context)
+	{
+		TokenPrinter.Print(node.FixedKeyword, context);
+		Spacing.AfterControlFlowKeyword(context);
+		TokenPrinter.Print(node.OpenParenToken, context);
+		Node.Print(node.Declaration, context);
+		TokenPrinter.Print(node.CloseParenToken, context);
+		EmbeddedStatement(node.Statement, context);
+	}
+
+	public static void UnsafeStatement(UnsafeStatementSyntax node, PrintContext context)
+	{
+		TokenPrinter.Print(node.UnsafeKeyword, context);
+		BeforeOpenBrace(BraceStyle.ControlBlocks, context);
+		Node.Print(node.Block, context);
+	}
+
 	public static void LockStatement(LockStatementSyntax node, PrintContext context)
 	{
 		ConditionHeader(node.LockKeyword, node.OpenParenToken, node.Expression, node.CloseParenToken, context);
@@ -268,7 +285,7 @@ internal static partial class Printers
 		var arena = context.Arena;
 
 		TokenPrinter.Print(node.SwitchKeyword, context);
-		arena.Synthetic(SyntheticText.Space);
+		Spacing.AfterControlFlowKeyword(context);
 
 		if (node.OpenParenToken.RawKind != 0)
 		{

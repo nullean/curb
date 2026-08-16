@@ -66,6 +66,14 @@ internal static class Node
 				Printers.ParameterList((ParameterListSyntax)node, context);
 				break;
 
+			case SyntaxKind.FixedStatement:
+				Printers.FixedStatement((FixedStatementSyntax)node, context);
+				break;
+
+			case SyntaxKind.UnsafeStatement:
+				Printers.UnsafeStatement((UnsafeStatementSyntax)node, context);
+				break;
+
 			case SyntaxKind.EventDeclaration:
 				Printers.EventDeclaration((EventDeclarationSyntax)node, context);
 				break;

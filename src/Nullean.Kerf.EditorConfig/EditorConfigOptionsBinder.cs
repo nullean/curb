@@ -90,6 +90,51 @@ public static class EditorConfigOptionsBinder
 		if (TryBool(properties, "csharp_new_line_before_finally", diagnostics, out var newLineBeforeFinally))
 			options = options with { NewLineBeforeFinally = newLineBeforeFinally };
 
+		if (TryBool(properties, "csharp_space_after_cast", diagnostics, out var spaceAfterCast))
+			options = options with { SpaceAfterCast = spaceAfterCast };
+
+		if (TryBool(properties, "csharp_space_after_keywords_in_control_flow_statements", diagnostics, out var spaceAfterKeyword))
+			options = options with { SpaceAfterKeywordsInControlFlowStatements = spaceAfterKeyword };
+
+		if (TryBool(properties, "csharp_space_before_colon_in_inheritance_clause", diagnostics, out var spaceBeforeColon))
+			options = options with { SpaceBeforeColonInInheritanceClause = spaceBeforeColon };
+
+		if (TryBool(properties, "csharp_space_after_colon_in_inheritance_clause", diagnostics, out var spaceAfterColon))
+			options = options with { SpaceAfterColonInInheritanceClause = spaceAfterColon };
+
+		if (TryBool(properties, "csharp_space_before_dot", diagnostics, out var spaceBeforeDot))
+			options = options with { SpaceBeforeDot = spaceBeforeDot };
+
+		if (TryBool(properties, "csharp_space_after_dot", diagnostics, out var spaceAfterDot))
+			options = options with { SpaceAfterDot = spaceAfterDot };
+
+		if (TryBool(properties, "csharp_space_before_semicolon_in_for_statement", diagnostics, out var spaceBeforeSemicolon))
+			options = options with { SpaceBeforeSemicolonInForStatement = spaceBeforeSemicolon };
+
+		if (TryBool(properties, "csharp_space_after_semicolon_in_for_statement", diagnostics, out var spaceAfterSemicolon))
+			options = options with { SpaceAfterSemicolonInForStatement = spaceAfterSemicolon };
+
+		if (properties.TryGetValue("csharp_space_around_binary_operators", out var binaryOperators))
+		{
+			switch (binaryOperators.ToLowerInvariant())
+			{
+				case "before_and_after":
+					options = options with { SpaceAroundBinaryOperators = true };
+					break;
+				case "none":
+					options = options with { SpaceAroundBinaryOperators = false };
+					break;
+				default:
+					// `ignore` means reproduce the author's own whitespace verbatim, which is a
+					// different mechanism from a spacing flag and is not built yet.
+					diagnostics?.Add(KerfDiagnostic.UnrecognisedValue(
+						"csharp_space_around_binary_operators",
+						binaryOperators,
+						"before_and_after or none; ignore is not implemented yet"));
+					break;
+			}
+		}
+
 		if (properties.TryGetValue("csharp_new_line_before_open_brace", out var braceStyle))
 		{
 			if (BraceStyleParser.TryParse(braceStyle, out var style))

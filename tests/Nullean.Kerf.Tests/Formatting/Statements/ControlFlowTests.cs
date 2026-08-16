@@ -230,13 +230,27 @@ public class ControlFlowTests : FormattingTest
 		""");
 
 	[Test]
-	public Task For_loop_with_no_clauses() => Unchanged(
+	public Task For_loop_with_no_clauses() => Formats(
 		"""
 		public class C
 		{
 		    public void M()
 		    {
 		        for (;;)
+		        {
+		            Call();
+		        }
+		    }
+		}
+		""",
+		// dotnet format spaces an empty header out rather than collapsing it, and the two
+		// csharp_space_*_semicolon_in_for_statement options apply whether or not a clause follows.
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        for (; ; )
 		        {
 		            Call();
 		        }

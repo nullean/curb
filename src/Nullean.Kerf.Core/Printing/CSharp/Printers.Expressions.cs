@@ -46,7 +46,7 @@ internal static partial class Printers
 
 		if (right is ExpressionSyntax expression && BringsOwnBlock(expression))
 		{
-			arena.Synthetic(SyntheticText.Space);
+			Spacing.BeforeOperator(context);
 			Node.Print(right, context);
 			return;
 		}
@@ -54,7 +54,11 @@ internal static partial class Printers
 		using (arena.Group())
 		using (arena.Indent())
 		{
-			arena.Line();
+			// A Line is a space when flat; under `none` the break must not bring one back.
+			if (context.Options.SpaceAroundBinaryOperators)
+				arena.Line();
+			else
+				arena.SoftLine();
 			Node.Print(right, context);
 		}
 	}
@@ -62,16 +66,17 @@ internal static partial class Printers
 	public static void BinaryExpression(BinaryExpressionSyntax node, PrintContext context)
 	{
 		Node.Print(node.Left, context);
-		// csharp_space_around_binary_operators, default before_and_after.
-		context.Arena.Synthetic(SyntheticText.Space);
+		Spacing.BeforeOperator(context);
 		TokenPrinter.Print(node.OperatorToken, context);
 		OperandOnRight(node.Right, context);
 	}
 
 	public static void AssignmentExpression(AssignmentExpressionSyntax node, PrintContext context)
 	{
+		// dotnet format applies csharp_space_around_binary_operators to assignment too — `y=y+1`,
+		// though the `=` of a declarator keeps its spaces, since that is not an operator.
 		Node.Print(node.Left, context);
-		context.Arena.Synthetic(SyntheticText.Space);
+		Spacing.BeforeOperator(context);
 		TokenPrinter.Print(node.OperatorToken, context);
 		OperandOnRight(node.Right, context);
 	}
@@ -126,7 +131,7 @@ internal static partial class Printers
 		TokenPrinter.Print(node.OpenParenToken, context);
 		Node.Print(node.Type, context);
 		TokenPrinter.Print(node.CloseParenToken, context);
-		// csharp_space_after_cast, default false.
+		Spacing.AfterCast(context);
 		Node.Print(node.Expression, context);
 	}
 
@@ -487,10 +492,9 @@ internal static partial class Printers
 	{
 		var arena = context.Arena;
 
-		// csharp_space_before_colon_in_inheritance_clause / _after_, both default true. The space
-		// before is emitted by the caller, which knows what preceded the colon.
+		// The space before the colon is emitted by the caller, which knows what preceded it.
 		TokenPrinter.Print(node.ColonToken, context);
-		arena.Synthetic(SyntheticText.Space);
+		Spacing.AfterInheritanceColon(context);
 
 		for (var i = 0; i < node.Types.Count; i++)
 		{
