@@ -59,6 +59,25 @@ internal static class TokenPrinter
 		return false;
 	}
 
+	/// <summary>True when a token carries a comment or directive on either side of it.</summary>
+	/// <remarks>
+	/// Asked of a trailing comma the printer is considering dropping. Dropping the token drops its
+	/// trivia with it, and a comma either side of a comment is not worth losing the comment for, so
+	/// such a separator is printed exactly as written instead.
+	/// </remarks>
+	public static bool HasAnyContent(SyntaxToken token)
+	{
+		if (HasLeadingContent(token))
+			return true;
+
+		foreach (var trivia in token.TrailingTrivia)
+		{
+			if (trivia.Kind() is not (SyntaxKind.WhitespaceTrivia or SyntaxKind.EndOfLineTrivia))
+				return true;
+		}
+		return false;
+	}
+
 	/// <summary>Emits a token only if it is actually present, for optional syntax like a trailing semicolon.</summary>
 	public static void PrintIfPresent(SyntaxToken token, PrintContext context)
 	{

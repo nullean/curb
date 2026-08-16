@@ -123,7 +123,8 @@ public sealed class CSharpFormatter : IDisposable
 
 		var written = _output.Written;
 
-		if (!ContentVerifier.Verify(source.AsSpan(), written, out var failure, context.ReorderedSpan))
+		if (!ContentVerifier.Verify(
+			source.AsSpan(), written, out var failure, context.ReorderedSpan, options.RewritesTrailingCommas))
 			return new FormatResult(FormatStatus.VerificationFailed, false, null, context.Coverage, failure);
 
 		// The second parse only ever finds a moved token boundary, and the printer already knows
@@ -137,7 +138,8 @@ public sealed class CSharpFormatter : IDisposable
 		if (verifyRoundTrip)
 		{
 			RoundTripsChecked++;
-			if (!TokenStreamComparer.Verify(parsed.Root, source.AsSpan(), text!, out var roundTripFailure, reordered))
+			if (!TokenStreamComparer.Verify(
+				parsed.Root, source.AsSpan(), text!, out var roundTripFailure, reordered, options.RewritesTrailingCommas))
 				return new FormatResult(FormatStatus.VerificationFailed, false, null, context.Coverage, roundTripFailure);
 		}
 

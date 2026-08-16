@@ -35,7 +35,8 @@ public static class OptionValues
 		// Read and written but never a layout decision, so there is nothing resolved to report.
 		"charset" => "utf-8",
 
-		"kerf_opinionated" => Bool(options.Opinionated),
+		"csharp_trailing_comma_in_multiline_lists" => Bool(options.TrailingCommaInMultilineLists),
+		"csharp_trailing_comma_in_singleline_lists" => Bool(options.TrailingCommaInSinglelineLists),
 		"generated_code" => Bool(options.Excluded),
 		"dotnet_diagnostic.ide0055.severity" => options.Excluded ? "none" : "default",
 

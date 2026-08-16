@@ -36,11 +36,16 @@ internal static class ContentVerifier
 	/// <param name="reordered">
 	/// Source span whose content was deliberately permuted, or default when nothing was.
 	/// </param>
+	/// <param name="trailingCommas">
+	/// The trailing-comma options are on, so a <c>,</c> immediately before a closing brace or bracket
+	/// may appear on one side and not the other.
+	/// </param>
 	public static bool Verify(
 		ReadOnlySpan<char> source,
 		ReadOnlySpan<char> output,
 		out string? failure,
-		TextSpan reordered = default)
+		TextSpan reordered = default,
+		bool trailingCommas = false)
 	{
 		var sourceIndex = 0;
 		var outputIndex = 0;
@@ -87,6 +92,17 @@ internal static class ContentVerifier
 
 			if (source[sourceIndex] != output[outputIndex])
 			{
+				// The one declared token delta: a trailing comma the printer added or dropped. The
+				// allowance is deliberately narrow — the comma has to be the last thing before a
+				// closing brace or bracket on whichever side carries it — so it cannot excuse a
+				// dropped element. `{ a, x }` printed as `{ a, }` still fails here, because the
+				// mismatch is `x` against `}` and neither side is a comma.
+				if (trailingCommas && SkipTrailingComma(output, ref outputIndex))
+					continue;
+
+				if (trailingCommas && SkipTrailingComma(source, ref sourceIndex))
+					continue;
+
 				failure =
 					$"formatting changed content at source offset {sourceIndex}: "
 					+ $"expected {Excerpt(source, sourceIndex)} but produced {Excerpt(output, outputIndex)}";
@@ -96,6 +112,31 @@ internal static class ContentVerifier
 			sourceIndex++;
 			outputIndex++;
 		}
+	}
+
+	/// <summary>
+	/// Steps over a trailing comma, and only a trailing one.
+	/// </summary>
+	/// <remarks>
+	/// Advances <paramref name="index"/> past a <c>,</c> whose next content character closes a brace
+	/// or a bracket, and leaves it alone otherwise. Those are the only closers the grammar permits a
+	/// trailing comma before: a comma before <c>)</c> or <c>&gt;</c> is not legal C# and is not
+	/// something the printer can have produced, so it is still a verification failure.
+	/// </remarks>
+	private static bool SkipTrailingComma(ReadOnlySpan<char> text, ref int index)
+	{
+		if (index >= text.Length || text[index] != ',')
+			return false;
+
+		var next = index + 1;
+		while (next < text.Length && IsSkippable(text[next]))
+			next++;
+
+		if (next >= text.Length || text[next] is not ('}' or ']'))
+			return false;
+
+		index++;
+		return true;
 	}
 
 	/// <summary>Compares the next <paramref name="count"/> content characters as multisets.</summary>

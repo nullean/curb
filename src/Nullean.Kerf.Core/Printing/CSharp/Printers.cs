@@ -892,6 +892,94 @@ internal static partial class Printers
 	}
 
 	/// <summary>
+	/// True when a token is followed by a line comment, which has already ended the line.
+	/// </summary>
+	/// <remarks>
+	/// A caller about to emit a break of its own has to ask this first. A line comment closes its line
+	/// as part of being one, so a second break opens a blank line — and the next run preserves that
+	/// blank line and is asked the same question again, which is how this class of bug stops a file
+	/// settling rather than merely looking wrong once.
+	/// </remarks>
+	internal static bool EndsWithLineComment(SyntaxToken token)
+	{
+		foreach (var trivia in token.TrailingTrivia)
+		{
+			if (trivia.IsKind(SyntaxKind.SingleLineCommentTrivia))
+				return true;
+		}
+
+		return false;
+	}
+
+	/// <summary>
+	/// True when the printer, rather than the source, decides this list's trailing comma.
+	/// </summary>
+	/// <remarks>
+	/// <para>
+	/// Callers must only ask this of a list the C# grammar permits a trailing comma on — initializers,
+	/// enum bodies, anonymous types, switch expressions, collection expressions and list patterns.
+	/// Argument lists, parameter lists, type argument and type parameter lists and tuples forbid one,
+	/// and adding it there produces source that does not compile, so those printers never call this
+	/// and <see cref="PrintSeparated{T}"/>, which serves exactly those two forbidden shapes, has no
+	/// trailing-comma path at all.
+	/// </para>
+	/// <para>
+	/// A trailing separator carrying a comment is left to print itself as written. Suppressing the
+	/// token would take its trivia with it, and a comma is not worth losing a comment over.
+	/// </para>
+	/// <para>
+	/// A comment or directive sitting between the last element and the closer stands the list down
+	/// too. The comma there would be legal and is what Rider writes, but it puts a token Kerf invented
+	/// somewhere the content verifier cannot cheaply confirm — that check is a character scan which
+	/// knows nothing of comments, and teaching the always-on safety net to parse them to widen an
+	/// opinion is the wrong trade. Nine files in the corpus take this path.
+	/// </para>
+	/// </remarks>
+	internal static bool RewritesTrailingComma<T>(SeparatedSyntaxList<T> list, SyntaxToken closer, PrintContext context)
+		where T : SyntaxNode =>
+		context.Options.RewritesTrailingCommas
+		&& list.Count > 0
+		&& !TokenPrinter.HasLeadingContent(closer)
+		&& (list.SeparatorCount < list.Count || !TokenPrinter.HasAnyContent(list.GetSeparator(list.Count - 1)));
+
+	/// <summary>
+	/// Emits the trailing comma for a list <see cref="RewritesTrailingComma{T}"/> accepted.
+	/// </summary>
+	/// <remarks>
+	/// Whether the list ends up broken is reflow's decision, taken on this same run, so the comma
+	/// cannot be chosen from the source the way the preservation rules are. It goes in as an
+	/// <c>IfBreak</c> against the enclosing group and is resolved when that group's fit is measured —
+	/// which is also what makes the rule idempotent, since a second run measures the same group and
+	/// reaches the same branch.
+	/// </remarks>
+	internal static void PrintTrailingComma(PrintContext context)
+	{
+		var options = context.Options;
+		var arena = context.Arena;
+
+		if (options.TrailingCommaInMultilineLists && options.TrailingCommaInSinglelineLists)
+		{
+			// Wanted either way, so there is nothing for the printer to decide.
+			arena.Synthetic(SyntheticText.Comma);
+			return;
+		}
+
+		using var ifBreak = arena.IfBreak();
+
+		using (ifBreak.Branch())
+		{
+			if (options.TrailingCommaInSinglelineLists)
+				arena.Synthetic(SyntheticText.Comma);
+		}
+
+		using (ifBreak.Branch())
+		{
+			if (options.TrailingCommaInMultilineLists)
+				arena.Synthetic(SyntheticText.Comma);
+		}
+	}
+
+	/// <summary>
 	/// True when the author already spread this construct over more than one line.
 	/// </summary>
 	/// <remarks>

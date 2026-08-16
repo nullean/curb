@@ -41,6 +41,8 @@ internal static partial class Printers
 		var arena = context.Arena;
 		TokenPrinter.Print(node.OpenBraceToken, context);
 
+		var rewritesComma = RewritesTrailingComma(node.Members, node.CloseBraceToken, context);
+
 		using (arena.Indent())
 		{
 			var previousEnd = node.OpenBraceToken.Span.End;
@@ -51,10 +53,17 @@ internal static partial class Printers
 					arena.HardLine();
 
 				Node.Print(node.Members[i], context);
+				previousEnd = node.Members[i].Span.End;
+
+				if (rewritesComma && i == node.Members.Count - 1)
+					continue;
+
 				if (i < node.Members.SeparatorCount)
 					TokenPrinter.Print(node.Members.GetSeparator(i), context);
-				previousEnd = node.Members[i].Span.End;
 			}
+
+			if (rewritesComma)
+				PrintTrailingComma(context);
 		}
 
 		using (arena.IndentIf(context.Options.IndentBraces))

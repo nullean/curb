@@ -79,10 +79,10 @@ public abstract class FormattingTest
 	/// </summary>
 	/// <remarks>
 	/// <para>
-	/// Everything <c>kerf_opinionated</c> enables is a change <c>dotnet format</c> declines to make
-	/// and will not undo, so the opinion is safe to hold — but the default has to stay minimal-churn
-	/// or adopting Kerf stops being undramatic. Asserting both halves in one place is what stops an
-	/// opinion leaking into the default: <paramref name="asDefault"/> fails the moment it does.
+	/// Every opinion Kerf holds is a change <c>dotnet format</c> declines to make and will not undo,
+	/// so it is safe to hold — but each is off unless asked for, or adopting Kerf stops being
+	/// undramatic. Asserting both halves in one place is what stops an opinion leaking into the
+	/// default: <paramref name="asDefault"/> fails the moment it does.
 	/// </para>
 	/// <para>
 	/// Pass the source unchanged as <paramref name="asDefault"/> for the usual case, where the
@@ -90,17 +90,19 @@ public abstract class FormattingTest
 	/// </para>
 	/// </remarks>
 	/// <param name="source">The input.</param>
-	/// <param name="asDefault">What it formats to with the switch off.</param>
-	/// <param name="asOpinionated">What it formats to with <c>kerf_opinionated = true</c>.</param>
+	/// <param name="asDefault">What it formats to with <paramref name="opinionConfig"/> absent.</param>
+	/// <param name="asOpinion">What it formats to with it present.</param>
+	/// <param name="opinionConfig">The key that asks for the opinion, such as a trailing-comma one.</param>
 	/// <param name="editorConfig">Extra settings, applied to both halves.</param>
-	protected static Task Opinionated(
+	protected static Task WithAndWithout(
 		[LanguageInjection("csharp")][StringSyntax("C#")] string source,
 		[LanguageInjection("csharp")][StringSyntax("C#")] string asDefault,
-		[LanguageInjection("csharp")][StringSyntax("C#")] string asOpinionated,
+		[LanguageInjection("csharp")][StringSyntax("C#")] string asOpinion,
+		[StringSyntax("ini")] string opinionConfig,
 		[StringSyntax("ini")] string? editorConfig = null)
 	{
 		Formats(source, asDefault, editorConfig);
-		return Formats(source, asOpinionated, JoinConfig(editorConfig, "kerf_opinionated = true"));
+		return Formats(source, asOpinion, JoinConfig(editorConfig, opinionConfig));
 	}
 
 	private static string JoinConfig(string? editorConfig, string extra) =>

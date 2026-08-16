@@ -76,7 +76,7 @@ let private conformance (arguments:ParseResults<Arguments>) =
     printfn "copying corpus from %s" corpus.FullName
     copyTree corpus.FullName work
 
-    let opinionated = arguments.Contains Opinionated
+    let trailingCommas = arguments.Contains TrailingCommas
     let keepWidths = arguments.Contains Reflow
 
     // What this measures is dotnet_format(kerf(x)) = kerf(x) — that Kerf's output is a *fixed point*
@@ -97,7 +97,10 @@ let private conformance (arguments:ParseResults<Arguments>) =
         let widths =
             if keepWidths then text
             else Text.RegularExpressions.Regex.Replace(text, @"max_line_length\s*=\s*\S+", "max_line_length = off")
-        let rewritten = if opinionated then widths + "\n[*.cs]\nkerf_opinionated = true\n" else widths
+        let rewritten =
+            if trailingCommas then
+                widths + "\n[*.cs]\ncsharp_trailing_comma_in_multiline_lists = true\n"
+            else widths
         File.WriteAllText(config, rewritten)
 
     exec "dotnet" ["run"; "--project"; "src/Nullean.Kerf.Cli"; "-c"; "Release"; "--"; "format"; work] |> ignore
@@ -116,11 +119,11 @@ let private conformance (arguments:ParseResults<Arguments>) =
     let percentage = 100.0 * float agreeing / float total
     printfn ""
     let mode =
-        match arguments.Contains Opinionated, arguments.Contains Reflow with
+        match arguments.Contains TrailingCommas, arguments.Contains Reflow with
         | false, false -> ""
-        | true, false -> " (opinionated)"
+        | true, false -> " (trailing commas)"
         | false, true -> " (reflow)"
-        | true, true -> " (opinionated, reflow)"
+        | true, true -> " (trailing commas, reflow)"
     printfn "conformance with dotnet format%s: %d/%d files (%.2f%%)" mode agreeing total percentage
     if differing.Length > 0 then
         printfn ""

@@ -272,28 +272,60 @@ public readonly record struct FormatOptions
 	/// <summary><c>csharp_indent_labels</c>, default <see cref="LabelIndent.OneLessThanCurrent"/>.</summary>
 	public LabelIndent IndentLabels { get; init; } = LabelIndent.OneLessThanCurrent;
 
+	// ---- Opinions ---------------------------------------------------------------------------------
+	//
+	// Layout choices dotnet format declines to make, and which Kerf will make when asked. Each is off
+	// by default, each is a fixed point of dotnet format when on — that is the admission test, and it
+	// is the number ./build.sh conformance already reports — and each is asked for by a key somebody
+	// else already defined: ReSharper's for syntax style, Microsoft's IDE2000 series for blank lines.
+	//
+	// There is deliberately no master switch. An earlier design had `kerf_opinionated` on the premise
+	// that .NET offered nothing to borrow, which turned out to be wrong: Rider has held these opinions
+	// for years and reads these keys today, so a repository that has configured Rider has already said
+	// what it wants. A bundle switch on top would also mean a Kerf upgrade could silently reformat a
+	// repository as the bundle grew, which is the opposite of what the defaults promise. Kerf invents
+	// no formatting keys.
+
 	/// <summary>
-	/// Apply the formatting opinions <c>dotnet format</c> declines to hold.
+	/// Put a comma after the last element of a list the printer breaks across lines.
 	/// </summary>
 	/// <remarks>
 	/// <para>
-	/// <c>kerf_opinionated</c>, default false. The one key Kerf invents, because .NET has no concept
-	/// of "be more opinionated than <c>dotnet format</c>" and so offers nothing to borrow.
+	/// ReSharper's <c>trailing_comma_in_multiline_lists</c>, and deliberately not something Kerf
+	/// invented: Rider already offers this and already reads this key, so a repository that sets it
+	/// gets the same answer from Rider's cleanup and from Kerf. Also accepted under the
+	/// <c>csharp_</c>, <c>resharper_</c> and <c>resharper_csharp_</c> prefixes, all four of which
+	/// ReSharper documents.
 	/// </para>
 	/// <para>
-	/// Everything it enables is still a fixed point of <c>dotnet format</c> — that is the admission
-	/// test, and it is the same number <c>./build.sh conformance</c> already reports. A repository
-	/// formatted this way stays put when anyone runs <c>dotnet format</c>, hits Format Document, or
-	/// builds with <c>EnforceCodeStyleInBuild</c>. What it costs is one diff at the point of opting
-	/// in, which is why the default is off: onboarding should be undramatic.
+	/// Off by default. It is the one opinion here that adds and removes a token rather than moving
+	/// whitespace, and it is divisive enough that it has always been a setting wherever it is offered,
+	/// so it stays an explicit ask.
 	/// </para>
 	/// <para>
-	/// Rules that have a real EditorConfig key of their own — the IDE2000 series — are honoured
-	/// whether or not this is set, and an explicit setting of one of those wins over this switch in
-	/// both directions.
+	/// The decision is taken at print time, not from the source: whether the list breaks is reflow's
+	/// answer, so the comma is emitted as an <c>IfBreak</c> against the list's own group.
 	/// </para>
 	/// </remarks>
-	public bool Opinionated { get; init; }
+	public bool TrailingCommaInMultilineLists { get; init; }
+
+	/// <summary>
+	/// Put a comma after the last element even when the whole list sits on one line.
+	/// </summary>
+	/// <remarks>
+	/// ReSharper's <c>trailing_comma_in_singleline_lists</c>, under the same four prefixes as
+	/// <see cref="TrailingCommaInMultilineLists"/>, and independent of it: the two combine into the
+	/// four states ReSharper allows, including "flat only", which normalises a list to carrying a
+	/// trailing comma however it is laid out.
+	/// </remarks>
+	public bool TrailingCommaInSinglelineLists { get; init; }
+
+	/// <summary>True when either trailing-comma option asked for anything.</summary>
+	/// <remarks>
+	/// Gates both the printer work and the verifier's allowance for a comma that appears or vanishes,
+	/// so a repository that has not opted in cannot pay for either.
+	/// </remarks>
+	public bool RewritesTrailingCommas => TrailingCommaInMultilineLists || TrailingCommaInSinglelineLists;
 
 	/// <summary>
 	/// The file asked not to be formatted at all.

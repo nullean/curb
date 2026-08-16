@@ -88,9 +88,11 @@ public static class OptionCatalog
 	/// <summary>Keys Kerf actually acts on today. Everything else in the catalog reports KERF1003.</summary>
 	public static readonly FrozenSet<string> ImplementedKeys =
 		CoreKeys.Concat([
-			// Kerf's own switch. The only invented key, and the only one that can be: nothing in
-			// .NET expresses "hold the opinions dotnet format declines to hold".
-			"kerf_opinionated",
+			// ReSharper's keys, not Kerf's. Kerf invents no formatting keys: Rider has held this
+			// opinion for years and already reads these, so a repository that configured Rider has
+			// said what it wants. Opt-in, because this is the one opinion that moves a token.
+			"csharp_trailing_comma_in_multiline_lists",
+			"csharp_trailing_comma_in_singleline_lists",
 
 			// Not IDE0055 options: the two native ways a file says it should not be formatted.
 			"generated_code",

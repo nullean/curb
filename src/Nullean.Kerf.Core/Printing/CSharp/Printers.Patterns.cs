@@ -127,15 +127,25 @@ internal static partial class Printers
 		TokenPrinter.Print(node.OpenBracketToken, context);
 		Spacing.InsideBrackets(context);
 
+		var rewritesComma = RewritesTrailingComma(node.Patterns, node.CloseBracketToken, context);
+
 		for (var i = 0; i < node.Patterns.Count; i++)
 		{
 			Node.Print(node.Patterns[i], context);
 			if (i >= node.Patterns.SeparatorCount)
 				continue;
+
+			if (rewritesComma && i == node.Patterns.Count - 1)
+				continue;
+
 			Spacing.BeforeComma(context);
 			TokenPrinter.Print(node.Patterns.GetSeparator(i), context);
 			Spacing.AfterComma(context);
 		}
+
+		// A list pattern is always printed flat, so only the single-line option can reach it.
+		if (rewritesComma)
+			PrintTrailingComma(context);
 
 		Spacing.InsideBrackets(context);
 		TokenPrinter.Print(node.CloseBracketToken, context);

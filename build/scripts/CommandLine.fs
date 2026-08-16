@@ -24,7 +24,7 @@ type Arguments =
     | [<Inherit>] Corpus of string
     | [<Inherit>] Minimum of double
     | [<Inherit>] MaxAllocationRatio of double
-    | [<Inherit>] Opinionated
+    | [<Inherit>] TrailingCommas
     | [<Inherit>] Reflow
     | [<Inherit;AltCommandLine("-s")>] SingleTarget of bool
     | [<Inherit>] Token of string
@@ -42,7 +42,7 @@ with
             | Corpus _ -> "path to a checkout to measure conformance against"
             | Minimum _ -> "fail if conformance falls below this percentage"
             | MaxAllocationRatio _ -> "fail if perf allocates more than this multiple of the source size"
-            | Opinionated -> "measure conformance with kerf_opinionated = true"
+            | TrailingCommas -> "measure conformance with ReSharper's trailing-comma keys on"
             | Reflow -> "keep the corpus's own max_line_length instead of forcing it off"
             | Release -> "runs build, tests, then creates and validates the packages shy of publishing them"
             | Publish -> "runs the full release"

@@ -224,8 +224,13 @@ public static class EditorConfigOptionsBinder
 				options = options with { SortUsings = UsingOrder.SystemFirst };
 		}
 
-		if (TryBool(properties, "kerf_opinionated", diagnostics, out var opinionated))
-			options = options with { Opinionated = opinionated };
+		// ReSharper's keys rather than invented ones, so a repository that has already told Rider what
+		// it wants does not have to tell Kerf as well.
+		if (TryPrefixedBool(properties, "trailing_comma_in_multiline_lists", diagnostics, out var multiline))
+			options = options with { TrailingCommaInMultilineLists = multiline };
+
+		if (TryPrefixedBool(properties, "trailing_comma_in_singleline_lists", diagnostics, out var singleline))
+			options = options with { TrailingCommaInSinglelineLists = singleline };
 
 		// The two native ways of saying "do not format this file".
 		if (TryBool(properties, "generated_code", diagnostics, out var generatedCode) && generatedCode)
@@ -352,6 +357,32 @@ public static class EditorConfigOptionsBinder
 		diagnostics?.Add(KerfDiagnostic.UnrecognisedValue(key, raw, "an integer between 1 and 64"));
 		return false;
 	}
+
+	/// <summary>
+	/// Reads a key ReSharper documents under four spellings, most specific first.
+	/// </summary>
+	/// <remarks>
+	/// ReSharper accepts <c>resharper_csharp_x</c>, <c>csharp_x</c>, <c>resharper_x</c> and bare
+	/// <c>x</c> for the same setting, and real repositories use all four. Whichever is present wins,
+	/// and the more specific one wins when several are.
+	/// </remarks>
+	private static bool TryPrefixedBool(
+		IReadOnlyDictionary<string, string> properties,
+		string key,
+		ICollection<KerfDiagnostic>? diagnostics,
+		out bool value)
+	{
+		foreach (var prefix in ReSharperPrefixes)
+		{
+			if (TryBool(properties, prefix + key, diagnostics, out value))
+				return true;
+		}
+
+		value = false;
+		return false;
+	}
+
+	private static readonly string[] ReSharperPrefixes = ["resharper_csharp_", "csharp_", "resharper_", ""];
 
 	private static bool TryBool(
 		IReadOnlyDictionary<string, string> properties,

@@ -272,6 +272,8 @@ internal static partial class Printers
 
 			if (node.Expressions.Count > 0)
 			{
+				var rewritesComma = RewritesTrailingComma(node.Expressions, node.CloseBraceToken, context);
+
 				using (arena.Indent())
 				{
 					InsideBrace(node.OpenBraceToken.Span.End, node.Expressions[0].SpanStart);
@@ -281,6 +283,11 @@ internal static partial class Printers
 						if (i >= node.Expressions.SeparatorCount)
 							continue;
 
+						// The source's own trailing comma is suppressed when the printer is deciding
+						// this list's, so that the two cannot both emit one.
+						if (rewritesComma && i == node.Expressions.Count - 1)
+							continue;
+
 						Spacing.BeforeComma(context);
 						TokenPrinter.Print(node.Expressions.GetSeparator(i), context);
 
@@ -288,6 +295,14 @@ internal static partial class Printers
 						if (i < node.Expressions.Count - 1)
 							Separator(node.Expressions[i].Span.End, node.Expressions[i + 1].SpanStart);
 					}
+
+					if (rewritesComma)
+						PrintTrailingComma(context);
+
+					// The last member may itself have ended in a line comment, which closed the line
+					// already; the closing brace must then reuse that line rather than break again.
+					if (EndsWithLineComment(node.CloseBraceToken.GetPreviousToken()))
+						trailingTrivia = true;
 
 					// A comment sitting above the closing brace belongs with the members, not with
 					// the brace — the same rule Block already follows. Printed here, inside the
@@ -361,6 +376,7 @@ internal static partial class Printers
 		if (node.Elements.Count > 0)
 		{
 			var asWritten = SpansLines(node, context);
+			var rewritesComma = RewritesTrailingComma(node.Elements, node.CloseBracketToken, context);
 
 			using (arena.Group())
 			{
@@ -371,6 +387,9 @@ internal static partial class Printers
 					{
 						Node.Print(node.Elements[i], context);
 						if (i >= node.Elements.SeparatorCount)
+							continue;
+
+						if (rewritesComma && i == node.Elements.Count - 1)
 							continue;
 
 						Spacing.BeforeComma(context);
@@ -387,6 +406,9 @@ internal static partial class Printers
 						else
 							arena.HardLine();
 					}
+
+					if (rewritesComma)
+						PrintTrailingComma(context);
 				}
 
 				Edge(node.Elements[^1].Span.End, node.Span.End);
@@ -492,6 +514,7 @@ internal static partial class Printers
 
 		var oneMemberPerLine = context.Options.NewLineBeforeMembersInAnonymousTypes;
 		var asWritten = !oneMemberPerLine && SpansLines(node, context);
+		var rewritesComma = RewritesTrailingComma(node.Initializers, node.CloseBraceToken, context);
 
 		TokenPrinter.Print(node.NewKeyword, context);
 
@@ -513,11 +536,17 @@ internal static partial class Printers
 					if (i >= node.Initializers.SeparatorCount)
 						continue;
 
+					if (rewritesComma && i == node.Initializers.Count - 1)
+						continue;
+
 					Spacing.BeforeComma(context);
 					TokenPrinter.Print(node.Initializers.GetSeparator(i), context);
 					if (i < node.Initializers.Count - 1)
 						Separator(node.Initializers[i].Span.End, node.Initializers[i + 1].SpanStart);
 				}
+
+				if (rewritesComma)
+					PrintTrailingComma(context);
 			}
 
 			using (arena.IndentIf(context.Options.IndentBraces))
@@ -604,15 +633,25 @@ internal static partial class Printers
 
 		TokenPrinter.Print(node.OpenBraceToken, context);
 
+		var rewritesComma = RewritesTrailingComma(node.Arms, node.CloseBraceToken, context);
+
 		using (arena.Indent())
 		{
 			for (var i = 0; i < node.Arms.Count; i++)
 			{
 				arena.HardLine();
 				Node.Print(node.Arms[i], context);
+
+				if (rewritesComma && i == node.Arms.Count - 1)
+					continue;
+
 				if (i < node.Arms.SeparatorCount)
 					TokenPrinter.Print(node.Arms.GetSeparator(i), context);
 			}
+
+			// A switch expression is always laid out broken, so the flat branch never applies.
+			if (rewritesComma)
+				PrintTrailingComma(context);
 		}
 
 		using (arena.IndentIf(context.Options.IndentBraces))

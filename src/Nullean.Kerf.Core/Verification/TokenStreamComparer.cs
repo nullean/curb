@@ -1,4 +1,5 @@
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Text;
 
@@ -41,7 +42,8 @@ internal static class TokenStreamComparer
 		ReadOnlySpan<char> originalText,
 		string formatted,
 		out string? failure,
-		bool usingsReordered = false)
+		bool usingsReordered = false,
+		bool trailingCommas = false)
 	{
 		if (!CSharpSource.TryParse(formatted, out var reparsed, out var errors))
 		{
@@ -108,7 +110,20 @@ internal static class TokenStreamComparer
 			var before = original.Current;
 			var after = produced.Current;
 
-			if (before.RawKind != after.RawKind || !Text(originalText, before).SequenceEqual(Text(formattedText, after)))
+			// The declared token delta. A trailing comma that appeared or vanished shows up here as a
+			// `,` on one side against the closer on the other, which needs no lookahead to spot: the
+			// grammar allows at most one, so stepping over it once and re-comparing is exact. Any
+			// other mismatch, including a comma anywhere but immediately before a `}` or `]`, still
+			// fails.
+			if (trailingCommas && Mismatch(originalText, before, formattedText, after))
+			{
+				if (IsComma(before) && IsCloser(after) && Next(original, originalUsings, out var nextBefore))
+					before = nextBefore;
+				else if (IsCloser(before) && IsComma(after) && Next(produced, producedUsings, out var nextAfter))
+					after = nextAfter;
+			}
+
+			if (Mismatch(originalText, before, formattedText, after))
 			{
 				failure =
 					$"formatting changed token {index}: '{Text(originalText, before)}' became "
@@ -118,6 +133,36 @@ internal static class TokenStreamComparer
 
 			index++;
 		}
+	}
+
+	private static bool Mismatch(
+		ReadOnlySpan<char> originalText,
+		SyntaxToken before,
+		ReadOnlySpan<char> formattedText,
+		SyntaxToken after) =>
+		before.RawKind != after.RawKind
+		|| !Text(originalText, before).SequenceEqual(Text(formattedText, after));
+
+	private static bool IsComma(SyntaxToken token) => token.RawKind == (int)SyntaxKind.CommaToken;
+
+	/// <summary>The two closers the grammar permits a trailing comma before.</summary>
+	private static bool IsCloser(SyntaxToken token) =>
+		token.RawKind is (int)SyntaxKind.CloseBraceToken or (int)SyntaxKind.CloseBracketToken;
+
+	/// <summary>Pulls the next token outside the region checked as a set.</summary>
+	private static bool Next(IEnumerator<SyntaxToken> tokens, TextSpan skip, out SyntaxToken token)
+	{
+		while (tokens.MoveNext())
+		{
+			if (skip.Contains(tokens.Current.SpanStart))
+				continue;
+
+			token = tokens.Current;
+			return true;
+		}
+
+		token = default;
+		return false;
 	}
 
 	/// <summary>Compares the two using lists as multisets of their text.</summary>
