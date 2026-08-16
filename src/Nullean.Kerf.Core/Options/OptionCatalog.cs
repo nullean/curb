@@ -96,6 +96,7 @@ public static class OptionCatalog
 			"csharp_new_line_before_members_in_anonymous_types",
 			"csharp_new_line_between_query_expression_clauses",
 			"csharp_preserve_single_line_blocks",
+			"csharp_preserve_single_line_statements",
 			"csharp_indent_case_contents",
 			"csharp_indent_case_contents_when_block",
 			"csharp_indent_switch_labels",

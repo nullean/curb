@@ -153,6 +153,11 @@ internal static partial class Printers
 	{
 		var arena = context.Arena;
 
+		// Written on one line, this is a block like any other, so turning preservation off expands it
+		// rather than leaving it to whether it happens to fit.
+		var expand = !context.Options.PreserveSingleLineBlocks
+			&& context.OnSameLine(node.OpenBraceToken.SpanStart, node.CloseBraceToken.Span.End);
+
 		using (arena.Group())
 		{
 			// The accessor list belongs to whatever declares it. An indexer's list answers to the
@@ -164,22 +169,47 @@ internal static partial class Printers
 				EventDeclarationSyntax => BraceStyle.Events,
 				_ => BraceStyle.Properties,
 			};
-			BeforeOpenBraceWhenBroken(construct, context);
+			if (expand)
+				BeforeOpenBrace(construct, context);
+			else
+				BeforeOpenBraceWhenBroken(construct, context);
+
 			TokenPrinter.Print(node.OpenBraceToken, context);
 
 			using (arena.Indent())
 			{
+				var previousEnd = node.OpenBraceToken.Span.End;
 				for (var i = 0; i < node.Accessors.Count; i++)
 				{
-					arena.Line();
-					Node.Print(node.Accessors[i], context);
+					var accessor = node.Accessors[i];
+
+					// Expanding moves the accessors off the declaration's line but keeps ones the
+					// author wrote together together: `{ get; set; }` becomes three lines, not four.
+					if (i == 0)
+						Edge();
+					else if (expand && context.OnSameLine(previousEnd, accessor.SpanStart))
+						arena.Synthetic(SyntheticText.Space);
+					else
+						arena.Line();
+
+					Node.Print(accessor, context);
+					previousEnd = accessor.Span.End;
 				}
 			}
+
 			using (arena.IndentIf(context.Options.IndentBraces))
-				arena.Line();
+				Edge();
 		}
 
 		TokenPrinter.Print(node.CloseBraceToken, context);
+
+		void Edge()
+		{
+			if (expand)
+				arena.HardLine();
+			else
+				arena.Line();
+		}
 	}
 
 	/// <summary>The <c>event T Name { add { } remove { } }</c> form; the field form is a FieldDeclaration.</summary>

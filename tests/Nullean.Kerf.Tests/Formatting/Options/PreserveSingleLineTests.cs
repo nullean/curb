@@ -1,14 +1,21 @@
 namespace Nullean.Kerf.Tests.Formatting.Options;
 
 /// <summary>
-/// <c>csharp_preserve_single_line_blocks</c>.
+/// <c>csharp_preserve_single_line_blocks</c> and <c>csharp_preserve_single_line_statements</c>.
 /// </summary>
 /// <remarks>
 /// <para>
-/// This is the option that makes Kerf's output depend on its input, and it is on by default because
-/// that is what dotnet format does. It beats both <c>csharp_new_line_before_open_brace</c> — a
-/// preserved body keeps its brace on the header line — and <c>max_line_length</c>, since a
-/// preserved block is not reflowed.
+/// These are the options that make Kerf's output depend on its input, and both are on by default
+/// because that is what dotnet format does. They beat every other layout option: a preserved body
+/// keeps its brace on the header line whatever <c>csharp_new_line_before_open_brace</c> says, and
+/// is not reflowed whatever <c>max_line_length</c> says.
+/// </para>
+/// <para>
+/// The split between them is dotnet format's rather than one Kerf would have chosen. Blocks covers
+/// member, type, namespace and enum bodies; statements covers a control-flow body sharing its
+/// header's line, two statements separated by a semicolon, and a statement on its case label's
+/// line. A switch needs both, since a one-line switch necessarily has its statement on the label's
+/// line.
 /// </para>
 /// <para>
 /// Kerf remains idempotent: running it twice changes nothing, which every test here asserts for
@@ -200,7 +207,199 @@ public class PreserveSingleLineTests : FormattingTest
 		csharp_new_line_before_open_brace = none
 		""");
 
-	// ---- the option is what makes output input-dependent -------------------------------------------
+	// ---- csharp_preserve_single_line_statements ----------------------------------------------------
+
+	[Test]
+	public Task A_statement_on_its_header_line_stays_there() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        if (a) return;
+		        for (var i = 0; i < 1; i++) Call();
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Two_statements_on_one_line_stay_on_one_line() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        int y = 1; int z = 2;
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_case_statement_on_its_label_line_stays_there() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        switch (a) { case 1: break; }
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_whole_try_written_on_one_line_stays_there() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        try { Call(); } catch { }
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_catch_after_a_broken_try_still_takes_its_own_line() => Formats(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        try
+		        {
+		        } catch (Exception e)
+		        {
+		        }
+		    }
+		}
+		""",
+		// The brace and the keyword share a line, but the statement does not fit on one — what the
+		// option preserves is a single-line statement, not a single-line join.
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        try
+		        {
+		        }
+		        catch (Exception e)
+		        {
+		        }
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Disabling_it_moves_a_body_off_its_header_line() => Formats(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        if (a) return;
+		        int y = 1; int z = 2;
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        if (a)
+		            return;
+		        int y = 1;
+		        int z = 2;
+		    }
+		}
+		""",
+		editorConfig: "csharp_preserve_single_line_statements = false");
+
+	[Test]
+	public Task A_braced_body_moves_off_the_header_but_keeps_its_braces_collapsed() => Formats(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        if (a) { return; }
+		    }
+		}
+		""",
+		// Where the body goes is this option's decision; whether the braces collapse is the block
+		// option's, and that is still on.
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        if (a)
+		        { return; }
+		    }
+		}
+		""",
+		editorConfig: "csharp_preserve_single_line_statements = false");
+
+	[Test]
+	public Task A_one_line_switch_needs_both_options() => Formats(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        switch (a) { case 1: break; }
+		    }
+		}
+		""",
+		// A switch on one line necessarily has its statement on the label's line, which is this
+		// option's business, so turning it off expands the whole thing.
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        switch (a)
+		        {
+		            case 1:
+		                break;
+		        }
+		    }
+		}
+		""",
+		editorConfig: "csharp_preserve_single_line_statements = false");
+
+	[Test]
+	[Skip("dotnet format keeps an empty `catch { }` collapsed even with both preserve options off; Kerf expands it like any other block")]
+	public Task An_empty_catch_stays_collapsed_when_everything_else_expands() => Formats(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        try { Call(); } catch { }
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        try
+		        {
+		            Call();
+		        }
+		        catch { }
+		    }
+		}
+		""",
+		editorConfig: """
+		csharp_preserve_single_line_blocks = false
+		csharp_preserve_single_line_statements = false
+		""");
+
+	// ---- the options are what make output input-dependent -------------------------------------------
 
 	[Test]
 	public Task Two_bodies_written_differently_stay_different() => Unchanged(

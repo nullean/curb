@@ -32,7 +32,19 @@ public class ControlFlowTests : FormattingTest
 		""");
 
 	[Test]
-	public Task If_without_braces_is_re_indented() => Formats(
+	public Task A_braceless_if_on_one_line_stays_on_one_line() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        if (condition) Call();
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_braceless_if_is_re_indented_once_it_is_not_preserved() => Formats(
 		"""
 		public class C
 		{
@@ -51,7 +63,8 @@ public class ControlFlowTests : FormattingTest
 		            Call();
 		    }
 		}
-		""");
+		""",
+		editorConfig: "csharp_preserve_single_line_statements = false");
 
 	[Test]
 	public Task Space_after_the_if_keyword() => Formats(

@@ -353,6 +353,18 @@ internal static partial class Printers
 			var previousEnd = node.OpenBraceToken.Span.End;
 			foreach (var statement in node.Statements)
 			{
+				// `int y = 1; int z = 2;` — two statements the author put on one line stay there
+				// under csharp_preserve_single_line_statements.
+				if (context.Options.PreserveSingleLineStatements
+					&& previousEnd != node.OpenBraceToken.Span.End
+					&& context.OnSameLine(previousEnd, EffectiveStart(statement)))
+				{
+					arena.Synthetic(SyntheticText.Space);
+					Node.Print(statement, context);
+					previousEnd = statement.Span.End;
+					continue;
+				}
+
 				arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
 				if (context.BlankLinesBetween(previousEnd, EffectiveStart(statement)) > 0)
 					arena.HardLine();
@@ -584,6 +596,25 @@ internal static partial class Printers
 	}
 
 	/// <summary>
+	/// Emits a control-flow body that is not sharing its header's line.
+	/// </summary>
+	/// <remarks>
+	/// Whether a statement body joins its header is <c>csharp_preserve_single_line_statements</c>'s
+	/// decision and has already been taken by the caller; all that is left for
+	/// <c>csharp_preserve_single_line_blocks</c> is whether the braces stay collapsed once the body
+	/// is on its own line. dotnet format keeps them: with statements off and blocks on,
+	/// <c>if (a) { return; }</c> becomes <c>if (a)</c> then <c>{ return; }</c>, not a full expansion.
+	/// </remarks>
+	internal static void PrintStatementBody(SyntaxNode body, BraceStyle construct, PrintContext context)
+	{
+		var flat = context.Options.PreserveSingleLineBlocks && context.OnSameLine(body.SpanStart, body.Span.End);
+
+		BeforeOpenBrace(construct, context);
+		using (context.Arena.ForceFlatIf(flat))
+			Node.Print(body, context);
+	}
+
+	/// <summary>
 	/// The <see cref="BeforeOpenBrace"/> variant for braces that only move to their own line when
 	/// their group breaks — accessor lists, initializers, anonymous types.
 	/// </summary>
@@ -620,6 +651,7 @@ internal static partial class Printers
 		else
 			context.Arena.Synthetic(SyntheticText.Space);
 	}
+
 
 	private static void PrintModifiers(SyntaxTokenList modifiers, PrintContext context)
 	{

@@ -190,6 +190,9 @@ public static class EditorConfigOptionsBinder
 		if (TryBool(properties, "csharp_new_line_between_query_expression_clauses", diagnostics, out var newLineBetweenClauses))
 			options = options with { NewLineBetweenQueryExpressionClauses = newLineBetweenClauses };
 
+		if (TryBool(properties, "csharp_preserve_single_line_statements", diagnostics, out var preserveStatements))
+			options = options with { PreserveSingleLineStatements = preserveStatements };
+
 		if (TryBool(properties, "csharp_preserve_single_line_blocks", diagnostics, out var preserveBlocks))
 			options = options with { PreserveSingleLineBlocks = preserveBlocks };
 

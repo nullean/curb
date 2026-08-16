@@ -210,6 +210,20 @@ public readonly record struct FormatOptions
 	/// </remarks>
 	public bool PreserveSingleLineBlocks { get; init; } = true;
 
+	/// <summary>
+	/// Keep a statement the author left on one line on one line.
+	/// <c>csharp_preserve_single_line_statements</c>, default true.
+	/// </summary>
+	/// <remarks>
+	/// Distinct from <see cref="PreserveSingleLineBlocks"/>, and the split is dotnet format's rather
+	/// than one Kerf would have chosen. This one covers a control-flow body sharing its header's
+	/// line — braced or not — a <c>catch</c> or <c>finally</c> following a brace, two statements
+	/// separated by a semicolon, and a statement on its <c>case</c> label's line. The other covers
+	/// member, type, namespace, enum and switch bodies. A one-line <c>if (a) { return; }</c> is
+	/// therefore kept by this option even with the block option off.
+	/// </remarks>
+	public bool PreserveSingleLineStatements { get; init; } = true;
+
 	/// <summary>Indent the statements under a <c>case</c> label. <c>csharp_indent_case_contents</c>, default true.</summary>
 	public bool IndentCaseContents { get; init; } = true;
 

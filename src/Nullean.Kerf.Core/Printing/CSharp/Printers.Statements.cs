@@ -16,16 +16,33 @@ internal static partial class Printers
 	/// <c>csharp_new_line_before_open_brace</c> governs it). A single unbraced statement is indented
 	/// onto the next line instead.
 	/// </remarks>
-	private static void EmbeddedStatement(StatementSyntax? statement, PrintContext context)
+	/// <param name="statement">The body, or null for a header with none.</param>
+	/// <param name="headerEnd">
+	/// End of the token the body follows — usually the closing parenthesis. Needed to tell a body
+	/// the author left on the header's line from one they put on its own, which is the whole of
+	/// <c>csharp_preserve_single_line_statements</c>.
+	/// </param>
+	/// <param name="context">Per-file printing state.</param>
+	private static void EmbeddedStatement(StatementSyntax? statement, int headerEnd, PrintContext context)
 	{
 		if (statement is null)
 			return;
 
 		var arena = context.Arena;
 
+		// A statement that shared its header's line keeps sharing it, braces and all. This beats
+		// csharp_preserve_single_line_blocks: `if (a) { return; }` stays whole even with that off.
+		if (context.Options.PreserveSingleLineStatements && context.OnSameLine(headerEnd, statement.Span.End))
+		{
+			arena.Synthetic(SyntheticText.Space);
+			using (arena.ForceFlat())
+				Node.Print(statement, context);
+			return;
+		}
+
 		if (statement is BlockSyntax)
 		{
-			PrintBody(statement, BraceStyle.ControlBlocks, context);
+			PrintStatementBody(statement, BraceStyle.ControlBlocks, context);
 			return;
 		}
 
@@ -67,7 +84,7 @@ internal static partial class Printers
 	public static void IfStatement(IfStatementSyntax node, PrintContext context)
 	{
 		ConditionHeader(node.IfKeyword, node.OpenParenToken, node.Condition, node.CloseParenToken, context);
-		EmbeddedStatement(node.Statement, context);
+		EmbeddedStatement(node.Statement, node.CloseParenToken.Span.End, context);
 
 		if (node.Else is null)
 			return;
@@ -83,19 +100,19 @@ internal static partial class Printers
 			return;
 		}
 
-		EmbeddedStatement(node.Else.Statement, context);
+		EmbeddedStatement(node.Else.Statement, node.Else.ElseKeyword.Span.End, context);
 	}
 
 	public static void WhileStatement(WhileStatementSyntax node, PrintContext context)
 	{
 		ConditionHeader(node.WhileKeyword, node.OpenParenToken, node.Condition, node.CloseParenToken, context);
-		EmbeddedStatement(node.Statement, context);
+		EmbeddedStatement(node.Statement, node.CloseParenToken.Span.End, context);
 	}
 
 	public static void DoStatement(DoStatementSyntax node, PrintContext context)
 	{
 		TokenPrinter.Print(node.DoKeyword, context);
-		EmbeddedStatement(node.Statement, context);
+		EmbeddedStatement(node.Statement, node.DoKeyword.Span.End, context);
 		context.Arena.HardLine();
 		ConditionHeader(node.WhileKeyword, node.OpenParenToken, node.Condition, node.CloseParenToken, context);
 		TokenPrinter.Print(node.SemicolonToken, context);
@@ -134,7 +151,7 @@ internal static partial class Printers
 
 		Spacing.InsideControlFlowParens(context);
 		TokenPrinter.Print(node.CloseParenToken, context);
-		EmbeddedStatement(node.Statement, context);
+		EmbeddedStatement(node.Statement, node.CloseParenToken.Span.End, context);
 	}
 
 	public static void ForEachStatement(ForEachStatementSyntax node, PrintContext context)
@@ -160,7 +177,7 @@ internal static partial class Printers
 
 		Spacing.InsideControlFlowParens(context);
 		TokenPrinter.Print(node.CloseParenToken, context);
-		EmbeddedStatement(node.Statement, context);
+		EmbeddedStatement(node.Statement, node.CloseParenToken.Span.End, context);
 	}
 
 	public static void ForEachVariableStatement(ForEachVariableStatementSyntax node, PrintContext context)
@@ -184,20 +201,35 @@ internal static partial class Printers
 
 		Spacing.InsideControlFlowParens(context);
 		TokenPrinter.Print(node.CloseParenToken, context);
-		EmbeddedStatement(node.Statement, context);
+		EmbeddedStatement(node.Statement, node.CloseParenToken.Span.End, context);
 	}
 
 	public static void TryStatement(TryStatementSyntax node, PrintContext context)
 	{
+		// `try { Call(); } catch { }` written on one line stays on one line. A try whose blocks the
+		// author broke does not, even where a brace and the following `catch` share a line — what
+		// the option preserves is a single-line statement, not a single-line join.
+		if (context.Options.PreserveSingleLineStatements && context.OnSameLine(node.SpanStart, node.Span.End))
+		{
+			using (context.Arena.ForceFlat())
+				PrintTryStatement(node, context);
+			return;
+		}
+
+		PrintTryStatement(node, context);
+	}
+
+	private static void PrintTryStatement(TryStatementSyntax node, PrintContext context)
+	{
 		var arena = context.Arena;
 
 		TokenPrinter.Print(node.TryKeyword, context);
-		PrintBody(node.Block, BraceStyle.ControlBlocks, context);
+		PrintStatementBody(node.Block, BraceStyle.ControlBlocks, context);
 
 		foreach (var catchClause in node.Catches)
 		{
 			// Whatever precedes a catch is a block, so there is always a brace to join.
-			BeforeContinuation(context.Options.NewLineBeforeCatch, true, context);
+			BeforeContinuation(context.Options.NewLineBeforeCatch, followsABrace: true, context);
 			TokenPrinter.Print(catchClause.CatchKeyword, context);
 
 			if (catchClause.Declaration is not null)
@@ -228,15 +260,15 @@ internal static partial class Printers
 				TokenPrinter.Print(catchClause.Filter.CloseParenToken, context);
 			}
 
-			PrintBody(catchClause.Block, BraceStyle.ControlBlocks, context);
+			PrintStatementBody(catchClause.Block, BraceStyle.ControlBlocks, context);
 		}
 
 		if (node.Finally is null)
 			return;
 
-		BeforeContinuation(context.Options.NewLineBeforeFinally, true, context);
+		BeforeContinuation(context.Options.NewLineBeforeFinally, followsABrace: true, context);
 		TokenPrinter.Print(node.Finally.FinallyKeyword, context);
-		PrintBody(node.Finally.Block, BraceStyle.ControlBlocks, context);
+		PrintStatementBody(node.Finally.Block, BraceStyle.ControlBlocks, context);
 	}
 
 	public static void UsingStatement(UsingStatementSyntax node, PrintContext context)
@@ -264,7 +296,7 @@ internal static partial class Printers
 			return;
 		}
 
-		EmbeddedStatement(node.Statement, context);
+		EmbeddedStatement(node.Statement, node.CloseParenToken.Span.End, context);
 	}
 
 	/// <summary>A <c>goto</c> target — <c>label:</c> followed by the statement it names.</summary>
@@ -298,19 +330,19 @@ internal static partial class Printers
 		Node.Print(node.Declaration, context);
 		Spacing.InsideControlFlowParens(context);
 		TokenPrinter.Print(node.CloseParenToken, context);
-		EmbeddedStatement(node.Statement, context);
+		EmbeddedStatement(node.Statement, node.CloseParenToken.Span.End, context);
 	}
 
 	public static void UnsafeStatement(UnsafeStatementSyntax node, PrintContext context)
 	{
 		TokenPrinter.Print(node.UnsafeKeyword, context);
-		PrintBody(node.Block, BraceStyle.ControlBlocks, context);
+		PrintStatementBody(node.Block, BraceStyle.ControlBlocks, context);
 	}
 
 	public static void LockStatement(LockStatementSyntax node, PrintContext context)
 	{
 		ConditionHeader(node.LockKeyword, node.OpenParenToken, node.Expression, node.CloseParenToken, context);
-		EmbeddedStatement(node.Statement, context);
+		EmbeddedStatement(node.Statement, node.CloseParenToken.Span.End, context);
 	}
 
 	public static void SwitchStatement(SwitchStatementSyntax node, PrintContext context)
@@ -333,7 +365,11 @@ internal static partial class Printers
 			Node.Print(node.Expression, context);
 		}
 
-		var oneLine = KeepsOneLine(node.OpenBraceToken, node.CloseBraceToken, context);
+		// A switch on one line necessarily has each statement on its label's line, which is
+		// csharp_preserve_single_line_statements' business rather than the block option's — so
+		// dotnet format expands it as soon as either is off, and so does Kerf.
+		var oneLine = context.Options.PreserveSingleLineStatements
+			&& KeepsOneLine(node.OpenBraceToken, node.CloseBraceToken, context);
 
 		using (arena.ForceFlatIf(oneLine))
 		{
@@ -355,10 +391,12 @@ internal static partial class Printers
 		{
 			using (arena.Indent(context.Options.IndentSwitchLabels ? 1 : 0))
 			{
+				var labelEnd = 0;
 				foreach (var label in section.Labels)
 				{
 					arena.HardLine();
 					Node.Print(label, context);
+					labelEnd = label.Span.End;
 				}
 
 				// A braced body answers to csharp_indent_case_contents_when_block and everything else
@@ -366,6 +404,17 @@ internal static partial class Printers
 				// once for the section — a section may hold both.
 				foreach (var statement in section.Statements)
 				{
+					// `case 1: break;` — a statement on its label's line stays there.
+					if (context.Options.PreserveSingleLineStatements
+						&& context.OnSameLine(labelEnd, statement.Span.End))
+					{
+						arena.Synthetic(SyntheticText.Space);
+						using (arena.ForceFlat())
+							Node.Print(statement, context);
+						labelEnd = statement.Span.End;
+						continue;
+					}
+
 					var indented = statement is BlockSyntax
 						? context.Options.IndentCaseContentsWhenBlock
 						: context.Options.IndentCaseContents;

@@ -45,6 +45,7 @@ public static class OptionValues
 		"csharp_new_line_between_query_expression_clauses" => Bool(options.NewLineBetweenQueryExpressionClauses),
 
 		"csharp_preserve_single_line_blocks" => Bool(options.PreserveSingleLineBlocks),
+		"csharp_preserve_single_line_statements" => Bool(options.PreserveSingleLineStatements),
 
 		"csharp_indent_case_contents" => Bool(options.IndentCaseContents),
 		"csharp_indent_case_contents_when_block" => Bool(options.IndentCaseContentsWhenBlock),
