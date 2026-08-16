@@ -1,3 +1,5 @@
+using Microsoft.CodeAnalysis.Text;
+
 namespace Nullean.Kerf.Verification;
 
 /// <summary>
@@ -14,6 +16,12 @@ namespace Nullean.Kerf.Verification;
 /// printer can lose content.
 /// </para>
 /// <para>
+/// Reordering usings is the one thing Kerf does that legitimately changes the order of content, so
+/// the caller declares the source span that moved and the verifier switches to a multiset compare
+/// over exactly that region — still catching anything dropped, duplicated or altered there — and
+/// stays strict over the whole of the rest of the file.
+/// </para>
+/// <para>
 /// What it deliberately does <b>not</b> catch: two tokens being glued together by a missing space
 /// (<c>a b</c> becoming <c>ab</c>), since whitespace is exactly what it ignores. That is the
 /// re-parse token comparer's job, which is why both nets exist. Nor would it notice whitespace lost
@@ -22,13 +30,35 @@ namespace Nullean.Kerf.Verification;
 /// </remarks>
 internal static class ContentVerifier
 {
-	public static bool Verify(ReadOnlySpan<char> source, ReadOnlySpan<char> output, out string? failure)
+	/// <param name="source">The original text.</param>
+	/// <param name="output">What was printed.</param>
+	/// <param name="failure">Set when verification fails.</param>
+	/// <param name="reordered">
+	/// Source span whose content was deliberately permuted, or default when nothing was.
+	/// </param>
+	public static bool Verify(
+		ReadOnlySpan<char> source,
+		ReadOnlySpan<char> output,
+		out string? failure,
+		TextSpan reordered = default)
 	{
 		var sourceIndex = 0;
 		var outputIndex = 0;
+		var reorderedLength = reordered.Length == 0 ? 0 : CountContent(source[reordered.Start..reordered.End]);
 
 		while (true)
 		{
+			// The permuted region: take the same number of content characters from each side and
+			// compare them as multisets, then carry on in order from where both left off.
+			if (reorderedLength > 0 && sourceIndex >= reordered.Start)
+			{
+				if (!VerifyPermutation(source, output, ref sourceIndex, ref outputIndex, reorderedLength, out failure))
+					return false;
+
+				reorderedLength = 0;
+				continue;
+			}
+
 			while (sourceIndex < source.Length && IsSkippable(source[sourceIndex]))
 				sourceIndex++;
 			while (outputIndex < output.Length && IsSkippable(output[outputIndex]))
@@ -66,6 +96,68 @@ internal static class ContentVerifier
 			sourceIndex++;
 			outputIndex++;
 		}
+	}
+
+	/// <summary>Compares the next <paramref name="count"/> content characters as multisets.</summary>
+	/// <remarks>
+	/// A permutation of usings preserves every character, only their order, so sorting both sides
+	/// and comparing is exact rather than approximate: a dropped comment, a duplicated directive or
+	/// a mangled name all change the multiset.
+	/// </remarks>
+	private static bool VerifyPermutation(
+		ReadOnlySpan<char> source,
+		ReadOnlySpan<char> output,
+		ref int sourceIndex,
+		ref int outputIndex,
+		int count,
+		out string? failure)
+	{
+		var expected = new char[count];
+		var actual = new char[count];
+
+		if (!Take(source, ref sourceIndex, expected) || !Take(output, ref outputIndex, actual))
+		{
+			failure = "formatting lost content while reordering using directives";
+			return false;
+		}
+
+		Array.Sort(expected);
+		Array.Sort(actual);
+
+		if (!expected.AsSpan().SequenceEqual(actual))
+		{
+			failure = "reordering using directives changed their content, not just their order";
+			return false;
+		}
+
+		failure = null;
+		return true;
+	}
+
+	private static bool Take(ReadOnlySpan<char> text, ref int index, Span<char> into)
+	{
+		for (var taken = 0; taken < into.Length; taken++)
+		{
+			while (index < text.Length && IsSkippable(text[index]))
+				index++;
+			if (index >= text.Length)
+				return false;
+			into[taken] = text[index++];
+		}
+
+		return true;
+	}
+
+	private static int CountContent(ReadOnlySpan<char> text)
+	{
+		var count = 0;
+		foreach (var value in text)
+		{
+			if (!IsSkippable(value))
+				count++;
+		}
+
+		return count;
 	}
 
 	private static bool IsSkippable(char value) => value is ' ' or '\t' or '\r' or '\n';

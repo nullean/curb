@@ -1,4 +1,6 @@
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Text;
 
 namespace Nullean.Kerf.Verification;
 
@@ -22,6 +24,12 @@ namespace Nullean.Kerf.Verification;
 /// the code still means the same thing.
 /// </para>
 /// <para>
+/// Reordering usings changes the token stream on purpose, so when it has happened the using block
+/// is lifted out of the linear walk and checked separately: the two lists of directive texts are
+/// sorted and compared, which is exact rather than lenient — a lost, duplicated or altered
+/// directive all fail it — and the rest of the file is still compared token for token.
+/// </para>
+/// <para>
 /// Costs one extra parse, so it is opt-in for <c>check</c> (which writes nothing and therefore
 /// cannot corrupt anything) and on by default when formatting in place.
 /// </para>
@@ -32,7 +40,8 @@ internal static class TokenStreamComparer
 		SyntaxNode originalRoot,
 		ReadOnlySpan<char> originalText,
 		string formatted,
-		out string? failure)
+		out string? failure,
+		bool usingsReordered = false)
 	{
 		if (!CSharpSource.TryParse(formatted, out var reparsed, out var errors))
 		{
@@ -44,6 +53,18 @@ internal static class TokenStreamComparer
 
 		var formattedText = formatted.AsSpan();
 
+		var originalUsings = TextSpan.FromBounds(0, 0);
+		var producedUsings = TextSpan.FromBounds(0, 0);
+
+		if (usingsReordered)
+		{
+			if (!SameDirectives(originalRoot, reparsed.Root, out failure))
+				return false;
+
+			originalUsings = DirectiveRegion(originalRoot);
+			producedUsings = DirectiveRegion(reparsed.Root);
+		}
+
 		using var original = originalRoot.DescendantTokens().GetEnumerator();
 		using var produced = reparsed.Root.DescendantTokens().GetEnumerator();
 
@@ -51,8 +72,20 @@ internal static class TokenStreamComparer
 
 		while (true)
 		{
-			var hasOriginal = original.MoveNext();
-			var hasProduced = produced.MoveNext();
+			// The using block has been checked as a set; walking it in order would only re-discover
+			// the reordering it was asked for.
+			bool hasOriginal, hasProduced;
+			do
+			{
+				hasOriginal = original.MoveNext();
+			}
+			while (hasOriginal && originalUsings.Contains(original.Current.SpanStart));
+
+			do
+			{
+				hasProduced = produced.MoveNext();
+			}
+			while (hasProduced && producedUsings.Contains(produced.Current.SpanStart));
 
 			if (!hasOriginal && !hasProduced)
 			{
@@ -85,6 +118,56 @@ internal static class TokenStreamComparer
 
 			index++;
 		}
+	}
+
+	/// <summary>Compares the two using lists as multisets of their text.</summary>
+	private static bool SameDirectives(SyntaxNode before, SyntaxNode after, out string? failure)
+	{
+		var original = Directives(before);
+		var produced = Directives(after);
+
+		if (original.Length != produced.Length)
+		{
+			failure = $"reordering usings changed how many there are: {original.Length} became {produced.Length}";
+			return false;
+		}
+
+		Array.Sort(original, StringComparer.Ordinal);
+		Array.Sort(produced, StringComparer.Ordinal);
+
+		for (var i = 0; i < original.Length; i++)
+		{
+			if (string.Equals(original[i], produced[i], StringComparison.Ordinal))
+				continue;
+
+			failure = $"reordering usings altered one: '{original[i]}' is not among the directives written";
+			return false;
+		}
+
+		failure = null;
+		return true;
+	}
+
+	private static string[] Directives(SyntaxNode root) =>
+		[.. root.DescendantNodes(descendIntoChildren: node => node is CompilationUnitSyntax or BaseNamespaceDeclarationSyntax)
+			.OfType<UsingDirectiveSyntax>()
+			.Select(directive => directive.ToString())];
+
+	/// <summary>The span the using directives occupy, or an empty span at zero when there are none.</summary>
+	private static TextSpan DirectiveRegion(SyntaxNode root)
+	{
+		var start = int.MaxValue;
+		var end = 0;
+
+		foreach (var directive in root
+			.DescendantNodes(descendIntoChildren: node => node is CompilationUnitSyntax or BaseNamespaceDeclarationSyntax)
+			.OfType<UsingDirectiveSyntax>())
+		{
+			start = Math.Min(start, directive.SpanStart);
+			end = Math.Max(end, directive.Span.End);
+		}
+
+		return start == int.MaxValue ? TextSpan.FromBounds(0, 0) : TextSpan.FromBounds(start, end);
 	}
 
 	private static ReadOnlySpan<char> Text(ReadOnlySpan<char> source, SyntaxToken token) =>

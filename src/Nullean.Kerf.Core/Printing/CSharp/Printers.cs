@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Microsoft.CodeAnalysis.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -32,11 +33,7 @@ internal static partial class Printers
 			Node.Print(externAlias, context);
 		}
 
-		foreach (var directive in node.Usings)
-		{
-			Separate(context, ref previousEnd, directive);
-			Node.Print(directive, context);
-		}
+		PrintUsings(node, node.Usings, context, ref previousEnd);
 
 		foreach (var attributeList in node.AttributeLists)
 		{
@@ -62,15 +59,103 @@ internal static partial class Printers
 		TokenPrinter.PrintIfPresent(node.EndOfFileToken, context);
 	}
 
-	public static void UsingDirective(UsingDirectiveSyntax node, PrintContext context)
+	/// <summary>
+	/// Emits a using block, sorted if the file's <c>.editorconfig</c> asked for it.
+	/// </summary>
+	/// <remarks>
+	/// A file banner — everything above the last blank line before the first directive — belongs to
+	/// the file rather than to whichever directive happens to come first, so it is emitted verbatim
+	/// where it was and that directive is printed without it. The span that moved is recorded so the
+	/// content verifier can check the region as a multiset instead of in order.
+	/// </remarks>
+	private static void PrintUsings(
+		SyntaxNode container,
+		SyntaxList<UsingDirectiveSyntax> usings,
+		PrintContext context,
+		ref int previousEnd)
+	{
+		var ordered = UsingOrganiser.Order(container, usings, context.Options);
+
+		if (ordered is null)
+		{
+			foreach (var directive in usings)
+			{
+				Separate(context, ref previousEnd, directive);
+				Node.Print(directive, context);
+			}
+
+			return;
+		}
+
+		var arena = context.Arena;
+		var firstInSource = usings[0];
+		var bannerEnd = UsingOrganiser.BannerEnd(firstInSource);
+		var hasBanner = bannerEnd > firstInSource.FullSpan.Start;
+
+		if (hasBanner)
+		{
+			if (previousEnd >= 0)
+				arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
+
+			TokenPrinter.EmitVerbatimRange(context, firstInSource.FullSpan.Start, bannerEnd - firstInSource.FullSpan.Start);
+			previousEnd = bannerEnd;
+		}
+
+		for (var i = 0; i < ordered.Length; i++)
+		{
+			var directive = ordered[i];
+
+			if (i == 0)
+			{
+				if (previousEnd >= 0)
+					arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
+			}
+			else
+			{
+				arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
+				if (context.Options.SeparateImportDirectiveGroups
+					&& UsingOrganiser.StartsNewGroup(ordered[i - 1], directive))
+					arena.HardLine();
+			}
+
+			UsingDirective(directive, context, skipBanner: hasBanner && directive == firstInSource);
+		}
+
+		previousEnd = usings[^1].Span.End;
+
+		// To the end of the last directive's *full* span, so a trailing comment is inside the region
+		// the verifier treats as permuted. Ending at Span.End leaves `using X; // note` half in and
+		// half out, and the comment then fails a comparison it was never meant to be part of.
+		context.ReorderedSpan = TextSpan.FromBounds(firstInSource.FullSpan.Start, usings[^1].FullSpan.End);
+	}
+
+	public static void UsingDirective(UsingDirectiveSyntax node, PrintContext context) =>
+		UsingDirective(node, context, skipBanner: false);
+
+	/// <param name="node">The directive.</param>
+	/// <param name="context">Per-file printing state.</param>
+	/// <param name="skipBanner">
+	/// Drop the leading trivia of the first token. Set only for the directive that owned a file
+	/// banner which has already been emitted in its original place.
+	/// </param>
+	private static void UsingDirective(UsingDirectiveSyntax node, PrintContext context, bool skipBanner)
 	{
 		if (node.GlobalKeyword.RawKind != 0)
 		{
-			TokenPrinter.Print(node.GlobalKeyword, context);
+			if (skipBanner)
+				TokenPrinter.PrintWithoutLeadingTrivia(node.GlobalKeyword, context);
+			else
+				TokenPrinter.Print(node.GlobalKeyword, context);
+
 			context.Arena.Synthetic(SyntheticText.Space);
+			skipBanner = false;
 		}
 
-		TokenPrinter.Print(node.UsingKeyword, context);
+		if (skipBanner)
+			TokenPrinter.PrintWithoutLeadingTrivia(node.UsingKeyword, context);
+		else
+			TokenPrinter.Print(node.UsingKeyword, context);
+
 		context.Arena.Synthetic(SyntheticText.Space);
 
 		if (node.StaticKeyword.RawKind != 0)

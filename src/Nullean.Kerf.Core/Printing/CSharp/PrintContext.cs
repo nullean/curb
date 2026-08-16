@@ -20,6 +20,16 @@ internal sealed class PrintContext(DocArena arena, SourceText text, FormatOption
 	public FormatOptions Options { get; } = options;
 
 	/// <summary>Tokens emitted by a printer that understands them.</summary>
+	/// <summary>
+	/// Source span whose content was reordered, or default if nothing was.
+	/// </summary>
+	/// <remarks>
+	/// Reordering breaks the content verifier's linear compare, which is the point of it. Recording
+	/// the span lets the verifier switch to a multiset compare over exactly that region and stay
+	/// strict everywhere else, rather than being switched off for the file.
+	/// </remarks>
+	public TextSpan ReorderedSpan { get; set; }
+
 	public int PrintedTokens { get; set; }
 
 	/// <summary>Tokens emitted verbatim because no printer handles their node yet.</summary>

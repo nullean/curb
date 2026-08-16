@@ -44,6 +44,15 @@ public static class OptionValues
 		"csharp_new_line_before_members_in_anonymous_types" => Bool(options.NewLineBeforeMembersInAnonymousTypes),
 		"csharp_new_line_between_query_expression_clauses" => Bool(options.NewLineBetweenQueryExpressionClauses),
 
+		"dotnet_sort_system_directives_first" => options.SortUsings switch
+		{
+			UsingOrder.SystemFirst => "true",
+			UsingOrder.Alphabetical => "false",
+			UsingOrder.AsWritten => "false   # usings are left as written; see UsingOrder",
+			_ => "false",
+		},
+		"dotnet_separate_import_directive_groups" => Bool(options.SeparateImportDirectiveGroups),
+
 		"csharp_preserve_single_line_blocks" => Bool(options.PreserveSingleLineBlocks),
 		"csharp_preserve_single_line_statements" => Bool(options.PreserveSingleLineStatements),
 

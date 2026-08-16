@@ -190,6 +190,18 @@ public static class EditorConfigOptionsBinder
 		if (TryBool(properties, "csharp_new_line_between_query_expression_clauses", diagnostics, out var newLineBetweenClauses))
 			options = options with { NewLineBetweenQueryExpressionClauses = newLineBetweenClauses };
 
+		// Presence is the opt-in: neither key says whether to sort, so writing either one is taken
+		// as asking for it. See UsingOrder for the reasoning.
+		if (TryBool(properties, "dotnet_sort_system_directives_first", diagnostics, out var systemFirst))
+			options = options with { SortUsings = systemFirst ? UsingOrder.SystemFirst : UsingOrder.Alphabetical };
+
+		if (TryBool(properties, "dotnet_separate_import_directive_groups", diagnostics, out var separateGroups))
+		{
+			options = options with { SeparateImportDirectiveGroups = separateGroups };
+			if (options.SortUsings == UsingOrder.AsWritten)
+				options = options with { SortUsings = UsingOrder.SystemFirst };
+		}
+
 		if (TryBool(properties, "csharp_preserve_single_line_statements", diagnostics, out var preserveStatements))
 			options = options with { PreserveSingleLineStatements = preserveStatements };
 

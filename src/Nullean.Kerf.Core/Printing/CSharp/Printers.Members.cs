@@ -204,14 +204,7 @@ internal static partial class Printers
 		{
 			var previousEnd = node.OpenBraceToken.Span.End;
 
-			foreach (var directive in node.Usings)
-			{
-				arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
-				if (context.BlankLinesBetween(previousEnd, directive.SpanStart) > 0)
-					arena.HardLine();
-				Node.Print(directive, context);
-				previousEnd = directive.Span.End;
-			}
+			PrintUsings(node, node.Usings, context, ref previousEnd);
 
 			foreach (var member in node.Members)
 			{

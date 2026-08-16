@@ -224,6 +224,21 @@ public readonly record struct FormatOptions
 	/// </remarks>
 	public bool PreserveSingleLineStatements { get; init; } = true;
 
+	/// <summary>
+	/// Whether and how <c>using</c> directives are reordered.
+	/// <c>dotnet_sort_system_directives_first</c>, defaulting to <see cref="UsingOrder.AsWritten"/>
+	/// — see <see cref="UsingOrder"/> for why the default is not to sort at all.
+	/// </summary>
+	public UsingOrder SortUsings { get; init; } = UsingOrder.AsWritten;
+
+	/// <summary>
+	/// Separate groups of <c>using</c> directives with a blank line.
+	/// <c>dotnet_separate_import_directive_groups</c>, default false. Only reachable when
+	/// <see cref="SortUsings"/> is on, since a group is a run of directives sharing a first
+	/// namespace segment and that only holds once they are sorted.
+	/// </summary>
+	public bool SeparateImportDirectiveGroups { get; init; }
+
 	/// <summary>Indent the statements under a <c>case</c> label. <c>csharp_indent_case_contents</c>, default true.</summary>
 	public bool IndentCaseContents { get; init; } = true;
 

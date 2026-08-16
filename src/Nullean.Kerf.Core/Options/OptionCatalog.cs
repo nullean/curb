@@ -95,6 +95,8 @@ public static class OptionCatalog
 			"csharp_new_line_before_members_in_object_initializers",
 			"csharp_new_line_before_members_in_anonymous_types",
 			"csharp_new_line_between_query_expression_clauses",
+			"dotnet_sort_system_directives_first",
+			"dotnet_separate_import_directive_groups",
 			"csharp_preserve_single_line_blocks",
 			"csharp_preserve_single_line_statements",
 			"csharp_indent_case_contents",
