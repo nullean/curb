@@ -181,6 +181,11 @@ internal static partial class Printers
 	/// <summary>A tuple expression, and the same shape for a tuple type.</summary>
 	public static void TupleExpression(TupleExpressionSyntax node, PrintContext context)
 	{
+		// Every list that can hold a line break has to keep the author's, or it joins and the
+		// enclosing construct — which preserved its own layout and so emitted no break opportunity —
+		// has no way to break the result. A tuple was the last one still joining unconditionally.
+		var asWritten = SpansLines(node, context);
+
 		TokenPrinter.Print(node.OpenParenToken, context);
 
 		for (var i = 0; i < node.Arguments.Count; i++)
@@ -188,9 +193,14 @@ internal static partial class Printers
 			Node.Print(node.Arguments[i], context);
 			if (i >= node.Arguments.SeparatorCount)
 				continue;
+
 			Spacing.BeforeComma(context);
 			TokenPrinter.Print(node.Arguments.GetSeparator(i), context);
-			Spacing.AfterComma(context);
+
+			if (asWritten && !context.OnSameLine(node.Arguments[i].Span.End, node.Arguments[i + 1].SpanStart))
+				context.Arena.HardLine();
+			else
+				Spacing.AfterComma(context);
 		}
 
 		TokenPrinter.Print(node.CloseParenToken, context);

@@ -238,10 +238,17 @@ internal static partial class Printers
 		{
 			if (leadingLine)
 			{
-				// `new HttpClient(new Handler { … }) { Timeout = t }` — once the creation it belongs
-				// to has been opened out, the initializer takes a line of its own rather than
-				// trailing the closing parenthesis, however short it is.
-				var ownerSpansLines = node.Parent is not null && SpansLines(node.Parent, context);
+				// `new HttpClient(new Handler { … }) { Timeout = t }` — once the creation it belongs to
+				// has been opened out, the initializer takes a line of its own rather than trailing
+				// the closing parenthesis.
+				//
+				// Asked of the source, not of what the printer is about to produce. dotnet format can
+				// key this on the creation spanning lines because it never reflows, so its answer
+				// cannot change; Kerf's reflow can open a creation out on one run, which would flip
+				// the answer on the next and stop the file settling. Where the author put the brace
+				// is fixed, so it is that which decides.
+				var ownerSpansLines = node.Parent is not null
+					&& !context.OnSameLine(node.Parent.SpanStart, node.SpanStart);
 
 				if (oneMemberPerLine
 					|| ownerSpansLines
@@ -401,6 +408,21 @@ internal static partial class Printers
 		if (block is not null)
 		{
 			PrintBody(block, BraceStyle.Lambdas, context);
+			return;
+		}
+
+		// A body the author put on the next line stays there. Joining it here defeated reflow further
+		// out: the enclosing argument list saw nothing left to preserve, emitted no break
+		// opportunity, and the statement came back as one over-long line that only the next run
+		// broke — which is to say, formatting twice did not settle.
+		if (expression is not null && !context.OnSameLine(arrow.Span.End, expression.SpanStart))
+		{
+			using (arena.Indent())
+			{
+				arena.HardLine();
+				Node.Print(expression, context);
+			}
+
 			return;
 		}
 
