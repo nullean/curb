@@ -206,11 +206,31 @@ internal static partial class Printers
 		// written across lines with two members sharing one keeps them sharing it.
 		var asWritten = !oneMemberPerLine && SpansLines(node, context);
 
+		// A dictionary initializer — one whose elements are themselves brace-wrapped — is the one
+		// shape Roslyn declines to re-indent: hand `dotnet format` a `{ { "k", "v" } }` block
+		// indented four tabs too far and it leaves every line of it exactly where it is, in a way it
+		// does for no other initializer. Reproducing the source verbatim is what parity means here.
+		if (asWritten && HasBracedElements(node))
+		{
+			if (leadingLine)
+				arena.Synthetic(SyntheticText.Space);
+
+			PrintVerbatim(node, context);
+			return;
+		}
+
 		using (arena.Group())
 		{
 			if (leadingLine)
 			{
-				if (oneMemberPerLine || (asWritten && !context.OnSameLine(node.SpanStart, node.Parent!.SpanStart)))
+				// `new HttpClient(new Handler { … }) { Timeout = t }` — once the creation it belongs
+				// to has been opened out, the initializer takes a line of its own rather than
+				// trailing the closing parenthesis, however short it is.
+				var ownerSpansLines = node.Parent is not null && SpansLines(node.Parent, context);
+
+				if (oneMemberPerLine
+					|| ownerSpansLines
+					|| (asWritten && !context.OnSameLine(node.SpanStart, node.Parent!.SpanStart)))
 					BeforeOpenBrace(BraceStyle.ObjectCollectionArrayInitializers, context);
 				else
 					BeforeOpenBraceWhenBroken(BraceStyle.ObjectCollectionArrayInitializers, context);
@@ -269,6 +289,18 @@ internal static partial class Printers
 			else
 				arena.Line();
 		}
+	}
+
+	/// <summary>True for an initializer whose elements are brace-wrapped, as a dictionary's are.</summary>
+	private static bool HasBracedElements(InitializerExpressionSyntax node)
+	{
+		foreach (var expression in node.Expressions)
+		{
+			if (expression is InitializerExpressionSyntax)
+				return true;
+		}
+
+		return false;
 	}
 
 	public static void CollectionExpression(CollectionExpressionSyntax node, PrintContext context)

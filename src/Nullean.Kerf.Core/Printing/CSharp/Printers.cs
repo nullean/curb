@@ -552,12 +552,6 @@ internal static partial class Printers
 		{
 			var asWritten = SpansLines(node, context);
 
-			// The last argument brings its own block: it positions its own contents, so it is printed
-			// outside the list's indent while the arguments before it stay inside it. Otherwise
-			// `Resolve(root, new Options { … })` gets the list's level and the initializer's on top of
-			// it, one further right than dotnet format puts it.
-			var hugLast = node.Arguments.Count > 1 && BringsOwnBlock(node.Arguments[^1].Expression);
-			var inList = hugLast ? node.Arguments.Count - 1 : node.Arguments.Count;
 
 			using (arena.Group())
 			{
@@ -570,22 +564,7 @@ internal static partial class Printers
 					else
 						Spacing.InsideCallParens(context);
 
-					PrintSeparated(node.Arguments, context, asWritten, inList);
-				}
-
-				if (hugLast)
-				{
-					// The separator itself belongs to the list and PrintSeparated stopped short of it,
-					// so it is emitted here — dropping it would lose a comma outright.
-					Spacing.BeforeComma(context);
-					TokenPrinter.Print(node.Arguments.GetSeparator(inList - 1), context);
-
-					if (asWritten && !context.OnSameLine(node.Arguments[inList - 1].Span.End, node.Arguments[^1].SpanStart))
-						arena.HardLine();
-					else
-						Spacing.AfterComma(context);
-
-					Node.Print(node.Arguments[^1], context);
+					PrintSeparated(node.Arguments, context, asWritten, node.OpenParenToken.Span.End);
 				}
 
 				if (!asWritten)
@@ -848,25 +827,36 @@ internal static partial class Printers
 	/// than one line: a break they put in is emitted as a hard one and a separator they left inline
 	/// as a plain space, so the list comes out exactly as it went in.
 	/// </param>
-	/// <param name="count">
-	/// How many of the list's items to print. Below <c>list.Count</c> when the caller is printing the
-	/// tail itself, which is how a hugged last argument escapes the list's indent.
+	/// <param name="anchorEnd">
+	/// End of the token the list opens after. Used to tell an argument that sits inline from one the
+	/// author put on a line of its own, which is what decides where a nested block anchors.
 	/// </param>
 	private static void PrintSeparated<T>(
 		SeparatedSyntaxList<T> list,
 		PrintContext context,
 		bool asWritten = false,
-		int count = -1)
+		int anchorEnd = -1)
 		where T : SyntaxNode
 	{
-		if (count < 0)
-			count = list.Count;
+		var arena = context.Arena;
 
-		for (var i = 0; i < count; i++)
+		for (var i = 0; i < list.Count; i++)
 		{
-			Node.Print(list[i], context);
+			// A construct bringing its own braces anchors to the indent of the line it starts on.
+			// Inline after `M(` that is the statement's line, so the list's own level has to come
+			// back off; on a line of its own it is already the right depth and must be left alone.
+			// An argument inline and the same argument on its own line differ for that reason alone,
+			// and dotnet format distinguishes them the same way.
+			var previousEnd = i == 0 ? anchorEnd : list[i - 1].Span.End;
+			var ownBlock = list[i] is ArgumentSyntax { Expression: var value }
+				&& BringsOwnBlock(value)
+				&& previousEnd >= 0
+				&& context.OnSameLine(previousEnd, list[i].SpanStart);
 
-			if (i >= list.SeparatorCount || i == count - 1)
+			using (arena.IndentIf(ownBlock, -1))
+				Node.Print(list[i], context);
+
+			if (i >= list.SeparatorCount)
 				continue;
 
 			Spacing.BeforeComma(context);
@@ -881,7 +871,7 @@ internal static partial class Printers
 			if (context.OnSameLine(list[i].Span.End, list[i + 1].SpanStart))
 				Spacing.AfterComma(context);
 			else
-				context.Arena.HardLine();
+				arena.HardLine();
 		}
 	}
 
