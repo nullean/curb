@@ -271,6 +271,28 @@ internal static partial class Printers
 		EmbeddedStatement(node.Statement, context);
 	}
 
+	/// <summary>A <c>goto</c> target — <c>label:</c> followed by the statement it names.</summary>
+	/// <remarks>
+	/// The caller has already emitted the line the label sits on, at the ordinary statement indent,
+	/// so moving the label left means re-emitting that indent from inside a shallower scope rather
+	/// than adding a break of its own.
+	/// </remarks>
+	public static void LabeledStatement(LabeledStatementSyntax node, PrintContext context)
+	{
+		var arena = context.Arena;
+		var outdent = context.Options.IndentLabels == LabelIndent.OneLessThanCurrent ? -1 : 0;
+
+		using (arena.Indent(outdent))
+		{
+			arena.HardLine(DocFlags.Reindent);
+			TokenPrinter.Print(node.Identifier, context);
+			TokenPrinter.Print(node.ColonToken, context);
+		}
+
+		arena.HardLine();
+		Node.Print(node.Statement, context);
+	}
+
 	public static void FixedStatement(FixedStatementSyntax node, PrintContext context)
 	{
 		TokenPrinter.Print(node.FixedKeyword, context);
@@ -321,8 +343,7 @@ internal static partial class Printers
 
 		foreach (var section in node.Sections)
 		{
-			// csharp_indent_switch_labels, default true.
-			using (arena.Indent())
+			using (arena.Indent(context.Options.IndentSwitchLabels ? 1 : 0))
 			{
 				foreach (var label in section.Labels)
 				{
@@ -330,10 +351,16 @@ internal static partial class Printers
 					Node.Print(label, context);
 				}
 
-				// csharp_indent_case_contents, default true.
-				using (arena.Indent())
+				// A braced body answers to csharp_indent_case_contents_when_block and everything else
+				// to csharp_indent_case_contents, so the two are decided per statement rather than
+				// once for the section — a section may hold both.
+				foreach (var statement in section.Statements)
 				{
-					foreach (var statement in section.Statements)
+					var indented = statement is BlockSyntax
+						? context.Options.IndentCaseContentsWhenBlock
+						: context.Options.IndentCaseContents;
+
+					using (arena.Indent(indented ? 1 : 0))
 					{
 						arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
 						Node.Print(statement, context);

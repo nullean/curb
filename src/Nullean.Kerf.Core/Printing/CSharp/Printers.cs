@@ -330,7 +330,7 @@ internal static partial class Printers
 		var arena = context.Arena;
 		TokenPrinter.Print(node.OpenBraceToken, context);
 
-		using (arena.Indent())
+		using (arena.Indent(context.Options.IndentBlockContents ? 1 : 0))
 		{
 			var previousEnd = node.OpenBraceToken.Span.End;
 			foreach (var statement in node.Statements)

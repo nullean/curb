@@ -142,7 +142,7 @@ public class EdgeCaseTests : FormattingTest
 		""");
 
 	[Test]
-	public Task Goto_and_labels() => Unchanged(
+	public Task Goto_and_labels() => Formats(
 		"""
 		public class C
 		{
@@ -150,6 +150,19 @@ public class EdgeCaseTests : FormattingTest
 		    {
 		        goto done;
 		        done:
+		        Call();
+		    }
+		}
+		""",
+		// csharp_indent_labels defaults to one_less_than_current, so the label moves left of the
+		// statements it introduces and the statement itself returns to the ordinary indent.
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        goto done;
+		    done:
 		        Call();
 		    }
 		}

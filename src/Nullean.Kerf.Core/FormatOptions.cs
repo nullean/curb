@@ -151,6 +151,24 @@ public readonly record struct FormatOptions
 	/// <summary><c>csharp_space_after_semicolon_in_for_statement</c>, default true.</summary>
 	public bool SpaceAfterSemicolonInForStatement { get; init; } = true;
 
+	/// <summary>Indent the statements under a <c>case</c> label. <c>csharp_indent_case_contents</c>, default true.</summary>
+	public bool IndentCaseContents { get; init; } = true;
+
+	/// <summary>
+	/// Indent a braced <c>case</c> body. <c>csharp_indent_case_contents_when_block</c>, default true.
+	/// Governs a block where <see cref="IndentCaseContents"/> governs every other statement.
+	/// </summary>
+	public bool IndentCaseContentsWhenBlock { get; init; } = true;
+
+	/// <summary>Indent <c>case</c> labels inside their switch. <c>csharp_indent_switch_labels</c>, default true.</summary>
+	public bool IndentSwitchLabels { get; init; } = true;
+
+	/// <summary>Indent a block's statements. <c>csharp_indent_block_contents</c>, default true.</summary>
+	public bool IndentBlockContents { get; init; } = true;
+
+	/// <summary><c>csharp_indent_labels</c>, default <see cref="LabelIndent.OneLessThanCurrent"/>.</summary>
+	public LabelIndent IndentLabels { get; init; } = LabelIndent.OneLessThanCurrent;
+
 	/// <summary>True when reflow is disabled, which lets the printer skip fit measurement entirely.</summary>
 	public bool ReflowDisabled => MaxLineLength == Off;
 

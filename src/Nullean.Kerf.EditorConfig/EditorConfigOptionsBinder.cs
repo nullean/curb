@@ -181,6 +181,40 @@ public static class EditorConfigOptionsBinder
 			}
 		}
 
+		if (TryBool(properties, "csharp_indent_case_contents", diagnostics, out var indentCaseContents))
+			options = options with { IndentCaseContents = indentCaseContents };
+
+		if (TryBool(properties, "csharp_indent_case_contents_when_block", diagnostics, out var indentCaseBlock))
+			options = options with { IndentCaseContentsWhenBlock = indentCaseBlock };
+
+		if (TryBool(properties, "csharp_indent_switch_labels", diagnostics, out var indentSwitchLabels))
+			options = options with { IndentSwitchLabels = indentSwitchLabels };
+
+		if (TryBool(properties, "csharp_indent_block_contents", diagnostics, out var indentBlockContents))
+			options = options with { IndentBlockContents = indentBlockContents };
+
+		if (properties.TryGetValue("csharp_indent_labels", out var indentLabels))
+		{
+			switch (indentLabels.ToLowerInvariant())
+			{
+				case "one_less_than_current":
+					options = options with { IndentLabels = LabelIndent.OneLessThanCurrent };
+					break;
+				case "no_indent":
+					options = options with { IndentLabels = LabelIndent.NoIndent };
+					break;
+				case "flip_when_block":
+					options = options with { IndentLabels = LabelIndent.FlipWhenBlock };
+					break;
+				default:
+					diagnostics?.Add(KerfDiagnostic.UnrecognisedValue(
+						"csharp_indent_labels",
+						indentLabels,
+						"one_less_than_current, no_indent or flip_when_block"));
+					break;
+			}
+		}
+
 		if (properties.TryGetValue("csharp_new_line_before_open_brace", out var braceStyle))
 		{
 			if (BraceStyleParser.TryParse(braceStyle, out var style))
