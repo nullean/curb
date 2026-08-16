@@ -10,7 +10,7 @@ namespace Nullean.Kerf.Tests.Formatting.Options;
 /// asserting the default. <c>none</c> is K&amp;R, and any comma-separated subset mixes the two.
 /// </para>
 /// <para>
-/// Six of the twelve constructs — accessors, properties, indexers, events, anonymous types and
+/// Six of the twelve constructs — accessors, properties, anonymous types and
 /// object/collection/array initializers — brace on a <em>soft</em> break: the brace only moves to
 /// its own line once the construct no longer fits. With reflow off, which is the default, those
 /// stay on one line whatever this option says, so their tests set a <c>max_line_length</c> narrow
@@ -626,7 +626,12 @@ public class NewLineBeforeOpenBraceTests : FormattingTest
 	// ---- indexers --------------------------------------------------------------------------------
 
 	[Test]
-	public Task Indexers_take_their_own_flag_not_the_property_one() => Formats(
+	public Task An_indexer_answers_to_the_properties_flag() => Formats(
+		// Not what the option's documentation implies, and not what this test used to assert. Measured
+		// against dotnet format, which the fixed-point property makes authoritative: with `properties`
+		// set and `indexers` absent it moves the brace, and with `indexers` set and `properties`
+		// absent it does not. So `indexers` governs nothing, and reading it made Kerf's output stop
+		// being a fixed point for anyone who set `properties` alone.
 		"""
 		public class C
 		{
@@ -636,7 +641,8 @@ public class NewLineBeforeOpenBraceTests : FormattingTest
 		"""
 		public class C
 		{
-		    public int this[int index] {
+		    public int this[int index]
+		    {
 		        get;
 		        set;
 		    }
@@ -650,7 +656,7 @@ public class NewLineBeforeOpenBraceTests : FormattingTest
 	// ---- events ----------------------------------------------------------------------------------
 
 	[Test]
-	public Task Event_accessor_lists_take_the_events_flag() => Formats(
+	public Task An_event_accessor_list_answers_to_the_properties_flag_too() => Formats(
 		"""
 		public class C
 		{
@@ -662,7 +668,8 @@ public class NewLineBeforeOpenBraceTests : FormattingTest
 		"""
 		public class C
 		{
-		    public event EventHandler Changed {
+		    public event EventHandler Changed
+		    {
 		        add { }
 		        remove { }
 		    }

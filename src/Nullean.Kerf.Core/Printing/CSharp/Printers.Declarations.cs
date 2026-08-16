@@ -182,15 +182,16 @@ internal static partial class Printers
 
 		using (arena.Group())
 		{
-			// The accessor list belongs to whatever declares it. An indexer's list answers to the
-			// indexers flag, everything else's to properties — an event's accessor list included,
-			// since Roslyn has no separate slot for it.
-			var construct = node.Parent switch
-			{
-				IndexerDeclarationSyntax => BraceStyle.Indexers,
-				EventDeclarationSyntax => BraceStyle.Events,
-				_ => BraceStyle.Properties,
-			};
+			// Every accessor list answers to the properties flag, an indexer's and an event's included.
+			//
+			// Not what the option's documentation implies, and not what this used to do — it read the
+			// indexers and events flags for those two. Measured against dotnet format, which is what
+			// the fixed-point property makes authoritative: with `properties` set and neither of the
+			// others, it puts an indexer's and an event's brace on its own line; with `indexers` or
+			// `events` set and not `properties`, it puts neither. So those two flags govern nothing
+			// here, and Kerf reading them meant its output was not a fixed point for anyone who set
+			// `properties` alone. verifyexpectations is what surfaced it.
+			const BraceStyle construct = BraceStyle.Properties;
 			if (expand)
 				BeforeOpenBrace(construct, context);
 			else

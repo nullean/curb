@@ -163,9 +163,11 @@ jobs:
       # only that Kerf agrees with itself, so one written from a wrong belief would pass forever — it
       # found exactly that on its first run, an option value Roslyn rejects outright.
       #
-      # A floor rather than zero: seven disagree today and each needs deciding on its own merits.
+      # A floor rather than zero: five disagree today, each characterised in the plan. Two are
+      # tests feeding a deliberately invalid value where the fallback policies differ; two are real
+      # and open; one has no resolution, since Kerf honours a pragma dotnet format ignores.
       - name: Expectations survive dotnet format
-        run: ./build.sh verifyexpectations -s true --minimum 98.9
+        run: ./build.sh verifyexpectations -s true --minimum 99.2
 
   # ── Managed build / test / pack / publish ───────────────────────────────────
   build:
