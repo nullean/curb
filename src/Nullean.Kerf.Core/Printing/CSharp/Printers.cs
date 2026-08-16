@@ -379,14 +379,21 @@ internal static partial class Printers
 		// whole block of their own hug here; an object or collection initializer does not.
 		if (node.Expression is SwitchExpressionSyntax or QueryExpressionSyntax)
 		{
-			// A note here used to claim dotnet format puts the switch a level in when the parameter
-			// list wraps, and that fixing it needed an IfBreak against that list's group. The
-			// primitive now exists — see DocArena.IndentIfBroken — and using it here made these files
-			// worse, not better: dotnet format keeps the body level with the member whether the list
-			// wrapped or not, which is what this already does. The two files that still differ for
-			// another reason.
-			arena.Synthetic(SyntheticText.Space);
-			Node.Print(node.Expression, context);
+			// dotnet format anchors this to the indent of the line the *arrow* ends up on, which is
+			// not the same as whether the parameter list wrapped — an earlier note here said it was,
+			// and aiming an IfBreak at that list's group made both corpus files worse.
+			//
+			// The line the arrow lands on is the line the closing paren ended. A list that wrapped
+			// with `)` on a line of its own leaves the arrow at the member's indent; one that wrapped
+			// with `)` still hugging the last parameter leaves it a level deeper, and the body follows
+			// it down. Read from the source, where the two are already distinguishable, rather than
+			// from a layout being decided on this same run.
+			using (arena.IndentIf(ClosingParenHugsTheLastParameter(node, context)))
+			{
+				arena.Synthetic(SyntheticText.Space);
+				Node.Print(node.Expression, context);
+			}
+
 			return;
 		}
 
@@ -396,6 +403,30 @@ internal static partial class Printers
 			arena.Line();
 			Node.Print(node.Expression, context);
 		}
+	}
+
+	/// <summary>
+	/// True when the owner's parameter list wrapped but kept its <c>)</c> beside the last parameter.
+	/// </summary>
+	/// <remarks>
+	/// Which is the one shape that leaves an expression body's arrow a level deeper than the member,
+	/// and so the one shape where dotnet format puts a switch or query body a level deeper too.
+	/// </remarks>
+	private static bool ClosingParenHugsTheLastParameter(SyntaxNode arrow, PrintContext context)
+	{
+		var parameters = arrow.Parent switch
+		{
+			MethodDeclarationSyntax method => method.ParameterList,
+			LocalFunctionStatementSyntax local => local.ParameterList,
+			ConstructorDeclarationSyntax constructor => constructor.ParameterList,
+			OperatorDeclarationSyntax op => op.ParameterList,
+			ConversionOperatorDeclarationSyntax conversion => conversion.ParameterList,
+			_ => null,
+		};
+
+		return parameters is { Parameters.Count: > 0 }
+			&& SpansLines(parameters, context)
+			&& context.OnSameLine(parameters.Parameters[^1].Span.End, parameters.CloseParenToken.SpanStart);
 	}
 
 	public static void TypeParameterList(TypeParameterListSyntax node, PrintContext context)

@@ -135,7 +135,7 @@ jobs:
       #
       # Two files out of 1,196 differ, both the arrow-clause anchor recorded in the plan's §1d.
       - name: Conformance with dotnet format
-        run: ./build.sh conformance -s true --corpus /tmp/corpus --minimum 99.8
+        run: ./build.sh conformance -s true --corpus /tmp/corpus --minimum 100
 
       # Publishes native AOT and measures that, not the JIT build. On a run this short JIT
       # compilation dominates, so `dotnet run` reports several times the real cost and reads as a
