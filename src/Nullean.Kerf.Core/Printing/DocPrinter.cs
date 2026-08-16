@@ -45,6 +45,7 @@ internal sealed class DocPrinter
 	private string _endOfLine = "\n";
 	private int _width;
 	private int _column;
+	private int _tabWidth = 4;
 
 	// --- round-trip risk tracking ------------------------------------------------------------
 	private int _lastSourceEnd;
@@ -68,7 +69,8 @@ internal sealed class DocPrinter
 		_arena = arena;
 		_source = source;
 		_output = output;
-		_indenter = new Indenter(options.UseTabs, options.IndentSize);
+		_indenter = new Indenter(options.UseTabs, options.IndentSize, options.TabWidth);
+		_tabWidth = Math.Max(1, options.TabWidth);
 		_endOfLine = options.ResolveEndOfLine(source.Span);
 		_width = options.MaxLineLength;
 		_column = 0;
@@ -448,15 +450,26 @@ internal sealed class DocPrinter
 	/// Surrogate pairs count once. East Asian wide characters should count twice; that table is not
 	/// wired up yet and is tracked for when the syntax printers start handling string literals.
 	/// </remarks>
-	private static int TextWidth(ReadOnlySpan<char> text)
+	private int TextWidth(ReadOnlySpan<char> text)
 	{
 		var width = 0;
 		for (var i = 0; i < text.Length; i++)
 		{
+			// A tab advances to the next stop rather than by one, wherever it appears — inside a
+			// verbatim run as much as in an indent. Counting it as one character is what let lines
+			// of tab-indented source measure narrower than they print.
+			if (text[i] == '\t')
+			{
+				width += _tabWidth - ((_column + width) % _tabWidth);
+				continue;
+			}
+
 			if (char.IsHighSurrogate(text[i]) && i + 1 < text.Length && char.IsLowSurrogate(text[i + 1]))
 				i++;
+
 			width++;
 		}
+
 		return width;
 	}
 
