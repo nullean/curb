@@ -66,7 +66,11 @@ public sealed class CSharpFormatter : IDisposable
 	/// <param name="source">The C# text to format.</param>
 	/// <param name="options">Layout settings, normally bound from <c>.editorconfig</c>.</param>
 	/// <param name="expandUnhandled">Benchmark-only cost model; see <c>PrintContext.ExpandUnhandled</c>.</param>
-	/// <param name="forceRoundTrip">Re-parse even where the printer proved no boundary moved. Diagnostic use.</param>
+	/// <param name="forceRoundTrip">
+	/// Re-parse even where the printer proved no boundary moved. The conditional check is trusted in
+	/// normal use; this exists so the test suite can re-establish that the risk detector is not
+	/// letting damage through, and for consumers who want the check unconditionally.
+	/// </param>
 	/// <param name="verifyRoundTrip">
 	/// Re-parse the output and compare token streams, catching the damage the content check cannot
 	/// see. Costs one extra parse — but only where the printer actually put a token boundary at

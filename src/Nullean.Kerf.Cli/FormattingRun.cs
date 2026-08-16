@@ -14,7 +14,7 @@ namespace Nullean.Kerf.Cli;
 /// </remarks>
 internal static class FormattingRun
 {
-	public static int Execute(IFileSystem fileSystem, string target, bool write, bool expandUnhandled = false, bool? verify = null, bool forceVerify = false, bool coverageReport = false)
+	public static int Execute(IFileSystem fileSystem, string target, bool write, bool expandUnhandled = false, bool? verify = null, bool coverageReport = false)
 	{
 		var root = fileSystem.Path.GetFullPath(target);
 
@@ -62,7 +62,7 @@ internal static class FormattingRun
 			(item, _, formatter) =>
 			{
 				var source = fileSystem.File.ReadAllText(item.Path);
-				var result = formatter.Format(source, item.Options, produceText: write, expandUnhandled: expandUnhandled, verifyRoundTrip: verifyRoundTrip, forceRoundTrip: forceVerify);
+				var result = formatter.Format(source, item.Options, produceText: write, expandUnhandled: expandUnhandled, verifyRoundTrip: verifyRoundTrip);
 
 				switch (result.Status)
 				{
