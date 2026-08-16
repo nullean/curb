@@ -20,7 +20,10 @@
     <EnableAotAnalyzer>false</EnableAotAnalyzer>
   </PropertyGroup>
 
+  <!-- The package imports props before the project and targets after it, so the sample does the
+       same rather than importing both at the top and testing an arrangement no consumer has. -->
   <Import Project="../../src/Nullean.Kerf.MSBuild/build/Nullean.Kerf.MSBuild.props" />
+
   <Import Project="../../src/Nullean.Kerf.MSBuild/build/Nullean.Kerf.MSBuild.targets" />
 
 </Project>

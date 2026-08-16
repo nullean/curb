@@ -32,26 +32,34 @@
          someone asks for it. Errors and warnings are raised as diagnostics regardless. -->
     <Kerf_LogLevel Condition="'$(Kerf_LogLevel)' == ''">low</Kerf_LogLevel>
 
-    <!-- The stamp that makes the target incremental. Under the intermediate output path so it is
-         removed by Clean and never checked in. -->
-    <Kerf_StampFile Condition="'$(Kerf_StampFile)' == ''">$(IntermediateOutputPath)kerf.stamp</Kerf_StampFile>
   </PropertyGroup>
 
-  <Target Name="KerfResolveExecutable" Condition="'$(Kerf_Exe)' == ''">
+  <Target Name="KerfPrepare">
     <!--
-      The native binary, resolved from the RID-specific package NuGet picked through the runtime
-      graph. Consumers reference one small meta-package and get exactly the binary for the machine
-      doing the build rather than all five.
+      Both of these are resolved here rather than in the PropertyGroup above, because that is
+      evaluated when this file is imported and $(IntermediateOutputPath) is not set until the SDK's
+      own targets have been. Setting the stamp path up there left `kerf.stamp` and `kerf.files` in
+      the project directory next to somebody's source — which a build tool has no business doing, and
+      which was invisible until one of them was committed.
+
+      A target's Inputs and Outputs are evaluated after its DependsOnTargets have run, so setting the
+      stamp path here is early enough for incrementality to use it.
     -->
     <PropertyGroup>
-      <Kerf_Exe Condition="'$(OS)' == 'Windows_NT'">$(MSBuildThisFileDirectory)../tools/kerf.exe</Kerf_Exe>
-      <Kerf_Exe Condition="'$(OS)' != 'Windows_NT'">$(MSBuildThisFileDirectory)../tools/kerf</Kerf_Exe>
+      <Kerf_StampFile Condition="'$(Kerf_StampFile)' == ''">$(IntermediateOutputPath)kerf.stamp</Kerf_StampFile>
+      <Kerf_FileList Condition="'$(Kerf_FileList)' == ''">$(IntermediateOutputPath)kerf.files</Kerf_FileList>
+
+      <!-- The native binary, resolved from the RID-specific package NuGet picked through the runtime
+           graph: a consumer references one small meta-package and gets the binary for the machine
+           doing the build rather than all five. -->
+      <Kerf_Exe Condition="'$(Kerf_Exe)' == '' and '$(OS)' == 'Windows_NT'">$(MSBuildThisFileDirectory)../tools/kerf.exe</Kerf_Exe>
+      <Kerf_Exe Condition="'$(Kerf_Exe)' == '' and '$(OS)' != 'Windows_NT'">$(MSBuildThisFileDirectory)../tools/kerf</Kerf_Exe>
     </PropertyGroup>
   </Target>
 
   <Target Name="Kerf"
           BeforeTargets="CoreCompile"
-          DependsOnTargets="KerfResolveExecutable"
+          DependsOnTargets="KerfPrepare"
           Inputs="@(Compile);@(EditorConfigFiles);$(MSBuildProjectFullPath)"
           Outputs="$(Kerf_StampFile)"
           Condition="'$(Kerf_Bypass)' != 'true'
@@ -75,12 +83,12 @@
 
     <!-- Only the files this project actually compiles. Passing the folder would reach sources that
          belong to another project, or to none. -->
-    <WriteLinesToFile File="$(IntermediateOutputPath)kerf.files"
+    <WriteLinesToFile File="$(Kerf_FileList)"
                       Lines="@(Compile->'%(FullPath)')"
                       Overwrite="true"
                       WriteOnlyWhenDifferent="true" />
 
-    <Exec Command="&quot;$(Kerf_Exe)&quot; $(_KerfCommand) --files &quot;$(IntermediateOutputPath)kerf.files&quot;"
+    <Exec Command="&quot;$(Kerf_Exe)&quot; $(_KerfCommand) --files &quot;$(Kerf_FileList)&quot;"
           StandardOutputImportance="$(Kerf_LogLevel)"
           ContinueOnError="true"
           IgnoreExitCode="true">
@@ -108,7 +116,7 @@
     <Touch Condition="'$(_KerfExitCode)' == '0'" Files="$(Kerf_StampFile)" AlwaysCreate="true" />
 
     <ItemGroup>
-      <FileWrites Include="$(Kerf_StampFile);$(IntermediateOutputPath)kerf.files" />
+      <FileWrites Include="$(Kerf_StampFile);$(Kerf_FileList)" />
     </ItemGroup>
   </Target>
 
