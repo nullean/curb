@@ -224,6 +224,15 @@ public static class EditorConfigOptionsBinder
 				options = options with { SortUsings = UsingOrder.SystemFirst };
 		}
 
+		// The two native ways of saying "do not format this file".
+		if (TryBool(properties, "generated_code", diagnostics, out var generatedCode) && generatedCode)
+			options = options with { Excluded = true };
+
+		// EditorConfig lower-cases keys, so the rule id arrives as `ide0055` however it was written.
+		if (properties.TryGetValue("dotnet_diagnostic.ide0055.severity", out var formattingSeverity)
+			&& string.Equals(formattingSeverity, "none", StringComparison.OrdinalIgnoreCase))
+			options = options with { Excluded = true };
+
 		if (TryBool(properties, "csharp_preserve_single_line_statements", diagnostics, out var preserveStatements))
 			options = options with { PreserveSingleLineStatements = preserveStatements };
 

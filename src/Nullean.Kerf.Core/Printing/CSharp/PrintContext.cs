@@ -30,6 +30,12 @@ internal sealed class PrintContext(DocArena arena, SourceText text, FormatOption
 	/// </remarks>
 	public TextSpan ReorderedSpan { get; set; }
 
+	/// <summary>
+	/// Regions the file suppressed with <c>#pragma warning disable IDE0055</c>, or null for none.
+	/// </summary>
+	/// <remarks>Null in every file that has no such pragma, which is nearly all of them.</remarks>
+	public List<TextSpan>? Suppressed { get; init; }
+
 	public int PrintedTokens { get; set; }
 
 	/// <summary>Tokens emitted verbatim because no printer handles their node yet.</summary>

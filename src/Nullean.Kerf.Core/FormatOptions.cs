@@ -272,6 +272,17 @@ public readonly record struct FormatOptions
 	/// <summary><c>csharp_indent_labels</c>, default <see cref="LabelIndent.OneLessThanCurrent"/>.</summary>
 	public LabelIndent IndentLabels { get; init; } = LabelIndent.OneLessThanCurrent;
 
+	/// <summary>
+	/// The file asked not to be formatted at all.
+	/// </summary>
+	/// <remarks>
+	/// Set by <c>generated_code = true</c> or by <c>dotnet_diagnostic.IDE0055.severity = none</c>.
+	/// Neither is a layout choice — they are the two ways .NET already has of saying "leave this
+	/// alone", which is why Kerf needs no ignore file of its own. Honoured by the CLI rather than by
+	/// the printer: a caller who hands the library a string has asked for it to be formatted.
+	/// </remarks>
+	public bool Excluded { get; init; }
+
 	/// <summary>True when reflow is disabled, which lets the printer skip fit measurement entirely.</summary>
 	public bool ReflowDisabled => MaxLineLength == Off;
 

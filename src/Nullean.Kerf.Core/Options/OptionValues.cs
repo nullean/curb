@@ -35,6 +35,9 @@ public static class OptionValues
 		// Read and written but never a layout decision, so there is nothing resolved to report.
 		"charset" => "utf-8",
 
+		"generated_code" => Bool(options.Excluded),
+		"dotnet_diagnostic.ide0055.severity" => options.Excluded ? "none" : "default",
+
 		"csharp_new_line_before_open_brace" => BraceStyleParser.ToEditorConfigValue(options.NewLineBeforeOpenBrace),
 		"csharp_new_line_before_else" => Bool(options.NewLineBeforeElse),
 		"csharp_new_line_before_catch" => Bool(options.NewLineBeforeCatch),

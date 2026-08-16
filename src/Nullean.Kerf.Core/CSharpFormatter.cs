@@ -103,6 +103,7 @@ public sealed class CSharpFormatter : IDisposable
 		{
 			ExpandUnhandled = expandUnhandled,
 			UnhandledByKind = UnhandledByKind,
+			Suppressed = FormattingSuppression.Scan(parsed.Root, source.AsSpan()),
 		};
 
 		try
