@@ -41,12 +41,15 @@ internal static partial class Printers
 	/// A value that brings its own braces positions its own contents, so it takes a plain space
 	/// rather than a hanging indent — otherwise the whole construct sits one level too deep.
 	/// </remarks>
-	private static void OperandOnRight(SyntaxNode? right, PrintContext context)
+	private static void OperandOnRight(SyntaxNode? right, PrintContext context, int operatorEnd = -1)
 	{
 		var arena = context.Arena;
 
+		// Where the operand starts, not whether it spans lines — see EqualsValueClause for why the
+		// difference decides whether formatting twice settles.
 		if (right is ExpressionSyntax expression
-			&& (BringsOwnBlock(expression) || SpansLines(expression, context)))
+			&& (BringsOwnBlock(expression)
+				|| (operatorEnd >= 0 && context.OnSameLine(operatorEnd, expression.SpanStart))))
 		{
 			Spacing.BeforeOperator(context);
 			Node.Print(right, context);
@@ -76,7 +79,19 @@ internal static partial class Printers
 		Node.Print(node.Left, context);
 		Spacing.BeforeOperator(context);
 		TokenPrinter.Print(node.OperatorToken, context);
-		OperandOnRight(node.Right, context);
+
+		// A condition the author broke across lines stays broken, and its operands stay level with
+		// each other rather than gaining a continuation indent — that is where dotnet format leaves
+		// them. Joining these was the last thing making Kerf non-idempotent: a three-line condition
+		// came back as one 162-column line, which the next run then broke somewhere else entirely.
+		if (!context.OnSameLine(node.OperatorToken.Span.End, node.Right.SpanStart))
+		{
+			context.Arena.HardLine();
+			Node.Print(node.Right, context);
+			return;
+		}
+
+		OperandOnRight(node.Right, context, node.OperatorToken.Span.End);
 	}
 
 	public static void AssignmentExpression(AssignmentExpressionSyntax node, PrintContext context)
@@ -92,7 +107,7 @@ internal static partial class Printers
 		Node.Print(node.Left, context);
 		Spacing.BeforeOperator(context);
 		TokenPrinter.Print(node.OperatorToken, context);
-		OperandOnRight(node.Right, context);
+		OperandOnRight(node.Right, context, node.OperatorToken.Span.End);
 	}
 
 	public static void ConditionalExpression(ConditionalExpressionSyntax node, PrintContext context)

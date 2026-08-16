@@ -93,10 +93,13 @@ internal static partial class Printers
 		// continuation indent here would shift the whole construct one level right of where it
 		// belongs. Only a plain expression needs the hanging indent.
 		//
-		// A value the author already spread over several lines counts too: it starts on the `=` line
-		// and continues below, so breaking after the `=` as well would push the whole thing right
-		// and add a line nobody asked for.
-		if (BringsOwnBlock(node.Value) || SpansLines(node.Value, context))
+		// A value that starts on the `=` line and continues below counts too: breaking after the `=`
+		// as well would push the whole thing right and add a line nobody asked for.
+		//
+		// The test is where the value *starts*, not whether it spans lines. Reflow may have broken
+		// after the `=` itself on an earlier run, and asking "does this span lines" would then read
+		// Kerf's own output back as intent and hug it — formatting twice would not settle.
+		if (BringsOwnBlock(node.Value) || context.OnSameLine(node.EqualsToken.Span.End, node.Value.SpanStart))
 		{
 			arena.Synthetic(SyntheticText.Space);
 			Node.Print(node.Value, context);

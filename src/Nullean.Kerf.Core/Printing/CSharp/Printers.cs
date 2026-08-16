@@ -533,13 +533,15 @@ internal static partial class Printers
 		var arena = context.Arena;
 		TokenPrinter.Print(node.OpenParenToken, context);
 
-		// A sole argument positions its own contents when it brings braces — `Returns(new C { … })`,
-		// `Select(x => { … })` — or when the author already laid it out across lines. Wrapping it in
-		// the argument list's indent would push those contents a level right of where dotnet format
-		// puts them, and gains nothing: there is no list to lay out, just one construct that already
-		// knows its own shape.
-		if (node.Arguments.Count == 1
-			&& (BringsOwnBlock(node.Arguments[0].Expression) || SpansLines(node.Arguments[0], context)))
+		// A sole argument that brings its own braces positions its own contents — `Returns(new C
+		// { … })`, `Select(x => { … })` — so the list has nothing to lay out and adding its indent
+		// would push those contents a level right of where dotnet format puts them.
+		//
+		// Only for a construct that brings its own block. Extending this to any argument the author
+		// happened to spread over lines drops the group as well as the indent, leaving a long
+		// argument no break opportunity at all — it came back out as one over-long line, which the
+		// next run then broke again.
+		if (node.Arguments.Count == 1 && BringsOwnBlock(node.Arguments[0].Expression))
 		{
 			Spacing.InsideCallParens(context);
 			Node.Print(node.Arguments[0], context);
