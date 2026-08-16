@@ -44,7 +44,8 @@ internal static class TokenStreamComparer
 		out string? failure,
 		bool usingsReordered = false,
 		bool trailingCommas = false,
-		bool modifiersReordered = false)
+		bool modifiersReordered = false,
+		bool bracesAdded = false)
 	{
 		if (!CSharpSource.TryParse(formatted, out var reparsed, out var errors))
 		{
@@ -78,6 +79,9 @@ internal static class TokenStreamComparer
 		SyntaxToken before = default, after = default;
 		bool carryOriginal = false, carryProduced = false;
 
+		// Braces the output has and the source does not, counted so they have to balance.
+		var braceDebt = 0;
+
 		while (true)
 		{
 			// The using block has been checked as a set; walking it in order would only re-discover
@@ -88,8 +92,23 @@ internal static class TokenStreamComparer
 
 			if (!hasOriginal && !hasProduced)
 			{
+				if (braceDebt != 0)
+				{
+					failure = $"formatting left {braceDebt} added brace(s) unbalanced";
+					return false;
+				}
+
 				failure = null;
 				return true;
+			}
+
+			// The tail of an added brace pair, settled by count for the same reason as in the content
+			// check: the added `}` matched the enclosing block's own and left this one over.
+			if (bracesAdded && !hasOriginal && hasProduced
+				&& after.RawKind == (int)SyntaxKind.CloseBraceToken && braceDebt > 0)
+			{
+				braceDebt--;
+				continue;
 			}
 
 			if (!hasOriginal)
@@ -102,6 +121,24 @@ internal static class TokenStreamComparer
 			{
 				failure = $"formatting lost the token at position {index}: '{Text(originalText, before)}'";
 				return false;
+			}
+
+			// A brace the output added, held to balancing for the same reason as in the content check.
+			if (bracesAdded && hasOriginal && hasProduced && Mismatch(originalText, before, formattedText, after))
+			{
+				if (after.RawKind == (int)SyntaxKind.OpenBraceToken)
+				{
+					braceDebt++;
+					carryOriginal = true;
+					continue;
+				}
+
+				if (after.RawKind == (int)SyntaxKind.CloseBraceToken && braceDebt > 0)
+				{
+					braceDebt--;
+					carryOriginal = true;
+					continue;
+				}
 			}
 
 			// A permuted modifier run. Both sides start one at the same place, so collecting the

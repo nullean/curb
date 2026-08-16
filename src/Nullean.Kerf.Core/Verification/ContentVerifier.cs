@@ -41,16 +41,25 @@ internal static class ContentVerifier
 	/// The trailing-comma options are on, so a <c>,</c> immediately before a closing brace or bracket
 	/// may appear on one side and not the other.
 	/// </param>
+	/// <param name="bracesAdded">
+	/// A control-flow body was given braces, so the output carries <c>{</c> and <c>}</c> the source
+	/// does not. They are counted rather than merely allowed: an opening brace with no closing one, or
+	/// a closing one that was never opened, is still a failure.
+	/// </param>
 	public static bool Verify(
 		ReadOnlySpan<char> source,
 		ReadOnlySpan<char> output,
 		out string? failure,
 		IReadOnlyList<TextSpan>? reordered = null,
-		bool trailingCommas = false)
+		bool trailingCommas = false,
+		bool bracesAdded = false)
 	{
 		var sourceIndex = 0;
 		var outputIndex = 0;
 		var nextReordered = 0;
+
+		// Braces the output has and the source does not, counted so they have to balance.
+		var braceDebt = 0;
 
 		while (true)
 		{
@@ -82,8 +91,38 @@ internal static class ContentVerifier
 			var sourceDone = sourceIndex >= source.Length;
 			var outputDone = outputIndex >= output.Length;
 
+			// A brace the output added. Stepping over it is safe only because everything else still
+			// has to match exactly and the pair has to balance: `if (a) Foo();` printed as `if (a) {}`
+			// fails, since after the braces the source still has `Foo();` and the output has nothing.
+			//
+			// Which brace is "the added one" cannot be decided locally — braces are indistinguishable
+			// characters, so an added `}` sitting in front of the enclosing block's own `}` matches it
+			// and the pair is settled by the count instead, here and at the end of the file.
+			if (bracesAdded && !outputDone)
+			{
+				if (output[outputIndex] == '{' && (sourceDone || source[sourceIndex] != '{'))
+				{
+					braceDebt++;
+					outputIndex++;
+					continue;
+				}
+
+				if (output[outputIndex] == '}' && braceDebt > 0 && (sourceDone || source[sourceIndex] != '}'))
+				{
+					braceDebt--;
+					outputIndex++;
+					continue;
+				}
+			}
+
 			if (sourceDone && outputDone)
 			{
+				if (braceDebt != 0)
+				{
+					failure = $"formatting left {braceDebt} added brace(s) unbalanced";
+					return false;
+				}
+
 				failure = null;
 				return true;
 			}

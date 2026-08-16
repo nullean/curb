@@ -38,11 +38,18 @@ internal static class TestOptions
 
 	private static FormatOptions Bind(string editorConfig)
 	{
-		var fileSystem = new MockFileSystem();
-		fileSystem.AddFile("/test/.editorconfig", new MockFileData($"root = true{Environment.NewLine}[*.cs]{Environment.NewLine}{editorConfig}"));
-		fileSystem.AddFile("/test/Test.cs", new MockFileData(string.Empty));
+		// A directory of its own per configuration. The parser caches parsed files and compiled globs
+		// by path, and some of that cache is process-wide, so every test binding a different config at
+		// the same `/test/.editorconfig` could be served another test's settings. It showed up as one
+		// arbitrary width test failing in roughly one run in three, never the same one, and never when
+		// run alone.
+		var directory = $"/test/{(uint)StringComparer.Ordinal.GetHashCode(editorConfig):x8}";
 
-		var configuration = new KerfEditorConfig(fileSystem).For("/test/Test.cs");
+		var fileSystem = new MockFileSystem();
+		fileSystem.AddFile($"{directory}/.editorconfig", new MockFileData($"root = true{Environment.NewLine}[*.cs]{Environment.NewLine}{editorConfig}"));
+		fileSystem.AddFile($"{directory}/Test.cs", new MockFileData(string.Empty));
+
+		var configuration = new KerfEditorConfig(fileSystem).For($"{directory}/Test.cs");
 		var bound = EditorConfigOptionsBinder.Bind(configuration);
 
 		// A test that does not mention end_of_line still wants LF, so expected strings stay stable

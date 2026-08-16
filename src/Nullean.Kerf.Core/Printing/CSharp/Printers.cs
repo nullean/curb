@@ -921,18 +921,24 @@ internal static partial class Printers
 		var order = context.Options.PreferredModifierOrder!;
 
 		Span<int> indices = stackalloc int[modifiers.Count];
+		Span<int> ranks = stackalloc int[modifiers.Count];
 		for (var i = 0; i < modifiers.Count; i++)
+		{
 			indices[i] = i;
+			ranks[i] = RankOf(modifiers[i], order);
+		}
 
 		// Insertion sort: a declaration has a handful of modifiers, and this keeps it stable and
-		// allocation-free.
+		// allocation-free. Ranks are computed once above rather than inside the comparison — doing it
+		// per comparison is quadratic in a keyword lookup, and it cost the corpus a measurable share
+		// of its allocation.
 		for (var i = 1; i < indices.Length; i++)
 		{
 			var current = indices[i];
-			var rank = RankOf(modifiers[current], order);
+			var rank = ranks[current];
 			var j = i - 1;
 
-			while (j >= 0 && RankOf(modifiers[indices[j]], order) > rank)
+			while (j >= 0 && ranks[indices[j]] > rank)
 			{
 				indices[j + 1] = indices[j];
 				j--;
@@ -971,9 +977,15 @@ internal static partial class Printers
 
 	private static int RankOf(SyntaxToken modifier, string[] order)
 	{
+		// SyntaxFacts.GetText hands back the interned keyword, where SyntaxToken.Text builds a string
+		// from the green node every time it is asked.
+		var text = SyntaxFacts.GetText((SyntaxKind)modifier.RawKind);
+		if (text.Length == 0)
+			return int.MaxValue;
+
 		for (var i = 0; i < order.Length; i++)
 		{
-			if (order[i].Equals(modifier.Text, StringComparison.Ordinal))
+			if (order[i].Equals(text, StringComparison.Ordinal))
 				return i;
 		}
 

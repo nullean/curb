@@ -218,6 +218,10 @@ internal static class TokenPrinter
 				return false;
 		}
 
+		// A brace Kerf is about to synthesise would land between the two comments.
+		if (Printers.ClosesSynthesisedBlock(previous, context))
+			return false;
+
 		var lines = context.Text.Lines;
 		return lines.GetLineFromPosition(comment.SpanStart).LineNumber
 			== lines.GetLineFromPosition(last.SpanStart).LineNumber + 1;

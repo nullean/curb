@@ -2,6 +2,19 @@ using Nullean.Kerf.Options;
 
 namespace Nullean.Kerf;
 
+/// <summary>What <c>csharp_prefer_braces</c> asks for.</summary>
+public enum BraceRequirement
+{
+	/// <summary>Leave every body as the author wrote it. The default, and where <c>false</c> lands.</summary>
+	AsWritten,
+
+	/// <summary>Give every unbraced body braces.</summary>
+	Always,
+
+	/// <summary>Give a body braces only when it does not fit on the header's line.</summary>
+	WhenMultiline,
+}
+
 /// <summary>Line ending to emit.</summary>
 public enum EndOfLine : byte
 {
@@ -344,6 +357,31 @@ public readonly record struct FormatOptions
 	/// </para>
 	/// </remarks>
 	public string[]? PreferredModifierOrder { get; init; }
+
+	/// <summary>
+	/// Whether a control-flow body written without braces should be given them.
+	/// </summary>
+	/// <remarks>
+	/// <para>
+	/// <c>csharp_prefer_braces</c>, code style rule IDE0011 — another real key that
+	/// <c>dotnet format style</c> implements only with a workspace behind it. Kerf reaches the same
+	/// answer from syntax alone, which is the point of the MSBuild integration: what Kerf fixes before
+	/// the compiler runs is what <c>EnforceCodeStyleInBuild</c> no longer has to report.
+	/// </para>
+	/// <para>
+	/// <see cref="BraceRequirement.AsWritten"/> unless the key says otherwise, so a repository that
+	/// never mentioned it is untouched. <c>false</c> also maps to that: Roslyn reads it as "prefer no
+	/// braces" and will take them off, but removing a brace pair can change what a name means — a
+	/// declaration inside the block stops being scoped to it — and adding braces cannot. Kerf only
+	/// adds.
+	/// </para>
+	/// <para>
+	/// When braces are added the body is expanded onto its own lines even if the author had it on the
+	/// header's line, which is what Roslyn does. Leaving <c>if (a) Call();</c> inline would satisfy
+	/// nobody: IDE0011 would still fire on the next build, and the whole point is that it does not.
+	/// </para>
+	/// </remarks>
+	public BraceRequirement PreferBraces { get; init; } = BraceRequirement.AsWritten;
 
 	/// <summary>True when either trailing-comma option asked for anything.</summary>
 	/// <remarks>

@@ -37,6 +37,13 @@ public static class OptionValues
 
 		"csharp_trailing_comma_in_multiline_lists" => Bool(options.TrailingCommaInMultilineLists),
 		"csharp_trailing_comma_in_singleline_lists" => Bool(options.TrailingCommaInSinglelineLists),
+		"csharp_prefer_braces" => options.PreferBraces switch
+		{
+			BraceRequirement.Always => "true",
+			BraceRequirement.WhenMultiline => "when_multiline",
+			BraceRequirement.AsWritten => "false   # bodies are left as written; Kerf never removes braces",
+			_ => "false",
+		},
 		"csharp_preferred_modifier_order" => options.PreferredModifierOrder is { } order
 			? string.Join(",", order)
 			: "   # modifiers are left as written; the key is the opt-in",

@@ -234,6 +234,27 @@ public static class EditorConfigOptionsBinder
 
 		// IDE0036. Presence is the ask: the key has a documented default value, so binding it whether
 		// or not it was written would reorder a repository that never mentioned it.
+		if (properties.TryGetValue("csharp_prefer_braces", out var preferBraces))
+		{
+			var colon = preferBraces.LastIndexOf(':');
+			switch ((colon >= 0 ? preferBraces[..colon] : preferBraces).Trim().ToLowerInvariant())
+			{
+				case "true":
+					options = options with { PreferBraces = BraceRequirement.Always };
+					break;
+				case "when_multiline":
+					options = options with { PreferBraces = BraceRequirement.WhenMultiline };
+					break;
+				case "false":
+					// Roslyn reads this as "take the braces off". Kerf only ever adds them.
+					break;
+				default:
+					diagnostics?.Add(KerfDiagnostic.UnrecognisedValue(
+						"csharp_prefer_braces", preferBraces, "true, false or when_multiline"));
+					break;
+			}
+		}
+
 		if (properties.TryGetValue("csharp_preferred_modifier_order", out var modifierOrder))
 		{
 			// Code style options carry an optional `:severity` suffix — `public,...,async:error` — and

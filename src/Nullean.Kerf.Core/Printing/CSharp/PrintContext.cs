@@ -47,6 +47,9 @@ internal sealed class PrintContext(DocArena arena, SourceText text, FormatOption
 	/// <summary>True when any declaration's modifiers were put in the configured order.</summary>
 	public bool ModifiersReordered { get; set; }
 
+	/// <summary>True when a body was given braces the source did not have.</summary>
+	public bool BracesAdded { get; set; }
+
 	/// <summary>
 	/// Regions the file suppressed with <c>#pragma warning disable IDE0055</c>, or null for none.
 	/// </summary>

@@ -30,6 +30,15 @@ internal static partial class Printers
 
 		var arena = context.Arena;
 
+		// Braces first, because adding them expands the body onto its own lines whatever the
+		// preservation options say — see FormatOptions.PreferBraces for why matching Roslyn here is
+		// the whole point rather than a preference.
+		if (WantsBraces(statement, headerEnd, context))
+		{
+			PrintSynthesisedBlock(statement, context);
+			return;
+		}
+
 		// A statement that shared its header's line keeps sharing it, braces and all. This beats
 		// csharp_preserve_single_line_blocks: `if (a) { return; }` stays whole even with that off.
 		if (context.Options.PreserveSingleLineStatements && context.OnSameLine(headerEnd, statement.Span.End))
@@ -52,6 +61,108 @@ internal static partial class Printers
 			Node.Print(statement, context);
 		}
 	}
+
+	/// <summary>
+	/// Whether this body should be given braces it was not written with.
+	/// </summary>
+	/// <remarks>
+	/// Never for a body that already has them, and never for the <c>if</c> of an <c>else if</c> —
+	/// Roslyn braces the chain's bodies, not the chain. <c>when_multiline</c> asks whether the author
+	/// kept the body on the header's line, which is a fact about the source and so cannot change
+	/// under reflow; asking whether the printed body breaks would let one run's layout decide the next
+	/// run's tokens.
+	/// </remarks>
+	private static bool WantsBraces(StatementSyntax statement, int headerEnd, PrintContext context)
+	{
+		if (statement is BlockSyntax)
+			return false;
+
+		return context.Options.PreferBraces switch
+		{
+			BraceRequirement.Always => true,
+			BraceRequirement.WhenMultiline => !context.OnSameLine(headerEnd, statement.Span.End),
+			BraceRequirement.AsWritten => false,
+			_ => false,
+		};
+	}
+
+	/// <summary>
+	/// Emits a body inside braces the source did not have.
+	/// </summary>
+	/// <remarks>
+	/// The declared token delta: one <c>{</c> and one <c>}</c> that appear in the output and not in
+	/// the source. Both verifiers are told, and both hold the pair to being balanced, so a brace that
+	/// appears without its partner is still damage.
+	/// </remarks>
+	private static void PrintSynthesisedBlock(StatementSyntax statement, PrintContext context)
+	{
+		var arena = context.Arena;
+
+		BeforeOpenBrace(BraceStyle.ControlBlocks, context);
+		arena.Synthetic(SyntheticText.OpenBrace);
+
+		using (arena.Indent(context.Options.IndentBlockContents ? 1 : 0))
+		{
+			arena.HardLine(DocFlags.Reindent);
+			Node.Print(statement, context);
+		}
+
+		using (arena.IndentIf(context.Options.IndentBraces))
+			arena.HardLine(DocFlags.Reindent);
+
+		arena.Synthetic(SyntheticText.CloseBrace);
+		context.BracesAdded = true;
+	}
+
+	/// <summary>
+	/// True when a token is the last one inside a body that is about to be given braces.
+	/// </summary>
+	/// <remarks>
+	/// Asked by the comment-alignment rule, which lines a standalone comment up with a trailing
+	/// comment on the line above. A synthesised <c>}</c> lands between the two, so they are no longer
+	/// on consecutive lines and the premise is gone. Asked of the source, never of the printed
+	/// output: this is precisely the shape where the first run's braces changed the second run's
+	/// answer and the file never settled.
+	/// </remarks>
+	internal static bool ClosesSynthesisedBlock(SyntaxToken token, PrintContext context)
+	{
+		if (context.Options.PreferBraces == BraceRequirement.AsWritten)
+			return false;
+
+		for (var node = token.Parent; node is not null; node = node.Parent)
+		{
+			if (node is not StatementSyntax statement)
+				continue;
+
+			var headerEnd = EmbeddedHeaderEnd(statement);
+			if (headerEnd >= 0)
+				return WantsBraces(statement, headerEnd, context);
+
+			// A block of its own stops the walk: whatever braces it has are the source's.
+			if (statement is BlockSyntax)
+				return false;
+		}
+
+		return false;
+	}
+
+	/// <summary>
+	/// End of the header a statement hangs off, or -1 when it is not an embedded body.
+	/// </summary>
+	private static int EmbeddedHeaderEnd(StatementSyntax statement) =>
+		statement.Parent switch
+		{
+			IfStatementSyntax parent when parent.Statement == statement => parent.CloseParenToken.Span.End,
+			ElseClauseSyntax parent when parent.Statement == statement => parent.ElseKeyword.Span.End,
+			WhileStatementSyntax parent when parent.Statement == statement => parent.CloseParenToken.Span.End,
+			DoStatementSyntax parent when parent.Statement == statement => parent.DoKeyword.Span.End,
+			ForStatementSyntax parent when parent.Statement == statement => parent.CloseParenToken.Span.End,
+			CommonForEachStatementSyntax parent when parent.Statement == statement => parent.CloseParenToken.Span.End,
+			UsingStatementSyntax parent when parent.Statement == statement => parent.CloseParenToken.Span.End,
+			LockStatementSyntax parent when parent.Statement == statement => parent.CloseParenToken.Span.End,
+			FixedStatementSyntax parent when parent.Statement == statement => parent.CloseParenToken.Span.End,
+			_ => -1,
+		};
 
 	/// <summary>Emits <c>keyword (expression)</c>, the shape every control-flow header shares.</summary>
 	private static void ConditionHeader(
@@ -89,7 +200,12 @@ internal static partial class Printers
 		if (node.Else is null)
 			return;
 
-		BeforeContinuation(context.Options.NewLineBeforeElse, node.Statement is BlockSyntax, context);
+		// A body that just gained braces ends in one, so `else` continues from a block whatever the
+		// source looked like.
+		var afterBlock = node.Statement is BlockSyntax
+			|| WantsBraces(node.Statement, node.CloseParenToken.Span.End, context);
+
+		BeforeContinuation(context.Options.NewLineBeforeElse, afterBlock, context);
 		TokenPrinter.Print(node.Else.ElseKeyword, context);
 
 		// `else if` stays on one line rather than nesting a whole new indent level.
