@@ -95,6 +95,9 @@ internal enum DocFlags : byte
 	/// the previous statement and produces source that no longer compiles.
 	/// </remarks>
 	OnlyIfNotAtLineStart = 1 << 4,
+
+	/// <summary>A <c>//</c> comment: everything after it on the same line is swallowed.</summary>
+	LineComment = 1 << 5,
 }
 
 /// <summary>

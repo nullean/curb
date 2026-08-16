@@ -46,6 +46,23 @@ internal sealed class DocPrinter
 	private int _width;
 	private int _column;
 
+	// --- round-trip risk tracking ------------------------------------------------------------
+	private int _lastSourceEnd;
+	private bool _insideLineComment;
+
+	/// <summary>
+	/// True when this document could have changed the token stream, so the output is worth
+	/// re-parsing.
+	/// </summary>
+	/// <remarks>
+	/// Re-parsing every file to prove nothing broke doubles the cost of a run. But the only damage
+	/// re-parsing can find is a changed token boundary, and the printer knows where that risk is: it
+	/// happens when two things separated in the source come out adjacent, with characters that lex
+	/// together. Tracking that during printing costs a comparison per emitted run and lets the
+	/// expensive check become a targeted fallback rather than a blanket tax.
+	/// </remarks>
+	public bool RoundTripAtRisk { get; private set; }
+
 	public void Print(DocArena arena, ReadOnlyMemory<char> source, in FormatOptions options, OutputBuffer output)
 	{
 		_arena = arena;
@@ -56,6 +73,15 @@ internal sealed class DocPrinter
 		_width = options.MaxLineLength;
 		_column = 0;
 		_depth = 0;
+		_lastSourceEnd = -1;
+		_insideLineComment = false;
+
+		// Verbatim runs are re-emitted line by line with the configured ending, so when that differs
+		// from the source's own ending the content of a multi-line string literal changes. The
+		// boundary tracking below cannot see that, so rewriting line endings always forces a check.
+		var sourceNewLine = source.Span.IndexOf('\n');
+		var sourceUsesCrLf = sourceNewLine > 0 && source.Span[sourceNewLine - 1] == '\r';
+		RoundTripAtRisk = sourceNewLine >= 0 && sourceUsesCrLf != (_endOfLine == "\r\n");
 
 		_breaks.Run(arena);
 		EnsureGroupModes(arena.Count);
@@ -99,9 +125,14 @@ internal sealed class DocPrinter
 					break;
 
 				case DocKind.SrcText:
-					Emit(_source.Span.Slice(doc.A, doc.B), doc.Flags, scope.SuppressWidth);
-					i++;
-					break;
+					{
+						var text = _source.Span.Slice(doc.A, doc.B);
+						TrackRoundTripRisk(doc, text);
+						Emit(text, doc.Flags, scope.SuppressWidth);
+						_lastSourceEnd = doc.A + doc.B;
+						i++;
+						break;
+					}
 
 				case DocKind.SynText:
 					Emit(SyntheticText.Get(doc.A), doc.Flags, scope.SuppressWidth);
@@ -195,6 +226,7 @@ internal sealed class DocPrinter
 		{
 			_output.Append(_endOfLine);
 			_column = 0;
+			_insideLineComment = false;
 			return;
 		}
 
@@ -215,6 +247,46 @@ internal sealed class DocPrinter
 		_output.Append(_endOfLine);
 		_output.Append(_indenter.For(scope.Indent));
 		_column = _indenter.ColumnsFor(scope.Indent);
+		_insideLineComment = false;
+	}
+
+	/// <summary>
+	/// Notes whether this run of text could have moved a token boundary, which is the only thing
+	/// re-parsing the output would discover.
+	/// </summary>
+	private void TrackRoundTripRisk(in Doc doc, ReadOnlySpan<char> text)
+	{
+		if (RoundTripAtRisk || text.IsEmpty)
+			return;
+
+		// Anything written while a // comment is open is swallowed by it.
+		if (_insideLineComment)
+		{
+			RoundTripAtRisk = true;
+			return;
+		}
+
+		// A directive is only a directive when it starts its line.
+		if (doc.Flags.HasFlag(DocFlags.IsDirective) && !_output.AtLineStart())
+		{
+			RoundTripAtRisk = true;
+			return;
+		}
+
+		if (doc.Flags.HasFlag(DocFlags.LineComment))
+			_insideLineComment = true;
+
+		// Two runs that the source kept apart are only at risk if we have closed the gap. Runs that
+		// were already adjacent in the source cannot weld — they lexed fine there and are unchanged.
+		if (_lastSourceEnd < 0 || doc.A <= _lastSourceEnd)
+			return;
+
+		var previous = _output.LastChar();
+		if (previous is '\0' or ' ' or '\t' or '\n' or '\r')
+			return;
+
+		if (WeldDetector.CanWeld(previous, text[0]))
+			RoundTripAtRisk = true;
 	}
 
 	private void Emit(ReadOnlySpan<char> text, DocFlags flags, bool suppressWidth)

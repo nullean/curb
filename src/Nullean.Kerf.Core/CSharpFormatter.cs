@@ -57,12 +57,18 @@ public sealed class CSharpFormatter : IDisposable
 	private readonly DocPrinter _printer = new();
 	private readonly OutputBuffer _output = new();
 
+	/// <summary>How many files this formatter actually re-parsed, for reporting how often it was needed.</summary>
+	public int RoundTripsChecked { get; private set; }
+
 	/// <param name="source">The C# text to format.</param>
 	/// <param name="options">Layout settings, normally bound from <c>.editorconfig</c>.</param>
 	/// <param name="expandUnhandled">Benchmark-only cost model; see <c>PrintContext.ExpandUnhandled</c>.</param>
+	/// <param name="forceRoundTrip">Re-parse even where the printer proved no boundary moved. Diagnostic use.</param>
 	/// <param name="verifyRoundTrip">
-	/// Re-parse the output and compare token streams. Costs one extra parse, and catches the damage
-	/// the content check cannot see — see <see cref="TokenStreamComparer"/>.
+	/// Re-parse the output and compare token streams, catching the damage the content check cannot
+	/// see. Costs one extra parse — but only where the printer actually put a token boundary at
+	/// risk, which it tracks while laying the document out. On code that never closes a gap between
+	/// tokens this is free. Pass <c>true</c> to force it regardless.
 	/// </param>
 	/// <param name="produceText">
 	/// False for <c>check</c>, which only needs to know whether anything would change. Skipping the
@@ -73,7 +79,8 @@ public sealed class CSharpFormatter : IDisposable
 		in FormatOptions options,
 		bool produceText = true,
 		bool expandUnhandled = false,
-		bool verifyRoundTrip = false)
+		bool verifyRoundTrip = false,
+		bool forceRoundTrip = false)
 	{
 		if (!CSharpSource.TryParse(source, out var parsed, out var errors))
 		{
@@ -107,6 +114,10 @@ public sealed class CSharpFormatter : IDisposable
 		if (!ContentVerifier.Verify(source.AsSpan(), written, out var failure))
 			return new FormatResult(FormatStatus.VerificationFailed, false, null, context.Coverage, failure);
 
+		// The second parse only ever finds a moved token boundary, and the printer already knows
+		// whether it created that risk. Where it did not, the check is provably redundant.
+		verifyRoundTrip = verifyRoundTrip && (forceRoundTrip || _printer.RoundTripAtRisk);
+
 		var changed = !written.SequenceEqual(source.AsSpan());
 		var text = produceText || verifyRoundTrip ? _output.ToString() : null;
 
@@ -115,6 +126,8 @@ public sealed class CSharpFormatter : IDisposable
 		{
 			return new FormatResult(FormatStatus.VerificationFailed, false, null, context.Coverage, roundTripFailure);
 		}
+
+		RoundTripsChecked += verifyRoundTrip ? 1 : 0;
 
 		return new FormatResult(
 			FormatStatus.Formatted,

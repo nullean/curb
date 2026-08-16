@@ -16,6 +16,8 @@ if (args.Length == 0 || args[0] is "-h" or "--help")
 	Console.WriteLine("  kerf print-config <file>   show the resolved options and any diagnostics");
 	Console.WriteLine("  kerf doc-tree <file>       dump the document IR for a file");
 	Console.WriteLine("  kerf --version");
+	Console.WriteLine();
+	Console.WriteLine("  --no-verify   skip re-parsing output to prove the token stream is unchanged");
 	return 0;
 }
 
@@ -36,7 +38,8 @@ switch (args[0])
 	case "check" when args.Length > 1:
 		return FormattingRun.Execute(fileSystem, args[1], write: false,
 			expandUnhandled: args.Contains("--expand-unhandled"),
-			verify: args.Contains("--verify") ? true : null);
+			verify: !args.Contains("--no-verify"),
+			forceVerify: args.Contains("--verify-all"));
 
 	case "doc-tree" when args.Length > 1:
 		{

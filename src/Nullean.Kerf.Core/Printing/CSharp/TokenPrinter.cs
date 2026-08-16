@@ -75,7 +75,7 @@ internal static class TokenPrinter
 					// back as trailing trivia — so the output never settles.
 					FlushBlankLine(arena, ref pendingNewLines, emittedAnything);
 					arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
-					EmitTriviaText(trivia, context, DocFlags.None);
+					EmitTriviaText(trivia, context, CommentFlags(trivia));
 					arena.HardLine();
 					emittedAnything = true;
 					pendingNewLines = 0;
@@ -128,7 +128,7 @@ internal static class TokenPrinter
 					// A trailing comment always eats the rest of its physical line, so whatever
 					// follows has to start on a new one.
 					context.Arena.Synthetic(SyntheticText.Space);
-					EmitTriviaText(trivia, context, DocFlags.None);
+					EmitTriviaText(trivia, context, CommentFlags(trivia));
 
 					if (trivia.IsKind(SyntaxKind.SingleLineCommentTrivia))
 					{
@@ -147,6 +147,14 @@ internal static class TokenPrinter
 			}
 		}
 	}
+
+	/// <summary>
+	/// A <c>//</c> comment swallows the rest of its line, so the printer has to know it wrote one.
+	/// </summary>
+	private static DocFlags CommentFlags(SyntaxTrivia trivia) =>
+		trivia.IsKind(SyntaxKind.SingleLineCommentTrivia) || trivia.IsKind(SyntaxKind.SingleLineDocumentationCommentTrivia)
+			? DocFlags.LineComment
+			: DocFlags.None;
 
 	/// <summary>Emits at most one blank line, and never before anything has been written.</summary>
 	private static void FlushBlankLine(DocArena arena, ref int pendingNewLines, bool emittedAnything)

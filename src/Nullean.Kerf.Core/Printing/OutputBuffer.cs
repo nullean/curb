@@ -43,6 +43,9 @@ internal sealed class OutputBuffer : IDisposable
 		_buffer[_length++] = value;
 	}
 
+	/// <summary>The last character written, or NUL when nothing has been.</summary>
+	public char LastChar() => _length == 0 ? '\0' : _buffer[_length - 1];
+
 	/// <summary>True when only spaces and tabs separate the end of the buffer from a line start.</summary>
 	public bool AtLineStart()
 	{

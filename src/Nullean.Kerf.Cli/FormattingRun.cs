@@ -14,12 +14,13 @@ namespace Nullean.Kerf.Cli;
 /// </remarks>
 internal static class FormattingRun
 {
-	public static int Execute(IFileSystem fileSystem, string target, bool write, bool expandUnhandled = false, bool? verify = null)
+	public static int Execute(IFileSystem fileSystem, string target, bool write, bool expandUnhandled = false, bool? verify = null, bool forceVerify = false)
 	{
 		var root = fileSystem.Path.GetFullPath(target);
 
-		// Writing can corrupt a file, so it is verified by default; `check` writes nothing.
-		var verifyRoundTrip = verify ?? write;
+		// On by default for both commands: the printer tracks whether it actually put a token
+		// boundary at risk, so on code that does not, the second parse never happens.
+		var verifyRoundTrip = verify ?? true;
 
 		var files = fileSystem.Directory.Exists(root)
 			? fileSystem.Directory.EnumerateFiles(root, "*.cs", SearchOption.AllDirectories).Where(IsFormattable).ToArray()
@@ -47,6 +48,7 @@ internal static class FormattingRun
 		var unparsable = 0;
 		long printedTokens = 0;
 		long totalTokens = 0;
+		var reparsed = 0;
 		var messages = new System.Collections.Concurrent.ConcurrentBag<string>();
 
 		var allocatedBefore = GC.GetTotalAllocatedBytes(precise: true);
@@ -59,7 +61,7 @@ internal static class FormattingRun
 			(item, _, formatter) =>
 			{
 				var source = fileSystem.File.ReadAllText(item.Path);
-				var result = formatter.Format(source, item.Options, produceText: write, expandUnhandled: expandUnhandled, verifyRoundTrip: verifyRoundTrip);
+				var result = formatter.Format(source, item.Options, produceText: write, expandUnhandled: expandUnhandled, verifyRoundTrip: verifyRoundTrip, forceRoundTrip: forceVerify);
 
 				switch (result.Status)
 				{
@@ -90,7 +92,11 @@ internal static class FormattingRun
 				Interlocked.Increment(ref totalTokens);
 				return formatter;
 			},
-			formatter => formatter.Dispose());
+			formatter =>
+			{
+				Interlocked.Add(ref reparsed, formatter.RoundTripsChecked);
+				formatter.Dispose();
+			});
 
 		stopwatch.Stop();
 		var allocated = GC.GetTotalAllocatedBytes(precise: true) - allocatedBefore;
@@ -110,6 +116,13 @@ internal static class FormattingRun
 		Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
 			$"  {sourceBytes / 1024.0 / 1024.0:F2} MB source, allocated {allocated / 1024.0 / 1024.0:F1} MB "
 			+ $"({allocated / (double)Math.Max(1, sourceBytes):F1}x source){costModel}"));
+
+		if (verifyRoundTrip)
+		{
+			Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
+				$"  round-trip verified {reparsed} of {files.Length} file(s) "
+				+ $"({reparsed / (double)Math.Max(1, files.Length):P1} needed a second parse)"));
+		}
 
 		if (failed > 0)
 			return 3;
