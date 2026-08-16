@@ -35,9 +35,21 @@ internal static partial class Printers
 	}
 
 	/// <summary>Right-hand side of an operator: breaks and indents when it will not fit.</summary>
+	/// <remarks>
+	/// A value that brings its own braces positions its own contents, so it takes a plain space
+	/// rather than a hanging indent — otherwise the whole construct sits one level too deep.
+	/// </remarks>
 	private static void OperandOnRight(SyntaxNode? right, PrintContext context)
 	{
 		var arena = context.Arena;
+
+		if (right is ExpressionSyntax expression && BringsOwnBlock(expression))
+		{
+			arena.Synthetic(SyntheticText.Space);
+			Node.Print(right, context);
+			return;
+		}
+
 		using (arena.Group())
 		using (arena.Indent())
 		{

@@ -131,7 +131,7 @@ public class MemberTests : FormattingTest
 		""");
 
 	[Test]
-	[Skip("csharp_preserve_single_line_blocks is not implemented — a multi-line accessor list collapses")]
+	[Skip("reflow off collapses a multi-line accessor list onto one line; dotnet format never joins lines")]
 	public Task Property_with_expression_bodied_accessors() => Unchanged(
 		"""
 		public class C

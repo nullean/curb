@@ -76,6 +76,16 @@ internal static partial class Printers
 		arena.Synthetic(SyntheticText.Space);
 		TokenPrinter.Print(node.EqualsToken, context);
 
+		// A value that brings its own braces or brackets already positions its contents, so adding a
+		// continuation indent here would shift the whole construct one level right of where it
+		// belongs. Only a plain expression needs the hanging indent.
+		if (BringsOwnBlock(node.Value))
+		{
+			arena.Synthetic(SyntheticText.Space);
+			Node.Print(node.Value, context);
+			return;
+		}
+
 		using (arena.Group())
 		using (arena.Indent())
 		{
@@ -83,6 +93,23 @@ internal static partial class Printers
 			Node.Print(node.Value, context);
 		}
 	}
+
+	/// <summary>True for values whose own layout supplies the indentation of their contents.</summary>
+	internal static bool BringsOwnBlock(ExpressionSyntax? value) =>
+		value switch
+		{
+			ObjectCreationExpressionSyntax creation => creation.Initializer is not null,
+			ImplicitObjectCreationExpressionSyntax creation => creation.Initializer is not null,
+			ArrayCreationExpressionSyntax creation => creation.Initializer is not null,
+			ImplicitArrayCreationExpressionSyntax => true,
+			InitializerExpressionSyntax => true,
+			CollectionExpressionSyntax => true,
+			AnonymousObjectCreationExpressionSyntax => true,
+			SwitchExpressionSyntax => true,
+			QueryExpressionSyntax => true,
+			WithExpressionSyntax => true,
+			_ => false,
+		};
 
 	public static void PropertyDeclaration(PropertyDeclarationSyntax node, PrintContext context)
 	{
