@@ -30,10 +30,13 @@ var fileSystem = new FileSystem();
 switch (args[0])
 {
 	case "format" when args.Length > 1:
-		return FormattingRun.Execute(fileSystem, args[1], write: true);
+		return FormattingRun.Execute(fileSystem, args[1], write: true,
+			verify: !args.Contains("--no-verify"));
 
 	case "check" when args.Length > 1:
-		return FormattingRun.Execute(fileSystem, args[1], write: false, expandUnhandled: args.Contains("--expand-unhandled"));
+		return FormattingRun.Execute(fileSystem, args[1], write: false,
+			expandUnhandled: args.Contains("--expand-unhandled"),
+			verify: args.Contains("--verify") ? true : null);
 
 	case "doc-tree" when args.Length > 1:
 		{

@@ -65,6 +65,14 @@ internal static class Node
 				Printers.ParameterList((ParameterListSyntax)node, context);
 				break;
 
+			case SyntaxKind.TypeParameterList:
+				Printers.TypeParameterList((TypeParameterListSyntax)node, context);
+				break;
+
+			case SyntaxKind.TypeParameter:
+				Printers.TypeParameter((TypeParameterSyntax)node, context);
+				break;
+
 			case SyntaxKind.ArrowExpressionClause:
 				Printers.ArrowExpressionClause((ArrowExpressionClauseSyntax)node, context);
 				break;

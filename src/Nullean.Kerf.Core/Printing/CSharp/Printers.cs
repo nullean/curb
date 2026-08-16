@@ -115,7 +115,7 @@ internal static class Printers
 		TokenPrinter.Print(node.Identifier, context);
 
 		if (node.TypeParameterList is not null)
-			Tokens(node.TypeParameterList, context);
+			Node.Print(node.TypeParameterList, context);
 		if (node.ParameterList is not null)
 			Node.Print(node.ParameterList, context);
 		if (node.BaseList is not null)
@@ -172,7 +172,7 @@ internal static class Printers
 
 		TokenPrinter.Print(node.Identifier, context);
 		if (node.TypeParameterList is not null)
-			Tokens(node.TypeParameterList, context);
+			Node.Print(node.TypeParameterList, context);
 
 		Node.Print(node.ParameterList, context);
 
@@ -209,6 +209,40 @@ internal static class Printers
 			arena.Line();
 			Node.Print(node.Expression, context);
 		}
+	}
+
+	public static void TypeParameterList(TypeParameterListSyntax node, PrintContext context)
+	{
+		TokenPrinter.Print(node.LessThanToken, context);
+
+		for (var i = 0; i < node.Parameters.Count; i++)
+		{
+			Node.Print(node.Parameters[i], context);
+			if (i >= node.Parameters.SeparatorCount)
+				continue;
+			TokenPrinter.Print(node.Parameters.GetSeparator(i), context);
+			context.Arena.Synthetic(SyntheticText.Space);
+		}
+
+		TokenPrinter.Print(node.GreaterThanToken, context);
+	}
+
+	public static void TypeParameter(TypeParameterSyntax node, PrintContext context)
+	{
+		foreach (var attributeList in node.AttributeLists)
+		{
+			Node.Print(attributeList, context);
+			context.Arena.Synthetic(SyntheticText.Space);
+		}
+
+		// `in` / `out` variance; without the space this becomes part of the parameter's name.
+		if (node.VarianceKeyword.RawKind != 0)
+		{
+			TokenPrinter.Print(node.VarianceKeyword, context);
+			context.Arena.Synthetic(SyntheticText.Space);
+		}
+
+		TokenPrinter.Print(node.Identifier, context);
 	}
 
 	public static void ParameterList(ParameterListSyntax node, PrintContext context)

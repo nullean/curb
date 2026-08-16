@@ -60,11 +60,20 @@ public sealed class CSharpFormatter : IDisposable
 	/// <param name="source">The C# text to format.</param>
 	/// <param name="options">Layout settings, normally bound from <c>.editorconfig</c>.</param>
 	/// <param name="expandUnhandled">Benchmark-only cost model; see <c>PrintContext.ExpandUnhandled</c>.</param>
+	/// <param name="verifyRoundTrip">
+	/// Re-parse the output and compare token streams. Costs one extra parse, and catches the damage
+	/// the content check cannot see — see <see cref="TokenStreamComparer"/>.
+	/// </param>
 	/// <param name="produceText">
 	/// False for <c>check</c>, which only needs to know whether anything would change. Skipping the
 	/// string keeps an unchanged file allocation-free on the output side.
 	/// </param>
-	public FormatResult Format(string source, in FormatOptions options, bool produceText = true, bool expandUnhandled = false)
+	public FormatResult Format(
+		string source,
+		in FormatOptions options,
+		bool produceText = true,
+		bool expandUnhandled = false,
+		bool verifyRoundTrip = false)
 	{
 		if (!CSharpSource.TryParse(source, out var parsed, out var errors))
 		{
@@ -99,11 +108,18 @@ public sealed class CSharpFormatter : IDisposable
 			return new FormatResult(FormatStatus.VerificationFailed, false, null, context.Coverage, failure);
 
 		var changed = !written.SequenceEqual(source.AsSpan());
+		var text = produceText || verifyRoundTrip ? _output.ToString() : null;
+
+		if (verifyRoundTrip
+			&& !TokenStreamComparer.Verify(parsed.Root, source.AsSpan(), text!, out var roundTripFailure))
+		{
+			return new FormatResult(FormatStatus.VerificationFailed, false, null, context.Coverage, roundTripFailure);
+		}
 
 		return new FormatResult(
 			FormatStatus.Formatted,
 			changed,
-			produceText ? _output.ToString() : null,
+			produceText ? text : null,
 			context.Coverage,
 			null);
 	}

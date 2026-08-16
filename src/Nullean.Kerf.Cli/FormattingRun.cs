@@ -14,9 +14,12 @@ namespace Nullean.Kerf.Cli;
 /// </remarks>
 internal static class FormattingRun
 {
-	public static int Execute(IFileSystem fileSystem, string target, bool write, bool expandUnhandled = false)
+	public static int Execute(IFileSystem fileSystem, string target, bool write, bool expandUnhandled = false, bool? verify = null)
 	{
 		var root = fileSystem.Path.GetFullPath(target);
+
+		// Writing can corrupt a file, so it is verified by default; `check` writes nothing.
+		var verifyRoundTrip = verify ?? write;
 
 		var files = fileSystem.Directory.Exists(root)
 			? fileSystem.Directory.EnumerateFiles(root, "*.cs", SearchOption.AllDirectories).Where(IsFormattable).ToArray()
@@ -56,7 +59,7 @@ internal static class FormattingRun
 			(item, _, formatter) =>
 			{
 				var source = fileSystem.File.ReadAllText(item.Path);
-				var result = formatter.Format(source, item.Options, produceText: write, expandUnhandled: expandUnhandled);
+				var result = formatter.Format(source, item.Options, produceText: write, expandUnhandled: expandUnhandled, verifyRoundTrip: verifyRoundTrip);
 
 				switch (result.Status)
 				{

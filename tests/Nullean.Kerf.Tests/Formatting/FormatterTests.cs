@@ -336,6 +336,34 @@ public class FormatterTests
 	}
 
 	[Test]
+	public async Task Keeps_the_space_after_a_generic_variance_keyword()
+	{
+		// Without it `out` welds onto the parameter name and becomes part of the identifier. The
+		// content verifier cannot see this — it ignores whitespace — so only re-parsing catches it.
+		const string source = "public interface IReader<out T, in TKey> { }";
+
+		var formatted = Format(source);
+
+		formatted.Should().Contain("<out T, in TKey>");
+		ShouldStillParse(formatted);
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task Round_trip_verification_catches_damage_the_content_check_cannot()
+	{
+		// Both nets exist because they fail on different things: this one is whitespace-blind, so
+		// welded tokens survive it and are caught by re-parsing instead.
+		const string source = "public interface IReader<out T> { }";
+
+		using var formatter = new CSharpFormatter();
+		var result = formatter.Format(source, Options(), verifyRoundTrip: true);
+
+		result.Status.Should().Be(FormatStatus.Formatted, result.Message ?? "no message");
+		await Task.CompletedTask;
+	}
+
+	[Test]
 	public async Task Formatting_is_idempotent()
 	{
 		const string source = """
