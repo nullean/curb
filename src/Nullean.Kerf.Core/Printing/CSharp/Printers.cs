@@ -372,11 +372,7 @@ internal static partial class Printers
 
 	public static void TypeParameter(TypeParameterSyntax node, PrintContext context)
 	{
-		foreach (var attributeList in node.AttributeLists)
-		{
-			Node.Print(attributeList, context);
-			context.Arena.Synthetic(SyntheticText.Space);
-		}
+		PrintInlineAttributeLists(node.AttributeLists, context);
 
 		// `in` / `out` variance; without the space this becomes part of the parameter's name.
 		if (node.VarianceKeyword.RawKind != 0)
@@ -427,15 +423,7 @@ internal static partial class Printers
 
 	public static void Parameter(ParameterSyntax node, PrintContext context)
 	{
-		// Consecutive attribute lists are never separated — `[A][property: B] int x`, not `[A] [B]`.
-		// Only the last is followed by a space, to part it from what it decorates.
-		if (node.AttributeLists.Count > 0)
-		{
-			foreach (var attributeList in node.AttributeLists)
-				Node.Print(attributeList, context);
-
-			context.Arena.Synthetic(SyntheticText.Space);
-		}
+		PrintInlineAttributeLists(node.AttributeLists, context);
 
 		PrintModifiers(node.Modifiers, context);
 
@@ -683,6 +671,33 @@ internal static partial class Printers
 	}
 
 	/// <summary>Emits attribute lists, each on its own line above the declaration.</summary>
+	/// <summary>
+	/// Emits attribute sections that share a line with what they decorate.
+	/// </summary>
+	/// <remarks>
+	/// <para>
+	/// Consecutive sections are glued — <c>[A][property: B] int x</c>, not <c>[A] [B]</c> — and only
+	/// the last is followed by a space, to part it from what it decorates.
+	/// </para>
+	/// <para>
+	/// Not configurable, and it was tried. ReSharper offers
+	/// <c>space_between_attribute_sections</c> and defaults it the other way, but <c>dotnet format</c>
+	/// does not merely decline to add the space — it actively removes one that is there. An option for
+	/// it would therefore not be a fixed point, and Format Document would undo it on every save, which
+	/// is the one thing Kerf's defaults exist to prevent. Glued is the only safe answer here.
+	/// </para>
+	/// </remarks>
+	private static void PrintInlineAttributeLists(SyntaxList<AttributeListSyntax> attributeLists, PrintContext context)
+	{
+		if (attributeLists.Count == 0)
+			return;
+
+		foreach (var attributeList in attributeLists)
+			Node.Print(attributeList, context);
+
+		context.Arena.Synthetic(SyntheticText.Space);
+	}
+
 	private static void PrintAttributeLists(SyntaxList<AttributeListSyntax> attributeLists, PrintContext context)
 	{
 		foreach (var attributeList in attributeLists)
