@@ -33,6 +33,32 @@ internal static class TokenPrinter
 		context.PrintedTokens++;
 	}
 
+	/// <summary>Emits a token and its trailing trivia, but not its leading trivia.</summary>
+	/// <remarks>
+	/// For callers that need the leading trivia printed at a different indent than the token, which
+	/// is the case for a comment sitting just above a closing brace: the comment belongs with the
+	/// block's contents, the brace does not.
+	/// </remarks>
+	public static void PrintWithoutLeadingTrivia(SyntaxToken token, PrintContext context)
+	{
+		if (token.Span.Length > 0)
+			context.Arena.SourceText(token.Span.Start, token.Span.Length);
+
+		PrintTrailingTrivia(token, context);
+		context.PrintedTokens++;
+	}
+
+	/// <summary>True when a token carries a comment or directive ahead of it.</summary>
+	public static bool HasLeadingContent(SyntaxToken token)
+	{
+		foreach (var trivia in token.LeadingTrivia)
+		{
+			if (trivia.Kind() is not (SyntaxKind.WhitespaceTrivia or SyntaxKind.EndOfLineTrivia))
+				return true;
+		}
+		return false;
+	}
+
 	/// <summary>Emits a token only if it is actually present, for optional syntax like a trailing semicolon.</summary>
 	public static void PrintIfPresent(SyntaxToken token, PrintContext context)
 	{
@@ -40,7 +66,16 @@ internal static class TokenPrinter
 			Print(token, context);
 	}
 
-	internal static void PrintLeadingTrivia(SyntaxToken token, PrintContext context)
+	/// <param name="token">The token whose leading trivia to emit.</param>
+	/// <param name="context">Per-file printing state.</param>
+	/// <param name="trailingBreak">
+	/// Emit a break after each comment. Every comment is already preceded by a conditional break, so
+	/// a run of them stays correct without this; it exists for the caller that supplies its own break
+	/// afterwards — a closing brace, whose comment belongs at the inner indent but whose own line
+	/// must be at the outer one. Emitting both breaks would insert a blank line, and the next run
+	/// would then preserve it and add another.
+	/// </param>
+	internal static void PrintLeadingTrivia(SyntaxToken token, PrintContext context, bool trailingBreak = true)
 	{
 		var leading = token.LeadingTrivia;
 		if (leading.Count == 0)
@@ -76,7 +111,8 @@ internal static class TokenPrinter
 					FlushBlankLine(arena, ref pendingNewLines, emittedAnything);
 					arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
 					EmitTriviaText(trivia, context, CommentFlags(trivia));
-					arena.HardLine();
+					if (trailingBreak)
+						arena.HardLine();
 					emittedAnything = true;
 					pendingNewLines = 0;
 					break;
@@ -99,8 +135,19 @@ internal static class TokenPrinter
 					// we are already at a line start. It is emitted but never counted against the
 					// width of the code around it.
 					FlushBlankLine(arena, ref pendingNewLines, emittedAnything);
-					arena.Trim();
-					arena.LiteralLine(DocFlags.OnlyIfNotAtLineStart);
+
+					// Regions are indented with the code they wrap; conditional-compilation
+					// directives are not, and sit at column 0.
+					if (trivia.IsKind(SyntaxKind.RegionDirectiveTrivia) || trivia.IsKind(SyntaxKind.EndRegionDirectiveTrivia))
+					{
+						arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
+					}
+					else
+					{
+						arena.Trim();
+						arena.LiteralLine(DocFlags.OnlyIfNotAtLineStart);
+					}
+
 					EmitTriviaText(trivia, context, DocFlags.IsDirective);
 					arena.HardLine();
 					emittedAnything = true;

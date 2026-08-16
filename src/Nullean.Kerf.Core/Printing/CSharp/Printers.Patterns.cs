@@ -225,8 +225,7 @@ internal static partial class Printers
 		Node.Print(node.Expression, context);
 		context.Arena.Synthetic(SyntheticText.Space);
 		TokenPrinter.Print(node.WithKeyword, context);
-		context.Arena.Synthetic(SyntheticText.Space);
-		Node.Print(node.Initializer, context);
+		InitializerExpression(node.Initializer, context, leadingLine: true);
 	}
 
 	public static void ThrowExpression(ThrowExpressionSyntax node, PrintContext context)
@@ -266,6 +265,8 @@ internal static partial class Printers
 	public static void SpreadElement(SpreadElementSyntax node, PrintContext context)
 	{
 		TokenPrinter.Print(node.OperatorToken, context);
+		// Roslyn spaces a spread: `.. items`. A range expression does not, and prints elsewhere.
+		context.Arena.Synthetic(SyntheticText.Space);
 		Node.Print(node.Expression, context);
 	}
 
@@ -281,8 +282,7 @@ internal static partial class Printers
 		if (node.Initializer is null)
 			return;
 
-		context.Arena.Synthetic(SyntheticText.Space);
-		Node.Print(node.Initializer, context);
+		InitializerExpression(node.Initializer, context, leadingLine: true);
 	}
 
 	public static void ImplicitArrayCreationExpression(ImplicitArrayCreationExpressionSyntax node, PrintContext context)
@@ -292,8 +292,7 @@ internal static partial class Printers
 		foreach (var comma in node.Commas)
 			TokenPrinter.Print(comma, context);
 		TokenPrinter.Print(node.CloseBracketToken, context);
-		context.Arena.Synthetic(SyntheticText.Space);
-		Node.Print(node.Initializer, context);
+		InitializerExpression(node.Initializer, context, leadingLine: true);
 	}
 
 	public static void EnumDeclaration(EnumDeclarationSyntax node, PrintContext context)
@@ -416,11 +415,7 @@ internal static partial class Printers
 		TokenPrinter.Print(node.ThisKeyword, context);
 		Node.Print(node.ParameterList, context);
 
-		if (node.AccessorList is not null)
-		{
-			arena.Synthetic(SyntheticText.Space);
-			Node.Print(node.AccessorList, context);
-		}
+		Node.Print(node.AccessorList, context);
 
 		if (node.ExpressionBody is not null)
 		{
@@ -539,8 +534,7 @@ internal static partial class Printers
 		if (node.Initializer is null)
 			return;
 
-		context.Arena.Synthetic(SyntheticText.Space);
-		Node.Print(node.Initializer, context);
+		InitializerExpression(node.Initializer, context, leadingLine: true);
 	}
 
 	public static void SlicePattern(SlicePatternSyntax node, PrintContext context)

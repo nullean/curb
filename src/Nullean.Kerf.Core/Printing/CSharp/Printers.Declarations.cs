@@ -89,11 +89,7 @@ internal static partial class Printers
 
 		TokenPrinter.Print(node.Identifier, context);
 
-		if (node.AccessorList is not null)
-		{
-			arena.Synthetic(SyntheticText.Space);
-			Node.Print(node.AccessorList, context);
-		}
+		Node.Print(node.AccessorList, context);
 
 		if (node.ExpressionBody is not null)
 		{
@@ -117,10 +113,14 @@ internal static partial class Printers
 	public static void AccessorList(AccessorListSyntax node, PrintContext context)
 	{
 		var arena = context.Arena;
-		TokenPrinter.Print(node.OpenBraceToken, context);
 
 		using (arena.Group())
 		{
+			// csharp_new_line_before_open_brace covers accessors and properties; its default puts
+			// the brace on its own line, but only where the list actually breaks.
+			arena.Line();
+			TokenPrinter.Print(node.OpenBraceToken, context);
+
 			using (arena.Indent())
 			{
 				for (var i = 0; i < node.Accessors.Count; i++)

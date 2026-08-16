@@ -103,7 +103,8 @@ internal static partial class Printers
 		PrintAttributeLists(node.AttributeLists, context);
 		PrintModifiers(node.Modifiers, context);
 		TokenPrinter.Print(node.Keyword, context);
-		arena.Synthetic(SyntheticText.Space);
+		if (node.Identifier.RawKind != 0)
+			arena.Synthetic(SyntheticText.Space);
 
 		// `record struct` and `record class` carry a second keyword that Keyword does not include.
 		if (node is RecordDeclarationSyntax { ClassOrStructKeyword.RawKind: not 0 } record)
@@ -152,10 +153,16 @@ internal static partial class Printers
 				Node.Print(member, context);
 				previousEnd = member.Span.End;
 			}
+
+			if (TokenPrinter.HasLeadingContent(node.CloseBraceToken))
+			{
+				arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
+				TokenPrinter.PrintLeadingTrivia(node.CloseBraceToken, context, trailingBreak: false);
+			}
 		}
 
 		arena.HardLine();
-		TokenPrinter.Print(node.CloseBraceToken, context);
+		TokenPrinter.PrintWithoutLeadingTrivia(node.CloseBraceToken, context);
 		TokenPrinter.PrintIfPresent(node.SemicolonToken, context);
 	}
 
@@ -305,10 +312,18 @@ internal static partial class Printers
 				Node.Print(statement, context);
 				previousEnd = statement.Span.End;
 			}
+
+			// A trailing comment belongs with the statements it follows, not with the brace. The
+			// brace's own break below returns to the outer indent.
+			if (TokenPrinter.HasLeadingContent(node.CloseBraceToken))
+			{
+				arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
+				TokenPrinter.PrintLeadingTrivia(node.CloseBraceToken, context, trailingBreak: false);
+			}
 		}
 
 		arena.HardLine();
-		TokenPrinter.Print(node.CloseBraceToken, context);
+		TokenPrinter.PrintWithoutLeadingTrivia(node.CloseBraceToken, context);
 	}
 
 	public static void ExpressionStatement(ExpressionStatementSyntax node, PrintContext context)

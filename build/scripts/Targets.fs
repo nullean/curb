@@ -49,6 +49,62 @@ let private test (arguments:ParseResults<Arguments>) =
 let private benchmark (arguments:ParseResults<Arguments>) =
     exec "dotnet" ["run"; "--project"; "tests/Nullean.Kerf.Benchmarks"; "-c"; "Release"] |> ignore
 
+/// Measures how far Kerf's output is from dotnet format's, which is the product claim made
+/// checkable. Reflow is forced off so that every difference is an option disagreement rather than a
+/// deliberate wrap: with max_line_length off, Kerf should be a fixed point of dotnet format.
+let private conformance (arguments:ParseResults<Arguments>) =
+    let corpus =
+        match arguments.TryGetResult Corpus with
+        | Some path -> DirectoryInfo(path)
+        | None -> failwith "conformance needs --corpus <path> pointing at a C# checkout"
+    if not corpus.Exists then failwithf "corpus not found: %s" corpus.FullName
+
+    let root = Path.Combine(Paths.Output.FullName, "conformance")
+    if Directory.Exists root then Directory.Delete(root, true)
+    let work = Path.Combine(root, "kerf")
+    let reference = Path.Combine(root, "reference")
+
+    let rec copyTree (source: string) (target: string) =
+        Directory.CreateDirectory target |> ignore
+        for file in Directory.GetFiles source do
+            File.Copy(file, Path.Combine(target, Path.GetFileName file), true)
+        for dir in Directory.GetDirectories source do
+            let name = Path.GetFileName dir
+            if name <> ".git" && name <> "bin" && name <> "obj" then
+                copyTree dir (Path.Combine(target, name))
+
+    printfn "copying corpus from %s" corpus.FullName
+    copyTree corpus.FullName work
+
+    // Any difference should be an option disagreement, not a wrap we chose to make.
+    for config in Directory.GetFiles(work, ".editorconfig", SearchOption.AllDirectories) do
+        let text = File.ReadAllText config
+        // A config with no max_line_length already gets the default, which is off.
+        let rewritten = Text.RegularExpressions.Regex.Replace(text, @"max_line_length\s*=\s*\S+", "max_line_length = off")
+        File.WriteAllText(config, rewritten)
+
+    exec "dotnet" ["run"; "--project"; "src/Nullean.Kerf.Cli"; "-c"; "Release"; "--"; "format"; work] |> ignore
+    copyTree work reference
+    exec "dotnet" ["format"; "whitespace"; reference; "--folder"] |> ignore
+
+    let sourceFiles = Directory.GetFiles(work, "*.cs", SearchOption.AllDirectories)
+    let differing =
+        sourceFiles
+        |> Array.filter (fun file ->
+            let other = Path.Combine(reference, Path.GetRelativePath(work, file))
+            not (File.Exists other) || File.ReadAllText file <> File.ReadAllText other)
+
+    let total = sourceFiles.Length
+    let agreeing = total - differing.Length
+    printfn ""
+    printfn "conformance with dotnet format: %d/%d files (%.1f%%)" agreeing total (100.0 * float agreeing / float total)
+    if differing.Length > 0 then
+        printfn ""
+        printfn "first differing files:"
+        differing |> Array.truncate 15 |> Array.iter (fun f -> printfn "  %s" (Path.GetRelativePath(work, f)))
+        printfn ""
+        printfn "compare with: diff -ru %s %s" reference work
+
 let private generatePackages (arguments:ParseResults<Arguments>) =
     let output = Paths.RootRelative Paths.Output.FullName
     if not Paths.Output.Exists then Paths.Output.Create()
@@ -177,6 +233,7 @@ let Setup (parsed:ParseResults<Arguments>) (subCommand:Arguments) =
 
     cmd Test.Name (Some [Build.Name]) None <| fun _ -> test parsed
     cmd Benchmark.Name (Some [Build.Name]) None <| fun _ -> benchmark parsed
+    cmd Conformance.Name (Some [Build.Name]) None <| fun _ -> conformance parsed
 
     step PristineCheck.Name pristineCheck
     step GeneratePackages.Name generatePackages

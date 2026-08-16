@@ -400,6 +400,9 @@ internal static class Node
 			case SyntaxKind.NullableType:
 				Printers.NullableType((NullableTypeSyntax)node, context);
 				break;
+			case SyntaxKind.ArrayRankSpecifier:
+				Printers.ArrayRankSpecifier((ArrayRankSpecifierSyntax)node, context);
+				break;
 			case SyntaxKind.ArrayType:
 				Printers.ArrayType((ArrayTypeSyntax)node, context);
 				break;

@@ -129,8 +129,7 @@ internal static partial class Printers
 		if (node.Initializer is null)
 			return;
 
-		context.Arena.Synthetic(SyntheticText.Space);
-		Node.Print(node.Initializer, context);
+		InitializerExpression(node.Initializer, context, leadingLine: true);
 	}
 
 	public static void ImplicitObjectCreationExpression(ImplicitObjectCreationExpressionSyntax node, PrintContext context)
@@ -141,19 +140,34 @@ internal static partial class Printers
 		if (node.Initializer is null)
 			return;
 
-		context.Arena.Synthetic(SyntheticText.Space);
-		Node.Print(node.Initializer, context);
+		InitializerExpression(node.Initializer, context, leadingLine: true);
 	}
 
 	/// <summary>Object, collection, array and <c>with</c> initialisers.</summary>
-	public static void InitializerExpression(InitializerExpressionSyntax node, PrintContext context)
+	/// <param name="node">The initializer to print.</param>
+	/// <param name="context">Per-file printing state.</param>
+	/// <param name="leadingLine">
+	/// Emit a break opportunity before the opening brace. True when the initializer follows a
+	/// construct on the same line — <c>new C { … }</c> — so that the brace moves to its own line
+	/// exactly when the contents break, which is what csharp_new_line_before_open_brace's
+	/// object_collection_array_initializers flag describes. False for a nested initializer, whose
+	/// parent has already emitted a separator.
+	/// </param>
+	public static void InitializerExpression(
+		InitializerExpressionSyntax node,
+		PrintContext context,
+		bool leadingLine = false)
 	{
 		var arena = context.Arena;
-		TokenPrinter.Print(node.OpenBraceToken, context);
 
-		if (node.Expressions.Count > 0)
+		using (arena.Group())
 		{
-			using (arena.Group())
+			if (leadingLine)
+				arena.Line();
+
+			TokenPrinter.Print(node.OpenBraceToken, context);
+
+			if (node.Expressions.Count > 0)
 			{
 				using (arena.Indent())
 				{
@@ -163,19 +177,23 @@ internal static partial class Printers
 						Node.Print(node.Expressions[i], context);
 						if (i >= node.Expressions.SeparatorCount)
 							continue;
+
 						TokenPrinter.Print(node.Expressions.GetSeparator(i), context);
-						arena.Line();
+
+						// A trailing separator is followed by the closing line, not by another one.
+						if (i < node.Expressions.Count - 1)
+							arena.Line();
 					}
 				}
 				arena.Line();
 			}
-		}
-		else
-		{
-			arena.Synthetic(SyntheticText.Space);
-		}
+			else
+			{
+				arena.Synthetic(SyntheticText.Space);
+			}
 
-		TokenPrinter.Print(node.CloseBraceToken, context);
+			TokenPrinter.Print(node.CloseBraceToken, context);
+		}
 	}
 
 	public static void CollectionExpression(CollectionExpressionSyntax node, PrintContext context)
@@ -195,8 +213,12 @@ internal static partial class Printers
 						Node.Print(node.Elements[i], context);
 						if (i >= node.Elements.SeparatorCount)
 							continue;
+
 						TokenPrinter.Print(node.Elements.GetSeparator(i), context);
-						arena.Line();
+
+						// A trailing comma runs straight into the closing bracket, not `, ]`.
+						if (i < node.Elements.Count - 1)
+							arena.Line();
 					}
 				}
 				arena.SoftLine();
@@ -255,11 +277,12 @@ internal static partial class Printers
 		var arena = context.Arena;
 
 		TokenPrinter.Print(node.NewKeyword, context);
-		arena.Synthetic(SyntheticText.Space);
-		TokenPrinter.Print(node.OpenBraceToken, context);
 
 		using (arena.Group())
 		{
+			arena.Line();
+			TokenPrinter.Print(node.OpenBraceToken, context);
+
 			using (arena.Indent())
 			{
 				arena.Line();
@@ -268,14 +291,15 @@ internal static partial class Printers
 					Node.Print(node.Initializers[i], context);
 					if (i >= node.Initializers.SeparatorCount)
 						continue;
+
 					TokenPrinter.Print(node.Initializers.GetSeparator(i), context);
-					arena.Line();
+					if (i < node.Initializers.Count - 1)
+						arena.Line();
 				}
 			}
 			arena.Line();
+			TokenPrinter.Print(node.CloseBraceToken, context);
 		}
-
-		TokenPrinter.Print(node.CloseBraceToken, context);
 	}
 
 	public static void AnonymousObjectMemberDeclarator(AnonymousObjectMemberDeclaratorSyntax node, PrintContext context)
@@ -402,7 +426,23 @@ internal static partial class Printers
 	{
 		Node.Print(node.ElementType, context);
 		foreach (var rank in node.RankSpecifiers)
-			Tokens(rank, context);
+			ArrayRankSpecifier(rank, context);
+	}
+
+	public static void ArrayRankSpecifier(ArrayRankSpecifierSyntax node, PrintContext context)
+	{
+		TokenPrinter.Print(node.OpenBracketToken, context);
+
+		for (var i = 0; i < node.Sizes.Count; i++)
+		{
+			Node.Print(node.Sizes[i], context);
+			if (i >= node.Sizes.SeparatorCount)
+				continue;
+			TokenPrinter.Print(node.Sizes.GetSeparator(i), context);
+			context.Arena.Synthetic(SyntheticText.Space);
+		}
+
+		TokenPrinter.Print(node.CloseBracketToken, context);
 	}
 
 	public static void BaseList(BaseListSyntax node, PrintContext context)

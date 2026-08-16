@@ -8,6 +8,7 @@ type Arguments =
     | [<CliPrefix(CliPrefix.None);SubCommand>] Build
     | [<CliPrefix(CliPrefix.None);SubCommand>] Test
     | [<CliPrefix(CliPrefix.None);SubCommand>] Benchmark
+    | [<CliPrefix(CliPrefix.None);SubCommand>] Conformance
 
     | [<CliPrefix(CliPrefix.None);Hidden;SubCommand>] PristineCheck
     | [<CliPrefix(CliPrefix.None);Hidden;SubCommand>] GeneratePackages
@@ -19,6 +20,7 @@ type Arguments =
     | [<CliPrefix(CliPrefix.None);Hidden;SubCommand>] CreateReleaseOnGithub
     | [<CliPrefix(CliPrefix.None);SubCommand>] Publish
 
+    | [<Inherit>] Corpus of string
     | [<Inherit;AltCommandLine("-s")>] SingleTarget of bool
     | [<Inherit>] Token of string
     | [<Inherit;AltCommandLine("-c")>] CleanCheckout of bool
@@ -30,6 +32,8 @@ with
             | Build -> "runs build"
             | Test -> "runs build then tests"
             | Benchmark -> "runs the BenchmarkDotNet suite against the AOT-published binary"
+            | Conformance -> "measures agreement with dotnet format over a corpus (--corpus <path>)"
+            | Corpus _ -> "path to a checkout to measure conformance against"
             | Release -> "runs build, tests, then creates and validates the packages shy of publishing them"
             | Publish -> "runs the full release"
 
