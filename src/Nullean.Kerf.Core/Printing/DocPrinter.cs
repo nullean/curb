@@ -241,6 +241,11 @@ internal sealed class DocPrinter
 	{
 		var type = doc.LineType;
 
+		// A line aimed at another group prints only if that group broke, and prints nothing at all
+		// otherwise — see DocArena.LineIfBroken.
+		if (doc.GroupId != 0 && _groupModes[doc.GroupId] != PrintMode.Break)
+			return;
+
 		if (doc.Flags.HasFlag(DocFlags.OnlyIfNotAtLineStart) && _output.AtLineStart())
 			return;
 
@@ -445,6 +450,16 @@ internal sealed class DocPrinter
 						var type = doc.LineType;
 						if (type == LineType.Literal)
 							return true;
+
+						// Aimed at another group: it is a real break when that group broke, and not
+						// there at all when it did not. Measuring it as an ordinary hard line would
+						// charge a space for something that prints nothing.
+						if (doc.GroupId != 0)
+						{
+							if (_groupModes[doc.GroupId] == PrintMode.Break)
+								return true;
+							break;
+						}
 
 						if (flat)
 						{

@@ -72,19 +72,39 @@ internal sealed class DocArena
 	/// <summary>Always a newline emitted at column 0, for content that must not be re-indented.</summary>
 	public void LiteralLine(DocFlags flags = DocFlags.None) => AddLine(LineType.Literal, flags);
 
+	/// <summary>
+	/// A newline, but only when the group <paramref name="groupId"/> names ended up broken.
+	/// </summary>
+	/// <remarks>
+	/// The third of the aimed primitives, and the one a construct needs when its choice is between a
+	/// real break and none — where <see cref="IfBreak"/> cannot help, because a hard line inside the
+	/// branch that is *not* taken still forces every enclosing group to break: break propagation
+	/// prefix-sums the whole subtree and cannot know which branch will print.
+	///
+	/// Emitting nothing when the named group is flat is the point: this is the difference between
+	/// putting a brace on its own line and leaving it where it is.
+	/// </remarks>
+	public void LineIfBroken(ushort groupId, DocFlags flags = DocFlags.None) =>
+		AddLine(LineType.Hard, flags, groupId);
+
 	/// <summary>Forces every enclosing group to break without emitting anything.</summary>
 	public void BreakParent() => Add(new Doc(DocKind.BreakParent));
 
 	/// <summary>Trims trailing whitespace already written.</summary>
 	public void Trim() => Add(new Doc(DocKind.Trim));
 
-	private void AddLine(LineType type, DocFlags flags) => Add(new Doc(DocKind.Line, a: (int)type, flags: flags));
+	private void AddLine(LineType type, DocFlags flags, ushort groupId = 0) =>
+		Add(new Doc(DocKind.Line, a: (int)type, flags: flags, groupId: groupId));
 
 	// ---- scopes ---------------------------------------------------------------------------------
 
 	public DocScope Concat() => Open(new Doc(DocKind.Concat));
 
 	public DocScope Group(ushort groupId = 0) => Open(new Doc(DocKind.Group, groupId: groupId));
+
+	/// <summary>Opens a named group only when <paramref name="condition"/> holds.</summary>
+	/// <remarks>Writes no document at all otherwise, so a construct nobody aims at costs nothing.</remarks>
+	public DocScope GroupIf(bool condition, ushort groupId) => condition ? Group(groupId) : default;
 
 	public DocScope ConditionalGroup(ushort groupId = 0) => Open(new Doc(DocKind.ConditionalGroup, groupId: groupId));
 

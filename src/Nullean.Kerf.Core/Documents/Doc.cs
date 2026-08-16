@@ -182,9 +182,15 @@ internal readonly struct Doc
 	public LineType LineType => (LineType)A;
 
 	/// <summary>True for nodes that unconditionally force enclosing groups to break.</summary>
+	/// <remarks>
+	/// A hard line that names a group is not unconditional — it breaks only if that group did — so it
+	/// must not be counted, or every enclosing group would break whether or not the line ever fires.
+	/// Safe to leave out of the count: a group can only break once its parent has, so a line that
+	/// fires is already inside something broken.
+	/// </remarks>
 	public bool IsBreakish =>
 		Kind == DocKind.BreakParent
-		|| (Kind == DocKind.Line && (LineType is LineType.Hard or LineType.Literal));
+		|| (Kind == DocKind.Line && GroupId == 0 && (LineType is LineType.Hard or LineType.Literal));
 
 	public bool HasChildren => Length > 1;
 }

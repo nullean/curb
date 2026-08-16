@@ -511,4 +511,70 @@ public class DocPrinterTests
 		Render(4).Should().Be("012\n345abcdefghij", "the named group broke, so the broken branch does");
 		await Task.CompletedTask;
 	}
+
+	[Test]
+	public async Task A_line_can_be_aimed_at_another_groups_decision()
+	{
+		// The case IfBreak cannot serve: the choice is between a real break and nothing at all, and a
+		// hard line inside the branch that is not taken would still force every enclosing group to
+		// break, because propagation cannot know which branch prints.
+		static string Render(int width)
+		{
+			var arena = new DocArena();
+			var group = arena.NextGroupId();
+
+			using (arena.Group(group))
+			{
+				Text(arena, "012");
+				arena.Line();
+				Text(arena, "345");
+			}
+
+			arena.LineIfBroken(group);
+			Text(arena, "abc");
+
+			DocValidator.Validate(arena, Source.Length);
+			return DocLayout.Render(arena, Source, new FormatOptions
+			{
+				MaxLineLength = width,
+				IndentSize = 2,
+				EndOfLine = EndOfLine.Lf,
+				InsertFinalNewLine = false,
+			});
+		}
+
+		Render(80).Should().Be("012 345abc", "the named group fit, so the aimed line prints nothing");
+		Render(4).Should().Be("012\n345\nabc", "the named group broke, so it prints a newline");
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task An_aimed_line_does_not_break_the_group_around_it()
+	{
+		// The property the whole design rests on. An ordinary hard line here would force the outer
+		// group broken before anything was measured; this one must not, or every construct that
+		// carries one would lose its flat rendering.
+		var arena = new DocArena();
+		var aimed = arena.NextGroupId();
+
+		using (arena.Group())
+		{
+			Text(arena, "012");
+			arena.Line();
+			arena.LineIfBroken(aimed);
+			Text(arena, "345");
+		}
+
+		DocValidator.Validate(arena, Source.Length);
+		var rendered = DocLayout.Render(arena, Source, new FormatOptions
+		{
+			MaxLineLength = 80,
+			IndentSize = 2,
+			EndOfLine = EndOfLine.Lf,
+			InsertFinalNewLine = false,
+		});
+
+		rendered.Should().Be("012 345", "the outer group still had the option of fitting on one line");
+		await Task.CompletedTask;
+	}
 }
