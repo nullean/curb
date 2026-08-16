@@ -314,6 +314,12 @@ internal static partial class Printers
 		{
 			var previousEnd = node.OpenBraceToken.Span.End;
 
+			// The compilation unit's own directives, when csharp_using_directive_placement asked for
+			// them to be in here. They print ahead of any this namespace already had.
+			var moved = context.TakeUsingsToPlaceInside();
+			if (moved.Count > 0)
+				PrintUsings(node, moved, context, ref previousEnd);
+
 			PrintUsings(node, node.Usings, context, ref previousEnd);
 
 			foreach (var member in node.Members)

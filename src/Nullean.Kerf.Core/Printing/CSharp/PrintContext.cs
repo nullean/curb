@@ -1,3 +1,5 @@
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
 using Nullean.Kerf.Documents;
 
@@ -85,6 +87,20 @@ internal sealed class PrintContext(DocArena arena, SourceText text, FormatOption
 
 	/// <summary>True when a block body was replaced by an expression body.</summary>
 	public bool ExpressionBodyAdded { get; set; }
+
+	/// <summary>
+	/// The compilation unit's using directives, when they are to be printed inside the namespace.
+	/// </summary>
+	/// <remarks>Set by the compilation unit just before it prints the namespace, and taken by it.</remarks>
+	public SyntaxList<UsingDirectiveSyntax> UsingsToPlaceInside { get; set; }
+
+	/// <summary>Takes the held directives, leaving none behind.</summary>
+	public SyntaxList<UsingDirectiveSyntax> TakeUsingsToPlaceInside()
+	{
+		var held = UsingsToPlaceInside;
+		UsingsToPlaceInside = default;
+		return held;
+	}
 
 	/// <summary>True when a block namespace was rewritten as a file-scoped one.</summary>
 	public bool NamespaceUnwrapped { get; set; }

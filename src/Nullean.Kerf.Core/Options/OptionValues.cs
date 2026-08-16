@@ -44,6 +44,13 @@ public static class OptionValues
 		"csharp_style_expression_bodied_accessors" => Expression(options.ExpressionBodiedAccessors),
 		"csharp_style_expression_bodied_properties" => Expression(options.ExpressionBodiedProperties),
 		"csharp_style_expression_bodied_indexers" => Expression(options.ExpressionBodiedIndexers),
+		"csharp_using_directive_placement" => options.UsingPlacement switch
+		{
+			UsingPlacement.InsideNamespace => "inside_namespace",
+			UsingPlacement.OutsideNamespace => "outside_namespace",
+			UsingPlacement.AsWritten => "outside_namespace   # directives are left where they are; the key is the opt-in",
+			_ => "outside_namespace",
+		},
 		"csharp_style_namespace_declarations" => options.NamespaceStyle == NamespaceStyle.FileScoped
 			? "file_scoped"
 			: "block   # namespaces are left as written; Kerf never adds the braces back",

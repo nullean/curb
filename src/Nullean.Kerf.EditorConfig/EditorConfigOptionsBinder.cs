@@ -245,6 +245,24 @@ public static class EditorConfigOptionsBinder
 			ExpressionBodiedIndexers = ExpressionBody(properties, "indexers", diagnostics),
 		};
 
+		if (properties.TryGetValue("csharp_using_directive_placement", out var usingPlacement))
+		{
+			var colon = usingPlacement.LastIndexOf(':');
+			switch ((colon >= 0 ? usingPlacement[..colon] : usingPlacement).Trim().ToLowerInvariant())
+			{
+				case "inside_namespace":
+					options = options with { UsingPlacement = UsingPlacement.InsideNamespace };
+					break;
+				case "outside_namespace":
+					options = options with { UsingPlacement = UsingPlacement.OutsideNamespace };
+					break;
+				default:
+					diagnostics?.Add(KerfDiagnostic.UnrecognisedValue(
+						"csharp_using_directive_placement", usingPlacement, "inside_namespace or outside_namespace"));
+					break;
+			}
+		}
+
 		if (properties.TryGetValue("csharp_style_namespace_declarations", out var namespaceStyle))
 		{
 			var colon = namespaceStyle.LastIndexOf(':');

@@ -102,6 +102,7 @@ public static class OptionCatalog
 			"csharp_style_expression_bodied_accessors",
 			"csharp_style_expression_bodied_properties",
 			"csharp_style_expression_bodied_indexers",
+			"csharp_using_directive_placement",
 
 			// IDE0036 and IDE0011, which dotnet format can only apply with a full compilation.
 			"csharp_preferred_modifier_order",

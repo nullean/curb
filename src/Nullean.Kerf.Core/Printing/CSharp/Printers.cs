@@ -33,7 +33,12 @@ internal static partial class Printers
 			Node.Print(externAlias, context);
 		}
 
-		PrintUsings(node, node.Usings, context, ref previousEnd);
+		// Held back when they are to be printed inside the namespace instead. Nothing is added or
+		// removed, so the whole region from the first directive to the namespace's opening is a
+		// permutation of itself, and that is what the content check is told.
+		var moveInside = MovesUsingsInside(node, context);
+		if (!moveInside)
+			PrintUsings(node, node.Usings, context, ref previousEnd);
 
 		foreach (var attributeList in node.AttributeLists)
 		{
@@ -44,6 +49,17 @@ internal static partial class Printers
 		foreach (var member in node.Members)
 		{
 			Separate(context, ref previousEnd, member);
+
+			if (moveInside && member is BaseNamespaceDeclarationSyntax)
+			{
+				context.UsingsToPlaceInside = node.Usings;
+				context.Reordered(TextSpan.FromBounds(node.Usings[0].FullSpan.Start, InsertionPoint(member)));
+
+				// The token stream genuinely reorders, so the comparer lifts the directives out of the
+				// linear walk and checks them as a set — the same handling sorting them already needs.
+				context.UsingsReordered = true;
+			}
+
 			Node.Print(member, context);
 		}
 
@@ -199,6 +215,10 @@ internal static partial class Printers
 			// Negative means "nothing precedes this", so the separator below adds nothing on top.
 			previousEnd = -1;
 		}
+
+		var moved = context.TakeUsingsToPlaceInside();
+		if (moved.Count > 0)
+			PrintUsings(node, moved, context, ref previousEnd);
 
 		// Usings may sit inside a file-scoped namespace, and this printer used to walk only the
 		// members — so every such file was refused by the content verifier rather than formatted. None
@@ -1277,6 +1297,29 @@ internal static partial class Printers
 				arena.HardLine();
 		}
 	}
+
+	/// <summary>
+	/// Whether the file's using directives should be printed inside its namespace.
+	/// </summary>
+	/// <remarks>
+	/// Only where there is exactly one namespace and nothing beside it. A file with two would need to
+	/// know which one a directive belonged to, and putting it in the wrong one changes what the names
+	/// inside that namespace resolve to — a refusal rather than a guess, as with the file-scoped
+	/// conversion.
+	/// </remarks>
+	private static bool MovesUsingsInside(CompilationUnitSyntax node, PrintContext context) =>
+		context.Options.UsingPlacement == UsingPlacement.InsideNamespace
+		&& node.Usings.Count > 0
+		&& node.AttributeLists.Count == 0
+		&& node.Members is [BaseNamespaceDeclarationSyntax];
+
+	/// <summary>Where the directives land: just past the brace or semicolon that opens the namespace.</summary>
+	private static int InsertionPoint(SyntaxNode member) => member switch
+	{
+		NamespaceDeclarationSyntax block => block.OpenBraceToken.Span.End,
+		FileScopedNamespaceDeclarationSyntax scoped => scoped.SemicolonToken.Span.End,
+		_ => member.SpanStart,
+	};
 
 	/// <summary>
 	/// True when a token is followed by a line comment, which has already ended the line.

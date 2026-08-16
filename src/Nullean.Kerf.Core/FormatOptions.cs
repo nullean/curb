@@ -2,6 +2,19 @@ using Nullean.Kerf.Options;
 
 namespace Nullean.Kerf;
 
+/// <summary>Where <c>csharp_using_directive_placement</c> wants the using directives.</summary>
+public enum UsingPlacement
+{
+	/// <summary>Leave them where they are. The default.</summary>
+	AsWritten,
+
+	/// <summary>Above the namespace.</summary>
+	OutsideNamespace,
+
+	/// <summary>Inside it.</summary>
+	InsideNamespace,
+}
+
 /// <summary>What a <c>csharp_style_expression_bodied_*</c> key asks for.</summary>
 public enum ExpressionBodyStyle
 {
@@ -481,6 +494,24 @@ public readonly record struct FormatOptions
 		|| ExpressionBodiedAccessors != ExpressionBodyStyle.AsWritten
 		|| ExpressionBodiedProperties != ExpressionBodyStyle.AsWritten
 		|| ExpressionBodiedIndexers != ExpressionBodyStyle.AsWritten;
+
+	/// <summary>
+	/// <c>csharp_using_directive_placement</c>, code style rule IDE0065.
+	/// </summary>
+	/// <remarks>
+	/// <para>
+	/// Moves the directives across the namespace boundary, in whichever direction the key names.
+	/// Nothing is added or removed, so it is the same kind of change as sorting them: the region from
+	/// the first directive to the namespace's opening is a permutation of itself, which is what the
+	/// content check is told.
+	/// </para>
+	/// <para>
+	/// Only where the file has exactly one namespace and nothing beside it. A file with two would
+	/// need to know which one a directive belonged to, and moving it into the wrong one changes what
+	/// the names in that namespace resolve to.
+	/// </para>
+	/// </remarks>
+	public UsingPlacement UsingPlacement { get; init; }
 
 	/// <summary>True when either trailing-comma option asked for anything.</summary>
 	/// <remarks>
