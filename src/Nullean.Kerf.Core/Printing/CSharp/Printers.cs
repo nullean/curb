@@ -335,6 +335,12 @@ internal static partial class Printers
 		// whole block of their own hug here; an object or collection initializer does not.
 		if (node.Expression is SwitchExpressionSyntax or QueryExpressionSyntax)
 		{
+			// dotnet format anchors this to the line the arrow sits on, so a wrapped parameter list
+			// puts the switch a level in. Kerf cannot ask that question: whether the list wrapped is
+			// reflow's decision, made on the same run, so keying off it made the file reformat itself
+			// on a second pass. Doing it properly means an IfBreak against the parameter list's own
+			// group rather than a source test — until then, two corpus files sit a level shallower
+			// than dotnet format puts them.
 			arena.Synthetic(SyntheticText.Space);
 			Node.Print(node.Expression, context);
 			return;
@@ -541,7 +547,7 @@ internal static partial class Printers
 		// happened to spread over lines drops the group as well as the indent, leaving a long
 		// argument no break opportunity at all — it came back out as one over-long line, which the
 		// next run then broke again.
-		if (node.Arguments.Count == 1 && BringsOwnBlock(node.Arguments[0].Expression))
+		if (node.Arguments.Count == 1 && EndsWithOwnBlock(node.Arguments[0].Expression))
 		{
 			Spacing.InsideCallParens(context);
 			Node.Print(node.Arguments[0], context);
@@ -851,7 +857,7 @@ internal static partial class Printers
 			// and dotnet format distinguishes them the same way.
 			var previousEnd = i == 0 ? anchorEnd : list[i - 1].Span.End;
 			var ownBlock = list[i] is ArgumentSyntax { Expression: var value }
-				&& BringsOwnBlock(value)
+				&& EndsWithOwnBlock(value)
 				&& previousEnd >= 0
 				&& context.OnSameLine(previousEnd, list[i].SpanStart);
 
@@ -888,6 +894,34 @@ internal static partial class Printers
 	/// </remarks>
 	internal static bool SpansLines(SyntaxNode node, PrintContext context) =>
 		!context.OnSameLine(node.SpanStart, node.Span.End);
+
+	/// <summary>
+	/// True when the block an expression finishes with is one that positions its own contents.
+	/// </summary>
+	/// <remarks>
+	/// Looks through calls to reach it: in <c>Outer(Inner(new Options { … }))</c> the initializer is
+	/// the tail of the whole argument, not of the outer call, and it anchors where dotnet format
+	/// anchors it — to the line the statement began on — rather than gaining a level for every call
+	/// it happens to be nested inside.
+	/// </remarks>
+	internal static bool EndsWithOwnBlock(ExpressionSyntax expression) =>
+		expression switch
+		{
+			InvocationExpressionSyntax invocation => LastArgumentEndsWithOwnBlock(invocation.ArgumentList),
+
+			// A creation with an initializer of its own already answers true through BringsOwnBlock;
+			// these are the ones carrying only arguments, such as `new(new Limiter(new Options { … }))`.
+			ObjectCreationExpressionSyntax { Initializer: null, ArgumentList: { } arguments } =>
+				LastArgumentEndsWithOwnBlock(arguments),
+			ImplicitObjectCreationExpressionSyntax { Initializer: null } implicitCreation =>
+				LastArgumentEndsWithOwnBlock(implicitCreation.ArgumentList),
+
+			_ => BringsOwnBlock(expression),
+		};
+
+	private static bool LastArgumentEndsWithOwnBlock(BaseArgumentListSyntax? arguments) =>
+		arguments is { Arguments.Count: > 0 }
+		&& EndsWithOwnBlock(arguments.Arguments[^1].Expression);
 
 	/// <summary>Emits the separator between two top-level items, preserving at most one blank line.</summary>
 	private static void Separate(PrintContext context, ref int previousEnd, SyntaxNode next)
