@@ -108,6 +108,37 @@ public static class EditorConfigOptionsBinder
 		if (TryBool(properties, "csharp_space_before_comma", diagnostics, out var spaceBeforeComma))
 			options = options with { SpaceBeforeComma = spaceBeforeComma };
 
+		if (TryBool(properties, "csharp_space_between_method_declaration_parameter_list_parentheses", diagnostics, out var inDeclarationParens))
+			options = options with { SpaceInDeclarationParameterList = inDeclarationParens };
+
+		if (TryBool(properties, "csharp_space_between_method_declaration_empty_parameter_list_parentheses", diagnostics, out var inEmptyDeclarationParens))
+			options = options with { SpaceInEmptyDeclarationParameterList = inEmptyDeclarationParens };
+
+		if (TryBool(properties, "csharp_space_between_method_declaration_name_and_open_parenthesis", diagnostics, out var beforeDeclarationParens))
+			options = options with { SpaceBeforeDeclarationParameterList = beforeDeclarationParens };
+
+		if (TryBool(properties, "csharp_space_between_method_call_parameter_list_parentheses", diagnostics, out var inCallParens))
+			options = options with { SpaceInCallArgumentList = inCallParens };
+
+		if (TryBool(properties, "csharp_space_between_method_call_empty_parameter_list_parentheses", diagnostics, out var inEmptyCallParens))
+			options = options with { SpaceInEmptyCallArgumentList = inEmptyCallParens };
+
+		if (TryBool(properties, "csharp_space_between_method_call_name_and_opening_parenthesis", diagnostics, out var beforeCallParens))
+			options = options with { SpaceBeforeCallArgumentList = beforeCallParens };
+
+		if (properties.TryGetValue("csharp_space_between_parentheses", out var betweenParentheses))
+		{
+			if (ParenthesisSpacingParser.TryParse(betweenParentheses, out var parenSpacing))
+				options = options with { SpaceBetweenParentheses = parenSpacing };
+			else
+			{
+				diagnostics?.Add(KerfDiagnostic.UnrecognisedValue(
+					"csharp_space_between_parentheses",
+					betweenParentheses,
+					"false, or a comma-separated list of " + string.Join(", ", ParenthesisSpacingParser.Names)));
+			}
+		}
+
 		if (TryBool(properties, "csharp_space_before_open_square_brackets", diagnostics, out var spaceBeforeBracket))
 			options = options with { SpaceBeforeOpenSquareBrackets = spaceBeforeBracket };
 

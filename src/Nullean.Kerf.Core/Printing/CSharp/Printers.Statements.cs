@@ -55,10 +55,11 @@ internal static partial class Printers
 		{
 			using (arena.Indent())
 			{
-				arena.SoftLine();
+				Spacing.InsideControlFlowParensBreakable(context);
 				Node.Print(condition, context);
 			}
-			arena.SoftLine();
+
+			Spacing.InsideControlFlowParensBreakable(context);
 		}
 
 		TokenPrinter.Print(closeParen, context);
@@ -106,6 +107,7 @@ internal static partial class Printers
 		TokenPrinter.Print(node.ForKeyword, context);
 		Spacing.AfterControlFlowKeyword(context);
 		TokenPrinter.Print(node.OpenParenToken, context);
+		Spacing.InsideControlFlowParens(context);
 
 		Node.Print(node.Declaration, context);
 		foreach (var initializer in node.Initializers)
@@ -131,6 +133,7 @@ internal static partial class Printers
 			context.Arena.Synthetic(SyntheticText.Space);
 		}
 
+		Spacing.InsideControlFlowParens(context);
 		TokenPrinter.Print(node.CloseParenToken, context);
 		EmbeddedStatement(node.Statement, context);
 	}
@@ -146,6 +149,7 @@ internal static partial class Printers
 		TokenPrinter.Print(node.ForEachKeyword, context);
 		Spacing.AfterControlFlowKeyword(context);
 		TokenPrinter.Print(node.OpenParenToken, context);
+		Spacing.InsideControlFlowParens(context);
 
 		Node.Print(node.Type, context);
 		arena.Synthetic(SyntheticText.Space);
@@ -155,6 +159,7 @@ internal static partial class Printers
 		arena.Synthetic(SyntheticText.Space);
 		Node.Print(node.Expression, context);
 
+		Spacing.InsideControlFlowParens(context);
 		TokenPrinter.Print(node.CloseParenToken, context);
 		EmbeddedStatement(node.Statement, context);
 	}
@@ -170,6 +175,7 @@ internal static partial class Printers
 		TokenPrinter.Print(node.ForEachKeyword, context);
 		Spacing.AfterControlFlowKeyword(context);
 		TokenPrinter.Print(node.OpenParenToken, context);
+		Spacing.InsideControlFlowParens(context);
 
 		Node.Print(node.Variable, context);
 		arena.Synthetic(SyntheticText.Space);
@@ -177,6 +183,7 @@ internal static partial class Printers
 		arena.Synthetic(SyntheticText.Space);
 		Node.Print(node.Expression, context);
 
+		Spacing.InsideControlFlowParens(context);
 		TokenPrinter.Print(node.CloseParenToken, context);
 		EmbeddedStatement(node.Statement, context);
 	}
@@ -199,12 +206,15 @@ internal static partial class Printers
 			{
 				Spacing.AfterControlFlowKeyword(context);
 				TokenPrinter.Print(catchClause.Declaration.OpenParenToken, context);
+				Spacing.InsideControlFlowParens(context);
 				Node.Print(catchClause.Declaration.Type, context);
 				if (catchClause.Declaration.Identifier.RawKind != 0)
 				{
 					arena.Synthetic(SyntheticText.Space);
 					TokenPrinter.Print(catchClause.Declaration.Identifier, context);
 				}
+
+				Spacing.InsideControlFlowParens(context);
 				TokenPrinter.Print(catchClause.Declaration.CloseParenToken, context);
 			}
 
@@ -214,7 +224,9 @@ internal static partial class Printers
 				TokenPrinter.Print(catchClause.Filter.WhenKeyword, context);
 				Spacing.AfterControlFlowKeyword(context);
 				TokenPrinter.Print(catchClause.Filter.OpenParenToken, context);
+				Spacing.InsideControlFlowParens(context);
 				Node.Print(catchClause.Filter.FilterExpression, context);
+				Spacing.InsideControlFlowParens(context);
 				TokenPrinter.Print(catchClause.Filter.CloseParenToken, context);
 			}
 
@@ -242,8 +254,10 @@ internal static partial class Printers
 		TokenPrinter.Print(node.UsingKeyword, context);
 		Spacing.AfterControlFlowKeyword(context);
 		TokenPrinter.Print(node.OpenParenToken, context);
+		Spacing.InsideControlFlowParens(context);
 		Node.Print(node.Declaration, context);
 		Node.Print(node.Expression, context);
+		Spacing.InsideControlFlowParens(context);
 		TokenPrinter.Print(node.CloseParenToken, context);
 
 		// Chained `using (a) using (b) { }` keeps the inner using on the same line.
@@ -262,7 +276,9 @@ internal static partial class Printers
 		TokenPrinter.Print(node.FixedKeyword, context);
 		Spacing.AfterControlFlowKeyword(context);
 		TokenPrinter.Print(node.OpenParenToken, context);
+		Spacing.InsideControlFlowParens(context);
 		Node.Print(node.Declaration, context);
+		Spacing.InsideControlFlowParens(context);
 		TokenPrinter.Print(node.CloseParenToken, context);
 		EmbeddedStatement(node.Statement, context);
 	}
@@ -290,7 +306,9 @@ internal static partial class Printers
 		if (node.OpenParenToken.RawKind != 0)
 		{
 			TokenPrinter.Print(node.OpenParenToken, context);
+			Spacing.InsideControlFlowParens(context);
 			Node.Print(node.Expression, context);
+			Spacing.InsideControlFlowParens(context);
 			TokenPrinter.Print(node.CloseParenToken, context);
 		}
 		else
@@ -368,6 +386,7 @@ internal static partial class Printers
 		if (node.TypeParameterList is not null)
 			Node.Print(node.TypeParameterList, context);
 
+		Spacing.BeforeDeclarationParens(context);
 		Node.Print(node.ParameterList, context);
 
 		foreach (var constraint in node.ConstraintClauses)

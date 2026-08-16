@@ -106,6 +106,30 @@ public readonly record struct FormatOptions
 	/// <summary><c>csharp_space_before_comma</c>, default false.</summary>
 	public bool SpaceBeforeComma { get; init; }
 
+	/// <summary>
+	/// Which parenthesised constructs get a space just inside their parentheses.
+	/// <c>csharp_space_between_parentheses</c>, default none.
+	/// </summary>
+	public ParenthesisSpacing SpaceBetweenParentheses { get; init; } = ParenthesisSpacing.None;
+
+	/// <summary><c>csharp_space_between_method_declaration_parameter_list_parentheses</c>, default false.</summary>
+	public bool SpaceInDeclarationParameterList { get; init; }
+
+	/// <summary><c>csharp_space_between_method_declaration_empty_parameter_list_parentheses</c>, default false.</summary>
+	public bool SpaceInEmptyDeclarationParameterList { get; init; }
+
+	/// <summary><c>csharp_space_between_method_declaration_name_and_open_parenthesis</c>, default false.</summary>
+	public bool SpaceBeforeDeclarationParameterList { get; init; }
+
+	/// <summary><c>csharp_space_between_method_call_parameter_list_parentheses</c>, default false.</summary>
+	public bool SpaceInCallArgumentList { get; init; }
+
+	/// <summary><c>csharp_space_between_method_call_empty_parameter_list_parentheses</c>, default false.</summary>
+	public bool SpaceInEmptyCallArgumentList { get; init; }
+
+	/// <summary><c>csharp_space_between_method_call_name_and_opening_parenthesis</c>, default false.</summary>
+	public bool SpaceBeforeCallArgumentList { get; init; }
+
 	/// <summary><c>csharp_space_before_open_square_brackets</c>, default false.</summary>
 	public bool SpaceBeforeOpenSquareBrackets { get; init; }
 

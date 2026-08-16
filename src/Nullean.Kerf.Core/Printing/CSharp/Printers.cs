@@ -129,7 +129,12 @@ internal static partial class Printers
 		if (node.TypeParameterList is not null)
 			Node.Print(node.TypeParameterList, context);
 		if (node.ParameterList is not null)
+		{
+			// A primary constructor's parameter list.
+			Spacing.BeforeDeclarationParens(context);
 			Node.Print(node.ParameterList, context);
+		}
+
 		if (node.BaseList is not null)
 		{
 			Spacing.BeforeInheritanceColon(context);
@@ -192,6 +197,7 @@ internal static partial class Printers
 		if (node.TypeParameterList is not null)
 			Node.Print(node.TypeParameterList, context);
 
+		Spacing.BeforeDeclarationParens(context);
 		Node.Print(node.ParameterList, context);
 
 		foreach (var constraint in node.ConstraintClauses)
@@ -284,12 +290,15 @@ internal static partial class Printers
 			{
 				using (arena.Indent())
 				{
-					arena.SoftLine();
+					Spacing.InsideDeclarationParensBreakable(context);
 					PrintSeparated(node.Parameters, context);
 				}
-				arena.SoftLine();
+
+				Spacing.InsideDeclarationParensBreakable(context);
 			}
 		}
+		else
+			Spacing.InsideEmptyDeclarationParens(context);
 
 		TokenPrinter.Print(node.CloseParenToken, context);
 	}
@@ -369,6 +378,7 @@ internal static partial class Printers
 	public static void InvocationExpression(InvocationExpressionSyntax node, PrintContext context)
 	{
 		Node.Print(node.Expression, context);
+		Spacing.BeforeCallParens(context);
 		Node.Print(node.ArgumentList, context);
 	}
 
@@ -392,12 +402,15 @@ internal static partial class Printers
 			{
 				using (arena.Indent())
 				{
-					arena.SoftLine();
+					Spacing.InsideCallParensBreakable(context);
 					PrintSeparated(node.Arguments, context);
 				}
-				arena.SoftLine();
+
+				Spacing.InsideCallParensBreakable(context);
 			}
 		}
+		else
+			Spacing.InsideEmptyCallParens(context);
 
 		TokenPrinter.Print(node.CloseParenToken, context);
 	}

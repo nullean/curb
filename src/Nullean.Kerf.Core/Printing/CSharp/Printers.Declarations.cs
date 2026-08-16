@@ -235,6 +235,7 @@ internal static partial class Printers
 		PrintAttributeLists(node.AttributeLists, context);
 		PrintModifiers(node.Modifiers, context);
 		TokenPrinter.Print(node.Identifier, context);
+		Spacing.BeforeDeclarationParens(context);
 		Node.Print(node.ParameterList, context);
 
 		if (node.Initializer is not null)
@@ -246,6 +247,7 @@ internal static partial class Printers
 				TokenPrinter.Print(node.Initializer.ColonToken, context);
 				arena.Synthetic(SyntheticText.Space);
 				TokenPrinter.Print(node.Initializer.ThisOrBaseKeyword, context);
+				Spacing.BeforeCallParens(context);
 				Node.Print(node.Initializer.ArgumentList, context);
 			}
 		}
@@ -297,7 +299,13 @@ internal static partial class Printers
 		if (node.ArgumentList is null)
 			return;
 
+		Spacing.BeforeCallParens(context);
 		TokenPrinter.Print(node.ArgumentList.OpenParenToken, context);
+		if (node.ArgumentList.Arguments.Count == 0)
+			Spacing.InsideEmptyCallParens(context);
+		else
+			Spacing.InsideCallParens(context);
+
 		for (var i = 0; i < node.ArgumentList.Arguments.Count; i++)
 		{
 			Node.Print(node.ArgumentList.Arguments[i], context);
@@ -307,6 +315,10 @@ internal static partial class Printers
 			TokenPrinter.Print(node.ArgumentList.Arguments.GetSeparator(i), context);
 			Spacing.AfterComma(context);
 		}
+
+		if (node.ArgumentList.Arguments.Count > 0)
+			Spacing.InsideCallParens(context);
+
 		TokenPrinter.Print(node.ArgumentList.CloseParenToken, context);
 	}
 

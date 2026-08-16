@@ -1,4 +1,5 @@
 using Nullean.Kerf.Documents;
+using Nullean.Kerf.Options;
 
 namespace Nullean.Kerf.Printing.CSharp;
 
@@ -119,6 +120,100 @@ internal static class Spacing
 			context.Arena.Line();
 		else
 			context.Arena.SoftLine();
+	}
+
+	/// <summary>Just inside a control-flow header's parentheses.</summary>
+	public static void InsideControlFlowParens(PrintContext context)
+	{
+		if (context.Options.SpaceBetweenParentheses.HasFlag(ParenthesisSpacing.ControlFlowStatements))
+			context.Arena.Synthetic(SyntheticText.Space);
+	}
+
+	/// <summary>
+	/// Just inside a control-flow header's parentheses, where the condition can break.
+	/// </summary>
+	/// <remarks>
+	/// Same soft-versus-normal line reasoning as <see cref="AfterCommaBreakable"/>. Only call this
+	/// from inside a group — an ungrouped line always breaks, which would put every condition on a
+	/// line of its own.
+	/// </remarks>
+	public static void InsideControlFlowParensBreakable(PrintContext context)
+	{
+		if (context.Options.SpaceBetweenParentheses.HasFlag(ParenthesisSpacing.ControlFlowStatements))
+			context.Arena.Line();
+		else
+			context.Arena.SoftLine();
+	}
+
+	/// <summary>Just inside a parenthesised expression — <c>( a + b )</c>.</summary>
+	public static void InsideExpressionParens(PrintContext context)
+	{
+		if (context.Options.SpaceBetweenParentheses.HasFlag(ParenthesisSpacing.Expressions))
+			context.Arena.Synthetic(SyntheticText.Space);
+	}
+
+	/// <summary>Just inside a cast's parentheses — <c>( int )value</c>.</summary>
+	public static void InsideCastParens(PrintContext context)
+	{
+		if (context.Options.SpaceBetweenParentheses.HasFlag(ParenthesisSpacing.TypeCasts))
+			context.Arena.Synthetic(SyntheticText.Space);
+	}
+
+	/// <summary>Between a method's name and its opening parenthesis.</summary>
+	/// <remarks>
+	/// Emitted by the declaring printer rather than by the parameter list, because a lambda has no
+	/// name for the space to sit after and must not get one.
+	/// </remarks>
+	public static void BeforeDeclarationParens(PrintContext context)
+	{
+		if (context.Options.SpaceBeforeDeclarationParameterList)
+			context.Arena.Synthetic(SyntheticText.Space);
+	}
+
+	/// <summary>Just inside a parameter list's parentheses, where it can break.</summary>
+	public static void InsideDeclarationParensBreakable(PrintContext context)
+	{
+		if (context.Options.SpaceInDeclarationParameterList)
+			context.Arena.Line();
+		else
+			context.Arena.SoftLine();
+	}
+
+	/// <summary>Inside an empty parameter list — <c>M( )</c>.</summary>
+	public static void InsideEmptyDeclarationParens(PrintContext context)
+	{
+		if (context.Options.SpaceInEmptyDeclarationParameterList)
+			context.Arena.Synthetic(SyntheticText.Space);
+	}
+
+	/// <summary>Between a call's name and its opening parenthesis.</summary>
+	public static void BeforeCallParens(PrintContext context)
+	{
+		if (context.Options.SpaceBeforeCallArgumentList)
+			context.Arena.Synthetic(SyntheticText.Space);
+	}
+
+	/// <summary>Just inside an argument list's parentheses.</summary>
+	public static void InsideCallParens(PrintContext context)
+	{
+		if (context.Options.SpaceInCallArgumentList)
+			context.Arena.Synthetic(SyntheticText.Space);
+	}
+
+	/// <summary>Just inside an argument list's parentheses, where it can break.</summary>
+	public static void InsideCallParensBreakable(PrintContext context)
+	{
+		if (context.Options.SpaceInCallArgumentList)
+			context.Arena.Line();
+		else
+			context.Arena.SoftLine();
+	}
+
+	/// <summary>Inside an empty argument list — <c>M( )</c>.</summary>
+	public static void InsideEmptyCallParens(PrintContext context)
+	{
+		if (context.Options.SpaceInEmptyCallArgumentList)
+			context.Arena.Synthetic(SyntheticText.Space);
 	}
 
 	/// <summary>

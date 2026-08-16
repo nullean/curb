@@ -123,14 +123,18 @@ internal static partial class Printers
 	public static void ParenthesizedExpression(ParenthesizedExpressionSyntax node, PrintContext context)
 	{
 		TokenPrinter.Print(node.OpenParenToken, context);
+		Spacing.InsideExpressionParens(context);
 		Node.Print(node.Expression, context);
+		Spacing.InsideExpressionParens(context);
 		TokenPrinter.Print(node.CloseParenToken, context);
 	}
 
 	public static void CastExpression(CastExpressionSyntax node, PrintContext context)
 	{
 		TokenPrinter.Print(node.OpenParenToken, context);
+		Spacing.InsideCastParens(context);
 		Node.Print(node.Type, context);
+		Spacing.InsideCastParens(context);
 		TokenPrinter.Print(node.CloseParenToken, context);
 		Spacing.AfterCast(context);
 		Node.Print(node.Expression, context);
@@ -143,7 +147,10 @@ internal static partial class Printers
 		Node.Print(node.Type, context);
 
 		if (node.ArgumentList is not null)
+		{
+			Spacing.BeforeCallParens(context);
 			Node.Print(node.ArgumentList, context);
+		}
 
 		if (node.Initializer is null)
 			return;
@@ -154,6 +161,7 @@ internal static partial class Printers
 	public static void ImplicitObjectCreationExpression(ImplicitObjectCreationExpressionSyntax node, PrintContext context)
 	{
 		TokenPrinter.Print(node.NewKeyword, context);
+		Spacing.BeforeCallParens(context);
 		Node.Print(node.ArgumentList, context);
 
 		if (node.Initializer is null)

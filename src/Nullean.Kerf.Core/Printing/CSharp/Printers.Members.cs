@@ -65,6 +65,7 @@ internal static partial class Printers
 		TokenPrinter.Print(node.OperatorKeyword, context);
 		arena.Synthetic(SyntheticText.Space);
 		TokenPrinter.Print(node.OperatorToken, context);
+		Spacing.BeforeDeclarationParens(context);
 		Node.Print(node.ParameterList, context);
 
 		if (node.Body is not null)
@@ -94,6 +95,7 @@ internal static partial class Printers
 		TokenPrinter.Print(node.OperatorKeyword, context);
 		arena.Synthetic(SyntheticText.Space);
 		Node.Print(node.Type, context);
+		Spacing.BeforeDeclarationParens(context);
 		Node.Print(node.ParameterList, context);
 
 		if (node.Body is not null)
@@ -211,6 +213,7 @@ internal static partial class Printers
 		if (node.TypeParameterList is not null)
 			Node.Print(node.TypeParameterList, context);
 
+		Spacing.BeforeDeclarationParens(context);
 		Node.Print(node.ParameterList, context);
 
 		foreach (var constraint in node.ConstraintClauses)
