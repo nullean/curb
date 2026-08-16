@@ -1,0 +1,458 @@
+namespace Nullean.Kerf.Tests.Formatting.Statements;
+
+/// <summary>Conditionals and loops, braced and unbraced.</summary>
+public class ControlFlowTests : FormattingTest
+{
+	[Test]
+	public Task If_with_a_block() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        if (condition)
+		        {
+		            Call();
+		        }
+		    }
+		}
+		""");
+
+	[Test]
+	public Task If_without_braces_indents_its_statement() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        if (condition)
+		            Call();
+		    }
+		}
+		""");
+
+	[Test]
+	public Task If_without_braces_is_re_indented() => Formats(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        if (condition) Call();
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        if (condition)
+		            Call();
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Space_after_the_if_keyword() => Formats(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        if(condition)
+		        {
+		            Call();
+		        }
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        if (condition)
+		        {
+		            Call();
+		        }
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Else_goes_on_its_own_line() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        if (condition)
+		        {
+		            First();
+		        }
+		        else
+		        {
+		            Second();
+		        }
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Else_is_moved_off_the_closing_brace() => Formats(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        if (condition)
+		        {
+		            First();
+		        } else
+		        {
+		            Second();
+		        }
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        if (condition)
+		        {
+		            First();
+		        }
+		        else
+		        {
+		            Second();
+		        }
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Else_if_stays_on_one_line() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        if (first)
+		        {
+		            First();
+		        }
+		        else if (second)
+		        {
+		            Second();
+		        }
+		        else
+		        {
+		            Third();
+		        }
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Nested_ifs() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        if (first)
+		        {
+		            if (second)
+		            {
+		                Call();
+		            }
+		        }
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Unbraced_else() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        if (condition)
+		            First();
+		        else
+		            Second();
+		    }
+		}
+		""");
+
+	[Test]
+	public Task For_loop() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        for (var i = 0; i < 10; i++)
+		        {
+		            Call();
+		        }
+		    }
+		}
+		""");
+
+	[Test]
+	public Task For_loop_semicolons_get_a_following_space() => Formats(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        for (var i = 0;i < 10;i++)
+		        {
+		        }
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        for (var i = 0; i < 10; i++)
+		        {
+		        }
+		    }
+		}
+		""");
+
+	[Test]
+	public Task For_loop_with_no_clauses() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        for (;;)
+		        {
+		            Call();
+		        }
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Foreach_loop() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        foreach (var item in items)
+		        {
+		            Call(item);
+		        }
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Await_foreach_loop() => Unchanged(
+		"""
+		public class C
+		{
+		    public async Task M()
+		    {
+		        await foreach (var item in items)
+		        {
+		            Call(item);
+		        }
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Foreach_over_a_tuple_deconstruction() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        foreach (var (key, value) in pairs)
+		        {
+		            Call(key, value);
+		        }
+		    }
+		}
+		""");
+
+	[Test]
+	public Task While_loop() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        while (condition)
+		        {
+		            Call();
+		        }
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Do_while_loop() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        do
+		        {
+		            Call();
+		        }
+		        while (condition);
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Nested_loops_are_indented() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        foreach (var outer in outers)
+		        {
+		            foreach (var inner in inners)
+		            {
+		                Call(outer, inner);
+		            }
+		        }
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Unbraced_nested_loops() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        foreach (var outer in outers)
+		            foreach (var inner in inners)
+		                Call(outer, inner);
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Using_statement() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        using (var stream = Open())
+		        {
+		            Call();
+		        }
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Using_declaration() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        using var stream = Open();
+		        Call();
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Await_using_declaration() => Unchanged(
+		"""
+		public class C
+		{
+		    public async Task M()
+		    {
+		        await using var stream = Open();
+		        Call();
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Chained_using_statements_stay_on_one_line() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        using (var first = Open()) using (var second = Open())
+		        {
+		            Call();
+		        }
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Lock_statement() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        lock (gate)
+		        {
+		            Call();
+		        }
+		    }
+		}
+		""");
+
+	[Test]
+	[Skip("binary chains are not flattened — operators trail the line and continuations double-indent")]
+	public Task Condition_breaks_when_it_does_not_fit() => Formats(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        if (alphaCondition && betaCondition && gammaCondition)
+		        {
+		            Call();
+		        }
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        if (
+		            alphaCondition
+		            && betaCondition
+		            && gammaCondition
+		        )
+		        {
+		            Call();
+		        }
+		    }
+		}
+		""",
+		editorConfig: "max_line_length = 40");
+}

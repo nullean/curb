@@ -10,6 +10,15 @@ internal static partial class Printers
 	{
 		PrintAttributeLists(node.AttributeLists, context);
 		PrintModifiers(node.Modifiers, context);
+
+		// An event field carries `event` as its own token rather than as a modifier, so printing
+		// only the modifiers drops the keyword entirely.
+		if (node is EventFieldDeclarationSyntax eventField)
+		{
+			TokenPrinter.Print(eventField.EventKeyword, context);
+			context.Arena.Synthetic(SyntheticText.Space);
+		}
+
 		Node.Print(node.Declaration, context);
 		TokenPrinter.Print(node.SemicolonToken, context);
 	}

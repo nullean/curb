@@ -540,6 +540,12 @@ internal static partial class Printers
 	public static void SlicePattern(SlicePatternSyntax node, PrintContext context)
 	{
 		TokenPrinter.Print(node.DotDotToken, context);
+
+		if (node.Pattern is null)
+			return;
+
+		// Spaced like a spread element in a collection expression: `[1, 2, .. var rest]`.
+		context.Arena.Synthetic(SyntheticText.Space);
 		Node.Print(node.Pattern, context);
 	}
 

@@ -88,7 +88,9 @@ internal sealed class DocPrinter
 
 		Walk(options);
 
-		if (options.InsertFinalNewLine)
+		// insert_final_newline terminates the last line; a file with no lines has nothing to
+		// terminate, so an empty result stays empty rather than becoming a lone newline.
+		if (options.InsertFinalNewLine && output.Length > 0)
 			output.EnsureSingleTrailingNewLine(_endOfLine);
 		else
 			output.RemoveTrailingNewLines();
