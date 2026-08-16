@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -421,15 +422,58 @@ internal static partial class Printers
 		if (node is null)
 			return;
 
+		var previousEnd = -1;
+		var previousLast = '\0';
+
 		foreach (var token in node.DescendantTokens())
 		{
+			if (token.Span.Length == 0)
+				continue;
+
+			GuardAgainstWelding(node, token, previousEnd, previousLast, context);
 			TokenPrinter.Print(token, context);
+
+			previousEnd = token.Span.End;
+			previousLast = context.Text[token.Span.End - 1];
 
 			// Separators still need their space; csharp_space_after_comma will govern this once the
 			// option is wired up, and its default is true.
-			if (token.IsKind(SyntaxKind.CommaToken))
-				context.Arena.Synthetic(SyntheticText.Space);
+			if (!token.IsKind(SyntaxKind.CommaToken))
+				continue;
+
+			context.Arena.Synthetic(SyntheticText.Space);
+			previousLast = ' ';
 		}
+	}
+
+	/// <summary>
+	/// Fails loudly when <see cref="Tokens"/> is used somewhere it would merge two tokens.
+	/// </summary>
+	/// <remarks>
+	/// Three content bugs have come from this helper: <c>out var</c> became <c>outvar</c>,
+	/// <c>out TGrouping</c> became <c>outTGrouping</c>, and <c>case Colour.Red</c> became
+	/// <c>caseColour.Red</c>. Each was caught downstream by the re-parse comparer, after the fact.
+	/// This turns the next one into an immediate, located failure naming the node that needs a real
+	/// printer. Debug-only: the release path pays nothing.
+	/// </remarks>
+	[Conditional("DEBUG")]
+	private static void GuardAgainstWelding(
+		SyntaxNode node,
+		SyntaxToken token,
+		int previousEnd,
+		char previousLast,
+		PrintContext context)
+	{
+		if (previousEnd < 0 || token.SpanStart <= previousEnd)
+			return;
+
+		if (!WeldDetector.CanWeld(previousLast, context.Text[token.SpanStart]))
+			return;
+
+		throw new InvalidOperationException(
+			$"Printers.Tokens would merge '{previousLast}' and '{context.Text[token.SpanStart]}' in a "
+			+ $"{node.Kind()}; it emits tokens with no separator and is only safe where the source had "
+			+ "none either. This node needs a printer of its own.");
 	}
 
 	/// <summary>Emits attribute lists, each on its own line above the declaration.</summary>

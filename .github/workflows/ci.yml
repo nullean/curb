@@ -93,6 +93,48 @@ jobs:
           path: build/output/*.nupkg
           if-no-files-found: error
 
+  # ── Corpus and conformance ──────────────────────────────────────────────────
+  # Every bug this project has had was found here rather than by the unit tests:
+  # dropped tokens, welded identifiers, indentation drift, non-idempotent output.
+  # Until this ran in CI it gated nothing.
+  corpus:
+    runs-on: ubuntu-latest
+    name: Corpus and conformance
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      - name: Check out the corpus
+        run: git clone --depth 1 https://github.com/elastic/docs-builder.git /tmp/corpus
+
+      - name: Build
+        run: ./build.sh build -s true
+
+      # Both verifiers on every file, and formatting must not fail or produce
+      # source that no longer parses.
+      - name: Verify the corpus formats safely
+        run: |
+          dotnet run --project src/Nullean.Kerf.Cli -c Release -- check /tmp/corpus | tee result.txt
+          grep -qE '0 failed, 0 unparsable' result.txt \
+            || (echo "::error::corpus reported failures" && exit 1)
+
+      - name: Verify formatting is idempotent
+        run: |
+          cp -R /tmp/corpus /tmp/pass1
+          dotnet run --project src/Nullean.Kerf.Cli -c Release -- format /tmp/pass1 >/dev/null
+          cp -R /tmp/pass1 /tmp/pass2
+          dotnet run --project src/Nullean.Kerf.Cli -c Release -- format /tmp/pass1 >/dev/null
+          diff -rq /tmp/pass2 /tmp/pass1 \
+            || (echo "::error::formatting is not idempotent" && exit 1)
+
+      # The product claim, as a number that must not go down.
+      - name: Conformance with dotnet format
+        run: ./build.sh conformance -s true --corpus /tmp/corpus --minimum 98.6
+
   # ── Managed build / test / pack / publish ───────────────────────────────────
   build:
     runs-on: ubuntu-latest

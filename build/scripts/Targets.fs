@@ -96,14 +96,22 @@ let private conformance (arguments:ParseResults<Arguments>) =
 
     let total = sourceFiles.Length
     let agreeing = total - differing.Length
+    let percentage = 100.0 * float agreeing / float total
     printfn ""
-    printfn "conformance with dotnet format: %d/%d files (%.1f%%)" agreeing total (100.0 * float agreeing / float total)
+    printfn "conformance with dotnet format: %d/%d files (%.2f%%)" agreeing total percentage
     if differing.Length > 0 then
         printfn ""
         printfn "first differing files:"
         differing |> Array.truncate 15 |> Array.iter (fun f -> printfn "  %s" (Path.GetRelativePath(work, f)))
         printfn ""
         printfn "compare with: diff -ru %s %s" reference work
+
+    // A regression here means Kerf drifted away from the reference implementation, which is the one
+    // number the product claim rests on. Fail rather than merely report it.
+    match arguments.TryGetResult Minimum with
+    | Some floor when percentage < floor ->
+        failwithf "conformance %.2f%% is below the required %.2f%%" percentage floor
+    | _ -> ()
 
 let private generatePackages (arguments:ParseResults<Arguments>) =
     let output = Paths.RootRelative Paths.Output.FullName

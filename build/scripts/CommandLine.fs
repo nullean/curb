@@ -21,6 +21,7 @@ type Arguments =
     | [<CliPrefix(CliPrefix.None);SubCommand>] Publish
 
     | [<Inherit>] Corpus of string
+    | [<Inherit>] Minimum of double
     | [<Inherit;AltCommandLine("-s")>] SingleTarget of bool
     | [<Inherit>] Token of string
     | [<Inherit;AltCommandLine("-c")>] CleanCheckout of bool
@@ -34,6 +35,7 @@ with
             | Benchmark -> "runs the BenchmarkDotNet suite against the AOT-published binary"
             | Conformance -> "measures agreement with dotnet format over a corpus (--corpus <path>)"
             | Corpus _ -> "path to a checkout to measure conformance against"
+            | Minimum _ -> "fail if conformance falls below this percentage"
             | Release -> "runs build, tests, then creates and validates the packages shy of publishing them"
             | Publish -> "runs the full release"
 
