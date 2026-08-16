@@ -96,8 +96,8 @@ public static class OptionValues
 		"csharp_indent_braces" => Bool(options.IndentBraces),
 		"csharp_indent_labels" => options.IndentLabels switch
 		{
-			LabelIndent.NoIndent => "no_indent",
-			LabelIndent.FlipWhenBlock => "flip_when_block",
+			LabelIndent.NoChange => "no_change",
+			LabelIndent.FlushLeft => "flush_left",
 			LabelIndent.OneLessThanCurrent => "one_less_than_current",
 			_ => "one_less_than_current",
 		},

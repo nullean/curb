@@ -424,9 +424,13 @@ internal static partial class Printers
 	public static void LabeledStatement(LabeledStatementSyntax node, PrintContext context)
 	{
 		var arena = context.Arena;
-		var outdent = context.Options.IndentLabels == LabelIndent.OneLessThanCurrent ? -1 : 0;
+		var placement = context.Options.IndentLabels;
 
-		using (arena.Indent(outdent))
+		// flush_left is column zero rather than a level relative to anything, so it needs the scope
+		// that ignores the enclosing indent instead of one that shifts it.
+		using (placement == LabelIndent.FlushLeft
+			? arena.IndentToRoot()
+			: arena.Indent(placement == LabelIndent.OneLessThanCurrent ? -1 : 0))
 		{
 			arena.HardLine(DocFlags.Reindent);
 			TokenPrinter.Print(node.Identifier, context);

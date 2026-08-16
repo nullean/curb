@@ -505,20 +505,14 @@ public class IndentationTests : FormattingTest
 		    }
 		}
 		""",
-		editorConfig: "csharp_indent_labels = no_indent");
+		editorConfig: "csharp_indent_labels = no_change");
 
 	[Test]
-	public Task Flip_when_block_matches_no_indent_everywhere_tested() => Formats(
-		"""
-		public class C
-		{
-		    public void M()
-		    {
-		    outer:
-		        Call();
-		    }
-		}
-		""",
+	public Task Flush_left_puts_a_label_at_column_zero() => Formats(
+		// Measured from dotnet format, which puts it at column zero whatever the surrounding indent.
+		// Kerf used to accept `no_indent` and `flip_when_block` — the names of Roslyn's internal enum
+		// rather than of its EditorConfig values — so the documented `flush_left` fell through to the
+		// default and column zero was never reachable at all.
 		"""
 		public class C
 		{
@@ -529,7 +523,17 @@ public class IndentationTests : FormattingTest
 		    }
 		}
 		""",
-		editorConfig: "csharp_indent_labels = flip_when_block");
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		outer:
+		        Call();
+		    }
+		}
+		""",
+		editorConfig: "csharp_indent_labels = flush_left");
 
 	[Test]
 	public Task A_label_inside_a_switch_section_follows_the_same_rule() => Unchanged(

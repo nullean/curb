@@ -366,17 +366,22 @@ public static class EditorConfigOptionsBinder
 				case "one_less_than_current":
 					options = options with { IndentLabels = LabelIndent.OneLessThanCurrent };
 					break;
-				case "no_indent":
-					options = options with { IndentLabels = LabelIndent.NoIndent };
+				case "no_change":
+					options = options with { IndentLabels = LabelIndent.NoChange };
 					break;
-				case "flip_when_block":
-					options = options with { IndentLabels = LabelIndent.FlipWhenBlock };
+				case "flush_left":
+					options = options with { IndentLabels = LabelIndent.FlushLeft };
 					break;
 				default:
+					// Roslyn's three, and only those. Kerf used to accept `no_indent` and
+					// `flip_when_block`, which are the names of Roslyn's *internal* enum rather than
+					// of its EditorConfig values — so a repository writing the documented `flush_left`
+					// was answered with a diagnostic and the default, and `flush_left` itself was
+					// never implemented. verifyexpectations is what surfaced it.
 					diagnostics?.Add(KerfDiagnostic.UnrecognisedValue(
 						"csharp_indent_labels",
 						indentLabels,
-						"one_less_than_current, no_indent or flip_when_block"));
+						"one_less_than_current, no_change or flush_left"));
 					break;
 			}
 		}

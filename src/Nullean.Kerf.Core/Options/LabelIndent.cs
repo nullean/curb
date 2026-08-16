@@ -6,20 +6,12 @@ namespace Nullean.Kerf.Options;
 /// </remarks>
 public enum LabelIndent : byte
 {
-	/// <summary>One indent level left of the surrounding statements. The default.</summary>
+	/// <summary><c>one_less_than_current</c>: one level left of the surrounding statements. The default.</summary>
 	OneLessThanCurrent = 0,
 
-	/// <summary>Level with the surrounding statements.</summary>
-	NoIndent = 1,
+	/// <summary><c>no_change</c>: level with the surrounding statements, where the author left it.</summary>
+	NoChange = 1,
 
-	/// <summary>
-	/// Documented as depending on whether the label sits in a block.
-	/// </summary>
-	/// <remarks>
-	/// dotnet format produced output identical to <see cref="NoIndent"/> for every position tested —
-	/// directly in a method body, inside a nested block, inside an if body, inside a switch section
-	/// and as a loop's embedded statement — so Kerf treats the two the same. If a shape is found
-	/// where they differ, this is where the difference goes.
-	/// </remarks>
-	FlipWhenBlock = 2,
+	/// <summary><c>flush_left</c>: at column zero, whatever the surrounding indent.</summary>
+	FlushLeft = 2,
 }
