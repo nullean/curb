@@ -137,6 +137,14 @@ jobs:
       - name: Conformance with dotnet format
         run: ./build.sh conformance -s true --corpus /tmp/corpus --minimum 100
 
+      # The same property with the corpus's own widths, so reflow is part of the measurement rather
+      # than excluded from it. One file short of clean: a property pattern that reflow breaks, whose
+      # brace dotnet format then moves to its own line. Fixing it by keying on the source misses that
+      # case entirely, and restructuring the clause to key on the printed layout cost two files
+      # elsewhere — so it is measured and held rather than chased.
+      - name: Conformance with reflow on
+        run: ./build.sh conformance -s true --corpus /tmp/corpus --reflow --minimum 99.9
+
       # Publishes native AOT and measures that, not the JIT build. On a run this short JIT
       # compilation dominates, so `dotnet run` reports several times the real cost and reads as a
       # regression that is not there. The gate is on allocations because they are deterministic;
