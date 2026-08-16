@@ -330,10 +330,10 @@ internal static partial class Printers
 		var arena = context.Arena;
 		TokenPrinter.Print(node.ArrowToken, context);
 
-		// Same rule as an initializer: a body that brings its own braces positions its own contents,
-		// so `=> x switch { … }` keeps the header on one line rather than breaking after the arrow
-		// and indenting the whole construct a level too deep.
-		if (BringsOwnBlock(node.Expression))
+		// Narrower than an initializer's rule. dotnet format leaves `=> x switch { … }` level with
+		// the member but indents `=> new() { … }` one further, so only the constructs that own a
+		// whole block of their own hug here; an object or collection initializer does not.
+		if (node.Expression is SwitchExpressionSyntax or QueryExpressionSyntax)
 		{
 			arena.Synthetic(SyntheticText.Space);
 			Node.Print(node.Expression, context);
@@ -389,15 +389,28 @@ internal static partial class Printers
 
 		if (node.Parameters.Count > 0)
 		{
+			var asWritten = SpansLines(node, context);
+
 			using (arena.Group())
 			{
 				using (arena.Indent())
 				{
-					Spacing.InsideDeclarationParensBreakable(context);
-					PrintSeparated(node.Parameters, context);
+					if (!asWritten)
+						Spacing.InsideDeclarationParensBreakable(context);
+					else if (!context.OnSameLine(node.SpanStart, node.Parameters[0].SpanStart))
+						arena.HardLine();
+					else
+						Spacing.InsideDeclarationParens(context);
+
+					PrintSeparated(node.Parameters, context, asWritten);
 				}
 
-				Spacing.InsideDeclarationParensBreakable(context);
+				if (!asWritten)
+					Spacing.InsideDeclarationParensBreakable(context);
+				else if (!context.OnSameLine(node.Parameters[^1].Span.End, node.Span.End))
+					arena.HardLine();
+				else
+					Spacing.InsideDeclarationParens(context);
 			}
 		}
 		else
@@ -495,6 +508,9 @@ internal static partial class Printers
 
 	public static void InvocationExpression(InvocationExpressionSyntax node, PrintContext context)
 	{
+		if (TryPrintChain(node, context))
+			return;
+
 		Node.Print(node.Expression, context);
 		Spacing.BeforeCallParens(context);
 		Node.Print(node.ArgumentList, context);
@@ -502,6 +518,9 @@ internal static partial class Printers
 
 	public static void MemberAccessExpression(MemberAccessExpressionSyntax node, PrintContext context)
 	{
+		if (TryPrintChain(node, context))
+			return;
+
 		Node.Print(node.Expression, context);
 		Spacing.BeforeDot(context);
 		TokenPrinter.Print(node.OperatorToken, context);
@@ -514,17 +533,67 @@ internal static partial class Printers
 		var arena = context.Arena;
 		TokenPrinter.Print(node.OpenParenToken, context);
 
+		// A sole argument positions its own contents when it brings braces — `Returns(new C { … })`,
+		// `Select(x => { … })` — or when the author already laid it out across lines. Wrapping it in
+		// the argument list's indent would push those contents a level right of where dotnet format
+		// puts them, and gains nothing: there is no list to lay out, just one construct that already
+		// knows its own shape.
+		if (node.Arguments.Count == 1
+			&& (BringsOwnBlock(node.Arguments[0].Expression) || SpansLines(node.Arguments[0], context)))
+		{
+			Spacing.InsideCallParens(context);
+			Node.Print(node.Arguments[0], context);
+			Spacing.InsideCallParens(context);
+			TokenPrinter.Print(node.CloseParenToken, context);
+			return;
+		}
+
 		if (node.Arguments.Count > 0)
 		{
+			var asWritten = SpansLines(node, context);
+
+			// The last argument brings its own block: it positions its own contents, so it is printed
+			// outside the list's indent while the arguments before it stay inside it. Otherwise
+			// `Resolve(root, new Options { … })` gets the list's level and the initializer's on top of
+			// it, one further right than dotnet format puts it.
+			var hugLast = node.Arguments.Count > 1 && BringsOwnBlock(node.Arguments[^1].Expression);
+			var inList = hugLast ? node.Arguments.Count - 1 : node.Arguments.Count;
+
 			using (arena.Group())
 			{
 				using (arena.Indent())
 				{
-					Spacing.InsideCallParensBreakable(context);
-					PrintSeparated(node.Arguments, context);
+					if (!asWritten)
+						Spacing.InsideCallParensBreakable(context);
+					else if (!context.OnSameLine(node.SpanStart, node.Arguments[0].SpanStart))
+						arena.HardLine();
+					else
+						Spacing.InsideCallParens(context);
+
+					PrintSeparated(node.Arguments, context, asWritten, inList);
 				}
 
-				Spacing.InsideCallParensBreakable(context);
+				if (hugLast)
+				{
+					// The separator itself belongs to the list and PrintSeparated stopped short of it,
+					// so it is emitted here — dropping it would lose a comma outright.
+					Spacing.BeforeComma(context);
+					TokenPrinter.Print(node.Arguments.GetSeparator(inList - 1), context);
+
+					if (asWritten && !context.OnSameLine(node.Arguments[inList - 1].Span.End, node.Arguments[^1].SpanStart))
+						arena.HardLine();
+					else
+						Spacing.AfterComma(context);
+
+					Node.Print(node.Arguments[^1], context);
+				}
+
+				if (!asWritten)
+					Spacing.InsideCallParensBreakable(context);
+				else if (!context.OnSameLine(node.Arguments[^1].Span.End, node.Span.End))
+					arena.HardLine();
+				else
+					Spacing.InsideCallParens(context);
 			}
 		}
 		else
@@ -772,21 +841,61 @@ internal static partial class Printers
 	}
 
 	/// <summary>Emits a comma-separated list, breaking one-per-line when the group does not fit.</summary>
-	private static void PrintSeparated<T>(SeparatedSyntaxList<T> list, PrintContext context)
+	/// <param name="list">The separated list.</param>
+	/// <param name="context">Per-file printing state.</param>
+	/// <param name="asWritten">
+	/// Reproduce the author's line breaks instead of reflowing. Set when the list already spans more
+	/// than one line: a break they put in is emitted as a hard one and a separator they left inline
+	/// as a plain space, so the list comes out exactly as it went in.
+	/// </param>
+	/// <param name="count">
+	/// How many of the list's items to print. Below <c>list.Count</c> when the caller is printing the
+	/// tail itself, which is how a hugged last argument escapes the list's indent.
+	/// </param>
+	private static void PrintSeparated<T>(
+		SeparatedSyntaxList<T> list,
+		PrintContext context,
+		bool asWritten = false,
+		int count = -1)
 		where T : SyntaxNode
 	{
-		for (var i = 0; i < list.Count; i++)
+		if (count < 0)
+			count = list.Count;
+
+		for (var i = 0; i < count; i++)
 		{
 			Node.Print(list[i], context);
 
-			if (i >= list.SeparatorCount)
+			if (i >= list.SeparatorCount || i == count - 1)
 				continue;
 
 			Spacing.BeforeComma(context);
 			TokenPrinter.Print(list.GetSeparator(i), context);
-			Spacing.AfterCommaBreakable(context);
+
+			if (!asWritten)
+			{
+				Spacing.AfterCommaBreakable(context);
+				continue;
+			}
+
+			if (context.OnSameLine(list[i].Span.End, list[i + 1].SpanStart))
+				Spacing.AfterComma(context);
+			else
+				context.Arena.HardLine();
 		}
 	}
+
+	/// <summary>
+	/// True when the author already spread this construct over more than one line.
+	/// </summary>
+	/// <remarks>
+	/// dotnet format never joins lines; neither should Kerf. Reflow exists to break a line that is
+	/// too long, not to gather up one somebody deliberately opened out — collapsing a laid-out
+	/// argument list and then re-breaking it somewhere else is the single largest source of churn a
+	/// formatter can inflict on a repository it is being introduced to.
+	/// </remarks>
+	internal static bool SpansLines(SyntaxNode node, PrintContext context) =>
+		!context.OnSameLine(node.SpanStart, node.Span.End);
 
 	/// <summary>Emits the separator between two top-level items, preserving at most one blank line.</summary>
 	private static void Separate(PrintContext context, ref int previousEnd, SyntaxNode next)

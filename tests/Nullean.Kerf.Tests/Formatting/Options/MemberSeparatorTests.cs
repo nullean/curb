@@ -86,7 +86,7 @@ public class MemberSeparatorTests : FormattingTest
 		editorConfig: "csharp_new_line_before_members_in_object_initializers = true");
 
 	[Test]
-	public Task An_expanded_initializer_collapses_when_the_option_is_off() => Formats(
+	public Task An_expanded_initializer_stays_expanded_with_the_option_off() => Unchanged(
 		"""
 		public class C
 		{
@@ -99,13 +99,23 @@ public class MemberSeparatorTests : FormattingTest
 		        };
 		    }
 		}
-		""",
+		""");
+
+	[Test]
+	public Task The_option_is_about_expanding_not_about_joining() => Unchanged(
+		// Turning it off does not gather up a layout the author chose; nothing in Kerf joins lines,
+		// which is what dotnet format does and what makes it safe to introduce to a repository.
 		"""
 		public class C
 		{
 		    public void M()
 		    {
-		        var o = new Point { X = 1, Y = 2 };
+		        var compact = new Point { X = 1, Y = 2 };
+		        var expanded = new Point
+		        {
+		            X = 1,
+		            Y = 2
+		        };
 		    }
 		}
 		""");

@@ -92,7 +92,11 @@ internal static partial class Printers
 		// A value that brings its own braces or brackets already positions its contents, so adding a
 		// continuation indent here would shift the whole construct one level right of where it
 		// belongs. Only a plain expression needs the hanging indent.
-		if (BringsOwnBlock(node.Value))
+		//
+		// A value the author already spread over several lines counts too: it starts on the `=` line
+		// and continues below, so breaking after the `=` as well would push the whole thing right
+		// and add a line nobody asked for.
+		if (BringsOwnBlock(node.Value) || SpansLines(node.Value, context))
 		{
 			arena.Synthetic(SyntheticText.Space);
 			Node.Print(node.Value, context);

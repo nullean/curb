@@ -47,7 +47,7 @@ internal static partial class Printers
 			for (var i = 0; i < node.Members.Count; i++)
 			{
 				arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
-				if (context.BlankLinesBetween(previousEnd, node.Members[i].SpanStart) > 0)
+				if (context.BlankLinesBetween(previousEnd, EffectiveStart(node.Members[i])) > 0)
 					arena.HardLine();
 
 				Node.Print(node.Members[i], context);
@@ -209,7 +209,7 @@ internal static partial class Printers
 			foreach (var member in node.Members)
 			{
 				arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
-				if (context.BlankLinesBetween(previousEnd, member.SpanStart) > 0)
+				if (context.BlankLinesBetween(previousEnd, EffectiveStart(member)) > 0)
 					arena.HardLine();
 				Node.Print(member, context);
 				previousEnd = member.Span.End;

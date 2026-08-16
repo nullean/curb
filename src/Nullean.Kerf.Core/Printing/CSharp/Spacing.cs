@@ -170,6 +170,13 @@ internal static class Spacing
 			context.Arena.Synthetic(SyntheticText.Space);
 	}
 
+	/// <summary>Just inside a parameter list's parentheses.</summary>
+	public static void InsideDeclarationParens(PrintContext context)
+	{
+		if (context.Options.SpaceInDeclarationParameterList)
+			context.Arena.Synthetic(SyntheticText.Space);
+	}
+
 	/// <summary>Just inside a parameter list's parentheses, where it can break.</summary>
 	public static void InsideDeclarationParensBreakable(PrintContext context)
 	{
