@@ -606,7 +606,12 @@ internal static partial class Printers
 		if (node.Body is not null)
 		{
 			if (!TryPrintExpressionBody(node.Body, context.Options.ExpressionBodiedLocalFunctions, context))
-				PrintBody(node.Body, BraceStyle.LocalFunctions, context);
+				// The methods flag, not the local_functions one. Measured against dotnet format, which
+				// the fixed-point property makes authoritative: `methods` alone moves a local
+				// function's brace, and `local_functions` alone moves nothing. Kerf reading the
+				// documented flag meant its output was not a fixed point for anyone who set
+				// `methods` — the same resolution as indexers and events, and found the same way.
+				PrintBody(node.Body, BraceStyle.Methods, context);
 			return;
 		}
 

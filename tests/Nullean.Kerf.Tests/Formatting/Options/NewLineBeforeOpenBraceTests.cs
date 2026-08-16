@@ -380,7 +380,20 @@ public class NewLineBeforeOpenBraceTests : FormattingTest
 	// ---- local_functions -------------------------------------------------------------------------
 
 	[Test]
-	public Task Local_functions_brace_independently_of_methods() => Formats(
+	public Task Local_functions_follow_the_methods_flag() => Formats(
+		// Not the `local_functions` flag, despite its name. Measured against dotnet format, which the
+		// fixed-point property makes authoritative: `methods` alone moves a local function's brace and
+		// `local_functions` alone moves nothing. This asserted the documented behaviour and cost a
+		// fixed point for anyone setting `methods` — the same resolution as indexers and events.
+		"""
+		public class C
+		{
+		    public void M() {
+		        void Inner() {
+		        }
+		    }
+		}
+		""",
 		"""
 		public class C
 		{
@@ -392,17 +405,7 @@ public class NewLineBeforeOpenBraceTests : FormattingTest
 		    }
 		}
 		""",
-		"""
-		public class C
-		{
-		    public void M() {
-		        void Inner()
-		        {
-		        }
-		    }
-		}
-		""",
-		editorConfig: "csharp_new_line_before_open_brace = types,local_functions");
+		editorConfig: "csharp_new_line_before_open_brace = types,methods");
 
 	// ---- lambdas ---------------------------------------------------------------------------------
 
