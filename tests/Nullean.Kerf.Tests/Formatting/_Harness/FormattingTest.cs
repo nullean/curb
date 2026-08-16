@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Diagnostics.CodeAnalysis;
 using JetBrains.Annotations;
 using Nullean.Kerf;
@@ -42,6 +43,8 @@ public abstract class FormattingTest
 		var options = TestOptions.Parse(editorConfig);
 		var actual = FormatOrFail(source, options, "source").TrimEnd('\n', '\r');
 		expected = expected.TrimEnd('\n', '\r');
+
+		ExpectationDump.Record(expected, editorConfig);
 
 		if (!string.Equals(actual, expected, StringComparison.Ordinal))
 			throw new FormattingAssertionException(FormattingDiff.Describe(expected, actual, source, editorConfig));
@@ -163,6 +166,45 @@ public abstract class FormattingTest
 			throw new FormattingAssertionException($"formatting the {what} failed with {result.Status}: {result.Message}");
 
 		return result.Text!;
+	}
+}
+
+/// <summary>
+/// Writes every expectation the suite asserts to a directory, when asked to.
+/// </summary>
+/// <remarks>
+/// <para>
+/// So that <c>./build.sh verifyexpectations</c> can run <c>dotnet format</c> over the lot and prove
+/// they are all fixed points of it. Until this existed only the corpus proved that; the ~800
+/// hand-written expectations proved only that Kerf agrees with itself, and an expectation written
+/// from a wrong belief about dotnet format would sit there passing forever.
+/// </para>
+/// <para>
+/// Off unless <c>KERF_EXPECTATION_DUMP</c> names a directory, so an ordinary test run neither writes
+/// anything nor pays for the hashing.
+/// </para>
+/// </remarks>
+internal static class ExpectationDump
+{
+	private static readonly string? Root = Environment.GetEnvironmentVariable("KERF_EXPECTATION_DUMP");
+	private static int _next;
+
+	public static void Record(string expected, string? editorConfig)
+	{
+		if (string.IsNullOrEmpty(Root))
+			return;
+
+		// A directory each, because the expectations do not share a configuration: one asserts tab
+		// indentation, the next a width of 40. Pooling them under one .editorconfig would judge most
+		// of them against settings they were never written for.
+		var directory = Path.Combine(Root, Interlocked.Increment(ref _next).ToString("D5", CultureInfo.InvariantCulture));
+		Directory.CreateDirectory(directory);
+
+		File.WriteAllText(
+			Path.Combine(directory, ".editorconfig"),
+			"root = true\n[*.cs]\n" + (editorConfig ?? "") + "\n");
+
+		File.WriteAllText(Path.Combine(directory, "Expected.cs"), expected + "\n");
 	}
 }
 

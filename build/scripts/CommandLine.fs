@@ -25,6 +25,7 @@ type Arguments =
     | [<Inherit>] Minimum of double
     | [<Inherit>] MaxAllocationRatio of double
     | [<CliPrefix(CliPrefix.None);SubCommand>] MsbuildSmoketest
+    | [<CliPrefix(CliPrefix.None);SubCommand>] VerifyExpectations
 
     | [<Inherit>] TrailingCommas
     | [<Inherit>] Reflow
@@ -45,6 +46,7 @@ with
             | Minimum _ -> "fail if conformance falls below this percentage"
             | MaxAllocationRatio _ -> "fail if perf allocates more than this multiple of the source size"
             | MsbuildSmoketest -> "prove the MSBuild integration runs before the compiler"
+            | VerifyExpectations -> "prove every expectation in the test suite survives dotnet format"
             | TrailingCommas -> "measure conformance with ReSharper's trailing-comma keys on"
             | Reflow -> "keep the corpus's own max_line_length instead of forcing it off"
             | Release -> "runs build, tests, then creates and validates the packages shy of publishing them"

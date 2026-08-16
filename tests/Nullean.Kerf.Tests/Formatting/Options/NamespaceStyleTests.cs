@@ -17,7 +17,7 @@ namespace Nullean.Kerf.Tests.Formatting.Options;
 /// again, and every one returned to its file-scoped original.
 /// </para>
 /// <para>
-/// One direction only. <c>block</c> is accepted and does nothing, because a file-scoped namespace is
+/// One direction only. <c>block_scoped</c> is accepted and does nothing, because a file-scoped namespace is
 /// already the form the compiler and the templates prefer and putting the braces back would indent a
 /// whole file to no end.
 /// </para>
@@ -40,8 +40,9 @@ public class NamespaceStyleTests : FormattingTest
 		""");
 
 	[Test]
-	public Task Block_is_accepted_and_changes_nothing() => Unchanged(
-		// Kerf never puts the braces back, so this value is inert rather than unsupported.
+	public Task Block_scoped_is_accepted_and_changes_nothing() => Unchanged(
+		// Kerf never puts the braces back, so this value is inert rather than unsupported. The
+		// spelling is `block_scoped`; Roslyn throws on a bare `block` rather than ignoring it.
 		"""
 		namespace Alpha;
 
@@ -49,7 +50,7 @@ public class NamespaceStyleTests : FormattingTest
 		{
 		}
 		""",
-		editorConfig: "csharp_style_namespace_declarations = block");
+		editorConfig: "csharp_style_namespace_declarations = block_scoped");
 
 	// ---- converting -------------------------------------------------------------------------------
 

@@ -253,12 +253,15 @@ public static class EditorConfigOptionsBinder
 				case "file_scoped":
 					options = options with { NamespaceStyle = NamespaceStyle.FileScoped };
 					break;
-				case "block":
+				case "block_scoped":
 					// Accepted, and deliberately inert: see FormatOptions.NamespaceStyle.
 					break;
 				default:
+					// `block_scoped`, not `block`. Roslyn throws on the short spelling rather than
+					// ignoring it, so accepting it here would have let Kerf bless a file that stops
+					// `dotnet format` dead — which is what verifyexpectations caught on its first run.
 					diagnostics?.Add(KerfDiagnostic.UnrecognisedValue(
-						"csharp_style_namespace_declarations", namespaceStyle, "file_scoped or block"));
+						"csharp_style_namespace_declarations", namespaceStyle, "file_scoped or block_scoped"));
 					break;
 			}
 		}

@@ -270,6 +270,64 @@ let private msbuildSmoketest (arguments:ParseResults<Arguments>) =
     printfn ""
     printfn "MSBuild integration verified: formatted before CoreCompile, and IDE0055 fails without it"
 
+/// Proves that every expectation the test suite asserts is a fixed point of dotnet format.
+///
+/// Until this existed only the corpus proved that. The hand-written expectations proved only that
+/// Kerf agrees with itself, so one written from a wrong belief about dotnet format would sit there
+/// passing forever — which is exactly how the note about arrow clauses survived several readings.
+///
+/// Slow, and it needs the SDK, so it is its own target rather than part of `test`.
+let private verifyExpectations (arguments:ParseResults<Arguments>) =
+    let dump = Path.Combine(Paths.Output.FullName, "expectations")
+    if Directory.Exists dump then Directory.Delete(dump, true)
+    Directory.CreateDirectory dump |> ignore
+
+    Environment.SetEnvironmentVariable("KERF_EXPECTATION_DUMP", dump)
+    exec "dotnet" ["run"; "--project"; "tests/Nullean.Kerf.Tests"; "-c"; "Release"] |> ignore
+    Environment.SetEnvironmentVariable("KERF_EXPECTATION_DUMP", null)
+
+    let cases = Directory.GetDirectories dump
+    printfn "checking %d expectations against dotnet format" cases.Length
+    if cases.Length = 0 then failwith "no expectations were written — is the dump still wired into the harness?"
+
+    // Trailing newlines are compared separately by the harness itself — insert_final_newline is a
+    // test subject of its own — so the dump's own trailing newline is not evidence of anything.
+    let read (d: string) = File.ReadAllText(Path.Combine(d, "Expected.cs")).TrimEnd('\n', '\r')
+
+    let before = cases |> Array.map (fun d -> d, read d) |> Map.ofArray
+
+    exec "dotnet" ["format"; "whitespace"; dump; "--folder"] |> ignore
+
+    let changed =
+        before
+        |> Map.toArray
+        |> Array.filter (fun (d, text) -> read d <> text)
+
+    printfn ""
+    printfn "%d of %d expectations survive dotnet format" (cases.Length - changed.Length) cases.Length
+
+    if changed.Length > 0 then
+        printfn ""
+        printfn "first disagreements:"
+        changed
+        |> Array.truncate 10
+        |> Array.iter (fun (d, text) ->
+            printfn "  %s" (Path.GetRelativePath(dump, d))
+            let now = read d
+            printfn "    expected: %s" (text.Replace("\n", "\\n"))
+            printfn "    became:   %s" (now.Replace("\n", "\\n")))
+
+    // A floor rather than zero, the same shape as the conformance gate. Seven expectations disagree
+    // today and each needs deciding on its own merits: some are tests that deliberately feed an
+    // invalid option value and assert the fallback, where Kerf's fallback and Roslyn's differ; others
+    // are real questions about which brace-style flag governs indexers and events. The gate stops the
+    // number growing while they are worked through, which is worth more than blocking on them.
+    let percentage = 100.0 * float (cases.Length - changed.Length) / float cases.Length
+    match arguments.TryGetResult Minimum with
+    | Some floor when percentage < floor ->
+        failwithf "%.2f%% of expectations survive dotnet format, below the required %.2f%%" percentage floor
+    | _ -> ()
+
 let private generatePackages (arguments:ParseResults<Arguments>) =
     let output = Paths.RootRelative Paths.Output.FullName
     if not Paths.Output.Exists then Paths.Output.Create()
@@ -405,6 +463,7 @@ let Setup (parsed:ParseResults<Arguments>) (subCommand:Arguments) =
     cmd Conformance.Name (Some [Build.Name]) None <| fun _ -> conformance parsed
     cmd Perf.Name (Some [Build.Name]) None <| fun _ -> perf parsed
     cmd MsbuildSmoketest.Name (Some [Build.Name]) None <| fun _ -> msbuildSmoketest parsed
+    cmd VerifyExpectations.Name (Some [Build.Name]) None <| fun _ -> verifyExpectations parsed
 
     step PristineCheck.Name pristineCheck
     step GeneratePackages.Name generatePackages
