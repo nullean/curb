@@ -165,6 +165,16 @@ internal sealed class DocPrinter
 
 				case DocKind.Indent:
 					{
+						// An indent aimed at another group applies only when that group broke. A
+						// group the walk has not reached has no mode, and an indent nobody asked for
+						// is the safer of the two answers.
+						if (doc.GroupId != 0 && _groupModes[doc.GroupId] != PrintMode.Break)
+						{
+							Push(new Scope(i + doc.Length, scope.Indent, scope.Mode, -1, scope.SuppressWidth));
+							i++;
+							break;
+						}
+
 						var indent = doc.B == Doc.IndentToRoot ? 0 : scope.Indent + doc.B;
 						Push(new Scope(i + doc.Length, Math.Max(0, indent), scope.Mode, -1, scope.SuppressWidth));
 						i++;
@@ -454,8 +464,18 @@ internal sealed class DocPrinter
 
 				case DocKind.IfBreak:
 					{
-						// Measure only the branch that would actually print.
-						var targetBroken = !flat && scope.Mode == PrintMode.Break;
+						// Measure only the branch that would actually print — including when the
+						// branch is chosen by another group's mode rather than by this scope's. The
+						// print pass has always honoured doc.GroupId here; measurement did not, so an
+						// aimed IfBreak was measured against the wrong branch and the group around it
+						// could be sized for text it would never emit.
+						//
+						// A target the walk has not reached yet has no mode, and there is nothing
+						// better to assume than the enclosing scope.
+						var aimed = doc.GroupId != 0 && _groupModes[doc.GroupId] != PrintMode.Unset;
+						var targetBroken = aimed
+							? _groupModes[doc.GroupId] == PrintMode.Break
+							: !flat && scope.Mode == PrintMode.Break;
 						var flatStart = i + 1;
 						var chosen = targetBroken ? flatStart + doc.A : flatStart;
 						var chosenLength = _arena[chosen].Length;
@@ -522,7 +542,9 @@ internal sealed class DocPrinter
 	{
 		if (_groupModes.Length < count + 1)
 			_groupModes = new PrintMode[count + 1];
-		else
-			Array.Clear(_groupModes);
+
+		// Filled rather than cleared: zero is Flat, and a group nobody has reached has not chosen
+		// flat. One pass over a few hundred bytes per file.
+		Array.Fill(_groupModes, PrintMode.Unset);
 	}
 }

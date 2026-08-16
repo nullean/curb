@@ -356,12 +356,12 @@ internal static partial class Printers
 		// whole block of their own hug here; an object or collection initializer does not.
 		if (node.Expression is SwitchExpressionSyntax or QueryExpressionSyntax)
 		{
-			// dotnet format anchors this to the line the arrow sits on, so a wrapped parameter list
-			// puts the switch a level in. Kerf cannot ask that question: whether the list wrapped is
-			// reflow's decision, made on the same run, so keying off it made the file reformat itself
-			// on a second pass. Doing it properly means an IfBreak against the parameter list's own
-			// group rather than a source test — until then, two corpus files sit a level shallower
-			// than dotnet format puts them.
+			// A note here used to claim dotnet format puts the switch a level in when the parameter
+			// list wraps, and that fixing it needed an IfBreak against that list's group. The
+			// primitive now exists — see DocArena.IndentIfBroken — and using it here made these files
+			// worse, not better: dotnet format keeps the body level with the member whether the list
+			// wrapped or not, which is what this already does. The two files that still differ for
+			// another reason.
 			arena.Synthetic(SyntheticText.Space);
 			Node.Print(node.Expression, context);
 			return;
@@ -414,7 +414,11 @@ internal static partial class Printers
 		{
 			var asWritten = SpansLines(node, context);
 
-			using (arena.Group())
+			// Named, so an expression body hanging off this list can indent against whether it wrapped.
+			var group = arena.NextGroupId();
+			context.ParameterListGroup = group;
+
+			using (arena.Group(group))
 			{
 				using (arena.Indent())
 				{

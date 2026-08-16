@@ -50,6 +50,16 @@ internal sealed class PrintContext(DocArena arena, SourceText text, FormatOption
 	/// <summary>True when a body was given braces the source did not have.</summary>
 	public bool BracesAdded { get; set; }
 
+	/// <summary>
+	/// The group id of the parameter list most recently printed, or 0 before there is one.
+	/// </summary>
+	/// <remarks>
+	/// So an expression body can indent itself against whether its own parameter list wrapped, which
+	/// is a decision taken on this run rather than one readable from the source. Set by ParameterList
+	/// and read by ArrowExpressionClause, which the printer always reaches in that order.
+	/// </remarks>
+	public ushort ParameterListGroup { get; set; }
+
 	/// <summary>True when a block namespace was rewritten as a file-scoped one.</summary>
 	public bool NamespaceUnwrapped { get; set; }
 

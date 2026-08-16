@@ -102,6 +102,20 @@ internal sealed class DocArena
 	/// </remarks>
 	public DocScope IndentIf(bool condition, int levels = 1) => condition ? Indent(levels) : default;
 
+	/// <summary>
+	/// Opens an indent scope only when the group <paramref name="groupId"/> names ends up broken.
+	/// </summary>
+	/// <remarks>
+	/// The conditional half of an <c>IfBreak</c> without its duplication: an <c>IfBreak</c> has to
+	/// hold both renderings of whatever it wraps, so indenting a large subtree that way would build
+	/// it into the arena twice. This wraps it once and shifts it, or does not.
+	///
+	/// The group has to be one the printer reaches first — a parameter list ahead of the arrow body
+	/// that hangs off it — since a mode is only known once its group has been entered.
+	/// </remarks>
+	public DocScope IndentIfBroken(ushort groupId, int levels = 1) =>
+		Open(new Doc(DocKind.Indent, b: levels, groupId: groupId));
+
 	/// <summary>Captures the current output column into <paramref name="register"/>.</summary>
 	public void Anchor(int register) => Add(new Doc(DocKind.Anchor, a: register));
 

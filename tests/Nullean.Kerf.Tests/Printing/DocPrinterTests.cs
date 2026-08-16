@@ -421,4 +421,94 @@ public class DocPrinterTests
 		DocLayout.Render(arena, Source, options).Should().Be("012\r\nabc");
 		await Task.CompletedTask;
 	}
+
+	// ---- aiming at another group's decision --------------------------------------------------------
+
+	/// <summary>
+	/// A construct laid out against whether a *different* group broke.
+	/// </summary>
+	/// <remarks>
+	/// The question a printer cannot answer from the source: whether the thing in front of it wrapped
+	/// is decided on this same run, so reading the source gives one answer on the first pass and
+	/// another on the second. Both of these aim at a named group instead, which the printer has
+	/// already resolved by the time it reaches them.
+	/// </remarks>
+	[Test]
+	public async Task An_indent_can_be_aimed_at_another_groups_decision()
+	{
+		static string Render(int width)
+		{
+			var arena = new DocArena();
+			var group = arena.NextGroupId();
+
+			using (arena.Group(group))
+			using (arena.Indent())
+			{
+				Text(arena, "012");
+				arena.Line();
+				Text(arena, "345");
+			}
+
+			// Indented only when the group above did not fit.
+			using (arena.IndentIfBroken(group))
+			{
+				arena.HardLine();
+				Text(arena, "abc");
+			}
+
+			DocValidator.Validate(arena, Source.Length);
+			return DocLayout.Render(arena, Source, new FormatOptions
+			{
+				MaxLineLength = width,
+				IndentSize = 2,
+				EndOfLine = EndOfLine.Lf,
+				InsertFinalNewLine = false,
+			});
+		}
+
+		Render(80).Should().Be("012 345\nabc", "the group fit, so nothing is indented");
+		Render(4).Should().Be("012\n  345\n  abc", "the group broke, so the tail moved in with it");
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task An_ifbreak_is_measured_against_the_group_it_names()
+	{
+		// The half that was wrong: the print pass honoured the named group, but fit measurement did
+		// not, so the group *around* an aimed IfBreak was sized against a branch it would never emit.
+		static string Render(int width)
+		{
+			var arena = new DocArena();
+			var group = arena.NextGroupId();
+
+			using (arena.Group(group))
+			{
+				Text(arena, "012");
+				arena.Line();
+				Text(arena, "345");
+			}
+
+			using (arena.Group())
+			{
+				using var ifBreak = arena.IfBreak(group);
+				using (ifBreak.Branch())
+					Text(arena, "abc");
+				using (ifBreak.Branch())
+					Text(arena, "abcdefghij");
+			}
+
+			DocValidator.Validate(arena, Source.Length);
+			return DocLayout.Render(arena, Source, new FormatOptions
+			{
+				MaxLineLength = width,
+				IndentSize = 2,
+				EndOfLine = EndOfLine.Lf,
+				InsertFinalNewLine = false,
+			});
+		}
+
+		Render(80).Should().Be("012 345abc", "the named group fit, so the flat branch prints");
+		Render(4).Should().Be("012\n345abcdefghij", "the named group broke, so the broken branch does");
+		await Task.CompletedTask;
+	}
 }
