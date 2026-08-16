@@ -135,6 +135,13 @@ jobs:
       - name: Conformance with dotnet format
         run: ./build.sh conformance -s true --corpus /tmp/corpus --minimum 98.6
 
+      # Publishes native AOT and measures that, not the JIT build. On a run this short JIT
+      # compilation dominates, so `dotnet run` reports several times the real cost and reads as a
+      # regression that is not there. The gate is on allocations because they are deterministic;
+      # wall time is reported for the trend but never asserted on a hosted runner.
+      - name: Speed and allocations
+        run: ./build.sh perf -s true --corpus /tmp/corpus --maxallocationratio 30
+
   # ── Managed build / test / pack / publish ───────────────────────────────────
   build:
     runs-on: ubuntu-latest

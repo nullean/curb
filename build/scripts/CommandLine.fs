@@ -9,6 +9,7 @@ type Arguments =
     | [<CliPrefix(CliPrefix.None);SubCommand>] Test
     | [<CliPrefix(CliPrefix.None);SubCommand>] Benchmark
     | [<CliPrefix(CliPrefix.None);SubCommand>] Conformance
+    | [<CliPrefix(CliPrefix.None);SubCommand>] Perf
 
     | [<CliPrefix(CliPrefix.None);Hidden;SubCommand>] PristineCheck
     | [<CliPrefix(CliPrefix.None);Hidden;SubCommand>] GeneratePackages
@@ -22,6 +23,7 @@ type Arguments =
 
     | [<Inherit>] Corpus of string
     | [<Inherit>] Minimum of double
+    | [<Inherit>] MaxAllocationRatio of double
     | [<Inherit;AltCommandLine("-s")>] SingleTarget of bool
     | [<Inherit>] Token of string
     | [<Inherit;AltCommandLine("-c")>] CleanCheckout of bool
@@ -34,8 +36,10 @@ with
             | Test -> "runs build then tests"
             | Benchmark -> "runs the BenchmarkDotNet suite against the AOT-published binary"
             | Conformance -> "measures agreement with dotnet format over a corpus (--corpus <path>)"
+            | Perf -> "times the AOT binary over a corpus (--corpus <path>); never measure the JIT build"
             | Corpus _ -> "path to a checkout to measure conformance against"
             | Minimum _ -> "fail if conformance falls below this percentage"
+            | MaxAllocationRatio _ -> "fail if perf allocates more than this multiple of the source size"
             | Release -> "runs build, tests, then creates and validates the packages shy of publishing them"
             | Publish -> "runs the full release"
 

@@ -113,6 +113,66 @@ let private conformance (arguments:ParseResults<Arguments>) =
         failwithf "conformance %.2f%% is below the required %.2f%%" percentage floor
     | _ -> ()
 
+/// Times the shipped binary over a corpus.
+///
+/// This target exists because measuring `dotnet run` is misleading and easy to do by accident: a
+/// one-shot format run is short enough that JIT compilation dominates it, so the JIT build reports
+/// several times the CPU and allocations of the native binary users actually get. Always measure
+/// the AOT publish.
+///
+/// The gate is on allocations, not time. Allocations are deterministic; wall time on a hosted
+/// runner is not, and a flaky perf gate gets disabled, which is worse than no gate.
+let private perf (arguments:ParseResults<Arguments>) =
+    let corpus =
+        match arguments.TryGetResult Corpus with
+        | Some path -> DirectoryInfo path
+        | None -> failwith "perf needs --corpus <path> pointing at a C# checkout"
+    if not corpus.Exists then failwithf "corpus %s does not exist" corpus.FullName
+
+    let rid =
+        let os =
+            if OperatingSystem.IsWindows() then "win"
+            elif OperatingSystem.IsMacOS() then "osx"
+            else "linux"
+        let arch =
+            match Runtime.InteropServices.RuntimeInformation.ProcessArchitecture with
+            | Runtime.InteropServices.Architecture.Arm64 -> "arm64"
+            | Runtime.InteropServices.Architecture.X64 -> "x64"
+            | other -> failwithf "no RID mapping for %O" other
+        sprintf "%s-%s" os arch
+
+    printfn "publishing native AOT for %s" rid
+    exec "dotnet" ["publish"; "src/Nullean.Kerf.Cli"; "-c"; "Release"; "-r"; rid] |> ignore
+
+    let binary =
+        let name = if OperatingSystem.IsWindows() then "Nullean.Kerf.Cli.exe" else "Nullean.Kerf.Cli"
+        Path.Combine(".artifacts", "publish", "Nullean.Kerf.Cli", sprintf "release_%s" rid, name)
+    if not (File.Exists binary) then failwithf "expected a native binary at %s" binary
+
+    // The first run pays for a cold file cache, so take the best of several rather than the mean.
+    let runs =
+        [ for _ in 1 .. 5 ->
+            let started = Diagnostics.Stopwatch.StartNew()
+            let result = Proc.Start(binary, "check", corpus.FullName)
+            started.Stop()
+            let output = result.ConsoleOut |> Seq.map (fun l -> l.Line) |> String.concat "\n"
+            started.Elapsed.TotalMilliseconds, output ]
+
+    let elapsed, output = runs |> List.minBy fst
+    printfn ""
+    printfn "%s" output
+    printfn "best of %d runs: %.0f ms wall" runs.Length elapsed
+
+    let ratio =
+        let matched = Text.RegularExpressions.Regex.Match(output, @"\(([0-9.]+)x source\)")
+        if matched.Success then Double.Parse(matched.Groups.[1].Value, Globalization.CultureInfo.InvariantCulture)
+        else failwithf "could not read the allocation ratio from:\n%s" output
+
+    match arguments.TryGetResult MaxAllocationRatio with
+    | Some ceiling when ratio > ceiling ->
+        failwithf "allocated %.1fx the source size, above the permitted %.1fx" ratio ceiling
+    | _ -> printfn "allocated %.1fx the source size" ratio
+
 let private generatePackages (arguments:ParseResults<Arguments>) =
     let output = Paths.RootRelative Paths.Output.FullName
     if not Paths.Output.Exists then Paths.Output.Create()
@@ -242,6 +302,7 @@ let Setup (parsed:ParseResults<Arguments>) (subCommand:Arguments) =
     cmd Test.Name (Some [Build.Name]) None <| fun _ -> test parsed
     cmd Benchmark.Name (Some [Build.Name]) None <| fun _ -> benchmark parsed
     cmd Conformance.Name (Some [Build.Name]) None <| fun _ -> conformance parsed
+    cmd Perf.Name (Some [Build.Name]) None <| fun _ -> perf parsed
 
     step PristineCheck.Name pristineCheck
     step GeneratePackages.Name generatePackages
