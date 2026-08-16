@@ -166,6 +166,16 @@ public readonly record struct FormatOptions
 	/// <summary>Indent a block's statements. <c>csharp_indent_block_contents</c>, default true.</summary>
 	public bool IndentBlockContents { get; init; } = true;
 
+	/// <summary>
+	/// Indent the brace tokens themselves one level further than the construct that owns them.
+	/// <c>csharp_indent_braces</c>, default false.
+	/// </summary>
+	/// <remarks>
+	/// Unlike the other indentation options this moves the braces rather than their contents, so the
+	/// contents stay exactly where they were and the braces come to meet them.
+	/// </remarks>
+	public bool IndentBraces { get; init; }
+
 	/// <summary><c>csharp_indent_labels</c>, default <see cref="LabelIndent.OneLessThanCurrent"/>.</summary>
 	public LabelIndent IndentLabels { get; init; } = LabelIndent.OneLessThanCurrent;
 

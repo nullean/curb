@@ -213,10 +213,13 @@ internal static partial class Printers
 							Spacing.AfterCommaBreakable(context);
 					}
 				}
-				arena.Line();
+
+				using (arena.IndentIf(context.Options.IndentBraces))
+					arena.Line();
 			}
 			else
 			{
+				// `{ }` — nothing to break around, so the brace pair just gets air between it.
 				arena.Synthetic(SyntheticText.Space);
 			}
 
@@ -353,7 +356,9 @@ internal static partial class Printers
 						Spacing.AfterCommaBreakable(context);
 				}
 			}
-			arena.Line();
+			using (arena.IndentIf(context.Options.IndentBraces))
+				arena.Line();
+
 			TokenPrinter.Print(node.CloseBraceToken, context);
 		}
 	}
@@ -411,7 +416,10 @@ internal static partial class Printers
 		Node.Print(node.GoverningExpression, context);
 		arena.Synthetic(SyntheticText.Space);
 		TokenPrinter.Print(node.SwitchKeyword, context);
-		arena.HardLine();
+
+		using (arena.IndentIf(context.Options.IndentBraces))
+			arena.HardLine();
+
 		TokenPrinter.Print(node.OpenBraceToken, context);
 
 		using (arena.Indent())
@@ -425,7 +433,9 @@ internal static partial class Printers
 			}
 		}
 
-		arena.HardLine();
+		using (arena.IndentIf(context.Options.IndentBraces))
+			arena.HardLine();
+
 		TokenPrinter.Print(node.CloseBraceToken, context);
 	}
 

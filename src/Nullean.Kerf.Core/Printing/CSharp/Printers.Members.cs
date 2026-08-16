@@ -42,7 +42,9 @@ internal static partial class Printers
 			}
 		}
 
-		arena.HardLine();
+		using (arena.IndentIf(context.Options.IndentBraces))
+			arena.HardLine();
+
 		TokenPrinter.Print(node.CloseBraceToken, context);
 		TokenPrinter.PrintIfPresent(node.SemicolonToken, context);
 	}
@@ -193,7 +195,9 @@ internal static partial class Printers
 			}
 		}
 
-		arena.HardLine();
+		using (arena.IndentIf(context.Options.IndentBraces))
+			arena.HardLine();
+
 		TokenPrinter.Print(node.CloseBraceToken, context);
 		TokenPrinter.PrintIfPresent(node.SemicolonToken, context);
 	}

@@ -175,7 +175,8 @@ internal static partial class Printers
 					Node.Print(node.Accessors[i], context);
 				}
 			}
-			arena.Line();
+			using (arena.IndentIf(context.Options.IndentBraces))
+				arena.Line();
 		}
 
 		TokenPrinter.Print(node.CloseBraceToken, context);

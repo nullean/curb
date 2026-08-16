@@ -296,6 +296,166 @@ public class IndentationTests : FormattingTest
 		""",
 		editorConfig: "csharp_indent_block_contents = false");
 
+	// ---- csharp_indent_braces --------------------------------------------------------------------
+
+	[Test]
+	public Task Braces_sit_with_their_construct_by_default() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        Call();
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Braces_can_be_indented_to_meet_their_contents() => Formats(
+		"""
+		namespace N
+		{
+		    public enum E
+		    {
+		        One,
+		    }
+
+		    public class C
+		    {
+		        public void M()
+		        {
+		            Call();
+		        }
+		    }
+		}
+		""",
+		// The contents do not move; the braces come to meet them.
+		"""
+		namespace N
+		    {
+		    public enum E
+		        {
+		        One,
+		        }
+
+		    public class C
+		        {
+		        public void M()
+		            {
+		            Call();
+		            }
+		        }
+		    }
+		""",
+		editorConfig: "csharp_indent_braces = true");
+
+	[Test]
+	public Task Indented_braces_cover_accessors_switches_and_control_blocks() => Formats(
+		"""
+		public class C
+		{
+		    public int Q
+		    {
+		        get
+		        {
+		            return 1;
+		        }
+		    }
+
+		    public void M()
+		    {
+		        switch (a)
+		        {
+		            case 1:
+		                break;
+		        }
+		        if (a)
+		        {
+		            Call();
+		        }
+		    }
+		}
+		""",
+		"""
+		public class C
+		    {
+		    public int Q
+		        {
+		        get
+		            {
+		            return 1;
+		            }
+		        }
+
+		    public void M()
+		        {
+		        switch (a)
+		            {
+		            case 1:
+		                break;
+		            }
+		        if (a)
+		            {
+		            Call();
+		            }
+		        }
+		    }
+		""",
+		editorConfig: "csharp_indent_braces = true");
+
+	[Test]
+	public Task Indented_braces_leave_brackets_alone() => Formats(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        int[] c = [1];
+		    }
+		}
+		""",
+		"""
+		public class C
+		    {
+		    public void M()
+		        {
+		        int[] c = [1];
+		        }
+		    }
+		""",
+		editorConfig: "csharp_indent_braces = true");
+
+	[Test]
+	[Skip("dotnet format also shifts a switch expression's arms and closes it two levels in; Kerf moves only the braces, as it does everywhere else")]
+	public Task A_switch_expression_shifts_its_arms_too() => Formats(
+		"""
+		public class C
+		{
+		    public int M(int x)
+		    {
+		        return x switch
+		        {
+		            1 => 1,
+		            _ => 0,
+		        };
+		    }
+		}
+		""",
+		"""
+		public class C
+		    {
+		    public int M(int x)
+		        {
+		        return x switch
+		            {
+		                1 => 1,
+		                _ => 0,
+		                };
+		        }
+		    }
+		""",
+		editorConfig: "csharp_indent_braces = true");
+
 	// ---- csharp_indent_labels ---------------------------------------------------------------------
 
 	[Test]

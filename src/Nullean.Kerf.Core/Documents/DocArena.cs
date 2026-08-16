@@ -94,6 +94,14 @@ internal sealed class DocArena
 	/// <summary>Places the subtree at column 0 regardless of the enclosing indent.</summary>
 	public DocScope IndentToRoot() => Open(new Doc(DocKind.Indent, b: Doc.IndentToRoot));
 
+	/// <summary>Opens an indent scope only when <paramref name="condition"/> holds.</summary>
+	/// <remarks>
+	/// Writes no document at all when the condition is false, so an option that is off costs nothing
+	/// — which matters for the several brace sites that consult csharp_indent_braces, since almost
+	/// nobody turns it on and every one of them is on the hot path.
+	/// </remarks>
+	public DocScope IndentIf(bool condition, int levels = 1) => condition ? Indent(levels) : default;
+
 	public DocScope ForceFlat() => Open(new Doc(DocKind.ForceFlat));
 
 	public DocScope AlwaysFits() => Open(new Doc(DocKind.AlwaysFits));
@@ -159,7 +167,8 @@ internal sealed class DocArena
 /// <summary>Closes a document scope, patching its subtree length, when disposed.</summary>
 internal readonly struct DocScope(DocArena arena, int index) : IDisposable
 {
-	public void Dispose() => arena.Close(index);
+	/// <summary>A default scope holds no arena — see <see cref="DocArena.IndentIf"/> — and closes nothing.</summary>
+	public void Dispose() => arena?.Close(index);
 }
 
 /// <summary>Writes the two branches of an <see cref="DocKind.IfBreak"/>. Flat branch first.</summary>

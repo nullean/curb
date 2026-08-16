@@ -190,6 +190,9 @@ public static class EditorConfigOptionsBinder
 		if (TryBool(properties, "csharp_indent_switch_labels", diagnostics, out var indentSwitchLabels))
 			options = options with { IndentSwitchLabels = indentSwitchLabels };
 
+		if (TryBool(properties, "csharp_indent_braces", diagnostics, out var indentBraces))
+			options = options with { IndentBraces = indentBraces };
+
 		if (TryBool(properties, "csharp_indent_block_contents", diagnostics, out var indentBlockContents))
 			options = options with { IndentBlockContents = indentBlockContents };
 

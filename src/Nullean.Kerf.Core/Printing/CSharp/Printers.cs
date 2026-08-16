@@ -176,8 +176,12 @@ internal static partial class Printers
 			}
 		}
 
-		arena.HardLine(DocFlags.Reindent);
-		TokenPrinter.PrintWithoutLeadingTrivia(node.CloseBraceToken, context);
+		using (arena.IndentIf(context.Options.IndentBraces))
+		{
+			arena.HardLine(DocFlags.Reindent);
+			TokenPrinter.PrintWithoutLeadingTrivia(node.CloseBraceToken, context);
+		}
+
 		TokenPrinter.PrintIfPresent(node.SemicolonToken, context);
 	}
 
@@ -354,8 +358,11 @@ internal static partial class Printers
 			}
 		}
 
-		arena.HardLine(DocFlags.Reindent);
-		TokenPrinter.PrintWithoutLeadingTrivia(node.CloseBraceToken, context);
+		using (arena.IndentIf(context.Options.IndentBraces))
+		{
+			arena.HardLine(DocFlags.Reindent);
+			TokenPrinter.PrintWithoutLeadingTrivia(node.CloseBraceToken, context);
+		}
 	}
 
 	public static void ExpressionStatement(ExpressionStatementSyntax node, PrintContext context)
@@ -521,10 +528,16 @@ internal static partial class Printers
 	/// </remarks>
 	internal static void BeforeOpenBrace(BraceStyle construct, PrintContext context)
 	{
-		if (context.Options.NewLineBeforeOpenBrace.HasFlag(construct))
-			context.Arena.HardLine();
-		else
+		if (!context.Options.NewLineBeforeOpenBrace.HasFlag(construct))
+		{
 			context.Arena.Synthetic(SyntheticText.Space);
+			return;
+		}
+
+		// The brace lands wherever this break leaves the cursor, so csharp_indent_braces is applied
+		// by emitting the break from a deeper scope rather than by moving the token afterwards.
+		using (context.Arena.IndentIf(context.Options.IndentBraces))
+			context.Arena.HardLine();
 	}
 
 	/// <summary>
@@ -538,10 +551,14 @@ internal static partial class Printers
 	/// </remarks>
 	internal static void BeforeOpenBraceWhenBroken(BraceStyle construct, PrintContext context)
 	{
-		if (context.Options.NewLineBeforeOpenBrace.HasFlag(construct))
-			context.Arena.Line();
-		else
+		if (!context.Options.NewLineBeforeOpenBrace.HasFlag(construct))
+		{
 			context.Arena.Synthetic(SyntheticText.Space);
+			return;
+		}
+
+		using (context.Arena.IndentIf(context.Options.IndentBraces))
+			context.Arena.Line();
 	}
 
 	/// <summary>

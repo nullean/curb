@@ -96,6 +96,7 @@ public static class OptionCatalog
 			"csharp_indent_case_contents_when_block",
 			"csharp_indent_switch_labels",
 			"csharp_indent_block_contents",
+			"csharp_indent_braces",
 			"csharp_indent_labels",
 			"csharp_space_after_cast",
 			"csharp_space_after_keywords_in_control_flow_statements",
