@@ -87,7 +87,12 @@ public static class OptionCatalog
 
 	/// <summary>Keys Kerf actually acts on today. Everything else in the catalog reports KERF1003.</summary>
 	public static readonly FrozenSet<string> ImplementedKeys =
-		CoreKeys.Concat(["csharp_new_line_before_open_brace"]).ToFrozenSet(StringComparer.Ordinal);
+		CoreKeys.Concat([
+			"csharp_new_line_before_open_brace",
+			"csharp_new_line_before_else",
+			"csharp_new_line_before_catch",
+			"csharp_new_line_before_finally",
+		]).ToFrozenSet(StringComparer.Ordinal);
 
 	/// <summary>True for a key Kerf knows about, whether or not it is implemented yet.</summary>
 	public static bool IsKnown(string key) => CoreKeys.Contains(key) || FormattingKeys.Contains(key);

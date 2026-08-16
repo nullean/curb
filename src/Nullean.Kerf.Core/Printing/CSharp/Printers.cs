@@ -519,6 +519,23 @@ internal static partial class Printers
 			context.Arena.Synthetic(SyntheticText.Space);
 	}
 
+	/// <summary>
+	/// Emits whatever separates a continuation keyword — <c>else</c>, <c>catch</c>, <c>finally</c> —
+	/// from what came before it.
+	/// </summary>
+	/// <remarks>
+	/// The three options behind this only ever pull the keyword up onto a closing brace: dotnet
+	/// format leaves <c>else</c> on its own line after a braceless <c>if</c> whatever the option
+	/// says, since there is no brace there to join.
+	/// </remarks>
+	internal static void BeforeContinuation(bool onItsOwnLine, bool followsABrace, PrintContext context)
+	{
+		if (onItsOwnLine || !followsABrace)
+			context.Arena.HardLine();
+		else
+			context.Arena.Synthetic(SyntheticText.Space);
+	}
+
 	private static void PrintModifiers(SyntaxTokenList modifiers, PrintContext context)
 	{
 		foreach (var modifier in modifiers)

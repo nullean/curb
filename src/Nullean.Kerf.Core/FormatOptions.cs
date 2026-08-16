@@ -60,6 +60,24 @@ public readonly record struct FormatOptions
 	/// </summary>
 	public BraceStyle NewLineBeforeOpenBrace { get; init; } = BraceStyle.All;
 
+	/// <summary>
+	/// Put <c>else</c> on a line of its own rather than joining it to the preceding brace.
+	/// <c>csharp_new_line_before_else</c>, default true.
+	/// </summary>
+	public bool NewLineBeforeElse { get; init; } = true;
+
+	/// <summary>
+	/// Put <c>catch</c> on a line of its own rather than joining it to the preceding brace.
+	/// <c>csharp_new_line_before_catch</c>, default true.
+	/// </summary>
+	public bool NewLineBeforeCatch { get; init; } = true;
+
+	/// <summary>
+	/// Put <c>finally</c> on a line of its own rather than joining it to the preceding brace.
+	/// <c>csharp_new_line_before_finally</c>, default true.
+	/// </summary>
+	public bool NewLineBeforeFinally { get; init; } = true;
+
 	/// <summary>True when reflow is disabled, which lets the printer skip fit measurement entirely.</summary>
 	public bool ReflowDisabled => MaxLineLength == Off;
 

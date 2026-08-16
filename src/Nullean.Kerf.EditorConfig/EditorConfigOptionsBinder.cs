@@ -81,6 +81,15 @@ public static class EditorConfigOptionsBinder
 		if (TryBool(properties, "trim_trailing_whitespace", diagnostics, out var trimTrailing))
 			options = options with { TrimTrailingWhitespace = trimTrailing };
 
+		if (TryBool(properties, "csharp_new_line_before_else", diagnostics, out var newLineBeforeElse))
+			options = options with { NewLineBeforeElse = newLineBeforeElse };
+
+		if (TryBool(properties, "csharp_new_line_before_catch", diagnostics, out var newLineBeforeCatch))
+			options = options with { NewLineBeforeCatch = newLineBeforeCatch };
+
+		if (TryBool(properties, "csharp_new_line_before_finally", diagnostics, out var newLineBeforeFinally))
+			options = options with { NewLineBeforeFinally = newLineBeforeFinally };
+
 		if (properties.TryGetValue("csharp_new_line_before_open_brace", out var braceStyle))
 		{
 			if (BraceStyleParser.TryParse(braceStyle, out var style))

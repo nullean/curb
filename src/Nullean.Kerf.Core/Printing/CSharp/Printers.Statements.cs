@@ -73,8 +73,7 @@ internal static partial class Printers
 		if (node.Else is null)
 			return;
 
-		// csharp_new_line_before_else, default true.
-		context.Arena.HardLine();
+		BeforeContinuation(context.Options.NewLineBeforeElse, node.Statement is BlockSyntax, context);
 		TokenPrinter.Print(node.Else.ElseKeyword, context);
 
 		// `else if` stays on one line rather than nesting a whole new indent level.
@@ -192,8 +191,8 @@ internal static partial class Printers
 
 		foreach (var catchClause in node.Catches)
 		{
-			// csharp_new_line_before_catch, default true.
-			arena.HardLine();
+			// Whatever precedes a catch is a block, so there is always a brace to join.
+			BeforeContinuation(context.Options.NewLineBeforeCatch, true, context);
 			TokenPrinter.Print(catchClause.CatchKeyword, context);
 
 			if (catchClause.Declaration is not null)
@@ -226,8 +225,7 @@ internal static partial class Printers
 		if (node.Finally is null)
 			return;
 
-		// csharp_new_line_before_finally, default true.
-		arena.HardLine();
+		BeforeContinuation(context.Options.NewLineBeforeFinally, true, context);
 		TokenPrinter.Print(node.Finally.FinallyKeyword, context);
 		BeforeOpenBrace(BraceStyle.ControlBlocks, context);
 		Node.Print(node.Finally.Block, context);
