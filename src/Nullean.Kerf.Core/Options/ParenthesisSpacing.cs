@@ -37,6 +37,16 @@ public static class ParenthesisSpacingParser
 		"type_casts",
 	];
 
+	/// <summary>Renders a value back as a <c>.editorconfig</c> would write it.</summary>
+	public static string ToEditorConfigValue(ParenthesisSpacing spacing)
+	{
+		if (spacing == ParenthesisSpacing.None)
+			return "false";
+
+		var set = Names.Where((_, index) => (spacing & (ParenthesisSpacing)(1 << index)) != 0);
+		return string.Join(",", set);
+	}
+
 	/// <summary>Parses a comma-separated list. <c>false</c> and <c>none</c> both mean no spacing.</summary>
 	public static bool TryParse(string value, out ParenthesisSpacing spacing)
 	{

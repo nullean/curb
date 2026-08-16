@@ -64,6 +64,20 @@ public static class BraceStyleParser
 		"types",
 	];
 
+	/// <summary>Renders a value back as a <c>.editorconfig</c> would write it.</summary>
+	public static string ToEditorConfigValue(BraceStyle style)
+	{
+		if (style == BraceStyle.All)
+			return "all";
+		if (style == BraceStyle.None)
+			return "none";
+
+		var set = Names[2..]
+			.Where((_, index) => (style & (BraceStyle)(1 << index)) != 0);
+
+		return string.Join(",", set);
+	}
+
 	/// <summary>Parses a comma-separated list, or one of the <c>all</c> / <c>none</c> shorthands.</summary>
 	public static bool TryParse(string value, out BraceStyle style)
 	{

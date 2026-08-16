@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.IO.Abstractions;
 using Nullean.Kerf;
 using Nullean.Kerf.Cli;
@@ -58,16 +57,41 @@ switch (args[0])
 			var diagnostics = new List<KerfDiagnostic>();
 			var options = EditorConfigOptionsBinder.Bind(config, diagnostics);
 
+			// Driven by the catalog rather than a hand-written list, so the command reports every
+			// option Kerf implements and cannot quietly fall behind as more are onboarded.
+			var keys = OptionCatalog.ImplementedKeys.Order(StringComparer.Ordinal).ToArray();
+			var width = keys.Max(key => key.Length);
+
 			Console.WriteLine($"# {path}");
 			Console.WriteLine();
-			Console.WriteLine("# resolved");
-			Console.WriteLine($"indent_style             = {(options.UseTabs ? "tab" : "space")}");
-			Console.WriteLine($"indent_size              = {options.IndentSize}");
-			Console.WriteLine($"tab_width                = {options.TabWidth}");
-			Console.WriteLine($"max_line_length          = {(options.ReflowDisabled ? "off" : options.MaxLineLength.ToString(CultureInfo.InvariantCulture))}");
-			Console.WriteLine($"end_of_line              = {options.EndOfLine.ToString().ToLowerInvariant()}");
-			Console.WriteLine($"insert_final_newline     = {options.InsertFinalNewLine.ToString().ToLowerInvariant()}");
-			Console.WriteLine($"trim_trailing_whitespace = {options.TrimTrailingWhitespace.ToString().ToLowerInvariant()}");
+			var implementedFormatting = OptionCatalog.FormattingKeys.Count(OptionCatalog.IsImplemented);
+			Console.WriteLine(
+				$"# resolved — {implementedFormatting} of {OptionCatalog.FormattingKeys.Count} IDE0055 options "
+				+ $"implemented, plus the {OptionCatalog.CoreKeys.Count} core keys");
+			Console.WriteLine();
+
+			// Capped, so one long list value does not push every comment off to the right.
+			var valueWidth = Math.Min(22, keys.Max(key => (OptionValues.Of(options, key) ?? "").Length));
+			foreach (var key in keys)
+			{
+				var value = OptionValues.Of(options, key) ?? "";
+				// A value someone actually set is the one worth looking at, so mark the rest.
+				var origin = config.Properties.ContainsKey(key) ? "" : "  # default";
+				Console.WriteLine($"{key.PadRight(width)} = {value.PadRight(origin.Length > 0 ? valueWidth : 0)}{origin}");
+			}
+
+			var unimplemented = OptionCatalog.FormattingKeys
+				.Where(key => !OptionCatalog.IsImplemented(key))
+				.Order(StringComparer.Ordinal)
+				.ToArray();
+
+			if (unimplemented.Length > 0)
+			{
+				Console.WriteLine();
+				Console.WriteLine($"# {unimplemented.Length} known option(s) not implemented yet");
+				foreach (var key in unimplemented)
+					Console.WriteLine($"# {key}");
+			}
 
 			if (diagnostics.Count > 0)
 			{

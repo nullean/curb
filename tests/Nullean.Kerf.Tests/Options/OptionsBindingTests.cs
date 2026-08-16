@@ -172,6 +172,37 @@ public class OptionsBindingTests
 	}
 
 	[Test]
+	public async Task Every_implemented_option_can_be_printed()
+	{
+		// print-config is driven by ImplementedKeys, so an option onboarded without teaching
+		// OptionValues about it would be reported as blank rather than left out. Fail here instead.
+		var options = new FormatOptions();
+
+		var missing = OptionCatalog.ImplementedKeys
+			.Where(key => OptionValues.Of(options, key) is null)
+			.Order(StringComparer.Ordinal)
+			.ToArray();
+
+		missing.Should().BeEmpty("print-config would report these as blank");
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task Nothing_unimplemented_claims_to_have_a_value()
+	{
+		var options = new FormatOptions();
+
+		var claimed = OptionCatalog.FormattingKeys
+			.Where(key => !OptionCatalog.IsImplemented(key))
+			.Where(key => OptionValues.Of(options, key) is not null)
+			.Order(StringComparer.Ordinal)
+			.ToArray();
+
+		claimed.Should().BeEmpty("reporting a resolved value for an option Kerf ignores is the failure mode the catalog exists to prevent");
+		await Task.CompletedTask;
+	}
+
+	[Test]
 	public async Task The_catalog_covers_all_39_ide0055_options()
 	{
 		// If this number moves, either Microsoft added an option or someone mistyped one.
