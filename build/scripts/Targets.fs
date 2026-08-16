@@ -301,13 +301,16 @@ let private generatePackages (arguments:ParseResults<Arguments>) =
 let private validatePackages (arguments:ParseResults<Arguments>) =
     let output = Paths.RootRelative <| Paths.Output.FullName
     // Only managed library packages carry signed assemblies. The root tool package holds just
-    // DotnetToolSettings.xml and the per-RID packages hold native binaries; both fail a signing check.
+    // DotnetToolSettings.xml, the per-RID packages hold native binaries, and Nullean.Kerf.MSBuild is
+    // build-only — props, targets and a CLI payload, with no assembly of its own. All three fail a
+    // signing check for the same reason: there is nothing signed in them to check.
     let nugetPackages =
         Paths.Output.GetFiles("*.nupkg") |> Seq.sortByDescending(fun f -> f.CreationTimeUtc)
         |> Seq.map (fun p -> Paths.RootRelative p.FullName)
         |> Seq.filter (fun p ->
             let baseName = Path.GetFileNameWithoutExtension(p).Replace("." + currentVersion.Value, "")
-            Paths.mapNugetToProject.ContainsKey(baseName))
+            Paths.mapNugetToProject.ContainsKey(baseName)
+            && not (Paths.buildOnlyPackages.Contains baseName))
 
     let args = ["-v"; currentVersionInformational.Value; "-k"; Paths.SignKey; "-t"; output]
     nugetPackages |> Seq.iter (fun p -> exec "dotnet" (["nupkg-validator"; p] @ args) |> ignore)
@@ -315,11 +318,12 @@ let private validatePackages (arguments:ParseResults<Arguments>) =
 let private generateApiChanges (arguments:ParseResults<Arguments>) =
     let output = Paths.RootRelative <| Paths.Output.FullName
     let currentVersion = currentVersion.Value
-    // Only diff managed packages — per-RID AOT packages have no managed assembly to diff.
+    // Only diff managed packages — per-RID AOT packages and the build-only MSBuild package have no
+    // managed assembly to diff.
     let nugetPackages =
         Paths.Output.GetFiles("*.nupkg") |> Seq.sortByDescending(fun f -> f.CreationTimeUtc)
         |> Seq.map (fun p -> Path.GetFileNameWithoutExtension(Paths.RootRelative p.FullName).Replace("." + currentVersion, ""))
-        |> Seq.filter (fun p -> Paths.mapNugetToProject.ContainsKey(p))
+        |> Seq.filter (fun p -> Paths.mapNugetToProject.ContainsKey(p) && not (Paths.buildOnlyPackages.Contains p))
     nugetPackages
     |> Seq.iter(fun p ->
         let outputFile = Path.Combine(output, sprintf "breaking-changes-%s.md" p)

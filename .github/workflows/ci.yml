@@ -144,6 +144,13 @@ jobs:
       - name: Speed and allocations
         run: ./build.sh perf -s true --corpus /tmp/corpus --maxallocationratio 30
 
+      # Two-sided on purpose. The sample builds clean with Kerf in the way even though IDE0055 is an
+      # error and its source is misformatted, and fails with those errors when Kerf is bypassed. The
+      # first assertion alone would pass just as well if the analysers were never running, which is
+      # the shape this kind of test usually takes.
+      - name: MSBuild integration runs before the compiler
+        run: ./build.sh msbuildsmoketest -s true
+
   # ── Managed build / test / pack / publish ───────────────────────────────────
   build:
     runs-on: ubuntu-latest

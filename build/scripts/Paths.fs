@@ -33,6 +33,9 @@ let mapProjectToNuget =
         .Add("Nullean.Kerf.EditorConfig", "Nullean.Kerf.EditorConfig")
         .Add("Nullean.Kerf.MSBuild", "Nullean.Kerf.MSBuild")
 
+/// Packages that ship no managed assembly, so signing and API-diff checks have nothing to look at.
+let buildOnlyPackages = set [ "Nullean.Kerf.MSBuild" ]
+
 let mapNugetToTFM = Map.empty<string, string>
 
 let mapNugetToProject =
