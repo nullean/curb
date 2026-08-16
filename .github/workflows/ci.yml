@@ -163,11 +163,13 @@ jobs:
       # only that Kerf agrees with itself, so one written from a wrong belief would pass forever — it
       # found exactly that on its first run, an option value Roslyn rejects outright.
       #
-      # A floor rather than zero: five disagree today, each characterised in the plan. Two are
-      # tests feeding a deliberately invalid value where the fallback policies differ; two are real
-      # and open; one has no resolution, since Kerf honours a pragma dotnet format ignores.
+      # A floor rather than zero: four disagree, and each is a judgement rather than a defect. Two
+      # are tests feeding a deliberately invalid value, where Kerf keeps its default and Roslyn
+      # declines to apply the option at all. One is a flag Kerf honours and dotnet format does not.
+      # The last has no resolution: Kerf leaves a `#pragma warning disable` region alone and dotnet
+      # format ignores pragmas entirely, so that region cannot be a fixed point either way.
       - name: Expectations survive dotnet format
-        run: ./build.sh verifyexpectations -s true --minimum 99.2
+        run: ./build.sh verifyexpectations -s true --minimum 99.3
 
   # ── Managed build / test / pack / publish ───────────────────────────────────
   build:

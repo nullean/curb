@@ -30,7 +30,7 @@ internal static partial class Printers
 		{
 			QueryFromClause(node.FromClause, context);
 
-			using (arena.Indent())
+			// No indent scope: a clause that breaks lands on the anchor's column, not on a level.
 			{
 				foreach (var clause in node.Body.Clauses)
 				{
@@ -53,10 +53,13 @@ internal static partial class Printers
 
 		void Separator()
 		{
+			// Aligned either way. The option decides whether the break is taken at all; where it
+			// lands when it is taken is the same question, and dotnet format answers it under the
+			// `from` whether the break came from the option or from the width.
 			if (oneClausePerLine)
 				arena.AlignedLine(QueryAnchor);
 			else
-				arena.Line();
+				arena.AlignedBreakOpportunity(QueryAnchor);
 		}
 	}
 

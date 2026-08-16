@@ -160,6 +160,18 @@ internal sealed class DocArena
 	public void AlignedLine(int register) =>
 		Add(new Doc(DocKind.Line, a: (int)LineType.Hard, b: register, flags: DocFlags.AlignToAnchor));
 
+	/// <summary>
+	/// A break opportunity that lands on a captured column when it is taken, and is a space when it
+	/// is not.
+	/// </summary>
+	/// <remarks>
+	/// The soft half of <see cref="AlignedLine"/>. A query whose clauses fit stays on one line; one
+	/// that does not gets them under the <c>from</c>, which is where dotnet format puts them however
+	/// the break came about.
+	/// </remarks>
+	public void AlignedBreakOpportunity(int register) =>
+		Add(new Doc(DocKind.Line, a: (int)LineType.Normal, b: register, flags: DocFlags.AlignToAnchor));
+
 	public DocScope ForceFlat() => Open(new Doc(DocKind.ForceFlat));
 
 	/// <summary>Opens a force-flat scope only when <paramref name="condition"/> holds.</summary>

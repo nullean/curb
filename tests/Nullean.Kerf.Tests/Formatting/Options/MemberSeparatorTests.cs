@@ -242,11 +242,16 @@ public class MemberSeparatorTests : FormattingTest
 		    public void M()
 		    {
 		        var q = from customer in customers
-		            where customer.Age > 18
-		            select customer.Name;
+		                where customer.Age > 18
+		                select customer.Name;
 		    }
 		}
 		""",
+		// Under the `from`, not at an indent level. This asserted the indent for a while, which is
+		// what Kerf did rather than what dotnet format does — the difference only shows when the
+		// break comes from the width rather than from
+		// csharp_new_line_between_query_expression_clauses, and nothing compared the two until
+		// verifyexpectations did.
 		editorConfig: "max_line_length = 60");
 
 	[Test]
