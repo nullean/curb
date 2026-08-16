@@ -29,9 +29,15 @@ let private currentVersionInformational =
         | true -> sprintf "%s+%s" currentVersion.Value (Information.getCurrentSHA1("."))
     )
 
+/// Cleans Release only, which is the configuration everything downstream builds.
+///
+/// Not a preference: this script is itself a project in the solution, and it runs from its Debug
+/// output. A bare `dotnet clean` defaults to Debug and so deletes the assemblies of the process
+/// executing it — anything the runner had not yet loaded then fails to resolve. It surfaced as
+/// `perf` dying on a missing System.Reactive, which reads like a restore problem and is not one.
 let private clean (arguments:ParseResults<Arguments>) =
     if (Paths.Output.Exists) then Paths.Output.Delete (true)
-    exec "dotnet" ["clean"] |> ignore
+    exec "dotnet" ["clean"; "-c"; "Release"] |> ignore
 
 let private build (arguments:ParseResults<Arguments>) = exec "dotnet" ["build"; "-c"; "Release"] |> ignore
 
