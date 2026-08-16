@@ -68,7 +68,13 @@ internal static class TokenPrinter
 				case SyntaxKind.MultiLineCommentTrivia:
 				case SyntaxKind.SingleLineDocumentationCommentTrivia:
 				case SyntaxKind.MultiLineDocumentationCommentTrivia:
+					// Roslyn puts everything up to and including the end of a line into the *trailing*
+					// trivia of the token before it, so anything reaching leading trivia genuinely
+					// starts a fresh line and must be emitted at one. Without this the comment glues
+					// onto whatever the enclosing printer emitted last, and the next run then reads it
+					// back as trailing trivia — so the output never settles.
 					FlushBlankLine(arena, ref pendingNewLines, emittedAnything);
+					arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
 					EmitTriviaText(trivia, context, DocFlags.None);
 					arena.HardLine();
 					emittedAnything = true;
@@ -78,7 +84,8 @@ internal static class TokenPrinter
 				case SyntaxKind.DisabledTextTrivia:
 					// Code inside a false #if branch is never reformatted; it is not even parsed.
 					FlushBlankLine(arena, ref pendingNewLines, emittedAnything);
-					arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
+					arena.Trim();
+					arena.LiteralLine(DocFlags.OnlyIfNotAtLineStart);
 					EmitVerbatimBlock(trivia, context);
 					emittedAnything = true;
 					pendingNewLines = 0;
@@ -92,7 +99,8 @@ internal static class TokenPrinter
 					// we are already at a line start. It is emitted but never counted against the
 					// width of the code around it.
 					FlushBlankLine(arena, ref pendingNewLines, emittedAnything);
-					arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
+					arena.Trim();
+					arena.LiteralLine(DocFlags.OnlyIfNotAtLineStart);
 					EmitTriviaText(trivia, context, DocFlags.IsDirective);
 					arena.HardLine();
 					emittedAnything = true;
@@ -121,8 +129,17 @@ internal static class TokenPrinter
 					// follows has to start on a new one.
 					context.Arena.Synthetic(SyntheticText.Space);
 					EmitTriviaText(trivia, context, DocFlags.None);
+
 					if (trivia.IsKind(SyntaxKind.SingleLineCommentTrivia))
+					{
+						// A // comment runs to end of line, so whatever follows must start a new one.
 						context.Arena.HardLine();
+					}
+					else
+					{
+						// A /* */ comment can have code after it on the same line; keep them apart.
+						context.Arena.Synthetic(SyntheticText.Space);
+					}
 					break;
 
 				default:

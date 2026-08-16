@@ -186,6 +186,9 @@ internal sealed class DocPrinter
 	{
 		var type = doc.LineType;
 
+		if (doc.Flags.HasFlag(DocFlags.OnlyIfNotAtLineStart) && _output.AtLineStart())
+			return;
+
 		// A literal line is content, not layout: it breaks even inside a ForceFlat, and carries no
 		// indent because whatever it sits inside (a raw string) owns its own leading whitespace.
 		if (type == LineType.Literal)
@@ -205,9 +208,6 @@ internal sealed class DocPrinter
 			}
 			return;
 		}
-
-		if (doc.Flags.HasFlag(DocFlags.OnlyIfNotAtLineStart) && _output.AtLineStart())
-			return;
 
 		if (options.TrimTrailingWhitespace && !doc.Flags.HasFlag(DocFlags.NoTrim))
 			_output.TrimTrailingWhitespace();

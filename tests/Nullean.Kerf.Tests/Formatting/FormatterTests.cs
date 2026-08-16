@@ -258,6 +258,84 @@ public class FormatterTests
 	}
 
 	[Test]
+	public async Task A_leading_comment_starts_its_own_line()
+	{
+		// Roslyn puts same-line trivia into the previous token's TRAILING trivia, so anything in
+		// leading trivia began a fresh line. Gluing it onto the previous output made the next run
+		// read it back as trailing trivia instead, and the output oscillated between the two.
+		const string source = """
+			public class C
+			{
+			    public void M()
+			    {
+			        Call(
+			            a
+			        );
+			        // a comment about the next call
+			        Other();
+			    }
+			}
+			""";
+
+		var formatted = Format(source);
+
+		formatted.Should().NotContain(");// a comment");
+		formatted.Should().Contain("\n        // a comment about the next call");
+		Format(formatted).Should().Be(formatted);
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task Disabled_preprocessor_branches_keep_their_own_indentation()
+	{
+		// Text inside a false #if is never parsed and carries its own indentation. Emitting the
+		// enclosing indent in front of it stacks one on top of the other, and every subsequent run
+		// indents the already-indented text again.
+		const string source = """
+			public class C
+			{
+			    public void M()
+			    {
+			        First();
+			#if DEBUG
+			        Debug.WriteLine("x");
+			#endif
+			        Last();
+			    }
+			}
+			""";
+
+		var once = Format(source);
+		var twice = Format(once);
+
+		twice.Should().Be(once, "indentation inside a disabled branch must not drift");
+		once.Should().Contain("\n#if DEBUG\n");
+		once.Should().Contain("\n#endif\n");
+		ShouldStillParse(once);
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task A_trailing_block_comment_keeps_code_after_it_separated()
+	{
+		const string source = """
+			public class C
+			{
+			    public void M()
+			    {
+			        Call(/*lang=json*/ "{}");
+			    }
+			}
+			""";
+
+		var formatted = Format(source);
+
+		formatted.Should().NotContain("*/\"");
+		ShouldStillParse(formatted);
+		await Task.CompletedTask;
+	}
+
+	[Test]
 	public async Task Formatting_is_idempotent()
 	{
 		const string source = """
