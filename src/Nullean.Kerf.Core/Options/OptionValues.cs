@@ -37,6 +37,13 @@ public static class OptionValues
 
 		"csharp_trailing_comma_in_multiline_lists" => Bool(options.TrailingCommaInMultilineLists),
 		"csharp_trailing_comma_in_singleline_lists" => Bool(options.TrailingCommaInSinglelineLists),
+		"csharp_style_expression_bodied_methods" => Expression(options.ExpressionBodiedMethods),
+		"csharp_style_expression_bodied_constructors" => Expression(options.ExpressionBodiedConstructors),
+		"csharp_style_expression_bodied_operators" => Expression(options.ExpressionBodiedOperators),
+		"csharp_style_expression_bodied_local_functions" => Expression(options.ExpressionBodiedLocalFunctions),
+		"csharp_style_expression_bodied_accessors" => Expression(options.ExpressionBodiedAccessors),
+		"csharp_style_expression_bodied_properties" => Expression(options.ExpressionBodiedProperties),
+		"csharp_style_expression_bodied_indexers" => Expression(options.ExpressionBodiedIndexers),
 		"csharp_style_namespace_declarations" => options.NamespaceStyle == NamespaceStyle.FileScoped
 			? "file_scoped"
 			: "block   # namespaces are left as written; Kerf never adds the braces back",
@@ -123,4 +130,12 @@ public static class OptionValues
 	};
 
 	private static string Bool(bool value) => value ? "true" : "false";
+
+	private static string Expression(ExpressionBodyStyle value) => value switch
+	{
+		ExpressionBodyStyle.Always => "true",
+		ExpressionBodyStyle.WhenOnSingleLine => "when_on_single_line",
+		ExpressionBodyStyle.AsWritten => "false   # bodies are left as written; Kerf never adds braces back",
+		_ => "false",
+	};
 }

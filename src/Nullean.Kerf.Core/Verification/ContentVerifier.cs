@@ -45,6 +45,15 @@ internal static class ContentVerifier
 	/// A block namespace was rewritten as a file-scoped one, so its <c>{</c> reads as <c>;</c> in the
 	/// output and its <c>}</c> is not there at all. Permitted once, and the two halves have to agree.
 	/// </param>
+	/// <param name="dropped">
+	/// Source spans a rewrite deliberately did not emit, in source order. Expression bodies drop a
+	/// block's braces and its <c>return</c>; naming the spans keeps the rest of the file under the
+	/// strict compare instead of excusing the whole of it.
+	/// </param>
+	/// <param name="arrowsAdded">
+	/// How many <c>=&gt;</c> the output carries that the source does not. Exact rather than a flag,
+	/// so an extra arrow is still damage.
+	/// </param>
 	/// <param name="bracesAdded">
 	/// A control-flow body was given braces, so the output carries <c>{</c> and <c>}</c> the source
 	/// does not. They are counted rather than merely allowed: an opening brace with no closing one, or
@@ -57,7 +66,9 @@ internal static class ContentVerifier
 		IReadOnlyList<TextSpan>? reordered = null,
 		bool trailingCommas = false,
 		bool bracesAdded = false,
-		bool namespaceUnwrapped = false)
+		bool namespaceUnwrapped = false,
+		IReadOnlyList<TextSpan>? dropped = null,
+		int arrowsAdded = 0)
 	{
 		var sourceIndex = 0;
 		var outputIndex = 0;
@@ -69,12 +80,28 @@ internal static class ContentVerifier
 		// The block namespace's closing brace, owed once its opening brace became a semicolon.
 		var namespaceBraceOwed = false;
 
+		var nextDropped = 0;
+		var arrowsOwed = arrowsAdded;
+
 		while (true)
 		{
 			while (sourceIndex < source.Length && IsSkippable(source[sourceIndex]))
 				sourceIndex++;
 			while (outputIndex < output.Length && IsSkippable(output[outputIndex]))
 				outputIndex++;
+
+			// Source a rewrite dropped on purpose. Stepping over it is only safe because what replaced
+			// it is counted: an expression body drops a block and adds one arrow, so the arrows and
+			// the dropped blocks have to balance by the end of the file.
+			if (dropped is not null && nextDropped < dropped.Count && sourceIndex >= dropped[nextDropped].Start)
+			{
+				sourceIndex = Math.Max(sourceIndex, dropped[nextDropped].End);
+				nextDropped++;
+
+				// Round again rather than falling through: the cursor now sits on the whitespace that
+				// followed the dropped token, and the compare below reads a character directly.
+				continue;
+			}
 
 			// A permuted region: take the same number of content characters from each side and compare
 			// them as multisets, then carry on in order from where both left off. Regions arrive in
@@ -146,8 +173,24 @@ internal static class ContentVerifier
 				}
 			}
 
+			if (!outputDone && arrowsOwed > 0
+				&& output[outputIndex] == '=' && outputIndex + 1 < output.Length && output[outputIndex + 1] == '>'
+				&& (sourceDone || source[sourceIndex] != '='))
+			{
+				// The arrow that replaced a dropped block. One per opening brace dropped, no more.
+				arrowsOwed--;
+				outputIndex += 2;
+				continue;
+			}
+
 			if (sourceDone && outputDone)
 			{
+				if (arrowsOwed != 0)
+				{
+					failure = "an expression body dropped a block without putting an arrow in its place";
+					return false;
+				}
+
 				if (braceDebt != 0)
 				{
 					failure = $"formatting left {braceDebt} added brace(s) unbalanced";

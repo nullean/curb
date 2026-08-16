@@ -333,7 +333,8 @@ internal static partial class Printers
 
 		if (node.Body is not null)
 		{
-			PrintBody(node.Body, BraceStyle.Methods, context);
+			if (!TryPrintExpressionBody(node.Body, context.Options.ExpressionBodiedMethods, context))
+				PrintBody(node.Body, BraceStyle.Methods, context);
 			return;
 		}
 
@@ -769,6 +770,210 @@ internal static partial class Printers
 		context.Options.PreserveSingleLineBlocks
 		&& openBrace.RawKind != 0
 		&& context.OnSameLine(openBrace.SpanStart, closeBrace.Span.End);
+
+	/// <summary>
+	/// Emits a block body as an expression body, when the configuration asked and the block allows.
+	/// </summary>
+	/// <remarks>
+	/// <para>
+	/// Eligible means exactly one statement — a <c>return</c> with a value, a <c>throw</c>, or a bare
+	/// expression — and nothing anywhere in the block that a comment or a directive is attached to. A
+	/// comment inside the braces has nowhere to go once the braces are gone, and dropping it is not a
+	/// trade worth making for a shorter member.
+	/// </para>
+	/// <para>
+	/// The declared delta: the two braces and any <c>return</c> keyword are recorded as dropped, and
+	/// one <c>=&gt;</c> is declared as added. The statement's own semicolon carries over, so nothing
+	/// is invented but the arrow.
+	/// </para>
+	/// </remarks>
+	internal static bool TryPrintExpressionBody(BlockSyntax body, ExpressionBodyStyle style, PrintContext context)
+	{
+		if (style == ExpressionBodyStyle.AsWritten || body.Statements.Count != 1)
+			return false;
+
+		// Asked of the source, which reflow cannot move. Asking whether the result fits would let one
+		// run's width decide the next run's tokens.
+		if (style == ExpressionBodyStyle.WhenOnSingleLine && !context.OnSameLine(body.SpanStart, body.Span.End))
+			return false;
+
+		var statement = body.Statements[0];
+		var throws = statement is ThrowStatementSyntax { Expression: not null };
+
+		ExpressionSyntax? value = statement switch
+		{
+			ReturnStatementSyntax { Expression: { } returned } => returned,
+			ExpressionStatementSyntax expression => expression.Expression,
+			_ => null,
+		};
+
+		if (value is null && !throws)
+			return false;
+
+		if (HasAnyTrivia(body.OpenBraceToken) || HasAnyTrivia(body.CloseBraceToken) || HasAnyTrivia(statement, context))
+			return false;
+
+		var arena = context.Arena;
+
+		arena.Synthetic(SyntheticText.Space);
+		arena.Synthetic(SyntheticText.Arrow);
+
+		using (arena.Group())
+		using (arena.Indent())
+		{
+			arena.Line();
+
+			if (throws)
+				Node.Print(statement, context);
+			else
+			{
+				Node.Print(value, context);
+				TokenPrinter.Print(SemicolonOf(statement), context);
+			}
+		}
+
+		// In source order: the verifier walks these with a single cursor.
+		context.Dropped(body.OpenBraceToken.Span);
+		if (statement is ReturnStatementSyntax returnStatement)
+			context.Dropped(returnStatement.ReturnKeyword.Span);
+		context.Dropped(body.CloseBraceToken.Span);
+
+		context.ArrowsAdded++;
+		context.ExpressionBodyAdded = true;
+		return true;
+	}
+
+	/// <summary>
+	/// Emits a whole accessor list as an expression body, for a property or indexer that is only a
+	/// getter.
+	/// </summary>
+	/// <remarks>
+	/// Wider than <see cref="TryPrintExpressionBody"/>: the accessor list's own braces and the
+	/// <c>get</c> keyword go as well, so it applies only where there is nothing else in the list to
+	/// keep — one accessor, a getter, no attributes and no modifiers on it.
+	/// </remarks>
+	internal static bool TryPrintExpressionProperty(
+		AccessorListSyntax? accessors,
+		ExpressionBodyStyle style,
+		PrintContext context)
+	{
+		if (style == ExpressionBodyStyle.AsWritten || accessors is null || accessors.Accessors.Count != 1)
+			return false;
+
+		var accessor = accessors.Accessors[0];
+		if (!accessor.Keyword.IsKind(SyntaxKind.GetKeyword)
+			|| accessor.AttributeLists.Count > 0
+			|| accessor.Modifiers.Count > 0)
+			return false;
+
+		if (style == ExpressionBodyStyle.WhenOnSingleLine
+			&& !context.OnSameLine(accessors.SpanStart, accessors.Span.End))
+			return false;
+
+		// Either shape of getter: one already using an arrow, or a block simple enough to become one.
+		ExpressionSyntax? value = null;
+		SyntaxToken semicolon = default;
+		ReturnStatementSyntax? returned = null;
+
+		if (accessor.ExpressionBody is { } arrow)
+		{
+			value = arrow.Expression;
+			semicolon = accessor.SemicolonToken;
+		}
+		else if (accessor.Body is { Statements: [ReturnStatementSyntax { Expression: { } inner } single] })
+		{
+			value = inner;
+			semicolon = single.SemicolonToken;
+			returned = single;
+		}
+
+		if (value is null || semicolon.RawKind == 0)
+			return false;
+
+		if (HasAnyTrivia(accessors.OpenBraceToken)
+			|| HasAnyTrivia(accessors.CloseBraceToken)
+			|| HasAnyTrivia(accessor, context))
+			return false;
+
+		var arena = context.Arena;
+
+		arena.Synthetic(SyntheticText.Space);
+		arena.Synthetic(SyntheticText.Arrow);
+
+		using (arena.Group())
+		using (arena.Indent())
+		{
+			arena.Line();
+			Node.Print(value, context);
+			TokenPrinter.Print(semicolon, context);
+		}
+
+		// A getter that already used an arrow carries its own across, so only the block form adds one.
+		if (returned is not null)
+			context.ArrowsAdded++;
+
+		// In source order, which is what the verifier walks.
+		context.Dropped(accessors.OpenBraceToken.Span);
+		context.Dropped(accessor.Keyword.Span);
+
+		if (returned is not null)
+		{
+			context.Dropped(accessor.Body!.OpenBraceToken.Span);
+			context.Dropped(returned.ReturnKeyword.Span);
+			context.Dropped(accessor.Body!.CloseBraceToken.Span);
+		}
+
+		context.Dropped(accessors.CloseBraceToken.Span);
+
+		context.ExpressionBodyAdded = true;
+		return true;
+	}
+
+	private static SyntaxToken SemicolonOf(StatementSyntax statement) => statement switch
+	{
+		ReturnStatementSyntax r => r.SemicolonToken,
+		ExpressionStatementSyntax e => e.SemicolonToken,
+		ThrowStatementSyntax t => t.SemicolonToken,
+		_ => default,
+	};
+
+	/// <summary>True when a token carries a comment or directive on either side.</summary>
+	private static bool HasAnyTrivia(SyntaxToken token) =>
+		TokenPrinter.HasLeadingContent(token) || TokenPrinter.HasAnyContent(token);
+
+	/// <summary>
+	/// True when anything under a node carries a comment or directive.
+	/// </summary>
+	/// <remarks>
+	/// Guarded by a character scan of the node's own text, because walking the descendants allocates
+	/// an enumerator and this is asked of every body a <c>csharp_style_expression_bodied_*</c> key
+	/// could reach. A comment needs a <c>/</c> and a directive a <c>#</c>; a body containing neither
+	/// cannot have either.
+	/// </remarks>
+	private static bool HasAnyTrivia(SyntaxNode node, PrintContext context)
+	{
+		if (!MightCarryTrivia(context.Text, node.FullSpan))
+			return false;
+
+		foreach (var token in node.DescendantTokens())
+		{
+			if (HasAnyTrivia(token))
+				return true;
+		}
+
+		return false;
+	}
+
+	private static bool MightCarryTrivia(SourceText text, TextSpan span)
+	{
+		for (var i = span.Start; i < span.End; i++)
+		{
+			if (text[i] is '/' or '#')
+				return true;
+		}
+
+		return false;
+	}
 
 	internal static void PrintBody(SyntaxNode body, BraceStyle construct, PrintContext context)
 	{

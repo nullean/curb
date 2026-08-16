@@ -60,6 +60,32 @@ internal sealed class PrintContext(DocArena arena, SourceText text, FormatOption
 	/// </remarks>
 	public ushort ParameterListGroup { get; set; }
 
+	/// <summary>Source spans a rewrite legitimately dropped, or null when nothing was dropped.</summary>
+	/// <remarks>
+	/// Expression bodies are the only thing that drops source today: a block's braces and its
+	/// <c>return</c> go, and <c>=&gt;</c> arrives. Declaring the spans lets the content check skip
+	/// exactly those characters and stay strict over everything else, rather than the whole file
+	/// being excused because one member was rewritten.
+	/// </remarks>
+	public List<TextSpan>? DroppedSpans { get; private set; }
+
+	/// <summary>Records source that a rewrite deliberately did not emit.</summary>
+	public void Dropped(TextSpan span) => (DroppedSpans ??= []).Add(span);
+
+	/// <summary>
+	/// How many <c>=&gt;</c> the printer put in that the source did not have.
+	/// </summary>
+	/// <remarks>
+	/// Declared rather than inferred from what was dropped, because the two do not correspond: a
+	/// property collapsed from a block getter drops two opening braces — the accessor list's and the
+	/// getter's — and adds one arrow, while a getter that already used an arrow drops braces and adds
+	/// none, since the source's own arrow carries over.
+	/// </remarks>
+	public int ArrowsAdded { get; set; }
+
+	/// <summary>True when a block body was replaced by an expression body.</summary>
+	public bool ExpressionBodyAdded { get; set; }
+
 	/// <summary>True when a block namespace was rewritten as a file-scoped one.</summary>
 	public bool NamespaceUnwrapped { get; set; }
 

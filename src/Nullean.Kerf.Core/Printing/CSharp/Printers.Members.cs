@@ -98,7 +98,8 @@ internal static partial class Printers
 
 		if (node.Body is not null)
 		{
-			PrintBody(node.Body, BraceStyle.Methods, context);
+			if (!TryPrintExpressionBody(node.Body, context.Options.ExpressionBodiedOperators, context))
+				PrintBody(node.Body, BraceStyle.Methods, context);
 			return;
 		}
 
@@ -127,7 +128,8 @@ internal static partial class Printers
 
 		if (node.Body is not null)
 		{
-			PrintBody(node.Body, BraceStyle.Methods, context);
+			if (!TryPrintExpressionBody(node.Body, context.Options.ExpressionBodiedOperators, context))
+				PrintBody(node.Body, BraceStyle.Methods, context);
 			return;
 		}
 

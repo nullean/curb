@@ -2,6 +2,19 @@ using Nullean.Kerf.Options;
 
 namespace Nullean.Kerf;
 
+/// <summary>What a <c>csharp_style_expression_bodied_*</c> key asks for.</summary>
+public enum ExpressionBodyStyle
+{
+	/// <summary>Leave bodies as written. The default, and where <c>false</c> lands.</summary>
+	AsWritten,
+
+	/// <summary>Give every eligible block body an expression body.</summary>
+	Always,
+
+	/// <summary>Only where the block was written on one line already.</summary>
+	WhenOnSingleLine,
+}
+
 /// <summary>What <c>csharp_style_namespace_declarations</c> asks for.</summary>
 public enum NamespaceStyle
 {
@@ -415,6 +428,59 @@ public readonly record struct FormatOptions
 	/// </para>
 	/// </remarks>
 	public NamespaceStyle NamespaceStyle { get; init; }
+
+	/// <summary>
+	/// <c>csharp_style_expression_bodied_methods</c>, code style rule IDE0022.
+	/// </summary>
+	/// <remarks>
+	/// <para>
+	/// One direction only, like <see cref="PreferBraces"/>: a block body that qualifies gains an
+	/// expression body, and <c>false</c> does nothing rather than turning expression bodies back into
+	/// blocks. Adding one cannot change what a name means; the reverse rewrite is a larger change for
+	/// no gain.
+	/// </para>
+	/// <para>
+	/// <c>when_on_single_line</c> asks whether the author already had the block on one line, which is
+	/// a fact about the source that reflow cannot move. Asking whether the *result* fits would make
+	/// one run's width decide the next run's tokens, which is what stopped initializer joining from
+	/// ever settling.
+	/// </para>
+	/// </remarks>
+	public ExpressionBodyStyle ExpressionBodiedMethods { get; init; }
+
+	/// <summary><c>csharp_style_expression_bodied_constructors</c>, IDE0021.</summary>
+	public ExpressionBodyStyle ExpressionBodiedConstructors { get; init; }
+
+	/// <summary><c>csharp_style_expression_bodied_operators</c>, IDE0023 and IDE0024.</summary>
+	public ExpressionBodyStyle ExpressionBodiedOperators { get; init; }
+
+	/// <summary><c>csharp_style_expression_bodied_local_functions</c>, IDE0061.</summary>
+	public ExpressionBodyStyle ExpressionBodiedLocalFunctions { get; init; }
+
+	/// <summary><c>csharp_style_expression_bodied_accessors</c>, IDE0027.</summary>
+	public ExpressionBodyStyle ExpressionBodiedAccessors { get; init; }
+
+	/// <summary><c>csharp_style_expression_bodied_properties</c>, IDE0025.</summary>
+	/// <remarks>
+	/// A wider rewrite than the accessor one: the whole accessor list goes, not just the accessor's
+	/// braces, so it applies only to a property with a single getter and nothing else to keep.
+	/// </remarks>
+	public ExpressionBodyStyle ExpressionBodiedProperties { get; init; }
+
+	/// <summary><c>csharp_style_expression_bodied_indexers</c>, IDE0026.</summary>
+	public ExpressionBodyStyle ExpressionBodiedIndexers { get; init; }
+
+	/// <summary>True when any expression-body key asked for a rewrite.</summary>
+	/// <remarks>Gates the printer work and the verifier's allowance, so a repository that has not
+	/// opted in pays for neither.</remarks>
+	public bool RewritesExpressionBodies =>
+		ExpressionBodiedMethods != ExpressionBodyStyle.AsWritten
+		|| ExpressionBodiedConstructors != ExpressionBodyStyle.AsWritten
+		|| ExpressionBodiedOperators != ExpressionBodyStyle.AsWritten
+		|| ExpressionBodiedLocalFunctions != ExpressionBodyStyle.AsWritten
+		|| ExpressionBodiedAccessors != ExpressionBodyStyle.AsWritten
+		|| ExpressionBodiedProperties != ExpressionBodyStyle.AsWritten
+		|| ExpressionBodiedIndexers != ExpressionBodyStyle.AsWritten;
 
 	/// <summary>True when either trailing-comma option asked for anything.</summary>
 	/// <remarks>

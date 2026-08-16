@@ -17,6 +17,7 @@ internal static class SyntheticText
 	public const int OpenBrace = 3;
 	public const int CloseBrace = 4;
 	public const int Semicolon = 5;
+	public const int Arrow = 6;
 
 	public static readonly string[] Table =
 	[
@@ -26,6 +27,7 @@ internal static class SyntheticText
 		"{",
 		"}",
 		";",
+		"=>",
 	];
 
 	public static string Get(int id) => Table[id];

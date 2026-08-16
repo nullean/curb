@@ -147,6 +147,9 @@ internal static partial class Printers
 
 		TokenPrinter.Print(node.Identifier, context);
 
+		if (TryPrintExpressionProperty(node.AccessorList, context.Options.ExpressionBodiedProperties, context))
+			return;
+
 		Node.Print(node.AccessorList, context);
 
 		if (node.ExpressionBody is not null)
@@ -264,7 +267,8 @@ internal static partial class Printers
 
 		if (node.Body is not null)
 		{
-			PrintBody(node.Body, BraceStyle.Accessors, context);
+			if (!TryPrintExpressionBody(node.Body, context.Options.ExpressionBodiedAccessors, context))
+				PrintBody(node.Body, BraceStyle.Accessors, context);
 			return;
 		}
 
@@ -303,7 +307,8 @@ internal static partial class Printers
 
 		if (node.Body is not null)
 		{
-			PrintBody(node.Body, BraceStyle.Methods, context);
+			if (!TryPrintExpressionBody(node.Body, context.Options.ExpressionBodiedConstructors, context))
+				PrintBody(node.Body, BraceStyle.Methods, context);
 			return;
 		}
 

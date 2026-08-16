@@ -141,8 +141,15 @@ jobs:
       # compilation dominates, so `dotnet run` reports several times the real cost and reads as a
       # regression that is not there. The gate is on allocations because they are deterministic;
       # wall time is reported for the trend but never asserted on a hosted runner.
+      #
+      # 31x rather than 30x since expression bodies landed, and the extra is verification rather
+      # than printing. The corpus asks for the expression-body rules, so Kerf now rewrites 25 files
+      # it used to leave alone and re-parses each one to prove the rewrite: 43 files take the second
+      # parse where 18 did. Measured, on the same corpus and binary — 30.4x with verification on and
+      # 28.9x with it off, against a 29.9x baseline whose own verified figure is higher than that.
+      # The printing got no more expensive; there is simply more of it being checked.
       - name: Speed and allocations
-        run: ./build.sh perf -s true --corpus /tmp/corpus --maxallocationratio 30
+        run: ./build.sh perf -s true --corpus /tmp/corpus --maxallocationratio 31
 
       # Two-sided on purpose. The sample builds clean with Kerf in the way even though IDE0055 is an
       # error and its source is misformatted, and fails with those errors when Kerf is bypassed. The

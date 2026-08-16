@@ -94,6 +94,15 @@ public static class OptionCatalog
 			"csharp_trailing_comma_in_multiline_lists",
 			"csharp_trailing_comma_in_singleline_lists",
 
+			// IDE0021-0027 and IDE0061, which dotnet format can only apply with a compilation.
+			"csharp_style_expression_bodied_methods",
+			"csharp_style_expression_bodied_constructors",
+			"csharp_style_expression_bodied_operators",
+			"csharp_style_expression_bodied_local_functions",
+			"csharp_style_expression_bodied_accessors",
+			"csharp_style_expression_bodied_properties",
+			"csharp_style_expression_bodied_indexers",
+
 			// IDE0036 and IDE0011, which dotnet format can only apply with a full compilation.
 			"csharp_preferred_modifier_order",
 			"csharp_prefer_braces",

@@ -601,7 +601,8 @@ internal static partial class Printers
 
 		if (node.Body is not null)
 		{
-			PrintBody(node.Body, BraceStyle.LocalFunctions, context);
+			if (!TryPrintExpressionBody(node.Body, context.Options.ExpressionBodiedLocalFunctions, context))
+				PrintBody(node.Body, BraceStyle.LocalFunctions, context);
 			return;
 		}
 

@@ -46,7 +46,9 @@ internal static class TokenStreamComparer
 		bool trailingCommas = false,
 		bool modifiersReordered = false,
 		bool bracesAdded = false,
-		bool namespaceUnwrapped = false)
+		bool namespaceUnwrapped = false,
+		IReadOnlyList<TextSpan>? dropped = null,
+		int arrowsAdded = 0)
 	{
 		if (!CSharpSource.TryParse(formatted, out var reparsed, out var errors))
 		{
@@ -86,6 +88,11 @@ internal static class TokenStreamComparer
 		// The block namespace's closing brace, owed once its opening brace became a semicolon.
 		var namespaceBraceOwed = false;
 
+		// Dropped spans arrive in source order and are consulted only at a mismatch, so one cursor
+		// through them is enough and a file that drops nothing never looks at them.
+		var nextDropped = 0;
+		var arrowsOwed = arrowsAdded;
+
 		while (true)
 		{
 			// The using block has been checked as a set; walking it in order would only re-discover
@@ -117,6 +124,12 @@ internal static class TokenStreamComparer
 					return false;
 				}
 
+				if (arrowsOwed != 0)
+				{
+					failure = "an expression body dropped a block without putting an arrow in its place";
+					return false;
+				}
+
 				failure = null;
 				return true;
 			}
@@ -140,6 +153,36 @@ internal static class TokenStreamComparer
 			{
 				failure = $"formatting lost the token at position {index}: '{Text(originalText, before)}'";
 				return false;
+			}
+
+			// A token an expression body dropped: the block's braces and its `return`. Tested before
+			// the two are compared, not at a mismatch — a dropped `}` sits directly in front of the
+			// enclosing block's own and compares equal to it, so waiting for a mismatch means the
+			// skip never fires and the file runs one brace short at the end.
+			//
+			// Skipped only where the printer said it dropped them, and balanced against the arrows
+			// that replaced them, so a token lost anywhere else is still a lost token.
+			if (dropped is not null && hasOriginal)
+			{
+				while (nextDropped < dropped.Count && dropped[nextDropped].End <= before.SpanStart)
+					nextDropped++;
+
+				if (nextDropped < dropped.Count && dropped[nextDropped].Contains(before.SpanStart))
+				{
+					nextDropped++;
+					carryProduced = hasProduced;
+					continue;
+				}
+			}
+
+			// The arrow that replaced a dropped block.
+			if (arrowsOwed > 0 && hasProduced
+				&& after.RawKind == (int)SyntaxKind.EqualsGreaterThanToken
+				&& (!hasOriginal || Mismatch(originalText, before, formattedText, after)))
+			{
+				arrowsOwed--;
+				carryOriginal = true;
+				continue;
 			}
 
 			// The namespace conversion: `{` became `;`, and the matching `}` is then owed. Permitted

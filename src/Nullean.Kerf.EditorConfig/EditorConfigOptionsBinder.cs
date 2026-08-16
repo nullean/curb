@@ -234,6 +234,17 @@ public static class EditorConfigOptionsBinder
 
 		// IDE0036. Presence is the ask: the key has a documented default value, so binding it whether
 		// or not it was written would reorder a repository that never mentioned it.
+		options = options with
+		{
+			ExpressionBodiedMethods = ExpressionBody(properties, "methods", diagnostics),
+			ExpressionBodiedConstructors = ExpressionBody(properties, "constructors", diagnostics),
+			ExpressionBodiedOperators = ExpressionBody(properties, "operators", diagnostics),
+			ExpressionBodiedLocalFunctions = ExpressionBody(properties, "local_functions", diagnostics),
+			ExpressionBodiedAccessors = ExpressionBody(properties, "accessors", diagnostics),
+			ExpressionBodiedProperties = ExpressionBody(properties, "properties", diagnostics),
+			ExpressionBodiedIndexers = ExpressionBody(properties, "indexers", diagnostics),
+		};
+
 		if (properties.TryGetValue("csharp_style_namespace_declarations", out var namespaceStyle))
 		{
 			var colon = namespaceStyle.LastIndexOf(':');
@@ -416,6 +427,36 @@ public static class EditorConfigOptionsBinder
 
 		diagnostics?.Add(KerfDiagnostic.UnrecognisedValue(key, raw, "an integer between 1 and 64"));
 		return false;
+	}
+
+	/// <summary>Reads one <c>csharp_style_expression_bodied_*</c> key.</summary>
+	/// <remarks>
+	/// <c>false</c> binds to <see cref="ExpressionBodyStyle.AsWritten"/> rather than to a mode of its
+	/// own: Roslyn reads it as "turn expression bodies back into blocks", and Kerf only ever adds.
+	/// </remarks>
+	private static ExpressionBodyStyle ExpressionBody(
+		IReadOnlyDictionary<string, string> properties,
+		string member,
+		ICollection<KerfDiagnostic>? diagnostics)
+	{
+		var key = "csharp_style_expression_bodied_" + member;
+		if (!properties.TryGetValue(key, out var raw))
+			return ExpressionBodyStyle.AsWritten;
+
+		var colon = raw.LastIndexOf(':');
+		switch ((colon >= 0 ? raw[..colon] : raw).Trim().ToLowerInvariant())
+		{
+			case "true":
+				return ExpressionBodyStyle.Always;
+			case "when_on_single_line":
+				return ExpressionBodyStyle.WhenOnSingleLine;
+			case "false":
+				return ExpressionBodyStyle.AsWritten;
+			default:
+				diagnostics?.Add(KerfDiagnostic.UnrecognisedValue(
+					key, raw, "true, false or when_on_single_line"));
+				return ExpressionBodyStyle.AsWritten;
+		}
 	}
 
 	/// <summary>
