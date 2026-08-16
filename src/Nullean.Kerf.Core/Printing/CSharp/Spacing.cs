@@ -77,6 +77,50 @@ internal static class Spacing
 			context.Arena.Synthetic(SyntheticText.Space);
 	}
 
+	/// <summary>Before a comma in one of the lists these options govern.</summary>
+	/// <remarks>
+	/// <para>
+	/// Not every comma in C# is one of them. dotnet format leaves the commas of a type
+	/// <em>parameter</em> list, a constraint clause, an attribute list, a base list, a declarator
+	/// list, an enum body, switch expression arms, a <c>for</c> header, an <c>orderby</c> and a
+	/// pattern's subpatterns exactly as they are, while governing the commas of argument and
+	/// parameter lists, type <em>argument</em> lists, initializers, tuples, array ranks, list
+	/// patterns and deconstruction designations.
+	/// </para>
+	/// <para>
+	/// The split looks arbitrary and is not one Kerf chose; matching it is what conformance means.
+	/// Only call these from a position on the governed side.
+	/// </para>
+	/// </remarks>
+	public static void BeforeComma(PrintContext context)
+	{
+		if (context.Options.SpaceBeforeComma)
+			context.Arena.Synthetic(SyntheticText.Space);
+	}
+
+	/// <summary>After a comma, where the list cannot break.</summary>
+	public static void AfterComma(PrintContext context)
+	{
+		if (context.Options.SpaceAfterComma)
+			context.Arena.Synthetic(SyntheticText.Space);
+	}
+
+	/// <summary>
+	/// After a comma, where the list breaks one item per line if it does not fit.
+	/// </summary>
+	/// <remarks>
+	/// A normal line is a space when flat, which is the wrong answer under
+	/// <c>space_after_comma = false</c>; a soft line is nothing when flat. Both still break, so
+	/// turning the space off does not cost the list its ability to wrap.
+	/// </remarks>
+	public static void AfterCommaBreakable(PrintContext context)
+	{
+		if (context.Options.SpaceAfterComma)
+			context.Arena.Line();
+		else
+			context.Arena.SoftLine();
+	}
+
 	/// <summary>
 	/// Before a binary or assignment operator.
 	/// </summary>

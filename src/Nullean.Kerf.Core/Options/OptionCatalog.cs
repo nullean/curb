@@ -97,6 +97,8 @@ public static class OptionCatalog
 			"csharp_space_before_colon_in_inheritance_clause",
 			"csharp_space_after_colon_in_inheritance_clause",
 			"csharp_space_around_binary_operators",
+			"csharp_space_after_comma",
+			"csharp_space_before_comma",
 			"csharp_space_before_dot",
 			"csharp_space_after_dot",
 			"csharp_space_before_semicolon_in_for_statement",

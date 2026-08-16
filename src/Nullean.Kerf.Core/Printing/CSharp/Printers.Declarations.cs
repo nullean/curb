@@ -303,8 +303,9 @@ internal static partial class Printers
 			Node.Print(node.ArgumentList.Arguments[i], context);
 			if (i >= node.ArgumentList.Arguments.SeparatorCount)
 				continue;
+			Spacing.BeforeComma(context);
 			TokenPrinter.Print(node.ArgumentList.Arguments.GetSeparator(i), context);
-			context.Arena.Synthetic(SyntheticText.Space);
+			Spacing.AfterComma(context);
 		}
 		TokenPrinter.Print(node.ArgumentList.CloseParenToken, context);
 	}

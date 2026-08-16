@@ -140,7 +140,6 @@ internal static partial class Printers
 
 	public static void BracketedParameterList(BracketedParameterListSyntax node, PrintContext context)
 	{
-		var arena = context.Arena;
 		TokenPrinter.Print(node.OpenBracketToken, context);
 
 		for (var i = 0; i < node.Parameters.Count; i++)
@@ -148,8 +147,9 @@ internal static partial class Printers
 			Node.Print(node.Parameters[i], context);
 			if (i >= node.Parameters.SeparatorCount)
 				continue;
+			Spacing.BeforeComma(context);
 			TokenPrinter.Print(node.Parameters.GetSeparator(i), context);
-			arena.Synthetic(SyntheticText.Space);
+			Spacing.AfterComma(context);
 		}
 
 		TokenPrinter.Print(node.CloseBracketToken, context);

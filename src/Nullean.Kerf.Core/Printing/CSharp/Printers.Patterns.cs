@@ -131,8 +131,9 @@ internal static partial class Printers
 			Node.Print(node.Patterns[i], context);
 			if (i >= node.Patterns.SeparatorCount)
 				continue;
+			Spacing.BeforeComma(context);
 			TokenPrinter.Print(node.Patterns.GetSeparator(i), context);
-			arena.Synthetic(SyntheticText.Space);
+			Spacing.AfterComma(context);
 		}
 
 		TokenPrinter.Print(node.CloseBracketToken, context);
@@ -160,7 +161,6 @@ internal static partial class Printers
 
 	public static void ParenthesizedVariableDesignation(ParenthesizedVariableDesignationSyntax node, PrintContext context)
 	{
-		var arena = context.Arena;
 		TokenPrinter.Print(node.OpenParenToken, context);
 
 		for (var i = 0; i < node.Variables.Count; i++)
@@ -168,8 +168,9 @@ internal static partial class Printers
 			Node.Print(node.Variables[i], context);
 			if (i >= node.Variables.SeparatorCount)
 				continue;
+			Spacing.BeforeComma(context);
 			TokenPrinter.Print(node.Variables.GetSeparator(i), context);
-			arena.Synthetic(SyntheticText.Space);
+			Spacing.AfterComma(context);
 		}
 
 		TokenPrinter.Print(node.CloseParenToken, context);
@@ -178,7 +179,6 @@ internal static partial class Printers
 	/// <summary>A tuple expression, and the same shape for a tuple type.</summary>
 	public static void TupleExpression(TupleExpressionSyntax node, PrintContext context)
 	{
-		var arena = context.Arena;
 		TokenPrinter.Print(node.OpenParenToken, context);
 
 		for (var i = 0; i < node.Arguments.Count; i++)
@@ -186,8 +186,9 @@ internal static partial class Printers
 			Node.Print(node.Arguments[i], context);
 			if (i >= node.Arguments.SeparatorCount)
 				continue;
+			Spacing.BeforeComma(context);
 			TokenPrinter.Print(node.Arguments.GetSeparator(i), context);
-			arena.Synthetic(SyntheticText.Space);
+			Spacing.AfterComma(context);
 		}
 
 		TokenPrinter.Print(node.CloseParenToken, context);
@@ -195,7 +196,6 @@ internal static partial class Printers
 
 	public static void TupleType(TupleTypeSyntax node, PrintContext context)
 	{
-		var arena = context.Arena;
 		TokenPrinter.Print(node.OpenParenToken, context);
 
 		for (var i = 0; i < node.Elements.Count; i++)
@@ -203,8 +203,9 @@ internal static partial class Printers
 			Node.Print(node.Elements[i], context);
 			if (i >= node.Elements.SeparatorCount)
 				continue;
+			Spacing.BeforeComma(context);
 			TokenPrinter.Print(node.Elements.GetSeparator(i), context);
-			arena.Synthetic(SyntheticText.Space);
+			Spacing.AfterComma(context);
 		}
 
 		TokenPrinter.Print(node.CloseParenToken, context);

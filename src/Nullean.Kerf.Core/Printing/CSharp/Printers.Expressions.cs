@@ -196,11 +196,12 @@ internal static partial class Printers
 						if (i >= node.Expressions.SeparatorCount)
 							continue;
 
+						Spacing.BeforeComma(context);
 						TokenPrinter.Print(node.Expressions.GetSeparator(i), context);
 
 						// A trailing separator is followed by the closing line, not by another one.
 						if (i < node.Expressions.Count - 1)
-							arena.Line();
+							Spacing.AfterCommaBreakable(context);
 					}
 				}
 				arena.Line();
@@ -232,11 +233,12 @@ internal static partial class Printers
 						if (i >= node.Elements.SeparatorCount)
 							continue;
 
+						Spacing.BeforeComma(context);
 						TokenPrinter.Print(node.Elements.GetSeparator(i), context);
 
 						// A trailing comma runs straight into the closing bracket, not `, ]`.
 						if (i < node.Elements.Count - 1)
-							arena.Line();
+							Spacing.AfterCommaBreakable(context);
 					}
 				}
 				arena.SoftLine();
@@ -335,9 +337,10 @@ internal static partial class Printers
 					if (i >= node.Initializers.SeparatorCount)
 						continue;
 
+					Spacing.BeforeComma(context);
 					TokenPrinter.Print(node.Initializers.GetSeparator(i), context);
 					if (i < node.Initializers.Count - 1)
-						arena.Line();
+						Spacing.AfterCommaBreakable(context);
 				}
 			}
 			arena.Line();
@@ -373,8 +376,9 @@ internal static partial class Printers
 			Node.Print(node.Arguments[i], context);
 			if (i >= node.Arguments.SeparatorCount)
 				continue;
+			Spacing.BeforeComma(context);
 			TokenPrinter.Print(node.Arguments.GetSeparator(i), context);
-			context.Arena.Synthetic(SyntheticText.Space);
+			Spacing.AfterComma(context);
 		}
 
 		TokenPrinter.Print(node.CloseBracketToken, context);
@@ -452,8 +456,9 @@ internal static partial class Printers
 			Node.Print(node.Arguments[i], context);
 			if (i >= node.Arguments.SeparatorCount)
 				continue;
+			Spacing.BeforeComma(context);
 			TokenPrinter.Print(node.Arguments.GetSeparator(i), context);
-			context.Arena.Synthetic(SyntheticText.Space);
+			Spacing.AfterComma(context);
 		}
 
 		TokenPrinter.Print(node.GreaterThanToken, context);
@@ -481,8 +486,9 @@ internal static partial class Printers
 			Node.Print(node.Sizes[i], context);
 			if (i >= node.Sizes.SeparatorCount)
 				continue;
+			Spacing.BeforeComma(context);
 			TokenPrinter.Print(node.Sizes.GetSeparator(i), context);
-			context.Arena.Synthetic(SyntheticText.Space);
+			Spacing.AfterComma(context);
 		}
 
 		TokenPrinter.Print(node.CloseBracketToken, context);

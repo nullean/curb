@@ -221,6 +221,16 @@ internal static partial class Printers
 		var arena = context.Arena;
 		TokenPrinter.Print(node.ArrowToken, context);
 
+		// Same rule as an initializer: a body that brings its own braces positions its own contents,
+		// so `=> x switch { … }` keeps the header on one line rather than breaking after the arrow
+		// and indenting the whole construct a level too deep.
+		if (BringsOwnBlock(node.Expression))
+		{
+			arena.Synthetic(SyntheticText.Space);
+			Node.Print(node.Expression, context);
+			return;
+		}
+
 		using (arena.Group())
 		using (arena.Indent())
 		{
@@ -558,9 +568,9 @@ internal static partial class Printers
 			if (i >= list.SeparatorCount)
 				continue;
 
-			// csharp_space_before_comma / _after_comma will govern these two.
+			Spacing.BeforeComma(context);
 			TokenPrinter.Print(list.GetSeparator(i), context);
-			context.Arena.Line();
+			Spacing.AfterCommaBreakable(context);
 		}
 	}
 

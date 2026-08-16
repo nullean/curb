@@ -102,6 +102,12 @@ public static class EditorConfigOptionsBinder
 		if (TryBool(properties, "csharp_space_after_colon_in_inheritance_clause", diagnostics, out var spaceAfterColon))
 			options = options with { SpaceAfterColonInInheritanceClause = spaceAfterColon };
 
+		if (TryBool(properties, "csharp_space_after_comma", diagnostics, out var spaceAfterComma))
+			options = options with { SpaceAfterComma = spaceAfterComma };
+
+		if (TryBool(properties, "csharp_space_before_comma", diagnostics, out var spaceBeforeComma))
+			options = options with { SpaceBeforeComma = spaceBeforeComma };
+
 		if (TryBool(properties, "csharp_space_before_dot", diagnostics, out var spaceBeforeDot))
 			options = options with { SpaceBeforeDot = spaceBeforeDot };
 

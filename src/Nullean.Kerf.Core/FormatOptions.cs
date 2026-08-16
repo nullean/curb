@@ -100,6 +100,12 @@ public readonly record struct FormatOptions
 	/// </summary>
 	public bool SpaceAroundBinaryOperators { get; init; } = true;
 
+	/// <summary><c>csharp_space_after_comma</c>, default true.</summary>
+	public bool SpaceAfterComma { get; init; } = true;
+
+	/// <summary><c>csharp_space_before_comma</c>, default false.</summary>
+	public bool SpaceBeforeComma { get; init; }
+
 	/// <summary><c>csharp_space_before_dot</c>, default false.</summary>
 	public bool SpaceBeforeDot { get; init; }
 
