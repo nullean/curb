@@ -207,7 +207,7 @@ internal static partial class Printers
 			Spacing.BeforeComma(context);
 			TokenPrinter.Print(node.Arguments.GetSeparator(i), context);
 
-			if (asWritten && !context.OnSameLine(node.Arguments[i].Span.End, node.Arguments[i + 1].SpanStart))
+			if (asWritten && context.AuthorBroke(node.Arguments[i].Span.End, node.Arguments[i + 1].SpanStart))
 				context.Arena.HardLine();
 			else
 				Spacing.AfterComma(context);
@@ -245,10 +245,16 @@ internal static partial class Printers
 
 	public static void WithExpression(WithExpressionSyntax node, PrintContext context)
 	{
+		// `X.CreateContext(a, b) with { … }` is the same shape as a creation with a trailing initializer,
+		// and dotnet format treats it the same way: once the call has opened out, the `{` takes its own
+		// line. So the initializer aims at the call's argument list, not at the source.
+		context.ArgumentListGroup = 0;
 		Node.Print(node.Expression, context);
+		var ownerGroup = context.ArgumentListGroup;
+
 		context.Arena.Synthetic(SyntheticText.Space);
 		TokenPrinter.Print(node.WithKeyword, context);
-		InitializerExpression(node.Initializer, context, leadingLine: true);
+		InitializerExpression(node.Initializer, context, leadingLine: true, ownerGroup: ownerGroup);
 	}
 
 	public static void ThrowExpression(ThrowExpressionSyntax node, PrintContext context)

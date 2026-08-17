@@ -131,12 +131,40 @@ public class PreserveSingleLineTests : FormattingTest
 		""",
 		editorConfig: "csharp_new_line_before_open_brace = all");
 
+	/// <summary>
+	/// A preserved body beats the width — but only in preservation mode, which a width no longer selects.
+	/// </summary>
+	/// <remarks>
+	/// <c>max_line_length</c> now chooses deterministic layout as well as the column, so this test has to
+	/// ask for preservation explicitly. That is not a workaround: the two settings together are precisely
+	/// the configuration this option is about, and the pairing is what a reader needs to see.
+	/// </remarks>
 	[Test]
 	public Task Preserving_beats_the_line_width() => Unchanged(
 		"""
 		public class C
 		{
 		    public void M() { CallSomethingWithAVeryLongNameIndeed(); }
+		}
+		""",
+		editorConfig: "max_line_length = 40\ncsharp_keep_existing_linebreaks = true");
+
+	/// <summary>Without that opt-out, the width wins and the body opens out.</summary>
+	[Test]
+	public Task Deterministic_layout_expands_it_instead() => Formats(
+		"""
+		public class C
+		{
+		    public void M() { CallSomethingWithAVeryLongNameIndeed(); }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        CallSomethingWithAVeryLongNameIndeed();
+		    }
 		}
 		""",
 		editorConfig: "max_line_length = 40");

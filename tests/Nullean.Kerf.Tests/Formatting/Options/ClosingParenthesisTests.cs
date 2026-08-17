@@ -19,6 +19,11 @@ public class ClosingParenthesisTests : FormattingTest
 {
 	private const string Narrow = "max_line_length = 60";
 
+	// A width now selects deterministic layout as well as the column, so a test whose subject is the
+	// author's own arrangement has to ask for preservation rather than assume it. That is the opt-out this
+	// file documents, and spelling it out is what stops these tests quietly changing subject.
+	private const string NarrowPreserving = Narrow + "\ncsharp_keep_existing_linebreaks = true";
+
 	// ---- the default ------------------------------------------------------------------------------
 
 	[Test]
@@ -39,8 +44,7 @@ public class ClosingParenthesisTests : FormattingTest
 		        int betaParameter,
 		        int gammaParameter
 		    )
-		    {
-		    }
+		    { }
 		}
 		""",
 		editorConfig: Narrow);
@@ -57,7 +61,7 @@ public class ClosingParenthesisTests : FormattingTest
 		    }
 		}
 		""",
-		editorConfig: Narrow);
+		editorConfig: NarrowPreserving);
 
 	// ---- taking the decision -------------------------------------------------------------------------
 
@@ -95,7 +99,7 @@ public class ClosingParenthesisTests : FormattingTest
 		}
 		""",
 		"csharp_wrap_before_declaration_rpar = true",
-		editorConfig: Narrow);
+		editorConfig: NarrowPreserving);
 
 	[Test]
 	public Task False_keeps_it_beside_the_last_parameter_even_when_reflow_breaks() => Formats(
@@ -114,8 +118,7 @@ public class ClosingParenthesisTests : FormattingTest
 		        int alphaParameter,
 		        int betaParameter,
 		        int gammaParameter)
-		    {
-		    }
+		    { }
 		}
 		""",
 		editorConfig: Narrow + "\ncsharp_wrap_before_declaration_rpar = false");
@@ -406,9 +409,10 @@ public class ClosingParenthesisTests : FormattingTest
 	// ---- binary chains ---------------------------------------------------------------------------------
 
 	[Test]
-	public Task A_long_condition_overflows_the_line_by_default() => Unchanged(
-		// Kerf has no break opportunity inside a binary chain, so a condition too long for the line
-		// simply overflows it: the parentheses move, the operands do not.
+	public Task A_long_condition_overflows_the_line_in_preservation_mode() => Unchanged(
+		// Kerf offers no break opportunity inside a binary chain it is reproducing, so a condition too long
+		// for the line simply overflows it: the parentheses move, the operands do not. That is what
+		// csharp_wrap_chained_binary_expressions exists to fix, below.
 		"""
 		public class C
 		{
@@ -419,6 +423,41 @@ public class ClosingParenthesisTests : FormattingTest
 		        )
 		        {
 		        }
+		    }
+		}
+		""",
+		editorConfig: NarrowPreserving);
+
+	/// <summary>Deterministic layout breaks it instead, without needing the chain key at all.</summary>
+	/// <remarks>
+	/// The operands are reached through <c>OperandOnRight</c>, which offers a break wherever it is not
+	/// reproducing an author's arrangement — so in this mode the condition never overflows. The stepped
+	/// indent is the chain's own nesting showing through, which is why the chain key still earns its place:
+	/// it flattens the whole chain to one level.
+	/// </remarks>
+	[Test]
+	public Task A_long_condition_breaks_under_deterministic_layout() => Formats(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        if (firstCondition && secondCondition && thirdCondition && fourth)
+		        {
+		        }
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        if (
+		            firstCondition && secondCondition &&
+		                thirdCondition && fourth
+		        )
+		        { }
 		    }
 		}
 		""",
@@ -670,4 +709,87 @@ public class ClosingParenthesisTests : FormattingTest
 		}
 		""",
 		editorConfig: "csharp_wrap_parameters_style = chop_always");
+
+	// ---- chop always, the two keys that need deterministic layout --------------------------------------
+
+	/// <summary>
+	/// <c>csharp_wrap_arguments_style</c> and <c>csharp_wrap_object_and_collection_initializer_style</c>,
+	/// which are honoured only under deterministic layout — that is, only once a width is set.
+	/// </summary>
+	/// <remarks>
+	/// The asymmetry with the parameter key above is measured, not chosen. Forcing every argument list to
+	/// break moves what is nested inside it, and preservation mode has rules that read that nesting's
+	/// indentation from the source — 140 corpus files stopped settling. Deterministic layout has no such
+	/// rule, and the corpus comes back idempotent and 100% conformant with both keys on.
+	/// </remarks>
+	// A width is all it takes: max_line_length selects deterministic layout as well as the column.
+	private const string Deterministic = "max_line_length = 120\n";
+
+	[Test]
+	public Task Arguments_can_be_chopped_under_deterministic_layout() => Formats(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        Call(a, b);
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        Call(
+		            a,
+		            b
+		        );
+		    }
+		}
+		""",
+		Deterministic + "csharp_wrap_arguments_style = chop_always");
+
+	[Test]
+	public Task Chopping_arguments_is_ignored_without_it() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        Call(a, b);
+		    }
+		}
+		""",
+		editorConfig: "csharp_wrap_arguments_style = chop_always");
+
+	[Test]
+	public Task Initializers_can_be_chopped_under_deterministic_layout() => Formats(
+		"""
+		public class C
+		{
+		    private C _c = new C { A = 1, B = 2 };
+		}
+		""",
+		"""
+		public class C
+		{
+		    private C _c = new C
+		    {
+		        A = 1,
+		        B = 2
+		    };
+		}
+		""",
+		Deterministic + "csharp_wrap_object_and_collection_initializer_style = chop_always");
+
+	[Test]
+	public Task Chopping_initializers_is_ignored_without_it() => Unchanged(
+		"""
+		public class C
+		{
+		    private C _c = new C { A = 1, B = 2 };
+		}
+		""",
+		editorConfig: "csharp_wrap_object_and_collection_initializer_style = chop_always");
 }

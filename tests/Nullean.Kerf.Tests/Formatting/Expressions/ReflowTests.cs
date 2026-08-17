@@ -66,8 +66,7 @@ public class ReflowTests : FormattingTest
 		        int beta,
 		        int gamma
 		    )
-		    {
-		    }
+		    { }
 		}
 		""",
 		editorConfig: "max_line_length = 30");

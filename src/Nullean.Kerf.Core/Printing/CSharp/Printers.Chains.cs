@@ -109,7 +109,7 @@ internal static partial class Printers
 				// is how this lost `.Values` from a chain the first time round.
 				if (!asWritten)
 					arena.SoftLine();
-				else if (!context.OnSameLine(PreviousEnd(links, receiver, i), link.Name.SpanStart))
+				else if (context.AuthorBroke(PreviousEnd(links, receiver, i), link.Name.SpanStart))
 					arena.HardLine();
 
 				PrintLink(link, context, dotAlreadyPrinted: dotTrails);
@@ -166,7 +166,7 @@ internal static partial class Printers
 	{
 		for (var i = from; i < links.Count; i++)
 		{
-			if (!context.OnSameLine(PreviousEnd(links, receiver, i), links[i].Name.SpanStart))
+			if (context.AuthorBroke(PreviousEnd(links, receiver, i), links[i].Name.SpanStart))
 				return true;
 		}
 

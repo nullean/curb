@@ -54,6 +54,45 @@ public static class EditorConfigOptionsBinder
 				diagnostics?.Add(KerfDiagnostic.UnrecognisedValue("max_line_length", maxLineLength, "a positive integer or 'off'"));
 		}
 
+		if (properties.TryGetValue("charset", out var charset))
+		{
+			switch (charset.Trim().ToLowerInvariant())
+			{
+				case "utf-8":
+					options = options with { Charset = Charset.Utf8 };
+					break;
+				case "utf-8-bom":
+					options = options with { Charset = Charset.Utf8Bom };
+					break;
+				default:
+					// latin1, utf-16le and utf-16be are documented by EditorConfig and not supported
+					// here: Kerf reads and writes UTF-8, and re-encoding a file is not a formatting
+					// change. Said out loud rather than silently ignored.
+					diagnostics?.Add(KerfDiagnostic.UnrecognisedValue("charset", charset, "utf-8 or utf-8-bom"));
+					break;
+			}
+		}
+
+		// After max_line_length and before anything that asks which mode it is in, and that order is
+		// load-bearing rather than tidy: FormatOptions.KeepExistingLinebreaks resolves from the width when
+		// the key is absent, and the diagnostic helpers at the bottom of this method read that resolved
+		// value while binding is still in progress. Bind this before the width and every one of them sees
+		// the default `off` and mis-fires; bind it after the keys that ask and they see the wrong mode.
+		if (TryBool(properties, "csharp_keep_existing_linebreaks", diagnostics, out var keepLinebreaks))
+		{
+			options = options with { KeepExistingLinebreaksOption = keepLinebreaks };
+
+			// Deterministic layout needs a width. The printer treats `off` as infinite, so every group
+			// that fits would be flattened — the largest diff Kerf can produce rather than the smallest.
+			// Refused rather than given an implied width: a repository that never named a width must not
+			// be reflowed by a key that reads as being about something else.
+			if (!keepLinebreaks && options.MaxLineLength == FormatOptions.Off)
+			{
+				diagnostics?.Add(KerfDiagnostic.DeterministicLayoutNeedsAWidth());
+				options = options with { KeepExistingLinebreaksOption = null };
+			}
+		}
+
 		if (properties.TryGetValue("end_of_line", out var endOfLine))
 		{
 			switch (endOfLine.ToLowerInvariant())
@@ -234,15 +273,16 @@ public static class EditorConfigOptionsBinder
 
 		// IDE0036. Presence is the ask: the key has a documented default value, so binding it whether
 		// or not it was written would reorder a repository that never mentioned it.
+		var deterministic = !options.KeepExistingLinebreaks;
 		options = options with
 		{
-			ExpressionBodiedMethods = ExpressionBody(properties, "methods", diagnostics),
-			ExpressionBodiedConstructors = ExpressionBody(properties, "constructors", diagnostics),
-			ExpressionBodiedOperators = ExpressionBody(properties, "operators", diagnostics),
-			ExpressionBodiedLocalFunctions = ExpressionBody(properties, "local_functions", diagnostics),
-			ExpressionBodiedAccessors = ExpressionBody(properties, "accessors", diagnostics),
-			ExpressionBodiedProperties = ExpressionBody(properties, "properties", diagnostics),
-			ExpressionBodiedIndexers = ExpressionBody(properties, "indexers", diagnostics),
+			ExpressionBodiedMethods = ExpressionBody(properties, "methods", diagnostics, deterministic),
+			ExpressionBodiedConstructors = ExpressionBody(properties, "constructors", diagnostics, deterministic),
+			ExpressionBodiedOperators = ExpressionBody(properties, "operators", diagnostics, deterministic),
+			ExpressionBodiedLocalFunctions = ExpressionBody(properties, "local_functions", diagnostics, deterministic),
+			ExpressionBodiedAccessors = ExpressionBody(properties, "accessors", diagnostics, deterministic),
+			ExpressionBodiedProperties = ExpressionBody(properties, "properties", diagnostics, deterministic),
+			ExpressionBodiedIndexers = ExpressionBody(properties, "indexers", diagnostics, deterministic),
 		};
 
 		if (properties.TryGetValue("file_header_template", out var header)
@@ -304,16 +344,33 @@ public static class EditorConfigOptionsBinder
 		if (TryPrefixedBool(properties, "place_simple_accessorholder_on_single_line", diagnostics, out var placeAccessors))
 			options = options with { PlaceSimpleAccessorholderOnSingleLine = placeAccessors };
 
-		// Only the parameter list's. wrap_arguments_style, the two initializer styles and
-		// wrap_chained_method_calls are left to the same silence as the several hundred other
-		// ReSharper keys Kerf does not implement: forcing every one of those to break moves
-		// constructs whose indentation other rules read from the source, and the file then formats
-		// differently on its second pass — 140 corpus files for arguments and 156 for chains, against
-		// none for parameters. Binding them to warn instead would fire on real repositories that set
-		// them perfectly reasonably for Rider.
+		// The parameter list's is admissible in either mode. The argument and initializer styles are not:
+		// forcing every one of those to break moves constructs whose indentation other rules read from
+		// the source, and the file then formats differently on its second pass — 140 corpus files for
+		// arguments against none for parameters. Deterministic layout has no rule that reads indentation
+		// from the source, which is exactly why they become available there.
+		//
+		// wrap_chained_method_calls stays out. It cost 156 files in preservation mode and has not been
+		// measured under deterministic layout; the same silence as the several hundred other ReSharper
+		// keys Kerf does not implement is the honest answer until it has.
 		options = options with
 		{
 			WrapParametersStyle = WrapStyleOf(properties, "wrap_parameters_style", diagnostics),
+			WrapArgumentsStyle = DeterministicOnlyWrapStyle("wrap_arguments_style"),
+			WrapObjectAndCollectionInitializerStyle =
+				DeterministicOnlyWrapStyle("wrap_object_and_collection_initializer_style"),
+		};
+
+		// Four of ReSharper's six. place_type_attribute_on_same_line and the accessorholder one are not
+		// here because dotnet format *moves* those onto their own line, so no value but the default could
+		// survive a Format Document — that is a fact about the reference implementation rather than about
+		// which mode Kerf is in, so they are left to the same silence as any other ReSharper key.
+		options = options with
+		{
+			PlaceMethodAttributeOnSameLine = DeterministicOnlyPlacement("place_method_attribute_on_same_line"),
+			PlaceFieldAttributeOnSameLine = DeterministicOnlyPlacement("place_field_attribute_on_same_line"),
+			PlacePropertyAttributeOnSameLine = DeterministicOnlyPlacement("place_property_attribute_on_same_line"),
+			PlaceEventAttributeOnSameLine = DeterministicOnlyPlacement("place_event_attribute_on_same_line"),
 		};
 
 		if (TryPrefixedLines(properties, "keep_blank_lines_in_declarations", diagnostics, out var keepDeclarations))
@@ -413,6 +470,7 @@ public static class EditorConfigOptionsBinder
 					break;
 				case "when_multiline":
 					options = options with { PreferBraces = BraceRequirement.WhenMultiline };
+					ReportIfDeterministic("csharp_prefer_braces", "every unbraced body is braced, as 'true' would");
 					break;
 				case "false":
 					// Roslyn reads this as "take the braces off". Kerf only ever adds them.
@@ -452,11 +510,26 @@ public static class EditorConfigOptionsBinder
 			&& string.Equals(formattingSeverity, "none", StringComparison.OrdinalIgnoreCase))
 			options = options with { Excluded = true };
 
+		// The two effects below are narrower than "no effect", and getting them wrong once already shipped:
+		// width does *not* decide these, because there is no conditional-flatten for a block body — Kerf
+		// expands every one. And csharp_preserve_single_line_blocks is only partly inert, because the
+		// accessor-list printer reads it as a plain option rather than through the source.
 		if (TryBool(properties, "csharp_preserve_single_line_statements", diagnostics, out var preserveStatements))
+		{
 			options = options with { PreserveSingleLineStatements = preserveStatements };
+			ReportIfDeterministic(
+				"csharp_preserve_single_line_statements",
+				"every body, label and statement takes its own line");
+		}
 
 		if (TryBool(properties, "csharp_preserve_single_line_blocks", diagnostics, out var preserveBlocks))
+		{
 			options = options with { PreserveSingleLineBlocks = preserveBlocks };
+			ReportIfDeterministic(
+				"csharp_preserve_single_line_blocks",
+				"block, type, namespace, enum and switch bodies each take their own lines. Accessor lists "
+				+ "still answer to it, alongside csharp_place_simple_accessorholder_on_single_line");
+		}
 
 		if (TryBool(properties, "csharp_indent_case_contents", diagnostics, out var indentCaseContents))
 			options = options with { IndentCaseContents = indentCaseContents };
@@ -517,6 +590,38 @@ public static class EditorConfigOptionsBinder
 			ReportUnhandledKeys(properties, diagnostics);
 
 		return options;
+
+		// Reads the mode off the enclosing local, which is why csharp_keep_existing_linebreaks is bound
+		// before anything else in this method.
+		void ReportIfDeterministic(string key, string effect)
+		{
+			if (!options.KeepExistingLinebreaks)
+				diagnostics?.Add(KerfDiagnostic.InertUnderDeterministicLayout(key, effect));
+		}
+
+		// The mirror of the above, for the keys that only exist in the other mode.
+		WrapStyle? DeterministicOnlyWrapStyle(string suffix)
+		{
+			var style = WrapStyleOf(properties, suffix, diagnostics);
+			if (style is null || !options.KeepExistingLinebreaks)
+				return style;
+
+			diagnostics?.Add(KerfDiagnostic.RequiresDeterministicLayout("csharp_" + suffix));
+			return null;
+		}
+
+		AttributePlacement DeterministicOnlyPlacement(string suffix)
+		{
+			var placement = PlacementOf(properties, suffix, diagnostics);
+			if (placement is null or AttributePlacement.OwnLine)
+				return AttributePlacement.OwnLine;
+
+			if (!options.KeepExistingLinebreaks)
+				return placement.Value;
+
+			diagnostics?.Add(KerfDiagnostic.RequiresDeterministicLayout("csharp_" + suffix));
+			return AttributePlacement.OwnLine;
+		}
 	}
 
 	/// <summary>Reports keys Kerf knows about but has not implemented, and keys it does not recognise at all.</summary>
@@ -582,7 +687,8 @@ public static class EditorConfigOptionsBinder
 	private static ExpressionBodyStyle ExpressionBody(
 		IReadOnlyDictionary<string, string> properties,
 		string member,
-		ICollection<KerfDiagnostic>? diagnostics)
+		ICollection<KerfDiagnostic>? diagnostics,
+		bool deterministic = false)
 	{
 		var key = "csharp_style_expression_bodied_" + member;
 		if (!properties.TryGetValue(key, out var raw))
@@ -594,6 +700,9 @@ public static class EditorConfigOptionsBinder
 			case "true":
 				return ExpressionBodyStyle.Always;
 			case "when_on_single_line":
+				if (deterministic)
+					diagnostics?.Add(KerfDiagnostic.InertUnderDeterministicLayout(
+						key, "no body is rewritten, as 'false' would"));
 				return ExpressionBodyStyle.WhenOnSingleLine;
 			case "false":
 				return ExpressionBodyStyle.AsWritten;
@@ -612,6 +721,45 @@ public static class EditorConfigOptionsBinder
 	/// treated as one of the others.
 	/// </para>
 	/// </remarks>
+	/// <summary>Reads one <c>place_*_attribute_on_same_line</c> key, under all four ReSharper spellings.</summary>
+	/// <remarks>
+	/// ReSharper writes the conditional value as <c>if_owner_is_single_line</c> and the other two as plain
+	/// booleans, so all three spellings are accepted here rather than normalised in the caller.
+	/// </remarks>
+	private static AttributePlacement? PlacementOf(
+		IReadOnlyDictionary<string, string> properties,
+		string key,
+		ICollection<KerfDiagnostic>? diagnostics)
+	{
+		foreach (var prefix in ReSharperPrefixes)
+		{
+			if (!properties.TryGetValue(prefix + key, out var raw))
+				continue;
+
+			switch (raw.Trim().ToLowerInvariant())
+			{
+				case "true":
+					// Measured, not assumed: joining every attribute is idempotent in Kerf and still came
+					// back changed on 347 of 1,196 corpus files, because dotnet format moves an attribute
+					// off a member that spans lines. Its rule is if_owner_is_single_line, so that is the
+					// value to point at.
+					diagnostics?.Add(KerfDiagnostic.OverruledByDotnetFormat(
+						prefix + key, "true", "Use 'if_owner_is_single_line', which is the rule dotnet format itself applies."));
+					return AttributePlacement.OwnLine;
+				case "false":
+					return AttributePlacement.OwnLine;
+				case "if_owner_is_single_line":
+					return AttributePlacement.IfOwnerIsSingleLine;
+				default:
+					diagnostics?.Add(KerfDiagnostic.UnrecognisedValue(
+						prefix + key, raw, "true, false or if_owner_is_single_line"));
+					return null;
+			}
+		}
+
+		return null;
+	}
+
 	private static WrapStyle? WrapStyleOf(
 		IReadOnlyDictionary<string, string> properties,
 		string key,

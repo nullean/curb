@@ -32,6 +32,41 @@ So ~97% of a formatter's cost is its own work, not parsing. Optimise the printer
 
 ## Current state
 
-M0 (spike and scaffolding) is done: the repo builds, tests pass, and the engine links and runs under
-native AOT on `osx-arm64` at ~11 MB with ~10 ms startup. There is **no formatter yet** — `CSharpSource`
-parses, and that is all. M1 builds the document arena, the printer and the first ~12 syntax printers.
+M0–M5 are done; see the milestone table in [README.md](README.md) for the caveats. The formatter works
+end to end: arena, printer, verifier, CLI, MSBuild integration, and ~90 `.editorconfig` keys — all 39
+IDE0055 formatting options, the 8 core keys, and 43 further syntax-style, wrapping and blank-line
+options. Native AOT on five RIDs, ~11 MB with ~10 ms startup.
+
+CI gates conformance on every push: byte-identical to `dotnet format whitespace` with reflow off (100%),
+99.9% with reflow on, zero failed or unparsable files across a 1,196-file corpus.
+
+Still open: redundant parentheses (IDE0047/0048), the `wrap_if_long` fill layout, the option-catalog
+generator that will produce `docs/options.md`, and replacing the hand-rolled CLI parser with
+`Nullean.Argh`.
+
+## Public documentation
+
+`docs/` is a [docs-builder](https://github.com/elastic/docs-builder) site published to GitHub Pages by
+`.github/workflows/docs.yml`.
+
+```sh
+./build.sh docs                  # build, apply the landing override, serve, open a browser
+./build.sh docs --port 9000
+./build.sh docs --noserve        # build only
+```
+
+`build/scripts/Documentation.fs` downloads docs-builder into `.artifacts/tools` on first use (it is a
+native binary, not a dotnet tool, so `dotnet tool restore` cannot fetch it), then runs the same two
+steps the workflow runs, in the same order. Use it rather than `docs-builder serve`, which renders
+pages on demand and so never applies the landing page override.
+
+Two things about the site are easy to get wrong:
+
+- **`docs/kerf-landing.html` is not generated.** It is a standalone page CI copies over the generated
+  `index.html`, so the build's `prefix` never reaches it. Its links are relative and resolve against a
+  `<base href="/formatter/">` that must stay in step with the workflow's `prefix: formatter` and with
+  `Documentation.PathPrefix`. `./build.sh docs` fails if the three drift apart — nothing else would
+  catch it, because docs-builder never reads the landing page.
+- **Prose uses `{{product}}`**, substituted from `_docset.yml`, so the codename can be changed in one
+  place. Headings use the literal name on purpose — slugs are generated before substitution, so
+  `## What {{product}} does` would anchor as `#what-product-does`.

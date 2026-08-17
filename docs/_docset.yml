@@ -1,0 +1,31 @@
+project: 'Kerf'
+max_toc_depth: 2
+dev_docs: true
+
+branding:
+  icon: assets/kerf-logo.svg
+
+# Kerf is a codename. Prose refers to the product as {{product}}, so a rename is an edit here plus a
+# sweep of the code samples, the CLI examples and the landing page — substitutions reach none of those.
+subs:
+  product: "Kerf"
+
+toc:
+  - file: index.md
+  - file: why.md
+  - folder: concepts
+    children:
+      - file: index.md
+      - file: reflow.md
+      - file: safety.md
+  - folder: workflow
+    children:
+      - file: ai-native.md
+      - file: msbuild.md
+  - folder: getting-started
+    children:
+      - file: index.md
+  - folder: contribute
+    children:
+      - file: layout-decisions.md
+      - file: formatter-comparison.md

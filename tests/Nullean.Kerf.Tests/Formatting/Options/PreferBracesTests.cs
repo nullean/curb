@@ -311,9 +311,13 @@ public class PreferBracesTests : FormattingTest
 		editorConfig: "csharp_prefer_braces = when_multiline");
 
 	[Test]
-	public Task When_multiline_braces_a_body_on_its_own_line() => Formats(
-		// Keyed on where the author put the body, not on where reflow ends up putting it: asking the
-		// printed layout would let one run's width decide the next run's tokens.
+	public Task When_multiline_leaves_a_one_line_body_alone() => Unchanged(
+		// The body is what has to span lines, not the statement. This test used to assert the
+		// opposite and so encoded the bug: Kerf asked whether the body sat on the header's line, which
+		// is true of almost every unbraced statement ever written, and braced the lot.
+		//
+		// Measured against `dotnet format style` with the option at warning severity — the way the
+		// roslyn repository sets it, and where this was thousands of files of churn.
 		"""
 		public class C
 		{
@@ -324,15 +328,34 @@ public class PreferBracesTests : FormattingTest
 		    }
 		}
 		""",
+		editorConfig: "csharp_prefer_braces = when_multiline");
+
+	[Test]
+	public Task When_multiline_braces_a_body_that_spans_lines() => Formats(
+		// Keyed on where the author put the body, not on where reflow ends up putting it: asking the
+		// printed layout would let one run's width decide the next run's tokens.
 		"""
 		public class C
 		{
-		    public void M(int x)
+		    public bool M(int x)
+		    {
+		        if (x > 0)
+		            return
+		                false;
+		        return true;
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public bool M(int x)
 		    {
 		        if (x > 0)
 		        {
-		            Call();
+		            return false;
 		        }
+		        return true;
 		    }
 		}
 		""",

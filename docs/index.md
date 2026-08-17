@@ -1,0 +1,62 @@
+---
+navigation_title: Home
+description: A syntax and semantic style enforcer for C#, fast enough to always run as part of dotnet build. Your choices, not ours.
+---
+
+# Kerf
+
+A syntax and semantic style enforcer for C#, fast enough to always run as part of `dotnet build`.
+
+{{product}} reads the `.editorconfig` you already have — all of it, including the complete set of .NET
+formatting options behind code style rule
+[IDE0055](https://learn.microsoft.com/dotnet/fundamentals/code-analysis/style-rules/ide0055) — and
+reflows C# to a line width the way Prettier does. Its defaults are Roslyn's defaults, so it agrees with
+Visual Studio and Rider out of the box instead of fighting them.
+
+**Your choices, not ours.**
+
+```sh
+dotnet tool install -g Nullean.Kerf
+kerf format ./src
+```
+
+Or, more usefully, let the build do it:
+
+```xml
+<PackageReference Include="Nullean.Kerf.MSBuild" Version="*" PrivateAssets="all" />
+```
+
+## Three things worth knowing
+
+**Fast is the feature, not the boast.** Speed here is what makes running unconditionally possible. The
+syntax pass never loads a compilation, starts in about 10 ms as a native binary, and is skipped
+entirely by MSBuild when nothing changed — so nobody has to decide when to run it.
+→ [Why {{product}}](why.md)
+
+**Your `.editorconfig` is the configuration.** Around 90 keys, and no new ones invented: where Rider
+already had an opinion, {{product}} reads Rider's key rather than adding a rival. On a repository that
+is already IDE0055-clean the diff is small, and confined to whitespace within lines until you ask for
+reflow.
+→ [The two passes](concepts/index.md)
+
+**It coexists with what you already run.** {{product}}'s output is a fixed point of `dotnet format`,
+measured and gated in CI. Hit Format Document in your IDE and nothing moves;
+`EnforceCodeStyleInBuild` stays green. → [Why {{product}}](why.md)
+
+## Built for a codebase agents also edit
+
+Because the syntax pass needs no build, it can run *inside* one — before `CoreCompile`, so the compiler
+reads source that is already correct. Mechanical offences never become diagnostics, which means a
+coding agent never spends context on brace placement and never has to be told your house style.
+→ [Style enforcement that costs no context](workflow/ai-native.md)
+
+## Start here
+
+- [Getting started](getting-started/index.md) — install, format, configure.
+- [Why {{product}}](why.md) — the problem, and the measurements behind the claims.
+- [The two passes](concepts/index.md) — the vocabulary, and the scope boundary.
+- [Safety](concepts/safety.md) — why automatic rewriting cannot damage your code.
+- [The build integration](workflow/msbuild.md) — every property, and why it runs before the compiler.
+
+A full per-option reference is coming; until then `kerf print-config <file>` prints every resolved
+option for a file, with its value and where it came from.

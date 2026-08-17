@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-labelledby="kerf-logo-title">
+  <title id="kerf-logo-title">Kerf</title>
+
+  <!--
+    A kerf is the slot a blade removes. The mark is exactly that: one block of stock with a slot cut
+    down through it, stopping short of the far edge.
+
+    The slot is punched with a mask rather than painted in a background colour, so it stays genuinely
+    transparent and the mark sits on a light or a dark page without a second variant. The art fills
+    the viewBox, so no consumer needs a crop hack to use it as an avatar.
+  -->
+
+  <defs>
+    <mask id="kerf-slot">
+      <rect x="0" y="0" width="64" height="64" fill="#000"/>
+      <rect x="6" y="6" width="52" height="52" rx="7" fill="#fff"/>
+      <!-- The cut: enters past the top edge so it reads as travelling through, and stops at y=44. -->
+      <path d="M29 2 h6 v40 a3 3 0 0 1 -6 0 z" fill="#000"/>
+    </mask>
+  </defs>
+
+  <g mask="url(#kerf-slot)">
+    <rect x="6" y="6" width="52" height="52" rx="7" fill="#F2A33C"/>
+  </g>
+</svg>

@@ -276,7 +276,7 @@ internal static partial class Printers
 		foreach (var member in node.Members)
 		{
 			Separate(context, ref previousEnd, member);
-			Node.Print(member, context);
+			PrintMember(member, context);
 		}
 
 		// The closing brace is gone; a comment written above it is not, and neither is the blank line
@@ -331,7 +331,7 @@ internal static partial class Printers
 				context.BlankLines(context.DeclarationSeparation(
 					previousEnd, EffectiveStart(member), first ? 0 : MinimumBlankLinesFor(member, context)));
 				first = false;
-				Node.Print(member, context);
+				PrintMember(member, context);
 				previousEnd = member.Span.End;
 			}
 		}

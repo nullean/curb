@@ -33,7 +33,7 @@ internal static partial class Printers
 		// Braces first, because adding them expands the body onto its own lines whatever the
 		// preservation options say — see FormatOptions.PreferBraces for why matching Roslyn here is
 		// the whole point rather than a preference.
-		if (WantsBraces(statement, headerEnd, context))
+		if (WantsBraces(statement, context))
 		{
 			PrintSynthesisedBlock(statement, context);
 			return;
@@ -41,7 +41,7 @@ internal static partial class Printers
 
 		// A statement that shared its header's line keeps sharing it, braces and all. This beats
 		// csharp_preserve_single_line_blocks: `if (a) { return; }` stays whole even with that off.
-		if (context.Options.PreserveSingleLineStatements && context.OnSameLine(headerEnd, statement.Span.End))
+		if (context.Options.PreserveSingleLineStatements && context.AuthorJoined(headerEnd, statement.Span.End))
 		{
 			arena.Synthetic(SyntheticText.Space);
 			using (arena.ForceFlat())
@@ -66,13 +66,37 @@ internal static partial class Printers
 	/// Whether this body should be given braces it was not written with.
 	/// </summary>
 	/// <remarks>
+	/// <para>
 	/// Never for a body that already has them, and never for the <c>if</c> of an <c>else if</c> —
-	/// Roslyn braces the chain's bodies, not the chain. <c>when_multiline</c> asks whether the author
-	/// kept the body on the header's line, which is a fact about the source and so cannot change
-	/// under reflow; asking whether the printed body breaks would let one run's layout decide the next
-	/// run's tokens.
+	/// Roslyn braces the chain's bodies, not the chain.
+	///
+	/// <c>when_multiline</c> asks whether the <em>body</em> spans lines, not whether it sits on the
+	/// header's line. Those differ for the commonest shape in the language:
+	///
+	/// <code>
+	/// if (x)
+	///     return false;      // one-line body: no braces
+	///
+	/// if (x)
+	///     return
+	///         false;         // body spans lines: braces
+	/// </code>
+	///
+	/// Kerf asked the second question and so braced every body the author had put on its own line.
+	/// Measured against `dotnet format style` with the option at warning severity, which is how the
+	/// roslyn repository sets it — and where this was costing thousands of files of churn.
+	///
+	/// Either way it is a fact about the source and cannot change under reflow; asking whether the
+	/// printed body breaks would let one run's layout decide the next run's tokens.
+	/// </para>
+	/// <para>
+	/// Under deterministic layout there is no such fact, and <c>when_multiline</c> degrades to
+	/// <c>always</c> — every unbraced body gets braces. That is the conservative direction and, more to
+	/// the point, the stable one: leaving it reading the source would let run 1 join a body onto one line
+	/// and run 2 unbrace it. Reported rather than silent; see KERF1004.
+	/// </para>
 	/// </remarks>
-	private static bool WantsBraces(StatementSyntax statement, int headerEnd, PrintContext context)
+	private static bool WantsBraces(StatementSyntax statement, PrintContext context)
 	{
 		if (statement is BlockSyntax)
 			return false;
@@ -80,7 +104,7 @@ internal static partial class Printers
 		return context.Options.PreferBraces switch
 		{
 			BraceRequirement.Always => true,
-			BraceRequirement.WhenMultiline => !context.OnSameLine(headerEnd, statement.Span.End),
+			BraceRequirement.WhenMultiline => !context.AuthorJoined(statement.SpanStart, statement.Span.End),
 			BraceRequirement.AsWritten => false,
 			_ => false,
 		};
@@ -136,7 +160,7 @@ internal static partial class Printers
 
 			var headerEnd = EmbeddedHeaderEnd(statement);
 			if (headerEnd >= 0)
-				return WantsBraces(statement, headerEnd, context);
+				return WantsBraces(statement, context);
 
 			// A block of its own stops the walk: whatever braces it has are the source's.
 			if (statement is BlockSyntax)
@@ -203,7 +227,7 @@ internal static partial class Printers
 		// A body that just gained braces ends in one, so `else` continues from a block whatever the
 		// source looked like.
 		var afterBlock = node.Statement is BlockSyntax
-			|| WantsBraces(node.Statement, node.CloseParenToken.Span.End, context);
+			|| WantsBraces(node.Statement, context);
 
 		BeforeContinuation(context.Options.NewLineBeforeElse, afterBlock, context);
 		TokenPrinter.Print(node.Else.ElseKeyword, context);
@@ -325,7 +349,7 @@ internal static partial class Printers
 		// `try { Call(); } catch { }` written on one line stays on one line. A try whose blocks the
 		// author broke does not, even where a brace and the following `catch` share a line — what
 		// the option preserves is a single-line statement, not a single-line join.
-		if (context.Options.PreserveSingleLineStatements && context.OnSameLine(node.SpanStart, node.Span.End))
+		if (context.Options.PreserveSingleLineStatements && context.AuthorJoined(node.SpanStart, node.Span.End))
 		{
 			using (context.Arena.ForceFlat())
 				PrintTryStatement(node, context);
@@ -526,7 +550,7 @@ internal static partial class Printers
 				{
 					// `case 1: break;` — a statement on its label's line stays there.
 					if (context.Options.PreserveSingleLineStatements
-						&& context.OnSameLine(labelEnd, statement.Span.End))
+						&& context.AuthorJoined(labelEnd, statement.Span.End))
 					{
 						arena.Synthetic(SyntheticText.Space);
 						using (arena.ForceFlat())

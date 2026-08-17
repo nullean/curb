@@ -387,8 +387,7 @@ public class TrailingCommaTests : FormattingTest
 		        string parameterTwo,
 		        bool three
 		    )
-		    {
-		    }
+		    { }
 		}
 		""",
 		editorConfig: "max_line_length = 40\n" + Multiline + "\n" + Singleline);

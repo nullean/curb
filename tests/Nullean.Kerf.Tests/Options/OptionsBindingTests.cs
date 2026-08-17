@@ -130,12 +130,213 @@ public class OptionsBindingTests
 			csharp_align_multiline_array_and_object_initializer = false
 			csharp_alignment_tab_fill_style = optimal_fill
 			csharp_preferred_modifier_order = public, private, protected
-			csharp_wrap_object_and_collection_initializer_style = chop_always
 			csharp_max_initializer_elements_on_line = 5
 			csharp_place_simple_initializer_on_single_line = true
+			csharp_wrap_chained_method_calls = chop_always
 			""", out var diagnostics);
 
 		diagnostics.Should().BeEmpty("those belong to ReSharper, not to Kerf");
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task A_wrap_style_that_needs_deterministic_layout_says_so()
+	{
+		// Not silence, and not a plain "unimplemented" either: Kerf does implement this key, just not in
+		// the mode this configuration asked for. Forcing an initializer to wrap moves what is nested
+		// inside it, and preservation mode has other rules reading that nesting's indentation from the
+		// source — 140 corpus files stopped settling. Saying which mode it needs is the useful answer.
+		var options = Bind("""
+			root = true
+
+			[*.cs]
+			csharp_wrap_object_and_collection_initializer_style = chop_always
+			""", out var diagnostics);
+
+		diagnostics.Should().ContainSingle().Which.Id.Should().Be("KERF1005");
+		diagnostics[0].Message.Should().Contain("csharp_keep_existing_linebreaks = false");
+		options.WrapObjectAndCollectionInitializerStyle.Should().BeNull("the key was dropped, not applied");
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task The_same_wrap_style_binds_under_deterministic_layout()
+	{
+		var options = Bind("""
+			root = true
+
+			[*.cs]
+			max_line_length = 120
+			csharp_wrap_arguments_style = chop_always
+			csharp_wrap_object_and_collection_initializer_style = chop_always
+			""", out var diagnostics);
+
+		diagnostics.Should().BeEmpty();
+		options.KeepExistingLinebreaks.Should().BeFalse("a width was asked for, so layout is deterministic");
+		options.WrapArgumentsStyle.Should().Be(WrapStyle.ChopAlways);
+		options.WrapObjectAndCollectionInitializerStyle.Should().Be(WrapStyle.ChopAlways);
+		await Task.CompletedTask;
+	}
+
+	// ---- the mode resolves from the width -----------------------------------------------------------
+
+	/// <summary>
+	/// <c>max_line_length</c> selects the layout mode as well as the width.
+	/// </summary>
+	/// <remarks>
+	/// Asking for reflow is asking Kerf to decide layout, so it is one opt-in rather than two. The
+	/// alternative — deterministic everywhere, with an implied width — would hand a repository that never
+	/// named a width a 46,907-line diff instead of a 17,035-line one on the corpus. The file counts barely
+	/// differ (894 against 742), which is exactly why file count is the wrong metric for this decision.
+	/// </remarks>
+	[Test]
+	public async Task No_width_means_preservation()
+	{
+		var options = Bind("root = true\n\n[*.cs]\nindent_style = tab\n", out var diagnostics);
+
+		diagnostics.Should().BeEmpty();
+		options.KeepExistingLinebreaksOption.Should().BeNull("the key was not mentioned");
+		options.KeepExistingLinebreaks.Should().BeTrue();
+		options.ReflowDisabled.Should().BeTrue();
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task A_width_means_deterministic()
+	{
+		var options = Bind("root = true\n\n[*.cs]\nmax_line_length = 120\n", out var diagnostics);
+
+		diagnostics.Should().BeEmpty();
+		options.KeepExistingLinebreaksOption.Should().BeNull();
+		options.KeepExistingLinebreaks.Should().BeFalse();
+		options.ReflowDisabled.Should().BeFalse();
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task An_explicit_true_opts_back_out_of_it()
+	{
+		var options = Bind("""
+			root = true
+
+			[*.cs]
+			max_line_length = 120
+			csharp_keep_existing_linebreaks = true
+			""", out var diagnostics);
+
+		diagnostics.Should().BeEmpty();
+		options.KeepExistingLinebreaksOption.Should().BeTrue();
+		options.KeepExistingLinebreaks.Should().BeTrue("reflow on, but the author's breaks are kept");
+		options.ReflowDisabled.Should().BeFalse();
+		await Task.CompletedTask;
+	}
+
+	/// <summary>Deterministic layout with no width would join every construct that fits, so it is refused.</summary>
+	[Test]
+	public async Task Deterministic_layout_without_a_width_is_refused()
+	{
+		var options = Bind("""
+			root = true
+
+			[*.cs]
+			csharp_keep_existing_linebreaks = false
+			""", out var diagnostics);
+
+		diagnostics.Should().ContainSingle().Which.Id.Should().Be("KERF1007");
+		diagnostics[0].Message.Should().Contain("max_line_length");
+		options.KeepExistingLinebreaks.Should().BeTrue("refused, so preservation stands");
+		await Task.CompletedTask;
+	}
+
+	/// <summary>The order the binder reads these two in is load-bearing, so assert it rather than trust it.</summary>
+	/// <remarks>
+	/// The resolved mode reads <c>MaxLineLength</c>, and the binder's own diagnostic helpers read the
+	/// resolved mode while binding is still in progress. Put the width after the keys that ask and every one
+	/// of them sees the wrong mode — this is the cheapest possible guard against that regressing.
+	/// </remarks>
+	[Test]
+	public async Task A_deterministic_only_key_sees_the_width_whichever_order_it_is_written_in()
+	{
+		var before = Bind("""
+			root = true
+
+			[*.cs]
+			csharp_wrap_arguments_style = chop_always
+			max_line_length = 120
+			""", out var beforeDiagnostics);
+
+		var after = Bind("""
+			root = true
+
+			[*.cs]
+			max_line_length = 120
+			csharp_wrap_arguments_style = chop_always
+			""", out var afterDiagnostics);
+
+		beforeDiagnostics.Should().BeEmpty();
+		afterDiagnostics.Should().BeEmpty();
+		before.WrapArgumentsStyle.Should().Be(WrapStyle.ChopAlways);
+		after.WrapArgumentsStyle.Should().Be(WrapStyle.ChopAlways);
+		await Task.CompletedTask;
+	}
+
+	/// <summary>
+	/// The one class of failure Kerf cannot fix from the inside: a value it can express, and produce
+	/// idempotently, that <c>dotnet format</c> reverts anyway.
+	/// </summary>
+	/// <remarks>
+	/// Measured rather than reasoned: joining every attribute unconditionally came back changed on 347 of
+	/// 1,196 corpus files, because dotnet format moves an attribute off a member that spans lines. Its own
+	/// rule is <c>if_owner_is_single_line</c>, which is why that value is clean at 100%.
+	/// </remarks>
+	[Test]
+	public async Task An_attribute_placement_dotnet_format_would_undo_is_refused()
+	{
+		var options = Bind("""
+			root = true
+
+			[*.cs]
+			max_line_length = 120
+			csharp_place_method_attribute_on_same_line = true
+			""", out var diagnostics);
+
+		diagnostics.Should().ContainSingle().Which.Id.Should().Be("KERF1006");
+		diagnostics[0].Message.Should().Contain("if_owner_is_single_line");
+		options.PlaceMethodAttributeOnSameLine.Should().Be(AttributePlacement.OwnLine);
+		options.MeasuresWholeMembers.Should().BeFalse("nothing needs a member measured as one unit");
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task The_conditional_attribute_placement_binds_and_asks_for_a_member_group()
+	{
+		var options = Bind("""
+			root = true
+
+			[*.cs]
+			max_line_length = 120
+			csharp_place_property_attribute_on_same_line = if_owner_is_single_line
+			""", out var diagnostics);
+
+		diagnostics.Should().BeEmpty();
+		options.PlacePropertyAttributeOnSameLine.Should().Be(AttributePlacement.IfOwnerIsSingleLine);
+		options.PlaceMethodAttributeOnSameLine.Should().Be(AttributePlacement.OwnLine);
+		options.MeasuresWholeMembers.Should().BeTrue();
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task Preservation_keys_report_that_deterministic_layout_ignores_them()
+	{
+		Bind("""
+			root = true
+
+			[*.cs]
+			max_line_length = 120
+			csharp_preserve_single_line_blocks = true
+			""", out var diagnostics);
+
+		diagnostics.Should().ContainSingle().Which.Id.Should().Be("KERF1004");
 		await Task.CompletedTask;
 	}
 

@@ -49,7 +49,7 @@ internal static partial class Printers
 		// difference decides whether formatting twice settles.
 		if (right is ExpressionSyntax expression
 			&& (BringsOwnBlock(expression)
-				|| (operatorEnd >= 0 && context.OnSameLine(operatorEnd, expression.SpanStart))))
+				|| (operatorEnd >= 0 && context.AuthorJoined(operatorEnd, expression.SpanStart))))
 		{
 			Spacing.BeforeOperator(context);
 			Node.Print(right, context);
@@ -88,14 +88,14 @@ internal static partial class Printers
 		// end of a line, or `|| b` at the start of the next. Checking only after the operator missed
 		// the operator-first style entirely and joined those chains, which is what left two corpus
 		// files still reformatting themselves on a second run.
-		if (!context.OnSameLine(node.Left.Span.End, node.OperatorToken.SpanStart))
+		if (context.AuthorBroke(node.Left.Span.End, node.OperatorToken.SpanStart))
 			context.Arena.HardLine();
 		else
 			Spacing.BeforeOperator(context);
 
 		TokenPrinter.Print(node.OperatorToken, context);
 
-		if (!context.OnSameLine(node.OperatorToken.Span.End, node.Right.SpanStart))
+		if (context.AuthorBroke(node.OperatorToken.Span.End, node.Right.SpanStart))
 		{
 			context.Arena.HardLine();
 			Node.Print(node.Right, context);
@@ -185,28 +185,33 @@ internal static partial class Printers
 		context.Arena.Synthetic(SyntheticText.Space);
 		Node.Print(node.Type, context);
 
+		ushort argumentGroup = 0;
 		if (node.ArgumentList is not null)
 		{
 			Spacing.BeforeCallParens(context);
+			context.ArgumentListGroup = 0;
 			Node.Print(node.ArgumentList, context);
+			argumentGroup = context.ArgumentListGroup;
 		}
 
 		if (node.Initializer is null)
 			return;
 
-		InitializerExpression(node.Initializer, context, leadingLine: true);
+		InitializerExpression(node.Initializer, context, leadingLine: true, ownerGroup: argumentGroup);
 	}
 
 	public static void ImplicitObjectCreationExpression(ImplicitObjectCreationExpressionSyntax node, PrintContext context)
 	{
 		TokenPrinter.Print(node.NewKeyword, context);
 		Spacing.BeforeCallParens(context);
+		context.ArgumentListGroup = 0;
 		Node.Print(node.ArgumentList, context);
+		var argumentGroup = context.ArgumentListGroup;
 
 		if (node.Initializer is null)
 			return;
 
-		InitializerExpression(node.Initializer, context, leadingLine: true);
+		InitializerExpression(node.Initializer, context, leadingLine: true, ownerGroup: argumentGroup);
 	}
 
 	/// <summary>Object, collection, array and <c>with</c> initialisers.</summary>
@@ -219,10 +224,16 @@ internal static partial class Printers
 	/// object_collection_array_initializers flag describes. False for a nested initializer, whose
 	/// parent has already emitted a separator.
 	/// </param>
+	/// <param name="ownerGroup">
+	/// The group of the argument list this initializer's creation carries, or 0 when it has none. The
+	/// brace takes a line of its own whenever that list wrapped, which is the one thing dotnet format
+	/// decides here and the only version of the question that survives deterministic layout.
+	/// </param>
 	public static void InitializerExpression(
 		InitializerExpressionSyntax node,
 		PrintContext context,
-		bool leadingLine = false)
+		bool leadingLine = false,
+		ushort ownerGroup = 0)
 	{
 		var arena = context.Arena;
 
@@ -247,7 +258,19 @@ internal static partial class Printers
 
 		var trailingTrivia = false;
 
-		using (arena.Group())
+		// Outside the group below, because it has to resolve against the owner's break rather than this
+		// initializer's — see BeforeOpenBraceWhenOwnerBroke. This is the deterministic half of the
+		// `ownerSpansLines` question further down: that one reads where the author put the brace, which
+		// is right in preservation mode and unavailable in deterministic mode, and this one reads the
+		// decision the argument list took on this run, which is available in both.
+		if (leadingLine && !oneMemberPerLine)
+			BeforeOpenBraceWhenOwnerBroke(BraceStyle.ObjectCollectionArrayInitializers, ownerGroup, context);
+
+		// Named and published so an enclosing construct can aim at it — see PrintContext.OwnBlockGroup.
+		var group = arena.NextGroupId();
+		context.OwnBlockGroup = group;
+
+		using (arena.Group(group))
 		{
 			if (leadingLine)
 			{
@@ -261,14 +284,15 @@ internal static partial class Printers
 				// the answer on the next and stop the file settling. Where the author put the brace
 				// is fixed, so it is that which decides.
 				var ownerSpansLines = node.Parent is not null
-					&& !context.OnSameLine(node.Parent.SpanStart, node.SpanStart);
+					&& context.AuthorBroke(node.Parent.SpanStart, node.SpanStart);
 
 				if (oneMemberPerLine
 					|| ownerSpansLines
-					|| (asWritten && !context.OnSameLine(node.SpanStart, node.Parent!.SpanStart)))
+					|| (asWritten && context.AuthorBroke(node.SpanStart, node.Parent!.SpanStart)))
 					BeforeOpenBrace(BraceStyle.ObjectCollectionArrayInitializers, context);
 				else
-					BeforeOpenBraceWhenBroken(BraceStyle.ObjectCollectionArrayInitializers, context);
+					BeforeOpenBraceWhenBroken(
+						BraceStyle.ObjectCollectionArrayInitializers, context, DocFlags.OnlyIfNotAtLineStart);
 			}
 
 			TokenPrinter.Print(node.OpenBraceToken, context);
@@ -287,7 +311,12 @@ internal static partial class Printers
 				// braces anchors is read from the source — the line it starts on — and forcing a break
 				// the source does not have puts it a level out, which the second run then corrects.
 				// The shapes this rule is for, an assignment or a field, are not in that position.
-				if (limit is { } elements && node.Expressions.Count > elements && !IsInsideArguments(node))
+				// The IsInsideArguments guard is preservation's, not the rule's: a break the source does
+				// not have puts a brace-bringing construct a level out, and only a rule that reads the
+				// source can be wrong about that. Deterministic mode has no such rule, so chop_always
+				// applies everywhere and the count keeps its guard.
+				var chopAlways = context.Options.WrapObjectAndCollectionInitializerStyle == WrapStyle.ChopAlways;
+				if (chopAlways || (limit is { } elements && node.Expressions.Count > elements && !IsInsideArguments(node)))
 					arena.BreakParent();
 
 				var rewritesComma = RewritesTrailingComma(node.Expressions, node.CloseBraceToken, context);
@@ -356,7 +385,7 @@ internal static partial class Printers
 		// Between two members: a hard line, or the ordinary comma separator.
 		void Separator(int from, int to)
 		{
-			if (oneMemberPerLine || (asWritten && !context.OnSameLine(from, to)))
+			if (oneMemberPerLine || (asWritten && context.AuthorBroke(from, to)))
 				arena.HardLine();
 			else if (asWritten)
 				Spacing.AfterComma(context);
@@ -367,7 +396,7 @@ internal static partial class Printers
 		// Just inside the braces, where no comma sits and the comma options do not reach.
 		void InsideBrace(int from, int to)
 		{
-			if (oneMemberPerLine || (asWritten && !context.OnSameLine(from, to)))
+			if (oneMemberPerLine || (asWritten && context.AuthorBroke(from, to)))
 				arena.HardLine();
 			else
 				arena.Line();
@@ -396,8 +425,18 @@ internal static partial class Printers
 			var asWritten = SpansLines(node, context);
 			var rewritesComma = RewritesTrailingComma(node.Elements, node.CloseBracketToken, context);
 
-			using (arena.Group())
+			// Published for the same reason an initializer's is: `new C([…]) { X = 1 }` hands the list no
+			// group to break, so the trailing initializer aims at this one instead.
+			var group = arena.NextGroupId();
+			context.OwnBlockGroup = group;
+
+			using (arena.Group(group))
 			{
+				// A collection expression is the third spelling of a collection initializer, so it answers
+				// to the same key. Deterministic mode only; see FormatOptions.
+				if (context.Options.WrapObjectAndCollectionInitializerStyle == WrapStyle.ChopAlways)
+					arena.BreakParent();
+
 				using (arena.Indent())
 				{
 					Edge(node.SpanStart, node.Elements[0].SpanStart);
@@ -419,7 +458,7 @@ internal static partial class Printers
 
 						if (!asWritten)
 							Spacing.AfterCommaBreakable(context);
-						else if (context.OnSameLine(node.Elements[i].Span.End, node.Elements[i + 1].SpanStart))
+						else if (context.AuthorJoined(node.Elements[i].Span.End, node.Elements[i + 1].SpanStart))
 							Spacing.AfterComma(context);
 						else
 							arena.HardLine();
@@ -434,7 +473,7 @@ internal static partial class Printers
 
 			void Edge(int from, int to)
 			{
-				if (asWritten && !context.OnSameLine(from, to))
+				if (asWritten && context.AuthorBroke(from, to))
 					arena.HardLine();
 				else
 					Spacing.InsideBracketsBreakable(context);
@@ -483,7 +522,7 @@ internal static partial class Printers
 		// out: the enclosing argument list saw nothing left to preserve, emitted no break
 		// opportunity, and the statement came back as one over-long line that only the next run
 		// broke — which is to say, formatting twice did not settle.
-		if (expression is not null && !context.OnSameLine(arrow.Span.End, expression.SpanStart))
+		if (expression is not null && context.AuthorBroke(arrow.Span.End, expression.SpanStart))
 		{
 			using (arena.Indent())
 			{
@@ -538,44 +577,54 @@ internal static partial class Printers
 
 		using (arena.Group())
 		{
-			if (oneMemberPerLine || (asWritten && !context.OnSameLine(node.NewKeyword.Span.End, node.OpenBraceToken.SpanStart)))
+			if (oneMemberPerLine || (asWritten && context.AuthorBroke(node.NewKeyword.Span.End, node.OpenBraceToken.SpanStart)))
 				BeforeOpenBrace(BraceStyle.AnonymousTypes, context);
 			else
 				BeforeOpenBraceWhenBroken(BraceStyle.AnonymousTypes, context);
 
 			TokenPrinter.Print(node.OpenBraceToken, context);
 
+			// `new { }` is valid C# and has nothing to lay out. Both ends of the block below index the
+			// initializer list, so an empty one crashed the printer — and because the CLI formats in
+			// parallel without isolating a file's exceptions, that one expression aborted the whole
+			// run. Found on MassTransit, efcore and roslyn, which is to say the three largest
+			// repositories measured.
 			using (arena.Indent())
 			{
-				InsideBrace(node.OpenBraceToken.Span.End, node.Initializers[0].SpanStart);
-				for (var i = 0; i < node.Initializers.Count; i++)
+				if (node.Initializers.Count > 0)
 				{
-					Node.Print(node.Initializers[i], context);
-					if (i >= node.Initializers.SeparatorCount)
-						continue;
+					InsideBrace(node.OpenBraceToken.Span.End, node.Initializers[0].SpanStart);
+					for (var i = 0; i < node.Initializers.Count; i++)
+					{
+						Node.Print(node.Initializers[i], context);
+						if (i >= node.Initializers.SeparatorCount)
+							continue;
 
-					if (rewritesComma && i == node.Initializers.Count - 1)
-						continue;
+						if (rewritesComma && i == node.Initializers.Count - 1)
+							continue;
 
-					Spacing.BeforeComma(context);
-					TokenPrinter.Print(node.Initializers.GetSeparator(i), context);
-					if (i < node.Initializers.Count - 1)
-						Separator(node.Initializers[i].Span.End, node.Initializers[i + 1].SpanStart);
+						Spacing.BeforeComma(context);
+						TokenPrinter.Print(node.Initializers.GetSeparator(i), context);
+						if (i < node.Initializers.Count - 1)
+							Separator(node.Initializers[i].Span.End, node.Initializers[i + 1].SpanStart);
+					}
+
+					if (rewritesComma)
+						PrintTrailingComma(context);
 				}
-
-				if (rewritesComma)
-					PrintTrailingComma(context);
 			}
 
 			using (arena.IndentIf(context.Options.IndentBraces))
-				InsideBrace(node.Initializers[^1].Span.End, node.CloseBraceToken.SpanStart);
+				InsideBrace(
+					node.Initializers.Count > 0 ? node.Initializers[^1].Span.End : node.OpenBraceToken.Span.End,
+					node.CloseBraceToken.SpanStart);
 
 			TokenPrinter.Print(node.CloseBraceToken, context);
 		}
 
 		void Separator(int from, int to)
 		{
-			if (oneMemberPerLine || (asWritten && !context.OnSameLine(from, to)))
+			if (oneMemberPerLine || (asWritten && context.AuthorBroke(from, to)))
 				arena.HardLine();
 			else if (asWritten)
 				Spacing.AfterComma(context);
@@ -585,7 +634,7 @@ internal static partial class Printers
 
 		void InsideBrace(int from, int to)
 		{
-			if (oneMemberPerLine || (asWritten && !context.OnSameLine(from, to)))
+			if (oneMemberPerLine || (asWritten && context.AuthorBroke(from, to)))
 				arena.HardLine();
 			else
 				arena.Line();

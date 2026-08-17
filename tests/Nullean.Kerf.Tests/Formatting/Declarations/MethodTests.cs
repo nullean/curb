@@ -333,20 +333,28 @@ public class MethodTests : FormattingTest
 		        int gamma,
 		        int delta
 		    )
-		    {
-		    }
+		    { }
 		}
 		""",
 		editorConfig: "max_line_length = 40");
 
 	[Test]
-	public Task Parameter_list_stays_on_one_line_when_it_fits() => Unchanged(
+	public Task Parameter_list_stays_on_one_line_when_it_fits() => Formats(
 		"""
 		public class C
 		{
 		    public void M(int alpha, int beta)
 		    {
 		    }
+		}
+		""",
+		// An empty pair collapses under deterministic layout, which a width now selects. It does not move
+		// onto the header line — that stays csharp_new_line_before_open_brace's call.
+		"""
+		public class C
+		{
+		    public void M(int alpha, int beta)
+		    { }
 		}
 		""",
 		editorConfig: "max_line_length = 120");

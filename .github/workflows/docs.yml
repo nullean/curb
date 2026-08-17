@@ -1,0 +1,75 @@
+name: docs
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - 'docs/**'
+      - '.github/workflows/docs.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Pages allows one deployment at a time. Do not cancel in progress: a half-finished deploy is worse
+# than a queued one.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  # Builds on every pull request so a broken link or a page missing from the toc fails there rather
+  # than on main. Deliberately touches no Pages API and declares no environment, so it works from a
+  # fork and cannot stall on a deployment protection rule.
+  build-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # docs-builder emits root-absolute URLs and GitHub Pages serves this repo from a sub-path, so
+      # the generated site has to be told about it.
+      #
+      # This value must stay in step with the <base href> in docs/kerf-landing.html, which the build
+      # never touches, and with Documentation.PathPrefix in the build scripts. `./build.sh docs`
+      # fails when the three drift apart.
+      - name: Build documentation
+        uses: elastic/docs-builder@main
+        with:
+          prefix: formatter
+
+      # docs-builder has no landing-page feature. The branded page is a standalone document that
+      # replaces the generated index.html here — docs/index.md survives as the "Home" nav entry.
+      - name: Swap in the landing page
+        run: cp docs/kerf-landing.html .artifacts/docs/html/index.html
+
+      - name: Copy robots.txt
+        run: cp docs/robots.txt .artifacts/docs/html/robots.txt
+
+      # Needs no Pages API, so it runs on pull requests too — it is what proves the output packages
+      # cleanly, and it is the artifact the deploy job publishes.
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .artifacts/docs/html
+
+  deploy-docs:
+    needs: build-docs
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write        # required for the OIDC token actions/deploy-pages exchanges
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      # `enablement` creates the Pages site on the first run rather than leaving it as a manual
+      # setup step someone has to be told about.
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
