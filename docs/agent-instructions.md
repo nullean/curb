@@ -19,6 +19,10 @@ already produced. It never builds anything itself, so it must be run after a bui
 
 What is left after that needs `dotnet format style`, or a human. `kerf cleanup` reports what it declined
 and why rather than failing quietly.
+
+To have it hand the remainder on automatically, add `--forward`. That is much slower — it loads an MSBuild
+workspace, seconds per solution against Kerf's milliseconds — and the run prints both timings so it is
+clear which half the wait belongs to.
 ```
 
 ---

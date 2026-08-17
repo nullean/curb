@@ -3,6 +3,7 @@ using System.Globalization;
 using System.IO.Abstractions;
 using Nullean.Kerf.Cleanup;
 using Nullean.Kerf.EditorConfig;
+using Nullean.Kerf.Options;
 
 namespace Nullean.Kerf.Cli;
 
@@ -29,12 +30,14 @@ internal static class CleanupRun
 	/// <param name="write">Apply the fixes, rather than only reporting what would change.</param>
 	/// <param name="logs">Explicit log paths, from <c>--diagnostics</c>.</param>
 	/// <param name="explicitFiles">Restrict to these files, from <c>--files</c>. Empty means every file the logs mention.</param>
+	/// <param name="forward">Hand what Kerf did not fix to <c>dotnet format</c>, from <c>--forward</c>.</param>
 	public static int Execute(
 		IFileSystem fileSystem,
 		string target,
 		bool write,
 		string[]? logs = null,
-		string[]? explicitFiles = null)
+		string[]? explicitFiles = null,
+		bool forward = false)
 	{
 		logs = logs is { Length: > 0 } ? logs : Discover(fileSystem, target);
 
@@ -49,6 +52,7 @@ internal static class CleanupRun
 		var stopwatch = Stopwatch.StartNew();
 
 		var byFile = new Dictionary<string, List<CleanupDiagnostic>>(StringComparer.Ordinal);
+		var notOurs = new List<CleanupDiagnostic>();
 		var newest = DateTime.MinValue;
 
 		foreach (var log in logs)
@@ -78,6 +82,14 @@ internal static class CleanupRun
 
 				forFile.Add(diagnostic);
 			}
+
+			// Everything the log reported that is not Kerf's to fix. Kept separately so `--forward` can
+			// name the remainder exactly rather than making someone run the whole command over everything.
+			foreach (var diagnostic in all)
+			{
+				if (!RuleCatalog.IsCleanupRule(diagnostic.RuleId))
+					notOurs.Add(diagnostic);
+			}
 		}
 
 		var wanted = explicitFiles is { Length: > 0 }
@@ -104,6 +116,7 @@ internal static class CleanupRun
 		var failed = 0;
 		var refused = 0;
 		var messages = new System.Collections.Concurrent.ConcurrentBag<string>();
+		var unfixed = new System.Collections.Concurrent.ConcurrentBag<CleanupDiagnostic>();
 
 		Parallel.ForEach(
 			Enumerable.Range(0, work.Length),
@@ -139,6 +152,9 @@ internal static class CleanupRun
 
 				var result = worker.Cleaner.Clean(source, diagnostics);
 				Interlocked.Add(ref refused, result.Refusals.Count);
+
+				foreach (var left in result.Unfixed)
+					unfixed.Add(left);
 
 				foreach (var refusal in result.Refusals)
 					messages.Add($"{path}: {refusal}");
@@ -188,10 +204,124 @@ internal static class CleanupRun
 				$"  {stale} file(s) changed after the build, so nothing was applied to them. Build again to pick them up.");
 		}
 
-		if (failed > 0)
+		var forwardFailed = false;
+		if (forward)
+		{
+			forwardFailed = Forward(
+				fileSystem.Path.GetFullPath(target), [.. notOurs, .. unfixed], stopwatch.ElapsedMilliseconds, write);
+		}
+
+		if (failed > 0 || forwardFailed)
 			return 3;
 
 		return !write && changed > 0 ? 1 : 0;
+	}
+
+	/// <summary>
+	/// Hands the remainder to <c>dotnet format</c> and reports both timings.
+	/// </summary>
+	/// <remarks>
+	/// <para>
+	/// The timings are printed side by side because the difference is the point. Kerf's own pass is a parse
+	/// and a rewrite; <c>dotnet format</c> loads an MSBuild workspace, and that is seconds per solution
+	/// whatever it is asked to fix. Measured on a 61-file project: 1.97 s narrowed to one file and one rule
+	/// against 1.98 s over everything — so scoping buys no time at all, and printing the two numbers is the
+	/// only way someone learns which half of their wait is which.
+	/// </para>
+	/// <para>
+	/// One invocation for the whole target rather than one per project, since the workspace load is the
+	/// cost and doing it repeatedly would multiply the only expensive part.
+	/// </para>
+	/// </remarks>
+	/// <returns>True when a forwarded invocation failed.</returns>
+	private static bool Forward(string target, IReadOnlyList<CleanupDiagnostic> remainder, long ourMilliseconds, bool write)
+	{
+		var plan = ForwardPlan.For(remainder, target);
+
+		if (plan.Withheld.Count > 0)
+		{
+			Console.WriteLine($"  {plan.Withheld.Count} rule(s) not forwarded, because no tool should apply them unattended:");
+			foreach (var rule in plan.Withheld)
+				Console.WriteLine($"    {rule.Id}  {rule.Title} — {rule.Reason}");
+		}
+
+		if (plan.Quiet > 0)
+		{
+			Console.WriteLine($"  {plan.Quiet} diagnostic(s) not forwarded, reported below warning — "
+				+ "your build did not show them, so nothing rewrites source on their account");
+		}
+
+		if (plan.Invocations.Count == 0)
+			return false;
+
+		var failed = false;
+		var forwardedMilliseconds = 0L;
+
+		foreach (var invocation in plan.Invocations)
+		{
+			// `--verify-no-changes` under --check, so the two halves agree about whether they are allowed to
+			// write. A check that quietly rewrote the tree would be worse than no check.
+			var arguments = write
+				? invocation.Arguments
+				: [.. invocation.Arguments, "--verify-no-changes"];
+
+			var scope = invocation.Files.Count > 0
+				? $"{invocation.Files.Count} file(s)"
+				: "the whole project, since a reported file sits outside the working directory";
+
+			Console.WriteLine($"  forwarding {invocation.RuleIds.Count} rule(s) in {scope} "
+				+ $"to `dotnet format {invocation.Subcommand}`: {string.Join(' ', invocation.RuleIds)}");
+
+			var start = Stopwatch.StartNew();
+			var exitCode = Run(target, arguments);
+			start.Stop();
+			forwardedMilliseconds += start.ElapsedMilliseconds;
+
+			// Exit 2 from `--verify-no-changes` is "there is something to fix", which is the answer, not a
+			// failure. Anything else non-zero means the tool could not run.
+			if (exitCode != 0 && !(!write && exitCode == 2))
+			{
+				Console.Error.WriteLine($"  `dotnet format {invocation.Subcommand}` exited {exitCode}");
+				failed = true;
+			}
+		}
+
+		var ratio = ourMilliseconds > 0
+			? string.Create(CultureInfo.InvariantCulture, $" ({forwardedMilliseconds / (double)ourMilliseconds:F1}x)")
+			: "";
+
+		Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
+			$"  kerf {ourMilliseconds}ms · dotnet format {forwardedMilliseconds}ms{ratio}"
+			+ $" — the difference is the workspace load, which no amount of scoping avoids"));
+
+		return failed;
+	}
+
+	/// <summary>
+	/// Starts <c>dotnet format</c> and waits.
+	/// </summary>
+	/// <remarks>
+	/// The one place Kerf starts a process, and it only happens when <c>--forward</c> asked for it. Not
+	/// routed through <c>IFileSystem</c> because it is not filesystem access; the part worth testing is
+	/// which arguments get built, and <see cref="ForwardPlan"/> is pure so that it can be.
+	/// </remarks>
+	private static int Run(string target, IReadOnlyList<string> arguments)
+	{
+		var info = new ProcessStartInfo("dotnet") { UseShellExecute = false };
+		foreach (var argument in arguments)
+			info.ArgumentList.Add(argument);
+
+		// `dotnet format` searches for a project or solution from its working directory, so pointing it at
+		// the same place cleanup was pointed keeps the two looking at one thing.
+		if (Directory.Exists(target))
+			info.WorkingDirectory = target;
+
+		using var process = Process.Start(info);
+		if (process is null)
+			return -1;
+
+		process.WaitForExit();
+		return process.ExitCode;
 	}
 
 	/// <summary>Finds the compiler's error logs under a directory. They live in <c>obj</c>, so nothing is excluded.</summary>

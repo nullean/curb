@@ -27,7 +27,8 @@ dotnet build          # clean
 `Nullean.Kerf.MSBuild` sets `$(ErrorLog)` to `$(IntermediateOutputPath)kerf.sarif` when the project has
 not set one, so the log exists without anyone asking for it. `kerf cleanup` with no arguments searches
 the current directory for those logs. `--diagnostics <path>` names one explicitly, `--check` reports
-without writing, and `kerf rules` lists every rule and who fixes it.
+without writing, `--forward` hands the remainder to `dotnet format`, and `kerf rules` lists every rule and
+who fixes it.
 
 The third build is not an extra step — it is the verify step you were going to run after any change.
 And it is the real safety net: a bad fix is a compile error you see immediately, which is why cleanup
@@ -186,6 +187,58 @@ Each rule refuses the shapes where the rewrite would be ambiguous rather than re
 argument list (`new { X = 1 }` is an anonymous object, which compiles and is a different program),
 `var` on a `const`, a multi-variable declaration, or a declaration with no initialiser.
 
+## Forwarding the remainder
+
+Kerf is not a replacement for `dotnet format style`. What it can be is precise about the remainder: it
+knows every diagnostic the build reported and which of them it dealt with, so `--forward` names the rest
+exactly instead of leaving someone to run the whole command over the whole solution.
+
+```
+Cleaned 1 file(s) from 1 log(s) in 105ms — 2 fix(es) in 1 file(s), 0 refused, 0 stale, 0 skipped, 0 failed
+  forwarding 1 rule(s) in 1 file(s) to `dotnet format style`: IDE0071
+  kerf 105ms · dotnet format 2366ms (22.5x) — the difference is the workspace load, which no amount of scoping avoids
+```
+
+Both timings are printed because the difference is the point. Nothing else tells someone which half of
+their wait belongs to which tool.
+
+**IDE\* goes to `style`, everything else to `analyzers`**, at most one invocation each, for the whole
+target rather than per project — the workspace load is the cost, and repeating it would multiply the only
+expensive part.
+
+### What the flags are for, and what they are not for
+
+- **`--include` buys blast radius, not speed.** Measured on a 61-file project: 1.97 s narrowed to one
+  file and one rule, against 1.98 s over everything. The cost is the workspace load, not applying fixes.
+  What it does buy is checked: a second file carrying an identical offence was left untouched. Fixing
+  exactly what was reported is the premise of cleanup, so forwarding keeps it.
+- **The paths have to be relative.** An absolute path in `--include` matches nothing and `dotnet format`
+  exits zero having done nothing — a silent no-op, which is the worst shape a bug can take here because
+  it is indistinguishable from success. Kerf relativises against its working directory, and if a reported
+  file sits outside it, drops `--include` altogether and says so rather than quietly covering less than
+  it claims.
+- **`--severity info`** because a diagnostic only reaches the log at info or above, so this is the
+  matching superset rather than a widening. **`--no-restore`** because the build already restored. There
+  is no `--no-build` to pass: `dotnet format` does not build output, it loads an MSBuild workspace, and
+  that *is* the 2.4 seconds.
+- **`--verify-no-changes`** is added under `--check`, so both halves agree about whether they may write.
+
+### What is not forwarded
+
+- **Diagnostics reported below warning.** The .NET analysers are on by default at note level, invisible at
+  normal build verbosity. Forwarding one would have `dotnet format` fix every occurrence of that rule in
+  the file on the strength of something nobody saw — a wider blast radius than Kerf's own span-local
+  fixes, taken for a weaker reason. Counted and reported, not silently dropped.
+- **Compiler diagnostics.** `dotnet format` cannot fix a `CS` warning; passing one asks for a no-op that
+  looks like a failure.
+- **Refusals that reach every tool.** Here the catalog distinguishes two things that are easy to
+  conflate, and getting it wrong made `--forward` worse before a test caught it. "Kerf will not delete a
+  declaration" is *Kerf's* constraint — non-negotiable #4 — and `dotnet format style` is entitled to do
+  it, so IDE0051 is forwarded. "No tool should rename a symbol unattended" is a claim about the fix
+  itself, since a rename compiles while changing which overload binds and breaks reflection and
+  serialisation strings no compiler check sees — so IDE1006 and IDE0130 are withheld, with the reason
+  printed. `kerf rules` marks each refusal `[not Kerf]` or `[no tool, unattended]`.
+
 ## What is slow
 
 Not this. Cleanup is a parse and a rewrite, so it runs at formatter speed — 102 ms on a one-file project
@@ -198,7 +251,7 @@ What costs time is everything around it:
 | `kerf cleanup` itself | A parse and a rewrite per file the log mentions — measured at 233 ms for a one-file project applying six fixes across all five rules, most of which is process start. Files the log does not mention are never opened. |
 | The build that produces the log | Whatever `EnforceCodeStyleInBuild` costs you. If you already run it, cleanup is free; if you do not, this is the bill. |
 | `$(ErrorLog)` | A SARIF is ~220–430 KB per project per target framework even for a trivial project, almost all of it rule metadata. Read with a streaming reader that skips it rather than deserialising. |
-| `dotnet format style` | Seconds per project — it loads an MSBuild workspace. Still the answer for everything in the table above. |
+| `dotnet format style` | ~2.4 s for one project and ~3.0 s for a blanket run, measured — it loads an MSBuild workspace, and scoping does not help. Still the answer for everything in the table above, and `--forward` will run it for you and print both numbers. |
 
 ## Rejected alternatives
 

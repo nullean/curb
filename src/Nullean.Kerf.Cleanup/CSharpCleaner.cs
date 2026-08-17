@@ -24,6 +24,10 @@ public enum CleanupStatus
 /// <param name="Text">The cleaned text, or null when nothing changed or nothing was produced.</param>
 /// <param name="Applied">How many diagnostics were fixed.</param>
 /// <param name="Refusals">Why each unfixed diagnostic was left alone. Never an error — see <see cref="ICleanupRule"/>.</param>
+/// <param name="Unfixed">
+/// The diagnostics handed over that no fix was applied for, so a caller can forward them somewhere that
+/// can. Parallel to <paramref name="Refusals"/>, which carries the prose.
+/// </param>
 /// <param name="Message">Detail for a non-successful status.</param>
 public readonly record struct CleanupResult(
 	CleanupStatus Status,
@@ -31,6 +35,7 @@ public readonly record struct CleanupResult(
 	string? Text,
 	int Applied,
 	IReadOnlyList<string> Refusals,
+	IReadOnlyList<CleanupDiagnostic> Unfixed,
 	string? Message)
 {
 	public bool Success => Status == CleanupStatus.Cleaned;
@@ -69,6 +74,7 @@ public sealed class CSharpCleaner
 
 	private readonly List<(PlannedFix Fix, CleanupDiagnostic Diagnostic)> _planned = [];
 	private readonly List<string> _refusals = [];
+	private readonly List<CleanupDiagnostic> _unfixed = [];
 	private readonly List<TextSpan> _dropped = [];
 	private readonly List<string> _inserted = [];
 
@@ -79,6 +85,7 @@ public sealed class CSharpCleaner
 	{
 		_planned.Clear();
 		_refusals.Clear();
+		_unfixed.Clear();
 		_dropped.Clear();
 		_inserted.Clear();
 
@@ -88,7 +95,7 @@ public sealed class CSharpCleaner
 				? errors[0].GetMessage(System.Globalization.CultureInfo.InvariantCulture)
 				: "the source does not parse";
 
-			return new CleanupResult(CleanupStatus.SyntaxError, false, null, 0, [], detail);
+			return new CleanupResult(CleanupStatus.SyntaxError, false, null, 0, [], [.. diagnostics], detail);
 		}
 
 		var context = new CleanupContext(parsed.Root, parsed.Text, source);
@@ -104,6 +111,7 @@ public sealed class CSharpCleaner
 				if (Options.RuleCatalog.IsCleanupRule(diagnostic.RuleId))
 					_refusals.Add($"{diagnostic.RuleId}: the catalog claims this rule but no fixer implements it");
 
+				_unfixed.Add(diagnostic);
 				continue;
 			}
 
@@ -112,6 +120,7 @@ public sealed class CSharpCleaner
 				// MSBuild's console output carries a start only. For IDE0005 that is not enough to know
 				// how many directives the diagnostic covers, so it is refused rather than guessed at.
 				_refusals.Add($"{diagnostic.RuleId}: the log carries no end position, and this rule needs one");
+				_unfixed.Add(diagnostic);
 				continue;
 			}
 
@@ -119,35 +128,41 @@ public sealed class CSharpCleaner
 			if (!diagnostic.TryResolve(parsed.Text, out var span))
 			{
 				_refusals.Add($"{diagnostic.RuleId}: the reported position is not inside the file, so the log is stale");
+				_unfixed.Add(diagnostic);
 				continue;
 			}
 
 			if (rule.TryFix(context, diagnostic, span, out var fix, out var refusal))
+			{
 				_planned.Add((fix, diagnostic));
+			}
 			else
+			{
 				_refusals.Add($"{diagnostic.RuleId}: {refusal}");
+				_unfixed.Add(diagnostic);
+			}
 		}
 
 		if (_planned.Count == 0)
-			return new CleanupResult(CleanupStatus.Cleaned, false, null, 0, [.. _refusals], null);
+			return new CleanupResult(CleanupStatus.Cleaned, false, null, 0, [.. _refusals], [.. _unfixed], null);
 
 		_planned.Sort(static (left, right) => left.Fix.Removed.Start.CompareTo(right.Fix.Removed.Start));
 		DropOverlaps();
 
 		if (_planned.Count == 0)
-			return new CleanupResult(CleanupStatus.Cleaned, false, null, 0, [.. _refusals], null);
+			return new CleanupResult(CleanupStatus.Cleaned, false, null, 0, [.. _refusals], [.. _unfixed], null);
 
 		var output = Apply(source);
 
 		// The declared-delta verifiers, unchanged and not switched off. The fixes said which tokens they
 		// would remove; everything else in the file is still held to a strict compare.
 		if (!ContentVerifier.Verify(source, output, out var contentFailure, dropped: _dropped, inserted: _inserted))
-			return new CleanupResult(CleanupStatus.VerificationFailed, false, null, 0, [.. _refusals], contentFailure);
+			return new CleanupResult(CleanupStatus.VerificationFailed, false, null, 0, [.. _refusals], [.. diagnostics], contentFailure);
 
 		if (!TokenStreamComparer.Verify(parsed.Root, source, output, out var tokenFailure, dropped: _dropped, inserted: _inserted))
-			return new CleanupResult(CleanupStatus.VerificationFailed, false, null, 0, [.. _refusals], tokenFailure);
+			return new CleanupResult(CleanupStatus.VerificationFailed, false, null, 0, [.. _refusals], [.. diagnostics], tokenFailure);
 
-		return new CleanupResult(CleanupStatus.Cleaned, true, output, _planned.Count, [.. _refusals], null);
+		return new CleanupResult(CleanupStatus.Cleaned, true, output, _planned.Count, [.. _refusals], [.. _unfixed], null);
 	}
 
 	private static ICleanupRule? FindRule(string ruleId)
@@ -190,6 +205,7 @@ public sealed class CSharpCleaner
 				continue;
 
 			_refusals.Add($"{_planned[i].Diagnostic.RuleId}: its fix overlaps another, so neither was applied");
+			_unfixed.Add(_planned[i].Diagnostic);
 			_planned.RemoveAt(i);
 		}
 	}

@@ -2,6 +2,27 @@ using Microsoft.CodeAnalysis.Text;
 
 namespace Nullean.Kerf.Cleanup;
 
+/// <summary>How loudly the build reported a diagnostic.</summary>
+/// <remarks>
+/// Matters for forwarding rather than for fixing. An info-level diagnostic is invisible at normal build
+/// verbosity, and handing one to <c>dotnet format</c> would fix every occurrence of that rule in the file
+/// on the strength of something nobody saw.
+/// </remarks>
+public enum DiagnosticLevel
+{
+	/// <summary>The log did not say. What MSBuild's console output leaves us with, since the severity word is localised.</summary>
+	Unknown,
+
+	/// <summary>Reported, but not as a problem.</summary>
+	Note,
+
+	/// <summary>A build warning.</summary>
+	Warning,
+
+	/// <summary>A build error.</summary>
+	Error,
+}
+
 /// <summary>
 /// One code style diagnostic a build reported, reduced to what a fix needs: which rule, which file,
 /// and where.
@@ -24,11 +45,13 @@ namespace Nullean.Kerf.Cleanup;
 /// <param name="FilePath">Absolute path to the file. Both log formats report one.</param>
 /// <param name="Start">Where the diagnostic starts. Zero-based, as <see cref="LinePosition"/> is.</param>
 /// <param name="End">Where it ends, when the log said. Null when only a start was reported.</param>
+/// <param name="Level">How loudly it was reported, when the log said.</param>
 public readonly record struct CleanupDiagnostic(
 	string RuleId,
 	string FilePath,
 	LinePosition Start,
-	LinePosition? End = null)
+	LinePosition? End = null,
+	DiagnosticLevel Level = DiagnosticLevel.Unknown)
 {
 	/// <summary>True when the log carried a full span rather than only a start.</summary>
 	public bool HasSpan => End is not null;

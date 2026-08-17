@@ -40,18 +40,41 @@ public enum TokenDelta
 	// then have to be taught to translate.
 }
 
+/// <summary>How far a refusal reaches.</summary>
+/// <remarks>
+/// The distinction matters to <c>--forward</c>. "Kerf will not do this" and "nobody should do this
+/// unattended" are different claims, and collapsing them into one would have Kerf withhold a rule from
+/// another tool that does it perfectly well — on the strength of a constraint that is Kerf's own.
+/// </remarks>
+public enum RefusalScope
+{
+	/// <summary>
+	/// Kerf will not, but another tool legitimately can — usually because the fix deletes a declaration,
+	/// which non-negotiable #4 forbids, or because the diagnostic does not carry enough to derive it.
+	/// </summary>
+	Kerf,
+
+	/// <summary>
+	/// No tool should apply it unattended. A rename compiles while changing which overload binds, and
+	/// breaks reflection and serialisation strings no compiler check sees.
+	/// </summary>
+	AnyTool,
+}
+
 /// <summary>One code style rule, and Kerf's position on it.</summary>
 /// <param name="Id">The rule id, for example <c>IDE0005</c>.</param>
 /// <param name="Title">Roslyn's own title, taken from the SDK's severity configuration.</param>
 /// <param name="Owner">Who fixes it.</param>
 /// <param name="Delta">What a fix does to the token stream.</param>
 /// <param name="Refusal">Why Kerf will not fix it, when <paramref name="Owner"/> is <see cref="RuleOwner.Never"/>.</param>
+/// <param name="Scope">Whether the refusal is Kerf's alone or applies to any tool.</param>
 public readonly record struct RuleEntry(
 	string Id,
 	string Title,
 	RuleOwner Owner,
 	TokenDelta Delta,
-	string? Refusal = null);
+	string? Refusal = null,
+	RefusalScope Scope = RefusalScope.Kerf);
 
 /// <summary>
 /// Every code style rule the .NET SDK can report, and whether Kerf fixes it.
@@ -160,7 +183,7 @@ public static class RuleCatalog
 		new("IDE0110", "Remove unnecessary discard",                                       RuleOwner.DotnetFormatStyle, TokenDelta.None),
 		new("IDE0120", "Simplify LINQ expression",                                         RuleOwner.DotnetFormatStyle, TokenDelta.None),
 		new("IDE0121", "Simplify LINQ expression",                                         RuleOwner.DotnetFormatStyle, TokenDelta.None),
-		new("IDE0130", "Namespace does not match folder structure",                        RuleOwner.Never, TokenDelta.None, "A namespace rename touches every reference site."),
+		new("IDE0130", "Namespace does not match folder structure",                        RuleOwner.Never, TokenDelta.None, "A namespace rename touches every reference site.", RefusalScope.AnyTool),
 		new("IDE0150", "Prefer 'null' check over type check",                              RuleOwner.DotnetFormatStyle, TokenDelta.None),
 		new("IDE0160", "Convert to block scoped namespace",                                RuleOwner.Never, TokenDelta.None, "Kerf converts to a file-scoped namespace and never back; removing braces can change what a name resolves to."),
 		new("IDE0161", "Convert to file-scoped namespace",                                 RuleOwner.Formatting, TokenDelta.None),
@@ -198,7 +221,7 @@ public static class RuleCatalog
 		new("IDE0391", "Make method synchronous",                                          RuleOwner.DotnetFormatStyle, TokenDelta.None),
 		new("IDE0410", "Use labeled jump statement",                                       RuleOwner.DotnetFormatStyle, TokenDelta.None),
 		new("IDE1005", "Delegate invocation can be simplified.",                           RuleOwner.DotnetFormatStyle, TokenDelta.None),
-		new("IDE1006", "Naming Styles",                                                    RuleOwner.Never, TokenDelta.None, "A rename touches every reference site, and no compiler check catches a reflection or serialisation string that named the old one."),
+		new("IDE1006", "Naming Styles",                                                    RuleOwner.Never, TokenDelta.None, "A rename touches every reference site, and no compiler check catches a reflection or serialisation string that named the old one.", RefusalScope.AnyTool),
 		new("IDE2000", "Avoid multiple blank lines",                                       RuleOwner.Formatting, TokenDelta.None),
 		new("IDE2001", "Embedded statements must be on their own line",                    RuleOwner.Formatting, TokenDelta.None),
 		new("IDE2002", "Consecutive braces must not have blank line between them",         RuleOwner.Formatting, TokenDelta.None),

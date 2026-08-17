@@ -121,6 +121,7 @@ public static class SarifReader
 	{
 		string? ruleId = null;
 		string? path = null;
+		var level = DiagnosticLevel.Unknown;
 		var start = default(LinePosition);
 		LinePosition? end = null;
 		var located = false;
@@ -131,6 +132,18 @@ public static class SarifReader
 			{
 				reader.Read();
 				ruleId = reader.TokenType == JsonTokenType.String ? reader.GetString() : null;
+				continue;
+			}
+
+			if (reader.ValueTextEquals("level"))
+			{
+				reader.Read();
+				level = reader.TokenType != JsonTokenType.String ? DiagnosticLevel.Unknown
+					: reader.ValueTextEquals("error") ? DiagnosticLevel.Error
+					: reader.ValueTextEquals("warning") ? DiagnosticLevel.Warning
+					: reader.ValueTextEquals("note") ? DiagnosticLevel.Note
+					: DiagnosticLevel.Unknown;
+
 				continue;
 			}
 
@@ -159,7 +172,7 @@ public static class SarifReader
 		}
 
 		if (ruleId is not null && located && path is not null)
-			into.Add(new CleanupDiagnostic(ruleId, path, start, end));
+			into.Add(new CleanupDiagnostic(ruleId, path, start, end, level));
 	}
 
 	private static bool ReadLocation(ref Utf8JsonReader reader, ref string? path, ref LinePosition start, ref LinePosition? end)

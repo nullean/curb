@@ -22,6 +22,8 @@ if (args.Length == 0 || args[0] is "-h" or "--help")
 	Console.WriteLine();
 	Console.WriteLine("  --diagnostics <path>       the log to read, instead of searching <path> for kerf.sarif");
 	Console.WriteLine("  --check                    with cleanup: report what would be fixed, change nothing");
+	Console.WriteLine("  --forward                  with cleanup: hand what Kerf cannot fix to dotnet format,");
+	Console.WriteLine("                             scoped to the reported rules and files, and report both timings");
 	Console.WriteLine("  --no-verify   skip re-parsing output to prove the token stream is unchanged");
 	Console.WriteLine();
 	Console.WriteLine("Cleanup never builds. Build first, then run it:");
@@ -85,7 +87,8 @@ switch (args[0])
 			return CleanupRun.Execute(fileSystem, path,
 				write: !args.Contains("--check"),
 				logs: [.. explicitLogs],
-				explicitFiles: explicitFiles);
+				explicitFiles: explicitFiles,
+				forward: args.Contains("--forward"));
 		}
 
 	case "rules":
@@ -97,7 +100,7 @@ switch (args[0])
 			{
 				(RuleOwner.Cleanup, "fixed by `kerf cleanup`, from a diagnostic your build reported"),
 				(RuleOwner.Formatting, "already satisfied by `kerf format`, before the compiler looks"),
-				(RuleOwner.Never, "never fixed by Kerf"),
+				(RuleOwner.Never, "never fixed by Kerf — `--forward` still hands on the ones another tool may do"),
 				(RuleOwner.DotnetFormatStyle, "not Kerf's — use `dotnet format style`"),
 			};
 
@@ -110,7 +113,12 @@ switch (args[0])
 				{
 					Console.WriteLine($"  {entry.Id}  {entry.Title}");
 					if (entry.Refusal is { } refusal)
-						Console.WriteLine($"            {refusal}");
+					{
+						// The scope is the part that decides what --forward does with it, so it is said out
+						// loud rather than left for someone to infer from the wording.
+						var scope = entry.Scope == RefusalScope.AnyTool ? "no tool, unattended" : "not Kerf";
+						Console.WriteLine($"            [{scope}] {refusal}");
+					}
 				}
 
 				Console.WriteLine();

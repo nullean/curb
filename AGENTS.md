@@ -117,7 +117,8 @@ build, and it is why Core's only package reference is the exact-pinned parser.
   bodies, file-scoped namespaces, modifier order, redundant parentheses).
 - **`kerf cleanup`, in scope:** semantic code style rules — but only ones a build has already reported,
   and only where the fix is derivable from the diagnostic's position plus syntax. It *consumes a verdict*
-  rather than deriving one. See [docs/cleanup.md](docs/cleanup.md).
+  rather than deriving one. `--forward` hands the remainder to `dotnet format` and prints both timings.
+  See [docs/cleanup.md](docs/cleanup.md).
 - **Out of scope, permanently:** any fix that deletes a declaration (IDE0051/0052) or renames a symbol
   (IDE1006/IDE0130), and any fix the diagnostic does not carry enough information to make (IDE0008 needs
   a type name). Report these and point the user at `dotnet format style`.
