@@ -585,6 +585,20 @@ public readonly record struct FormatOptions
 	public int? MaxArgumentsOnLine { get; init; }
 
 	/// <summary>
+	/// <c>csharp_max_initializer_elements_on_line</c>: chop an object or collection initializer
+	/// carrying more than this many elements.
+	/// </summary>
+	/// <remarks>
+	/// The safe half of the initializer wrapping family. This only ever *breaks* a list — the joining
+	/// direction, closing up an initializer that fits, is the one that cannot be made to settle while
+	/// every other construct still reads its layout from the source.
+	/// </remarks>
+	public int? MaxInitializerElementsOnLine { get; init; }
+
+	/// <summary><c>csharp_max_array_initializer_elements_on_line</c>, the same for an array.</summary>
+	public int? MaxArrayInitializerElementsOnLine { get; init; }
+
+	/// <summary>
 	/// <c>csharp_wrap_before_first_method_call</c>: when a chain breaks at its dots, break before the
 	/// first call too, leaving the receiver on a line of its own.
 	/// </summary>

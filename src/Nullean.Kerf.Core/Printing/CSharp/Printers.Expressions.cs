@@ -275,6 +275,19 @@ internal static partial class Printers
 
 			if (node.Expressions.Count > 0)
 			{
+				// A count rather than a column, the same question the parameter and argument limits
+				// ask. Breaking only — an initializer that fits is never closed up by this.
+				var limit = node.IsKind(SyntaxKind.ArrayInitializerExpression)
+					? context.Options.MaxArrayInitializerElementsOnLine
+					: context.Options.MaxInitializerElementsOnLine;
+
+				// Not for an initializer sitting in an argument list. Where a construct with its own
+				// braces anchors is read from the source — the line it starts on — and forcing a break
+				// the source does not have puts it a level out, which the second run then corrects.
+				// The shapes this rule is for, an assignment or a field, are not in that position.
+				if (limit is { } elements && node.Expressions.Count > elements && !IsInsideArguments(node))
+					arena.BreakParent();
+
 				var rewritesComma = RewritesTrailingComma(node.Expressions, node.CloseBraceToken, context);
 
 				using (arena.Indent())

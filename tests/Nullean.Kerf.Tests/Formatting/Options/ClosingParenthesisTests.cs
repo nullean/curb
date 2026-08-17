@@ -530,4 +530,99 @@ public class ClosingParenthesisTests : FormattingTest
 		}
 		""",
 		editorConfig: Narrow + "\ncsharp_wrap_chained_binary_expressions = chop_if_long");
+
+	// ---- initializer element counts ---------------------------------------------------------------------
+
+	[Test]
+	public Task An_initializer_over_the_element_limit_chops() => WithAndWithout(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        var b = new Options { X = 1, Y = 2, Z = 3 };
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        var b = new Options { X = 1, Y = 2, Z = 3 };
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        var b = new Options
+		        {
+		            X = 1,
+		            Y = 2,
+		            Z = 3
+		        };
+		    }
+		}
+		""",
+		"csharp_max_initializer_elements_on_line = 2");
+
+	[Test]
+	public Task An_initializer_at_the_limit_is_left_alone() => Unchanged(
+		// Breaking only. This never closes up an initializer that fits — that direction is the one
+		// that cannot be made to settle.
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        var a = new Point { X = 1, Y = 2 };
+		    }
+		}
+		""",
+		editorConfig: "csharp_max_initializer_elements_on_line = 2");
+
+	[Test]
+	public Task Arrays_have_a_limit_of_their_own() => Formats(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        var c = new[] { 1, 2, 3 };
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        var c = new[]
+		        {
+		            1,
+		            2,
+		            3
+		        };
+		    }
+		}
+		""",
+		editorConfig: "csharp_max_array_initializer_elements_on_line = 2");
+
+	[Test]
+	public Task An_initializer_in_an_argument_is_left_to_the_call() => Unchanged(
+		// Where a construct with its own braces anchors is read from the source, so forcing a break
+		// the source does not have puts it a level out and the next run corrects it.
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        Send(new Options { X = 1, Y = 2, Z = 3 });
+		    }
+		}
+		""",
+		editorConfig: "csharp_max_initializer_elements_on_line = 2");
 }

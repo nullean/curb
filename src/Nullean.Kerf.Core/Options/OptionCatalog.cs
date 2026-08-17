@@ -106,6 +106,8 @@ public static class OptionCatalog
 			"csharp_wrap_before_first_method_call",
 			"csharp_wrap_chained_binary_expressions",
 			"csharp_wrap_before_binary_opsign",
+			"csharp_max_initializer_elements_on_line",
+			"csharp_max_array_initializer_elements_on_line",
 			"csharp_max_formal_parameters_on_line",
 			"csharp_max_invocation_arguments_on_line",
 			"csharp_wrap_before_declaration_rpar",

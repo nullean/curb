@@ -283,6 +283,12 @@ public static class EditorConfigOptionsBinder
 		if (TryPrefixedBool(properties, "wrap_before_first_method_call", diagnostics, out var wrapFirstCall))
 			options = options with { WrapBeforeFirstMethodCall = wrapFirstCall };
 
+		if (TryPrefixedCount(properties, "max_initializer_elements_on_line", diagnostics, out var maxElements))
+			options = options with { MaxInitializerElementsOnLine = maxElements };
+
+		if (TryPrefixedCount(properties, "max_array_initializer_elements_on_line", diagnostics, out var maxArrayElements))
+			options = options with { MaxArrayInitializerElementsOnLine = maxArrayElements };
+
 		if (TryPrefixedCount(properties, "max_formal_parameters_on_line", diagnostics, out var maxParameters))
 			options = options with { MaxParametersOnLine = maxParameters };
 

@@ -55,6 +55,8 @@ public static class OptionValues
 			false => "false",
 			null => "false   # a plain identifier receiver keeps its first call; anything else stands alone",
 		},
+		"csharp_max_initializer_elements_on_line" => Count(options.MaxInitializerElementsOnLine),
+		"csharp_max_array_initializer_elements_on_line" => Count(options.MaxArrayInitializerElementsOnLine),
 		"csharp_max_formal_parameters_on_line" => Count(options.MaxParametersOnLine),
 		"csharp_max_invocation_arguments_on_line" => Count(options.MaxArgumentsOnLine),
 		"csharp_wrap_before_declaration_rpar" => Rpar(options.WrapBeforeDeclarationRpar),
