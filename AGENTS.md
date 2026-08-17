@@ -91,6 +91,12 @@ folder with no restore and no build.
 - The conformance gate: with `max_line_length = off`, Kerf output must be **byte-identical to
   `dotnet format whitespace`**. That number is the product claim; keep it at 100%.
 
+**Before adding any option that moves a line break, read
+[docs/layout-decisions.md](docs/layout-decisions.md).** A layout rule may read the tokens and it may
+read layout the author owns; it may never read layout Kerf itself decides. That one mistake has
+killed more features than every other cause combined, and the note carries the measurements so they
+are not re-derived.
+
 ## Style
 
 Tabs, Allman braces, file-scoped namespaces, `var`, 160 columns. All of it is in `.editorconfig`,
