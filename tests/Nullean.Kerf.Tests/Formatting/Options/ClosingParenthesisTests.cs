@@ -402,4 +402,132 @@ public class ClosingParenthesisTests : FormattingTest
 		}
 		""",
 		editorConfig: Narrow + "\ncsharp_wrap_before_first_method_call = true");
+
+	// ---- binary chains ---------------------------------------------------------------------------------
+
+	[Test]
+	public Task A_long_condition_overflows_the_line_by_default() => Unchanged(
+		// Kerf has no break opportunity inside a binary chain, so a condition too long for the line
+		// simply overflows it: the parentheses move, the operands do not.
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        if (
+		            firstCondition && secondCondition && thirdCondition && fourth
+		        )
+		        {
+		        }
+		    }
+		}
+		""",
+		editorConfig: Narrow);
+
+	[Test]
+	public Task Chopping_gives_every_operand_a_line() => Formats(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        var ok = alphaCondition && betaCondition && gammaCond;
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        var ok = alphaCondition
+		            && betaCondition
+		            && gammaCond;
+		    }
+		}
+		""",
+		editorConfig: Narrow + "\ncsharp_wrap_chained_binary_expressions = chop_if_long");
+
+	[Test]
+	public Task The_operator_can_end_the_line_instead_of_starting_it() => Formats(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        var ok = alphaCondition && betaCondition && gammaCond;
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        var ok = alphaCondition &&
+		            betaCondition &&
+		            gammaCond;
+		    }
+		}
+		""",
+		editorConfig: Narrow
+			+ "\ncsharp_wrap_chained_binary_expressions = chop_if_long"
+			+ "\ncsharp_wrap_before_binary_opsign = false");
+
+	[Test]
+	public Task A_two_operand_chain_is_left_alone() => Unchanged(
+		// Two reads fine on one line, and the group around it already offers a break.
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        var ok = alphaCondition && betaCondition;
+		    }
+		}
+		""",
+		editorConfig: Narrow + "\ncsharp_wrap_chained_binary_expressions = chop_if_long");
+
+	[Test]
+	public Task A_right_associative_chain_keeps_every_operator() => Formats(
+		// `??` associates the other way, so its operands are left-hand children. Looking each operator
+		// up from its operand afterwards found nothing for them and dropped the lot — caught by the
+		// content check on a corpus file, not by any test that existed.
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        var value = alphaCandidate ?? betaCandidate ?? gammaCandidate;
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        var value = alphaCandidate
+		            ?? betaCandidate
+		            ?? gammaCandidate;
+		    }
+		}
+		""",
+		editorConfig: Narrow + "\ncsharp_wrap_chained_binary_expressions = chop_if_long");
+
+	[Test]
+	public Task A_chain_inside_a_call_is_left_to_the_call() => Unchanged(
+		// A chain there is measured by whatever encloses it, and the break opportunities this would
+		// add change that measurement without necessarily being taken — which left one corpus file
+		// long on the first run and broken on the second.
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        Assert(d => d.A == 1 && d.B == 2 && d.C == 3);
+		    }
+		}
+		""",
+		editorConfig: Narrow + "\ncsharp_wrap_chained_binary_expressions = chop_if_long");
 }

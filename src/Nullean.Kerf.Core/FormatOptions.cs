@@ -2,6 +2,16 @@ using Nullean.Kerf.Options;
 
 namespace Nullean.Kerf;
 
+/// <summary>How a chain is laid out once it no longer fits.</summary>
+public enum WrapStyle
+{
+	/// <summary>Every element on its own line, but only when the chain does not fit.</summary>
+	ChopIfLong,
+
+	/// <summary>Pack elements onto a line until the width runs out. Not implemented.</summary>
+	WrapIfLong,
+}
+
 /// <summary>Where <c>csharp_using_directive_placement</c> wants the using directives.</summary>
 public enum UsingPlacement
 {
@@ -590,6 +600,31 @@ public readonly record struct FormatOptions
 	/// </para>
 	/// </remarks>
 	public bool? WrapBeforeFirstMethodCall { get; init; }
+
+	/// <summary>
+	/// <c>csharp_wrap_chained_binary_expressions</c>: give each operand of a long <c>&amp;&amp;</c>
+	/// or <c>||</c> chain a line of its own. Null leaves such a chain unbroken.
+	/// </summary>
+	/// <remarks>
+	/// <para>
+	/// Kerf has no break opportunity inside a binary chain at all, so a condition too long for the
+	/// line simply overflows it — the parentheses around it move, the operands do not. This is the
+	/// key that gives them somewhere to go.
+	/// </para>
+	/// <para>
+	/// Only <c>chop_if_long</c> is implemented: every operand on its own line once the chain does not
+	/// fit. <c>wrap_if_long</c> is the fill layout, packing operands until the width runs out, and the
+	/// document printer has no primitive for it.
+	/// </para>
+	/// </remarks>
+	public WrapStyle? WrapChainedBinaryExpressions { get; init; }
+
+	/// <summary>
+	/// <c>csharp_wrap_before_binary_opsign</c>: start the new line with the operator rather than
+	/// ending the old one with it. True by default, which is where ReSharper and CSharpier both put
+	/// it, and only consulted once a chain is being broken at all.
+	/// </summary>
+	public bool WrapBeforeBinaryOpsign { get; init; } = true;
 
 	/// <summary>True when either trailing-comma option asked for anything.</summary>
 	/// <remarks>

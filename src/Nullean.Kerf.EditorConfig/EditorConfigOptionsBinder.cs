@@ -250,6 +250,36 @@ public static class EditorConfigOptionsBinder
 			&& !string.Equals(header, "unset", StringComparison.OrdinalIgnoreCase))
 			options = options with { FileHeaderTemplate = header };
 
+		if (TryPrefixedBool(properties, "wrap_before_binary_opsign", diagnostics, out var beforeOpsign))
+			options = options with { WrapBeforeBinaryOpsign = beforeOpsign };
+
+		foreach (var prefix in ReSharperPrefixes)
+		{
+			if (!properties.TryGetValue(prefix + "wrap_chained_binary_expressions", out var binaryWrap))
+				continue;
+
+			var colon = binaryWrap.LastIndexOf(':');
+			switch ((colon >= 0 ? binaryWrap[..colon] : binaryWrap).Trim().ToLowerInvariant())
+			{
+				case "chop_if_long":
+					options = options with { WrapChainedBinaryExpressions = WrapStyle.ChopIfLong };
+					break;
+				case "wrap_if_long":
+					// The fill layout, which the document printer has no primitive for. Reported
+					// rather than silently treated as the other one.
+					diagnostics?.Add(KerfDiagnostic.UnrecognisedValue(
+						prefix + "wrap_chained_binary_expressions", binaryWrap,
+						"chop_if_long; wrap_if_long is not implemented"));
+					break;
+				default:
+					diagnostics?.Add(KerfDiagnostic.UnrecognisedValue(
+						prefix + "wrap_chained_binary_expressions", binaryWrap, "chop_if_long"));
+					break;
+			}
+
+			break;
+		}
+
 		if (TryPrefixedBool(properties, "wrap_before_first_method_call", diagnostics, out var wrapFirstCall))
 			options = options with { WrapBeforeFirstMethodCall = wrapFirstCall };
 

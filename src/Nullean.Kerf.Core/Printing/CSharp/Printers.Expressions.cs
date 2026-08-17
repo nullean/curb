@@ -76,6 +76,9 @@ internal static partial class Printers
 			return;
 		}
 
+		if (TryPrintBinaryChain(node, context))
+			return;
+
 		Node.Print(node.Left, context);
 
 		// A chain the author broke stays broken, with its operands level rather than gaining a

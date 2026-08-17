@@ -45,6 +45,10 @@ public static class OptionValues
 		"csharp_style_expression_bodied_properties" => Expression(options.ExpressionBodiedProperties),
 		"csharp_style_expression_bodied_indexers" => Expression(options.ExpressionBodiedIndexers),
 		"file_header_template" => options.FileHeaderTemplate ?? "   # no header is required",
+		"csharp_wrap_chained_binary_expressions" => options.WrapChainedBinaryExpressions is null
+			? "   # a chain that does not fit overflows the line rather than breaking"
+			: "chop_if_long",
+		"csharp_wrap_before_binary_opsign" => Bool(options.WrapBeforeBinaryOpsign),
 		"csharp_wrap_before_first_method_call" => options.WrapBeforeFirstMethodCall switch
 		{
 			true => "true",
