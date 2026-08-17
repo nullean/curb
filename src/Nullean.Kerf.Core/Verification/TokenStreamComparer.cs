@@ -470,19 +470,25 @@ internal static class TokenStreamComparer
 	}
 
 	/// <summary>
-	/// Yields every token in source order by following Roslyn's sibling-chain navigation.
+	/// Walks the syntax tree in source order using an explicit stack over
+	/// <c>ChildNodesAndTokens().Reverse()</c>.
 	/// </summary>
-	/// <remarks>
-	/// <c>GetNextToken()</c> walks the green tree via parent/sibling pointers — O(1) amortised
-	/// per step, O(n) total — and never touches <c>ChildSyntaxList</c> indexing.
-	/// </remarks>
 	private static IEnumerator<SyntaxToken> TokenWalker(SyntaxNode root)
 	{
-		var token = root.GetFirstToken();
-		while (token != default)
+		var stack = new Stack<SyntaxNodeOrToken>();
+		stack.Push(root);
+		while (stack.Count > 0)
 		{
-			yield return token;
-			token = token.GetNextToken();
+			var item = stack.Pop();
+			if (item.IsToken)
+			{
+				yield return item.AsToken();
+			}
+			else
+			{
+				foreach (var child in item.AsNode()!.ChildNodesAndTokens().Reverse())
+					stack.Push(child);
+			}
 		}
 	}
 }
