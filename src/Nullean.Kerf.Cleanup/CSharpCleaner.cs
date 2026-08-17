@@ -76,7 +76,11 @@ public sealed class CSharpCleaner
 	private readonly List<string> _refusals = [];
 	private readonly List<CleanupDiagnostic> _unfixed = [];
 	private readonly List<TextSpan> _dropped = [];
-	private readonly List<string> _inserted = [];
+	private readonly List<InsertedToken> _inserted = [];
+	private readonly List<PlannedFix> _scratch = [];
+
+	/// <summary>Diagnostics fixed, which is not the same as edits made — one diagnostic can need several.</summary>
+	private int _appliedDiagnostics;
 
 	/// <summary>Cleans one file. Returns unchanged output rather than throwing when there is nothing to do.</summary>
 	/// <param name="source">The file's text, which must be what the build compiled.</param>
@@ -88,6 +92,8 @@ public sealed class CSharpCleaner
 		_unfixed.Clear();
 		_dropped.Clear();
 		_inserted.Clear();
+		_scratch.Clear();
+		_appliedDiagnostics = 0;
 
 		if (!CSharpSource.TryParse(source, out var parsed, out var errors))
 		{
@@ -132,13 +138,19 @@ public sealed class CSharpCleaner
 				continue;
 			}
 
-			if (rule.TryFix(context, diagnostic, span, out var fix, out var refusal))
+			// A rule may describe several edits: IDE0005 removes each directive of a run separately so that
+			// whatever sits between them survives.
+			_scratch.Clear();
+			if (rule.TryFix(context, diagnostic, span, _scratch, out var refusal) && _scratch.Count > 0)
 			{
-				_planned.Add((fix, diagnostic));
+				foreach (var fix in _scratch)
+					_planned.Add((fix, diagnostic));
+
+				_appliedDiagnostics++;
 			}
 			else
 			{
-				_refusals.Add($"{diagnostic.RuleId}: {refusal}");
+				_refusals.Add($"{diagnostic.RuleId}: {refusal ?? "the rule produced no edit"}");
 				_unfixed.Add(diagnostic);
 			}
 		}
@@ -162,7 +174,7 @@ public sealed class CSharpCleaner
 		if (!TokenStreamComparer.Verify(parsed.Root, source, output, out var tokenFailure, dropped: _dropped, inserted: _inserted))
 			return new CleanupResult(CleanupStatus.VerificationFailed, false, null, 0, [.. _refusals], [.. diagnostics], tokenFailure);
 
-		return new CleanupResult(CleanupStatus.Cleaned, true, output, _planned.Count, [.. _refusals], [.. _unfixed], null);
+		return new CleanupResult(CleanupStatus.Cleaned, true, output, _appliedDiagnostics, [.. _refusals], [.. _unfixed], null);
 	}
 
 	private static ICleanupRule? FindRule(string ruleId)
@@ -199,14 +211,36 @@ public sealed class CSharpCleaner
 			keep[i] = false;
 		}
 
+		// A diagnostic that lost one edit loses all of them. Since IDE0005 removes a run one directive at a
+		// time, keeping the survivors would apply half of what the diagnostic described — and half a fix is
+		// the partial application the one-pass contract exists to avoid.
+		var abandoned = new HashSet<CleanupDiagnostic>();
+		for (var i = 0; i < _planned.Count; i++)
+		{
+			if (!keep[i])
+				abandoned.Add(_planned[i].Diagnostic);
+		}
+
+		if (abandoned.Count > 0)
+		{
+			for (var i = 0; i < _planned.Count; i++)
+			{
+				if (abandoned.Contains(_planned[i].Diagnostic))
+					keep[i] = false;
+			}
+		}
+
+		foreach (var diagnostic in abandoned)
+		{
+			_refusals.Add($"{diagnostic.RuleId}: its fix overlaps another, so neither was applied");
+			_unfixed.Add(diagnostic);
+			_appliedDiagnostics = Math.Max(0, _appliedDiagnostics - 1);
+		}
+
 		for (var i = _planned.Count - 1; i >= 0; i--)
 		{
-			if (keep[i])
-				continue;
-
-			_refusals.Add($"{_planned[i].Diagnostic.RuleId}: its fix overlaps another, so neither was applied");
-			_unfixed.Add(_planned[i].Diagnostic);
-			_planned.RemoveAt(i);
+			if (!keep[i])
+				_planned.RemoveAt(i);
 		}
 	}
 
@@ -218,11 +252,20 @@ public sealed class CSharpCleaner
 		foreach (var (fix, _) in _planned)
 		{
 			output.Append(source, cursor, fix.Removed.Start - cursor);
+
+			// Where the inserted text lands in the output, which is what the verifiers match on. Taken here
+			// because this is the only place that knows it: the offset shifts by every edit before it.
+			var at = output.Length;
 			output.Append(fix.Inserted);
 			cursor = fix.Removed.End;
 
 			_dropped.AddRange(fix.DroppedTokens);
-			_inserted.AddRange(fix.InsertedTokens);
+
+			foreach (var token in fix.InsertedTokens)
+			{
+				var relative = fix.Inserted.IndexOf(token, StringComparison.Ordinal);
+				_inserted.Add(new InsertedToken(at + Math.Max(0, relative), token));
+			}
 		}
 
 		output.Append(source, cursor, source.Length - cursor);

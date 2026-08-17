@@ -253,6 +253,68 @@ What costs time is everything around it:
 | `$(ErrorLog)` | A SARIF is ~220–430 KB per project per target framework even for a trivial project, almost all of it rule metadata. Read with a streaming reader that skips it rather than deserialising. |
 | `dotnet format style` | ~2.4 s for one project and ~3.0 s for a blanket run, measured — it loads an MSBuild workspace, and scoping does not help. Still the answer for everything in the table above, and `--forward` will run it for you and print both numbers. |
 
+## The adversarial gate
+
+`./build.sh cleanupsafety --corpus <path>` is the counterpart to `conformance`, for the half of cleanup
+that conformance cannot reach.
+
+Every other cleanup test hands over a diagnostic the compiler really reported. This one claims every rule
+fires everywhere it could — so it deletes using directives the file needs, writes `var` where the type was
+load-bearing, and drops type names that were not inferable. **Those are wrong verdicts by construction.**
+Kerf's premise is that it trusts the compiler's answer and owns only the rewrite; this measures the second
+half on its own, and what it asserts is about the machinery rather than the verdicts:
+
+1. No file ever fails verification — the declared deltas describe exactly what each fix does.
+2. Anything rewritten still parses. A wrong verdict may leave a file that does not *compile*; none may
+   leave one the parser rejects.
+3. Re-running with the same, now stale, diagnostics changes nothing — the node-kind gate, at scale.
+
+Nothing is written; the corpus is read, cleaned in memory and discarded, so it can be pointed at a
+checkout somebody is working in. It also does not need the corpus to *build*, which means a repository
+whose SDK cannot be resolved locally is still a usable corpus — dotnet/roslyn pins an SDK Arcade
+downloads, and is used anyway.
+
+Measured on dotnet/roslyn: **17,169 files, 140,528 fixes applied across 15,788 files, 652,496 refusals, in
+26 s.**
+
+### What it found
+
+Four defects on its first run, none of which the unit tests or the smoke test could reach. They are worth
+recording because each is a class, not an instance.
+
+- **An insertion consumed at the first disagreement rather than at its declared offset.** `string version`
+  becoming `var version` puts `var` in front of a token that also starts with `v`, so there is no
+  disagreement to trigger on, the insertion is never consumed, and the walk desynchronises. Insertions now
+  declare their exact output offset. This is the same trap the dropped-brace handling already carried a
+  comment about — the lesson did not transfer until a corpus insisted.
+- **A zero-width token stealing a dropped span.** `new Dictionary<string, byte[]>()` contains an omitted
+  array-size token, which has zero width — and `TextSpan.Contains` is exclusive at the end, so nothing can
+  ever contain it. Under one-span-per-token accounting it consumed the span belonging to the `]` behind it
+  and left that `]` unexcused. Dropped spans are now matched by containment with a non-advancing cursor, so
+  one span may cover several tokens and a zero-width token costs nothing.
+- **A run of using directives removed as one contiguous range.** What sits between two directives is not
+  always whitespace: a comment saying why an import is there, or the `#line` and `#nullable` directives
+  that fill generated files. IDE0005 now emits one edit per directive, so anything between them survives —
+  and a rule may produce several edits, which is why `ICleanupRule` takes a collection.
+- **A diagnostic having some edits applied and others dropped for overlap.** Half a fix is exactly the
+  partial application the one-pass contract exists to prevent. A diagnostic that loses one edit now loses
+  all of them.
+
+Two further refusals came out of it rather than fixes, because the honest answer was to decline. A type
+with a comment inside it — `new Dictionary<string, /*isBanned*/bool>()` is real code — and a using
+directive Razor's code generator split across `#line` directives:
+
+```
+using global::Microsoft.AspNetCore.Components
+#line default
+#line hidden
+    ;
+```
+
+The directive's span runs from `using` to that `;` and contains both `#line`s. Removing it removed them.
+The content verifier caught it, which is the net working — but a rule that has to be caught should have
+declined, since the alternative is deciding which parts of somebody's generated file are load-bearing.
+
 ## Rejected alternatives
 
 Recorded so they are not re-litigated.

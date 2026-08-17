@@ -65,11 +65,10 @@ internal static class ContentVerifier
 	/// a closing one that was never opened, is still a failure.
 	/// </param>
 	/// <param name="inserted">
-	/// Exact token texts the output carries and the source does not, in output order — a modifier a
-	/// cleanup rule added, for instance. Given as the text rather than a count, so the allowance is
-	/// "precisely this word, once, here" and not "some extra content somewhere". Consumed only at a
-	/// point where the two sides already disagree, and every entry has to be used by the end of the
-	/// file.
+	/// Tokens the output carries and the source does not, in output order — a modifier a cleanup rule
+	/// added, for instance. Each names its exact text <b>and its exact offset in the output</b>, so the
+	/// allowance is "precisely this word, once, here" rather than "some extra content somewhere". Every
+	/// entry has to be used by the end of the file.
 	/// </param>
 	public static bool Verify(
 		ReadOnlySpan<char> source,
@@ -82,7 +81,7 @@ internal static class ContentVerifier
 		IReadOnlyList<TextSpan>? dropped = null,
 		int arrowsAdded = 0,
 		string? headerAdded = null,
-		IReadOnlyList<string>? inserted = null)
+		IReadOnlyList<InsertedToken>? inserted = null)
 	{
 		var sourceIndex = 0;
 		var outputIndex = 0;
@@ -204,17 +203,15 @@ internal static class ContentVerifier
 				continue;
 			}
 
-			// A word the output has and the source does not, declared exactly. Gated on the two sides
-			// already disagreeing, which for a modifier is guaranteed: at the insertion point the output
-			// holds a keyword the source does not, so this can never fire where the file already matched.
-			//
-			// Unlike a brace, an inserted word cannot be confused with one that was already there — which
-			// is why this can be settled locally where `bracesAdded` has to be settled by count.
+			// A word the output has and the source does not, matched by position rather than by looking for
+			// a disagreement. Gating on a mismatch is what an earlier version did and it was wrong: `var`
+			// inserted in front of a variable called `version` leaves both sides reading `v`, so the skip
+			// never fired and the walk desynchronised. The offset removes the guess.
 			if (inserted is not null && nextInserted < inserted.Count && !outputDone
-				&& (sourceDone || source[sourceIndex] != output[outputIndex])
-				&& StartsWithWord(output, outputIndex, inserted[nextInserted]))
+				&& outputIndex == inserted[nextInserted].Offset
+				&& StartsWithWord(output, outputIndex, inserted[nextInserted].Text))
 			{
-				outputIndex += inserted[nextInserted].Length;
+				outputIndex += inserted[nextInserted].Text.Length;
 				nextInserted++;
 				continue;
 			}

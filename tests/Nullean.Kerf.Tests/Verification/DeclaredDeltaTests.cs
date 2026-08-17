@@ -27,8 +27,35 @@ public class DeclaredDeltaTests
 		IReadOnlyList<TextSpan>? reordered = null,
 		bool trailingCommas = false,
 		bool bracesAdded = false,
-		IReadOnlyList<string>? inserted = null) =>
-		ContentVerifier.Verify(source, output, out _, reordered, trailingCommas, bracesAdded, inserted: inserted);
+		IReadOnlyList<string>? inserted = null,
+		IReadOnlyList<TextSpan>? dropped = null) =>
+		ContentVerifier.Verify(source, output, out _, reordered, trailingCommas, bracesAdded,
+			dropped: dropped, inserted: Locate(output, inserted));
+
+	/// <summary>
+	/// Turns declared words into the offsets the verifier matches on, by finding each in the output in turn.
+	/// </summary>
+	/// <remarks>
+	/// A word the output does not contain gets an offset nothing can match, so "declared but never appeared"
+	/// stays a failure rather than becoming an exception.
+	/// </remarks>
+	private static IReadOnlyList<InsertedToken>? Locate(string output, IReadOnlyList<string>? inserted)
+	{
+		if (inserted is null)
+			return null;
+
+		var tokens = new List<InsertedToken>(inserted.Count);
+		var from = 0;
+
+		foreach (var text in inserted)
+		{
+			var at = output.IndexOf(text, from, StringComparison.Ordinal);
+			tokens.Add(new InsertedToken(at, text));
+			from = at < 0 ? from : at + text.Length;
+		}
+
+		return tokens;
+	}
 
 	// ---- no delta declared ------------------------------------------------------------------------
 
@@ -116,6 +143,37 @@ public class DeclaredDeltaTests
 
 		Verify("private string _n; int _c;", "private readonly string _n;", inserted: ["readonly"])
 			.Should().BeFalse("a whole declaration went missing");
+
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task A_declared_word_may_share_a_prefix_with_the_token_behind_it()
+	{
+		// The case a 17,000-file corpus found. `var` inserted in front of a variable called `version` leaves
+		// both sides reading `v`, so an insertion consumed at the first disagreement is never consumed at
+		// all and the walk desynchronises. Matching on the declared offset is what fixes it, and this is the
+		// regression.
+		var dropped = new[] { new TextSpan("private ".Length, "string".Length) };
+
+		Verify("private string version = x;", "private var version = x;", inserted: ["var"], dropped: dropped)
+			.Should().BeTrue();
+
+		Verify("private string value = x;", "private var value = x;", inserted: ["var"], dropped: dropped)
+			.Should().BeTrue();
+
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task A_declared_word_at_the_wrong_place_is_still_damage()
+	{
+		// The offset is part of the declaration, not a hint. A word that turns up somewhere else is not the
+		// insertion that was declared.
+		var inserted = new[] { new InsertedToken(0, "private") };
+
+		ContentVerifier.Verify("int _n; int _m;", "int _n; private int _m;", out _, inserted: inserted)
+			.Should().BeFalse();
 
 		await Task.CompletedTask;
 	}

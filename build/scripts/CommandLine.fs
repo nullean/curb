@@ -26,6 +26,7 @@ type Arguments =
     | [<Inherit>] MaxAllocationRatio of double
     | [<CliPrefix(CliPrefix.None);SubCommand>] MsbuildSmoketest
     | [<CliPrefix(CliPrefix.None);SubCommand>] CleanupSmoketest
+    | [<CliPrefix(CliPrefix.None);SubCommand>] CleanupSafety
     | [<CliPrefix(CliPrefix.None);SubCommand>] VerifyExpectations
 
     | [<Inherit>] TrailingCommas
@@ -48,6 +49,7 @@ with
             | MaxAllocationRatio _ -> "fail if perf allocates more than this multiple of the source size"
             | MsbuildSmoketest -> "prove the MSBuild integration runs before the compiler"
             | CleanupSmoketest -> "prove kerf cleanup fixes what a build reported, and only that"
+            | CleanupSafety -> "feed a corpus wrong verdicts and prove none of them damages a file (--corpus <path>)"
             | VerifyExpectations -> "prove every expectation in the test suite survives dotnet format"
             | TrailingCommas -> "measure conformance with ReSharper's trailing-comma keys on"
             | Reflow -> "keep the corpus's own max_line_length instead of forcing it off"

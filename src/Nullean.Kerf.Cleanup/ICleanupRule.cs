@@ -87,12 +87,20 @@ internal interface ICleanupRule
 	bool NeedsSpan { get; }
 
 	/// <summary>
-	/// Plans the edit, or refuses with a reason.
+	/// Plans the edits, or refuses with a reason.
 	/// </summary>
 	/// <remarks>
+	/// <para>
+	/// Several edits rather than one, because a single diagnostic can describe several places. IDE0005
+	/// covers a whole run of using directives, and removing the run as one contiguous range would take
+	/// whatever sits between them — a comment, or the <c>#line</c> and <c>#nullable</c> directives that fill
+	/// generated files. Found on a corpus; one edit per directive keeps them.
+	/// </para>
+	/// <para>
 	/// The refusal is a first-class outcome, not an error. A rule that declines because the position no
 	/// longer holds what the log described has done the right thing, and saying so is what lets the
 	/// caller tell "Kerf declined" apart from "Kerf is broken".
+	/// </para>
 	/// </remarks>
-	bool TryFix(CleanupContext context, in CleanupDiagnostic diagnostic, TextSpan span, out PlannedFix fix, out string? refusal);
+	bool TryFix(CleanupContext context, in CleanupDiagnostic diagnostic, TextSpan span, ICollection<PlannedFix> into, out string? refusal);
 }

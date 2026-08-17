@@ -188,9 +188,8 @@ internal sealed class ReadOnlyFields : ICleanupRule
 	// The position identifies one field declaration, so a start is enough.
 	public bool NeedsSpan => false;
 
-	public bool TryFix(CleanupContext context, in CleanupDiagnostic diagnostic, TextSpan span, out PlannedFix fix, out string? refusal)
+	public bool TryFix(CleanupContext context, in CleanupDiagnostic diagnostic, TextSpan span, ICollection<PlannedFix> into, out string? refusal)
 	{
-		fix = default;
 
 		if (!Modifiers.TryFindMember(context, span, out var member, out refusal))
 			return false;
@@ -219,7 +218,7 @@ internal sealed class ReadOnlyFields : ICleanupRule
 		}
 
 		refusal = null;
-		fix = PlannedFix.InsertKeyword(Modifiers.InsertionPoint(field, SyntaxKind.ReadOnlyKeyword), "readonly");
+		into.Add(PlannedFix.InsertKeyword(Modifiers.InsertionPoint(field, SyntaxKind.ReadOnlyKeyword), "readonly"));
 		return true;
 	}
 }
@@ -244,9 +243,8 @@ internal sealed class AccessibilityModifiers : ICleanupRule
 
 	public bool NeedsSpan => false;
 
-	public bool TryFix(CleanupContext context, in CleanupDiagnostic diagnostic, TextSpan span, out PlannedFix fix, out string? refusal)
+	public bool TryFix(CleanupContext context, in CleanupDiagnostic diagnostic, TextSpan span, ICollection<PlannedFix> into, out string? refusal)
 	{
-		fix = default;
 
 		if (!Modifiers.TryFindMember(context, span, out var member, out refusal))
 			return false;
@@ -279,7 +277,7 @@ internal sealed class AccessibilityModifiers : ICleanupRule
 		}
 
 		refusal = null;
-		fix = PlannedFix.InsertKeyword(Modifiers.AfterAttributes(member), keyword);
+		into.Add(PlannedFix.InsertKeyword(Modifiers.AfterAttributes(member), keyword));
 		return true;
 	}
 

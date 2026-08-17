@@ -49,7 +49,7 @@ internal static class TokenStreamComparer
 		bool namespaceUnwrapped = false,
 		IReadOnlyList<TextSpan>? dropped = null,
 		int arrowsAdded = 0,
-		IReadOnlyList<string>? inserted = null)
+		IReadOnlyList<InsertedToken>? inserted = null)
 	{
 		if (!CSharpSource.TryParse(formatted, out var reparsed, out var errors))
 		{
@@ -144,12 +144,15 @@ internal static class TokenStreamComparer
 				return true;
 			}
 
-			// A token the output carries and the source does not, declared by its exact text. The original
-			// token is carried forward rather than consumed, so it is still compared on the next turn —
-			// which is what keeps this an insertion rather than a substitution.
+			// A token the output carries and the source does not, matched on its declared offset and text.
+			// Position rather than disagreement, for the reason InsertedToken records: an inserted word can
+			// share a prefix with the token behind it, and then there is no mismatch to trigger on.
+			//
+			// The original token is carried forward rather than consumed, so it is still compared on the
+			// next turn — which is what keeps this an insertion rather than a substitution.
 			if (inserted is not null && nextInserted < inserted.Count && hasProduced
-				&& (!hasOriginal || Mismatch(originalText, before, formattedText, after))
-				&& formattedText.Slice(after.Span.Start, after.Span.Length).SequenceEqual(inserted[nextInserted]))
+				&& after.SpanStart == inserted[nextInserted].Offset
+				&& formattedText.Slice(after.Span.Start, after.Span.Length).SequenceEqual(inserted[nextInserted].Text))
 			{
 				nextInserted++;
 				carryOriginal = hasOriginal;
@@ -189,9 +192,18 @@ internal static class TokenStreamComparer
 				while (nextDropped < dropped.Count && dropped[nextDropped].End <= before.SpanStart)
 					nextDropped++;
 
-				if (nextDropped < dropped.Count && dropped[nextDropped].Contains(before.SpanStart))
+				// Containment rather than one span per token, and the cursor does not advance on a match, so
+				// a span may cover several tokens. Both matter: a zero-width token cannot be `Contains`-ed
+				// by anything, since Contains is exclusive at the end, and C# has them — the omitted size in
+				// `byte[]` is one. Under the old one-for-one accounting that token consumed the span
+				// belonging to the `]` behind it, leaving the `]` itself unexcused and the walk one token out.
+				// Found on a 17,000-file corpus, reported as "']' became '('".
+				//
+				// The check is still exactly as strict: a span only ever excuses tokens that lie inside it.
+				if (nextDropped < dropped.Count
+					&& before.SpanStart >= dropped[nextDropped].Start
+					&& before.Span.End <= dropped[nextDropped].End)
 				{
-					nextDropped++;
 					carryProduced = hasProduced;
 					continue;
 				}

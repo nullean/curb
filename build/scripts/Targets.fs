@@ -270,6 +270,43 @@ let private msbuildSmoketest (arguments:ParseResults<Arguments>) =
     printfn ""
     printfn "MSBuild integration verified: formatted before CoreCompile, and IDE0055 fails without it"
 
+/// Feeds a corpus verdicts Kerf has no business trusting, and requires that none of them damages a file.
+///
+/// The counterpart to `conformance`, for the half of cleanup that conformance cannot reach. Every other
+/// cleanup test hands over a diagnostic the compiler really reported; this one claims every rule fires
+/// everywhere it could, so it deletes needed imports and writes `var` where the type was load-bearing.
+/// Those are wrong verdicts on purpose. What is asserted is that a wrong verdict still cannot produce a
+/// file the parser rejects, still cannot fail verification, and still leaves the node-kind gate refusing a
+/// second pass — which is the property that makes consuming a verdict from an earlier build safe.
+///
+/// Nothing is written. The corpus is read and cleaned in memory, so this is safe to point at a checkout
+/// somebody is working in — which also means it does not need the corpus to build, and a repository whose
+/// SDK cannot be resolved here is still a usable corpus.
+let private cleanupSafety (arguments:ParseResults<Arguments>) =
+    let corpus =
+        match arguments.TryGetResult Corpus with
+        | Some c -> DirectoryInfo(c)
+        | None -> failwith "cleanupsafety needs --corpus <path> pointing at a C# checkout"
+    if not corpus.Exists then failwithf "corpus not found: %s" corpus.FullName
+
+    printfn "sweeping %s" corpus.FullName
+    let summaryFile = Path.Combine(Path.GetTempPath(), "kerf-cleanup-summary.txt")
+    if File.Exists summaryFile then File.Delete summaryFile
+    Environment.SetEnvironmentVariable("KERF_CLEANUP_CORPUS", corpus.FullName)
+    Environment.SetEnvironmentVariable("KERF_CLEANUP_SUMMARY", summaryFile)
+
+    let result =
+        Proc.Start("dotnet",
+            [| "run"; "--project"; "tests/Nullean.Kerf.Tests"; "-c"; "Release"; "--"
+               "--treenode-filter"; "/*/*/CleanupCorpusTests/*" |])
+
+    let output = result.ConsoleOut |> Seq.map (fun l -> l.Line) |> String.concat "\n"
+    if result.ExitCode <> 0 then
+        printfn "%s" output
+        failwith "the corpus sweep found a wrong verdict that damaged a file"
+
+    if File.Exists summaryFile then printfn "%s" (File.ReadAllText(summaryFile).Trim())
+
 /// Proves `kerf cleanup` fixes what a build reported, and nothing else.
 ///
 /// Four assertions, where the MSBuild formatting smoke test needs two. Two of them are the same idea —
@@ -588,6 +625,7 @@ let Setup (parsed:ParseResults<Arguments>) (subCommand:Arguments) =
     cmd Perf.Name (Some [Build.Name]) None <| fun _ -> perf parsed
     cmd MsbuildSmoketest.Name (Some [Build.Name]) None <| fun _ -> msbuildSmoketest parsed
     cmd CleanupSmoketest.Name (Some [Build.Name]) None <| fun _ -> cleanupSmoketest parsed
+    cmd CleanupSafety.Name (Some [Build.Name]) None <| fun _ -> cleanupSafety parsed
     cmd VerifyExpectations.Name (Some [Build.Name]) None <| fun _ -> verifyExpectations parsed
 
     step PristineCheck.Name pristineCheck

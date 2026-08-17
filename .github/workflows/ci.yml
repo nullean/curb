@@ -175,6 +175,21 @@ jobs:
       - name: Cleanup fixes what the build reported, and only that
         run: ./build.sh cleanupsmoketest -s true
 
+      # The adversarial half. The smoke test hands cleanup a diagnostic the compiler really reported; this
+      # claims every rule fires everywhere it could, so it deletes needed imports and writes `var` where the
+      # type was load-bearing. Those are wrong verdicts on purpose, and the property is that a wrong verdict
+      # still cannot fail verification, cannot produce a file the parser rejects, and cannot survive a second
+      # pass through the node-kind gate.
+      #
+      # It earned its place on the first run. Four separate defects, none of which the unit tests or the
+      # smoke test could reach: an insertion consumed at the first disagreement rather than at its declared
+      # offset (`var` in front of a variable called `version` leaves both sides reading `v`); a zero-width
+      # token, the omitted array size in `byte[]`, stealing the dropped span belonging to the `]` behind it;
+      # a run of using directives removed as one range, taking the comments and `#line` directives between
+      # them; and a diagnostic having some of its edits dropped for overlap while the rest were applied.
+      - name: No wrong verdict damages a file
+        run: ./build.sh cleanupsafety -s true --corpus /tmp/corpus
+
       # Every expectation the suite asserts, written out and run through dotnet format. Until this
       # existed only the corpus proved the fixed-point property; the hand-written expectations proved
       # only that Kerf agrees with itself, so one written from a wrong belief would pass forever — it

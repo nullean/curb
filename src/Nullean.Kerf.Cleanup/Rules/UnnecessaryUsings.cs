@@ -32,10 +32,8 @@ internal sealed class UnnecessaryUsings : ICleanupRule
 
 	public bool NeedsSpan => true;
 
-	public bool TryFix(CleanupContext context, in CleanupDiagnostic diagnostic, TextSpan span, out PlannedFix fix, out string? refusal)
+	public bool TryFix(CleanupContext context, in CleanupDiagnostic diagnostic, TextSpan span, ICollection<PlannedFix> into, out string? refusal)
 	{
-		fix = default;
-
 		if (context.HasConditionalDirectives)
 		{
 			refusal = "the file has a #if, so an unused directive under one symbol set may be needed under another";
@@ -86,21 +84,30 @@ internal sealed class UnnecessaryUsings : ICleanupRule
 			return false;
 		}
 
-		var dropped = new List<TextSpan>();
-		var start = int.MaxValue;
-		var end = 0;
-
+		// One edit per directive, not one spanning the run.
+		//
+		// A single contiguous range from the first directive to the last takes everything between them, and
+		// what sits between using directives is not always whitespace: a comment explaining why an import is
+		// there, or the `#line` and `#nullable` directives that fill generated files. Measured on a
+		// 17,000-file corpus, where a run-wide range ate both. The content verifier caught it — the net
+		// working — but a rule that has to be caught should not have done it.
 		foreach (var directive in run)
 		{
-			PlannedFix.CollectTokens(directive, dropped);
+			// A directive whose own span holds a comment or a #line would lose it. Razor's generated code
+			// really does split one directive across two #line directives; see Interior.
+			if (Interior.CarriesContent(directive))
+			{
+				refusal = "a directive in the run has a comment or a directive inside it, which removing it would take too";
+				into.Clear();
+				return false;
+			}
 
-			var line = Widen(context.Text, directive.Span);
-			start = Math.Min(start, line.Start);
-			end = Math.Max(end, line.End);
+			var dropped = new List<TextSpan>();
+			PlannedFix.CollectTokens(directive, dropped);
+			into.Add(PlannedFix.Delete(Widen(context.Text, directive.Span), dropped));
 		}
 
 		refusal = null;
-		fix = PlannedFix.Delete(TextSpan.FromBounds(start, end), dropped);
 		return true;
 	}
 

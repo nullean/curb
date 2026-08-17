@@ -27,9 +27,8 @@ internal sealed class ImplicitObjectCreation : ICleanupRule
 	// The position identifies one `new`, so a start is enough.
 	public bool NeedsSpan => false;
 
-	public bool TryFix(CleanupContext context, in CleanupDiagnostic diagnostic, TextSpan span, out PlannedFix fix, out string? refusal)
+	public bool TryFix(CleanupContext context, in CleanupDiagnostic diagnostic, TextSpan span, ICollection<PlannedFix> into, out string? refusal)
 	{
-		fix = default;
 
 		var token = context.Root.FindToken(span.Start);
 
@@ -54,6 +53,12 @@ internal sealed class ImplicitObjectCreation : ICleanupRule
 			return false;
 		}
 
+		if (Interior.CarriesContent(creation.Type))
+		{
+			refusal = "the type has a comment or a directive inside it, which dropping it would take too";
+			return false;
+		}
+
 		var dropped = new List<TextSpan>();
 		PlannedFix.CollectTokens(creation.Type, dropped);
 
@@ -65,7 +70,7 @@ internal sealed class ImplicitObjectCreation : ICleanupRule
 
 		// From the end of `new` to the end of the type, so the space between them goes with it.
 		refusal = null;
-		fix = PlannedFix.Delete(TextSpan.FromBounds(token.Span.End, creation.Type.Span.End), dropped);
+		into.Add(PlannedFix.Delete(TextSpan.FromBounds(token.Span.End, creation.Type.Span.End), dropped));
 		return true;
 	}
 }
@@ -95,9 +100,8 @@ internal sealed class ImplicitTypes : ICleanupRule
 	// The position identifies the type node, so a start is enough.
 	public bool NeedsSpan => false;
 
-	public bool TryFix(CleanupContext context, in CleanupDiagnostic diagnostic, TextSpan span, out PlannedFix fix, out string? refusal)
+	public bool TryFix(CleanupContext context, in CleanupDiagnostic diagnostic, TextSpan span, ICollection<PlannedFix> into, out string? refusal)
 	{
-		fix = default;
 
 		var token = context.Root.FindToken(span.Start);
 		if (token.SpanStart != span.Start)
@@ -149,6 +153,12 @@ internal sealed class ImplicitTypes : ICleanupRule
 				return false;
 		}
 
+		if (Interior.CarriesContent(type))
+		{
+			refusal = "the type has a comment or a directive inside it, which replacing it would take too";
+			return false;
+		}
+
 		var dropped = new List<TextSpan>();
 		PlannedFix.CollectTokens(type, dropped);
 
@@ -161,7 +171,7 @@ internal sealed class ImplicitTypes : ICleanupRule
 		// A deletion and an insertion rather than a substitution, because that is what the verifiers
 		// already understand: the type's tokens are declared dropped and `var` is declared inserted.
 		refusal = null;
-		fix = new PlannedFix(type.Span, "var", dropped, ["var"]);
+		into.Add(new PlannedFix(type.Span, "var", dropped, ["var"]));
 		return true;
 	}
 }
