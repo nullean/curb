@@ -115,7 +115,7 @@ internal static partial class Printers
 		// was closed up onto a single line, because nothing here asked. That shape is everywhere in
 		// analyzer code and was among the largest sources of churn measured on roslyn.
 		if (!context.OnSameLine(node.Left.Span.End, node.OperatorToken.SpanStart))
-			context.Arena.HardLine();
+			context.Arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
 		else
 			context.Arena.Synthetic(SyntheticText.Space);
 

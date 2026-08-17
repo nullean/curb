@@ -107,6 +107,9 @@ internal static class TokenPrinter
 		var pendingNewLines = 0;
 		var emittedAnything = false;
 
+		// True while emitting a run of comments that began aligned under a trailing comment.
+		var alignedRun = false;
+
 		foreach (var trivia in leading)
 		{
 			switch (trivia.Kind())
@@ -127,16 +130,33 @@ internal static class TokenPrinter
 					// starts a fresh line and must be emitted at one. Without this the comment glues
 					// onto whatever the enclosing printer emitted last, and the next run then reads it
 					// back as trailing trivia — so the output never settles.
+					// Captured before the flush, which zeroes it — the old check read it afterwards
+					// and so was always true.
+					var priorNewLines = pendingNewLines;
 					FlushBlankLine(arena, ref pendingNewLines, emittedAnything);
 
 					// dotnet format aligns a comment sitting directly under a trailing comment to
 					// that comment's column, and normalises every other comment to the statement
 					// indent. Kerf used to normalise both, which pulled hand-aligned continuations
 					// back to the left.
-					if (!emittedAnything && pendingNewLines == 0 && AlignsUnderTrailingComment(token, trivia, context))
+					//
+					// The whole run aligns, not only the comment that starts it. Aligning the first
+					// and dropping the rest to the statement indent is neither what dotnet format
+					// writes nor stable: the ragged result read back differently on the next run.
+					var startsAligned = !emittedAnything
+						&& priorNewLines == 0
+						&& AlignsUnderTrailingComment(token, trivia, context);
+
+					if (startsAligned || (alignedRun && priorNewLines <= 1))
+					{
 						arena.AlignedLine(TrailingCommentAnchor);
+						alignedRun = true;
+					}
 					else
+					{
 						arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
+						alignedRun = false;
+					}
 
 					pendingNewLines = EmitTriviaText(trivia, context, CommentFlags(trivia));
 					if (trailingBreak)

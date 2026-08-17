@@ -88,8 +88,11 @@ internal static partial class Printers
 		// end of a line, or `|| b` at the start of the next. Checking only after the operator missed
 		// the operator-first style entirely and joined those chains, which is what left two corpus
 		// files still reformatting themselves on a second run.
+		// OnlyIfNotAtLineStart: a trailing `// note` on the left operand has already ended its own
+		// line, and a second break here made a blank one — which then moved the comment run below it
+		// out of reach of the align-under-a-trailing-comment rule on the next run.
 		if (context.AuthorBroke(node.Left.Span.End, node.OperatorToken.SpanStart))
-			context.Arena.HardLine();
+			context.Arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
 		else
 			Spacing.BeforeOperator(context);
 
