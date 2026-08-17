@@ -134,7 +134,10 @@ public class MemberSeparatorTests : FormattingTest
 		""");
 
 	[Test]
-	public Task One_member_per_line_does_not_reach_anonymous_types() => Formats(
+	public Task The_object_initializer_key_reaches_anonymous_types_too() => Formats(
+		// Roslyn's behaviour rather than its documentation, and the one expectation in this suite that
+		// dotnet format moved: with only csharp_new_line_before_members_in_object_initializers set, it
+		// still spreads an opened-out anonymous type. Kerf had the two keys independent.
 		"""
 		public class C
 		{
@@ -163,7 +166,8 @@ public class MemberSeparatorTests : FormattingTest
 		        };
 		        var a = new
 		        {
-		            First = 1, Second = 2
+		            First = 1,
+		            Second = 2
 		        };
 		    }
 		}
