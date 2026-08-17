@@ -174,8 +174,15 @@ internal static class FormattingRun
 		var allocated = GC.GetTotalAllocatedBytes(precise: true) - allocatedBefore;
 		var sourceBytes = work.Sum(w => fileSystem.FileInfo.New(w.Path).Length);
 
-		foreach (var message in messages.Take(20))
+		// Sorted, because a ConcurrentBag hands them back in whatever order the threads finished, so
+		// two runs over the same tree reported a different arbitrary twenty. Diagnosing a large
+		// repository against a moving sample is worse than useless.
+		var reported = messages.OrderBy(m => m, StringComparer.Ordinal).ToArray();
+		foreach (var message in reported.Take(20))
 			Console.Error.WriteLine(message);
+
+		if (reported.Length > 20)
+			Console.Error.WriteLine($"… and {reported.Length - 20} more not shown");
 
 		var coverage = totalTokens == 0 ? 1 : printedTokens / (double)totalTokens / 1000;
 

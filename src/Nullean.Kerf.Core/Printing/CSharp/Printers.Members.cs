@@ -92,6 +92,12 @@ internal static partial class Printers
 		arena.Synthetic(SyntheticText.Space);
 		TokenPrinter.Print(node.OperatorKeyword, context);
 		arena.Synthetic(SyntheticText.Space);
+
+		// C# 11's `operator checked +`. Dropping it does not fail to compile, it silently changes
+		// which operator is declared — so this is one of the few printer omissions that would have
+		// altered behaviour rather than layout. The content verifier is what caught it.
+		PrintCheckedKeyword(node.CheckedKeyword, context);
+
 		TokenPrinter.Print(node.OperatorToken, context);
 		Spacing.BeforeDeclarationParens(context);
 		Node.Print(node.ParameterList, context);
@@ -112,6 +118,16 @@ internal static partial class Printers
 		TokenPrinter.PrintIfPresent(node.SemicolonToken, context);
 	}
 
+	/// <summary>Emits an operator's <c>checked</c> keyword, which is absent on the ordinary form.</summary>
+	private static void PrintCheckedKeyword(SyntaxToken keyword, PrintContext context)
+	{
+		if (keyword.RawKind == 0)
+			return;
+
+		TokenPrinter.Print(keyword, context);
+		context.Arena.Synthetic(SyntheticText.Space);
+	}
+
 	public static void ConversionOperatorDeclaration(ConversionOperatorDeclarationSyntax node, PrintContext context)
 	{
 		var arena = context.Arena;
@@ -122,6 +138,10 @@ internal static partial class Printers
 		arena.Synthetic(SyntheticText.Space);
 		TokenPrinter.Print(node.OperatorKeyword, context);
 		arena.Synthetic(SyntheticText.Space);
+
+		// `explicit operator checked int(...)`, the conversion form of the same C# 11 feature.
+		PrintCheckedKeyword(node.CheckedKeyword, context);
+
 		Node.Print(node.Type, context);
 		Spacing.BeforeDeclarationParens(context);
 		Node.Print(node.ParameterList, context);

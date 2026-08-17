@@ -22,6 +22,10 @@ internal static partial class Printers
 		var arena = context.Arena;
 		var oneClausePerLine = context.Options.NewLineBetweenQueryExpressionClauses;
 
+		// Whether the author opened this query out. Read from the source, and stable there because
+		// Kerf reproduces their breaks, so the next run reads the same answer back.
+		var asWritten = !oneClausePerLine && SpansLines(node, context);
+
 		// Clauses line up under the `from`, not at an indent level — `var x = from a in b` puts the
 		// following `where` under the `f`, wherever that lands. Capture the column before printing.
 		arena.Anchor(QueryAnchor);
@@ -31,35 +35,66 @@ internal static partial class Printers
 			QueryFromClause(node.FromClause, context);
 
 			// No indent scope: a clause that breaks lands on the anchor's column, not on a level.
-			{
-				foreach (var clause in node.Body.Clauses)
-				{
-					Separator();
-					Node.Print(clause, context);
-				}
-
-				Separator();
-				Node.Print(node.Body.SelectOrGroup, context);
-
-				if (node.Body.Continuation is null)
-					return;
-
-				Separator();
-				TokenPrinter.Print(node.Body.Continuation.IntoKeyword, context);
-				arena.Synthetic(SyntheticText.Space);
-				TokenPrinter.Print(node.Body.Continuation.Identifier, context);
-			}
+			PrintQueryBody(node.Body, node.FromClause.Span.End);
 		}
 
-		void Separator()
+		// A continuation carries a whole query body of its own, and it was never printed: everything
+		// after `into g` — the clauses, the select, and any comment among them — was dropped. The
+		// content verifier caught it, so no file was ever written that way, but any query using
+		// `into` simply could not be formatted. Nothing in the corpus uses one.
+		void PrintQueryBody(QueryBodySyntax body, int previousEnd)
+		{
+			foreach (var clause in body.Clauses)
+			{
+				Separator(previousEnd, clause.SpanStart);
+				Node.Print(clause, context);
+				previousEnd = clause.Span.End;
+			}
+
+			Separator(previousEnd, body.SelectOrGroup.SpanStart);
+			Node.Print(body.SelectOrGroup, context);
+			previousEnd = body.SelectOrGroup.Span.End;
+
+			if (body.Continuation is null)
+				return;
+
+			Separator(previousEnd, body.Continuation.SpanStart);
+			TokenPrinter.Print(body.Continuation.IntoKeyword, context);
+			arena.Synthetic(SyntheticText.Space);
+			TokenPrinter.Print(body.Continuation.Identifier, context);
+			PrintQueryBody(body.Continuation.Body, body.Continuation.Identifier.Span.End);
+		}
+
+		void Separator(int previousEnd, int nextStart)
 		{
 			// Aligned either way. The option decides whether the break is taken at all; where it
 			// lands when it is taken is the same question, and dotnet format answers it under the
 			// `from` whether the break came from the option or from the width.
+			//
+			// A break the author already put between two clauses is kept, as it is in a member chain
+			// and in an expression body. Without that the whole query closed up onto one line
+			// whenever it fitted, which with reflow off is always.
 			if (oneClausePerLine)
+			{
 				arena.AlignedLine(QueryAnchor);
-			else
-				arena.AlignedBreakOpportunity(QueryAnchor);
+				return;
+			}
+
+			// A query the author already opened out keeps their breaks exactly, clause by clause, and
+			// a plain space where they joined two. A break opportunity will not do: one hard line
+			// anywhere breaks the group, and every soft line in it with it, so `group x by x into g`
+			// came apart at the `into`.
+			if (asWritten)
+			{
+				if (context.OnSameLine(previousEnd, nextStart))
+					arena.Synthetic(SyntheticText.Space);
+				else
+					arena.AlignedLine(QueryAnchor);
+
+				return;
+			}
+
+			arena.AlignedBreakOpportunity(QueryAnchor);
 		}
 	}
 

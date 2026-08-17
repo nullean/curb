@@ -52,7 +52,8 @@ internal static partial class Printers
 			context.Arena.Synthetic(SyntheticText.Space);
 		}
 
-		PrintModifiers(node.Modifiers, context);
+		// A local's `ref readonly` is grammar too, and dotnet format leaves it alone.
+		PrintModifiers(node.Modifiers, context, reorder: false);
 		Node.Print(node.Declaration, context);
 		TokenPrinter.Print(node.SemicolonToken, context);
 	}

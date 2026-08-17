@@ -191,7 +191,19 @@ internal static partial class Printers
 			context.Arena.Synthetic(SyntheticText.Space);
 		}
 
-		Tokens(node.NamespaceOrType, context);
+		// A name keeps the token path, which reproduces the author's layout through trivia — some
+		// aliases target a generic spanning three lines, and the using-sort verifier compares the
+		// directive's text, so reformatting one makes it unrecognisable.
+		//
+		// Anything else goes to a real printer. Since C# 12 an alias can target any type, and Tokens
+		// is a raw token dump that only knows how to space a dotted name: it welded a tuple's element
+		// type to its name, so `using X = (int Left, string Right)` came out as `intLeft`. That is the
+		// fourth content bug traced to this helper and the first the release build could not catch,
+		// GuardAgainstWelding being debug-only.
+		if (node.NamespaceOrType is NameSyntax)
+			Tokens(node.NamespaceOrType, context);
+		else
+			Node.Print(node.NamespaceOrType, context);
 		TokenPrinter.Print(node.SemicolonToken, context);
 	}
 
@@ -585,7 +597,8 @@ internal static partial class Printers
 	{
 		PrintInlineAttributeLists(node.AttributeLists, context);
 
-		PrintModifiers(node.Modifiers, context);
+		// `this ref readonly` is the only order the grammar allows, so this is not a preference.
+		PrintModifiers(node.Modifiers, context, reorder: false);
 
 		if (node.Type is not null)
 		{
@@ -1471,9 +1484,9 @@ internal static partial class Printers
 			TokenPrinter.PrintTrailingTrivia(last, context);
 	}
 
-	private static void PrintModifiers(SyntaxTokenList modifiers, PrintContext context)
+	private static void PrintModifiers(SyntaxTokenList modifiers, PrintContext context, bool reorder = true)
 	{
-		if (CanOrderModifiers(modifiers, context))
+		if (reorder && CanOrderModifiers(modifiers, context))
 		{
 			PrintOrderedModifiers(modifiers, context);
 			return;
@@ -1515,6 +1528,16 @@ internal static partial class Printers
 	/// tokens takes their trivia along, so a comment written between two modifiers would follow the
 	/// wrong one — and the leading trivia of the first modifier is the declaration's doc comment,
 	/// which must stay at the front whatever happens to the keywords after it.
+	///
+	/// Callers pass <c>reorder: false</c> for parameters and locals, whose modifier order is grammar
+	/// rather than preference. Both were being sorted: `this ref readonly` came out as `readonly this
+	/// ref`, which does not compile, because a stable sort moves the modifiers IDE0036 does not name
+	/// to the back and only `readonly` is named.
+	///
+	/// It cannot be inferred from the modifiers alone — measured against `dotnet format style` at
+	/// warning severity, a *member* with an unnamed modifier is still reordered (`async static public`
+	/// becomes `public static async`), while a parameter or local is left exactly as written. So the
+	/// distinction is the declaration, not the keywords.
 	/// </remarks>
 	private static bool CanOrderModifiers(SyntaxTokenList modifiers, PrintContext context)
 	{
