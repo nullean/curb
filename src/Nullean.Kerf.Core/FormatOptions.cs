@@ -2,11 +2,14 @@ using Nullean.Kerf.Options;
 
 namespace Nullean.Kerf;
 
-/// <summary>How a chain is laid out once it no longer fits.</summary>
+/// <summary>How a list or chain is laid out.</summary>
 public enum WrapStyle
 {
-	/// <summary>Every element on its own line, but only when the chain does not fit.</summary>
+	/// <summary>Every element on its own line, but only when it does not fit. Kerf's own behaviour.</summary>
 	ChopIfLong,
+
+	/// <summary>Every element on its own line, fit or not.</summary>
+	ChopAlways,
 
 	/// <summary>Pack elements onto a line until the width runs out. Not implemented.</summary>
 	WrapIfLong,
@@ -597,6 +600,20 @@ public readonly record struct FormatOptions
 
 	/// <summary><c>csharp_max_array_initializer_elements_on_line</c>, the same for an array.</summary>
 	public int? MaxArrayInitializerElementsOnLine { get; init; }
+
+	/// <summary>
+	/// <c>csharp_wrap_parameters_style</c>: <c>chop_always</c> gives every parameter its own line
+	/// whether or not the list fits. Null leaves width to decide, which is <c>chop_if_long</c>.
+	/// </summary>
+	/// <remarks>
+	/// The breaking direction again, and safe for the same reason the counts are: it asks nothing
+	/// about the layout being decided. <c>wrap_if_long</c> — the fill layout — is reported as
+	/// unimplemented rather than quietly treated as one of the others.
+	/// </remarks>
+	public WrapStyle? WrapParametersStyle { get; init; }
+
+	// wrap_arguments_style, the two initializer styles and wrap_chained_method_calls are deliberately
+	// absent. See EditorConfigOptionsBinder for the measurement that rules them out.
 
 	/// <summary>
 	/// <c>csharp_wrap_before_first_method_call</c>: when a chain breaks at its dots, break before the

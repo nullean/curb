@@ -491,8 +491,10 @@ internal static partial class Printers
 			{
 				// A count, not a column: csharp_max_formal_parameters_on_line asks whether there are
 				// too many parameters rather than whether the line is too long, so it breaks the
-				// group outright instead of leaving it to fit measurement.
-				if (context.Options.MaxParametersOnLine is { } limit && node.Parameters.Count > limit)
+				// group outright instead of leaving it to fit measurement. chop_always is the same
+				// decision with no count to reach.
+				if (context.Options.WrapParametersStyle == WrapStyle.ChopAlways
+					|| (context.Options.MaxParametersOnLine is { } limit && node.Parameters.Count > limit))
 					arena.BreakParent();
 
 				using (arena.Indent())

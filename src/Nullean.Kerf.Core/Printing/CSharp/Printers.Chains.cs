@@ -51,6 +51,8 @@ internal static partial class Printers
 		if (links is null || (links.Count < MinimumLinksToBreak && !SpansLines(node, context)))
 			return false;
 
+
+
 		var arena = context.Arena;
 
 		// The author's own layout wins: a chain they opened out stays opened out, at their dots.

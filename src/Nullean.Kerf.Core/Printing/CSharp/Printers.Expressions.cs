@@ -277,9 +277,11 @@ internal static partial class Printers
 			{
 				// A count rather than a column, the same question the parameter and argument limits
 				// ask. Breaking only — an initializer that fits is never closed up by this.
-				var limit = node.IsKind(SyntaxKind.ArrayInitializerExpression)
+				var isArray = node.IsKind(SyntaxKind.ArrayInitializerExpression);
+				var limit = isArray
 					? context.Options.MaxArrayInitializerElementsOnLine
 					: context.Options.MaxInitializerElementsOnLine;
+
 
 				// Not for an initializer sitting in an argument list. Where a construct with its own
 				// braces anchors is read from the source — the line it starts on — and forcing a break

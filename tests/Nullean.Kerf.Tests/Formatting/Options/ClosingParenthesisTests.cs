@@ -625,4 +625,49 @@ public class ClosingParenthesisTests : FormattingTest
 		}
 		""",
 		editorConfig: "csharp_max_initializer_elements_on_line = 2");
+
+	// ---- chop always -----------------------------------------------------------------------------------
+
+	[Test]
+	public Task Parameters_can_be_chopped_whatever_the_width() => WithAndWithout(
+		"""
+		public class C
+		{
+		    public void M(int a, int b)
+		    {
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M(int a, int b)
+		    {
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M(
+		        int a,
+		        int b
+		    )
+		    {
+		    }
+		}
+		""",
+		"csharp_wrap_parameters_style = chop_always");
+
+	[Test]
+	public Task Chopping_always_still_leaves_an_empty_list_alone() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		    }
+		}
+		""",
+		editorConfig: "csharp_wrap_parameters_style = chop_always");
 }

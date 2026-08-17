@@ -55,6 +55,7 @@ public static class OptionValues
 			false => "false",
 			null => "false   # a plain identifier receiver keeps its first call; anything else stands alone",
 		},
+		"csharp_wrap_parameters_style" => Wrap(options.WrapParametersStyle),
 		"csharp_keep_blank_lines_in_declarations" => Lines(options.KeepBlankLinesInDeclarations),
 		"csharp_keep_blank_lines_in_code" => Lines(options.KeepBlankLinesInCode),
 		"csharp_blank_lines_around_invocable" => Lines(options.BlankLinesAroundInvocable),
@@ -164,6 +165,14 @@ public static class OptionValues
 	private static string Bool(bool value) => value ? "true" : "false";
 
 	private static string Lines(int value) => value.ToString(CultureInfo.InvariantCulture);
+
+	private static string Wrap(WrapStyle? value) => value switch
+	{
+		WrapStyle.ChopAlways => "chop_always",
+		WrapStyle.ChopIfLong => "chop_if_long",
+		WrapStyle.WrapIfLong => "chop_if_long   # wrap_if_long is not implemented",
+		_ => "chop_if_long   # width decides; the key is the opt-in",
+	};
 
 	private static string Count(int? value) =>
 		value?.ToString(CultureInfo.InvariantCulture) ?? "   # no limit; width alone breaks a list";

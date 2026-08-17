@@ -283,6 +283,18 @@ public static class EditorConfigOptionsBinder
 		if (TryPrefixedBool(properties, "wrap_before_first_method_call", diagnostics, out var wrapFirstCall))
 			options = options with { WrapBeforeFirstMethodCall = wrapFirstCall };
 
+		// Only the parameter list's. wrap_arguments_style, the two initializer styles and
+		// wrap_chained_method_calls are left to the same silence as the several hundred other
+		// ReSharper keys Kerf does not implement: forcing every one of those to break moves
+		// constructs whose indentation other rules read from the source, and the file then formats
+		// differently on its second pass — 140 corpus files for arguments and 156 for chains, against
+		// none for parameters. Binding them to warn instead would fire on real repositories that set
+		// them perfectly reasonably for Rider.
+		options = options with
+		{
+			WrapParametersStyle = WrapStyleOf(properties, "wrap_parameters_style", diagnostics),
+		};
+
 		if (TryPrefixedLines(properties, "keep_blank_lines_in_declarations", diagnostics, out var keepDeclarations))
 			options = options with { KeepBlankLinesInDeclarations = keepDeclarations };
 
@@ -563,6 +575,45 @@ public static class EditorConfigOptionsBinder
 					key, raw, "true, false or when_on_single_line"));
 				return ExpressionBodyStyle.AsWritten;
 		}
+	}
+
+	/// <summary>Reads one of ReSharper's wrapping styles, under its four spellings.</summary>
+	/// <remarks>
+	/// <para>
+	/// <c>wrap_if_long</c> is the fill layout — pack elements onto a line until the width runs out —
+	/// which the document printer has no primitive for, so it is reported rather than silently
+	/// treated as one of the others.
+	/// </para>
+	/// </remarks>
+	private static WrapStyle? WrapStyleOf(
+		IReadOnlyDictionary<string, string> properties,
+		string key,
+		ICollection<KerfDiagnostic>? diagnostics)
+	{
+		foreach (var prefix in ReSharperPrefixes)
+		{
+			if (!properties.TryGetValue(prefix + key, out var raw))
+				continue;
+
+			var colon = raw.LastIndexOf(':');
+			switch ((colon >= 0 ? raw[..colon] : raw).Trim().ToLowerInvariant())
+			{
+				case "chop_always":
+					return WrapStyle.ChopAlways;
+				case "chop_if_long":
+					return WrapStyle.ChopIfLong;
+				case "wrap_if_long":
+					diagnostics?.Add(KerfDiagnostic.UnrecognisedValue(
+						prefix + key, raw, "chop_always or chop_if_long; wrap_if_long is not implemented"));
+					return null;
+				default:
+					diagnostics?.Add(KerfDiagnostic.UnrecognisedValue(
+						prefix + key, raw, "chop_always or chop_if_long"));
+					return null;
+			}
+		}
+
+		return null;
 	}
 
 	/// <summary>Reads a blank-line count, which unlike the wrapping limits may legitimately be zero.</summary>

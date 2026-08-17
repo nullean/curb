@@ -106,6 +106,7 @@ public static class OptionCatalog
 			"csharp_wrap_before_first_method_call",
 			"csharp_wrap_chained_binary_expressions",
 			"csharp_wrap_before_binary_opsign",
+			"csharp_wrap_parameters_style",
 			"csharp_keep_blank_lines_in_declarations",
 			"csharp_keep_blank_lines_in_code",
 			"csharp_blank_lines_around_invocable",
