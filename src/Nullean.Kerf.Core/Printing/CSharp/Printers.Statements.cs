@@ -198,6 +198,23 @@ internal static partial class Printers
 	{
 		var arena = context.Arena;
 
+		// Where the author put a break just inside the parentheses, and nowhere else. A break
+		// opportunity there is wrong: a condition holding the author's own breaks makes this group
+		// broken, and every soft line in it goes with it, so a perfectly ordinary
+		//
+		//     if (a &&
+		//         b)
+		//
+		// came out as `if (` / `a &&` / `b` / `)`. dotnet format keeps the condition on the keyword's
+		// line and the `)` against its last operand.
+		//
+		// Safe to read from the source because it asks about exactly the two positions this printer
+		// reproduces: if Kerf does break after the `(`, the next run sees that break and keeps it.
+		var breakAfterOpen = condition is not null
+			&& !context.OnSameLine(openParen.Span.End, condition.SpanStart);
+		var breakBeforeClose = condition is not null
+			&& !context.OnSameLine(condition.Span.End, closeParen.SpanStart);
+
 		TokenPrinter.Print(keyword, context);
 		Spacing.AfterControlFlowKeyword(context);
 		TokenPrinter.Print(openParen, context);
@@ -206,11 +223,18 @@ internal static partial class Printers
 		{
 			using (arena.Indent())
 			{
-				Spacing.InsideControlFlowParensBreakable(context);
+				if (breakAfterOpen)
+					arena.HardLine();
+				else
+					Spacing.InsideControlFlowParens(context);
+
 				Node.Print(condition, context);
 			}
 
-			Spacing.InsideControlFlowParensBreakable(context);
+			if (breakBeforeClose)
+				arena.HardLine();
+			else
+				Spacing.InsideControlFlowParens(context);
 		}
 
 		TokenPrinter.Print(closeParen, context);

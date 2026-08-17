@@ -482,4 +482,50 @@ public class ControlFlowTests : FormattingTest
 		}
 		""",
 		editorConfig: "max_line_length = 40");
+	[Test]
+	public Task A_condition_the_author_broke_keeps_its_parentheses_hugging() => Unchanged(
+		// The break opportunities just inside the parentheses were wrong. A condition holding the
+		// author's own breaks makes the header's group broken, and every soft line in it goes with
+		// it, so an ordinary wrapped `if` came out as `if (` / condition / `)` on four lines.
+		//
+		// dotnet format keeps the condition on the keyword's line and the `)` against its last
+		// operand. This was worth roughly a fifth of all the lines Kerf changed on roslyn.
+		"""
+		public class C
+		{
+		    bool M(Decl decl)
+		    {
+		        if (decl.ExplicitInterfaceSpecifier != null &&
+		            !decl.ParameterList.IsMissing &&
+		            !decl.ParameterList.CloseParenToken.IsMissing)
+		        {
+		            return true;
+		        }
+		        return false;
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_condition_the_author_opened_after_the_parenthesis_keeps_that_too() => Unchanged(
+		// The other side of the same rule: where the break *is* just inside the parenthesis, it is
+		// the author's and stays. Asking about exactly the positions the printer reproduces is what
+		// keeps this stable across runs.
+		"""
+		public class C
+		{
+		    bool M(Decl decl)
+		    {
+		        if (
+		            decl.ExplicitInterfaceSpecifier != null &&
+		            !decl.ParameterList.IsMissing
+		        )
+		        {
+		            return true;
+		        }
+		        return false;
+		    }
+		}
+		""");
+
 }
