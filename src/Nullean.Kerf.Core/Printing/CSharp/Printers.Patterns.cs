@@ -12,7 +12,15 @@ internal static partial class Printers
 		Node.Print(node.Expression, context);
 		context.Arena.Synthetic(SyntheticText.Space);
 		TokenPrinter.Print(node.IsKeyword, context);
-		context.Arena.Synthetic(SyntheticText.Space);
+
+		// A break the author put after `is` is theirs, the same as one between two alternatives of the
+		// pattern that follows. Without this, `x is` / `A or` / `B` kept its `or` breaks and lost the
+		// first one, which reads worse than either preserving all of them or none.
+		if (!context.OnSameLine(node.IsKeyword.Span.End, node.Pattern.SpanStart))
+			context.Arena.HardLine();
+		else
+			context.Arena.Synthetic(SyntheticText.Space);
+
 		Node.Print(node.Pattern, context);
 	}
 
@@ -101,9 +109,23 @@ internal static partial class Printers
 	public static void BinaryPattern(BinaryPatternSyntax node, PrintContext context)
 	{
 		Node.Print(node.Left, context);
-		context.Arena.Synthetic(SyntheticText.Space);
+
+		// The same rule BinaryExpression follows: a chain the author broke stays broken, on whichever
+		// side of the operator they broke it. A long `is A or B or C` written one alternative per line
+		// was closed up onto a single line, because nothing here asked. That shape is everywhere in
+		// analyzer code and was among the largest sources of churn measured on roslyn.
+		if (!context.OnSameLine(node.Left.Span.End, node.OperatorToken.SpanStart))
+			context.Arena.HardLine();
+		else
+			context.Arena.Synthetic(SyntheticText.Space);
+
 		TokenPrinter.Print(node.OperatorToken, context);
-		context.Arena.Synthetic(SyntheticText.Space);
+
+		if (!context.OnSameLine(node.OperatorToken.Span.End, node.Right.SpanStart))
+			context.Arena.HardLine();
+		else
+			context.Arena.Synthetic(SyntheticText.Space);
+
 		Node.Print(node.Right, context);
 	}
 

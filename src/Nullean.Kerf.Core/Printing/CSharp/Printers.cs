@@ -455,6 +455,12 @@ internal static partial class Printers
 			return;
 		}
 
+		// Deliberately no "the author opened the body out, so keep the arrow inline" case here. It was
+		// tried: it reads whether the expression spans lines, and Kerf's own joining of a ternary
+		// changes that answer, so the arrow sat at one indent on the first run and another on the
+		// second — 217 further roslyn files that never settled. The trap in docs/layout-decisions.md,
+		// walked straight into. Only the two arrow-adjacent breaks above are safe, because Kerf
+		// reproduces those exactly.
 		using (arena.Group())
 		using (arena.Indent())
 		{

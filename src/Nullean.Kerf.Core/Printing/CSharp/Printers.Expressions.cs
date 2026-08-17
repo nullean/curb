@@ -237,11 +237,20 @@ internal static partial class Printers
 	{
 		var arena = context.Arena;
 
+		var spansLines = SpansLines(node, context);
 		var oneMemberPerLine = context.Options.NewLineBeforeMembersInObjectInitializers;
 
 		// Reproduce the author's own breaks rather than imposing one member per line: an initializer
 		// written across lines with two members sharing one keeps them sharing it.
-		var asWritten = !oneMemberPerLine && SpansLines(node, context);
+		var asWritten = !oneMemberPerLine && spansLines;
+
+		// The option says one member per line *when the initializer is opened out*, not that it must
+		// be opened out. Measured: with csharp_new_line_before_members_in_object_initializers = true
+		// and Allman braces, dotnet format leaves `new[] { a, b }`, `new List<int> { 1, 2, 3 }`,
+		// `new Thing { X = 1 }` and `new { P = 1 }` every one of them on its line. Kerf exploded all
+		// four, which on roslyn — where both keys are set — was the single largest source of churn,
+		// and produced things like a `new[]` at one indent with its brace at another.
+		var openItOut = oneMemberPerLine && spansLines;
 
 		// A dictionary initializer — one whose elements are themselves brace-wrapped — is the one
 		// shape Roslyn declines to re-indent: hand `dotnet format` a `{ { "k", "v" } }` block
@@ -286,7 +295,7 @@ internal static partial class Printers
 				var ownerSpansLines = node.Parent is not null
 					&& context.AuthorBroke(node.Parent.SpanStart, node.SpanStart);
 
-				if (oneMemberPerLine
+				if (openItOut
 					|| ownerSpansLines
 					|| (asWritten && context.AuthorBroke(node.SpanStart, node.Parent!.SpanStart)))
 					BeforeOpenBrace(BraceStyle.ObjectCollectionArrayInitializers, context);
@@ -385,7 +394,7 @@ internal static partial class Printers
 		// Between two members: a hard line, or the ordinary comma separator.
 		void Separator(int from, int to)
 		{
-			if (oneMemberPerLine || (asWritten && context.AuthorBroke(from, to)))
+			if (openItOut || (asWritten && context.AuthorBroke(from, to)))
 				arena.HardLine();
 			else if (asWritten)
 				Spacing.AfterComma(context);
@@ -396,7 +405,7 @@ internal static partial class Printers
 		// Just inside the braces, where no comma sits and the comma options do not reach.
 		void InsideBrace(int from, int to)
 		{
-			if (oneMemberPerLine || (asWritten && context.AuthorBroke(from, to)))
+			if (openItOut || (asWritten && context.AuthorBroke(from, to)))
 				arena.HardLine();
 			else
 				arena.Line();
@@ -570,6 +579,11 @@ internal static partial class Printers
 		var arena = context.Arena;
 
 		var oneMemberPerLine = context.Options.NewLineBeforeMembersInAnonymousTypes;
+
+		// Same rule as the object initializer above: one member per line *when the type is
+		// opened out*, not a reason to open it. dotnet format leaves `new { P = 1, Q = 2 }` alone
+		// with this key set.
+		var openItOut = oneMemberPerLine && SpansLines(node, context);
 		var asWritten = !oneMemberPerLine && SpansLines(node, context);
 		var rewritesComma = RewritesTrailingComma(node.Initializers, node.CloseBraceToken, context);
 
@@ -577,7 +591,7 @@ internal static partial class Printers
 
 		using (arena.Group())
 		{
-			if (oneMemberPerLine || (asWritten && context.AuthorBroke(node.NewKeyword.Span.End, node.OpenBraceToken.SpanStart)))
+			if (openItOut || (asWritten && context.AuthorBroke(node.NewKeyword.Span.End, node.OpenBraceToken.SpanStart)))
 				BeforeOpenBrace(BraceStyle.AnonymousTypes, context);
 			else
 				BeforeOpenBraceWhenBroken(BraceStyle.AnonymousTypes, context);
@@ -624,7 +638,7 @@ internal static partial class Printers
 
 		void Separator(int from, int to)
 		{
-			if (oneMemberPerLine || (asWritten && context.AuthorBroke(from, to)))
+			if (openItOut || (asWritten && context.AuthorBroke(from, to)))
 				arena.HardLine();
 			else if (asWritten)
 				Spacing.AfterComma(context);
@@ -634,7 +648,7 @@ internal static partial class Printers
 
 		void InsideBrace(int from, int to)
 		{
-			if (oneMemberPerLine || (asWritten && context.AuthorBroke(from, to)))
+			if (openItOut || (asWritten && context.AuthorBroke(from, to)))
 				arena.HardLine();
 			else
 				arena.Line();

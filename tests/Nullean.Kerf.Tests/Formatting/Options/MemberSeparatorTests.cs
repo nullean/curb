@@ -16,6 +16,13 @@ namespace Nullean.Kerf.Tests.Formatting.Options;
 /// initializer in a repository on first run, on the strength of an option no other tool applies.
 /// False keeps Kerf a fixed point of dotnet format and leaves the expanded layout one line away.
 /// </para>
+/// <para>
+/// What that reasoning missed, and the roslyn corpus later caught: the same is true with the key set
+/// to <c>true</c>. dotnet format does not open an initializer out then either. The key means one
+/// member per line <em>once the initializer is opened</em>, and Kerf read it as a licence to open
+/// one — exploding `new[] { a, b }` and every other one-line initializer in any repository setting
+/// it. roslyn sets it, and this was that repository's largest single source of churn.
+/// </para>
 /// </remarks>
 public class MemberSeparatorTests : FormattingTest
 {
@@ -35,12 +42,19 @@ public class MemberSeparatorTests : FormattingTest
 
 	[Test]
 	public Task An_initializer_can_be_asked_for_one_member_per_line() => Formats(
+		// One member per line *when the initializer is opened out*. It is not a reason to open one:
+		// measured with the key set, dotnet format leaves `new Point { X = 1, Y = 2 }` exactly where
+		// it is and only spreads the members of an initializer the author had already opened.
 		"""
 		public class C
 		{
 		    public void M()
 		    {
-		        var o = new Point { X = 1, Y = 2 };
+		        var inline = new Point { X = 1, Y = 2 };
+		        var opened = new Point
+		        {
+		            X = 1, Y = 2
+		        };
 		    }
 		}
 		""",
@@ -49,7 +63,8 @@ public class MemberSeparatorTests : FormattingTest
 		{
 		    public void M()
 		    {
-		        var o = new Point
+		        var inline = new Point { X = 1, Y = 2 };
+		        var opened = new Point
 		        {
 		            X = 1,
 		            Y = 2
@@ -67,6 +82,7 @@ public class MemberSeparatorTests : FormattingTest
 		    public void M()
 		    {
 		        var l = new List<int> { 1, 2 };
+		        var arr = new[] { 1, 2 };
 		    }
 		}
 		""",
@@ -75,11 +91,8 @@ public class MemberSeparatorTests : FormattingTest
 		{
 		    public void M()
 		    {
-		        var l = new List<int>
-		        {
-		            1,
-		            2
-		        };
+		        var l = new List<int> { 1, 2 };
+		        var arr = new[] { 1, 2 };
 		    }
 		}
 		""",
@@ -127,8 +140,14 @@ public class MemberSeparatorTests : FormattingTest
 		{
 		    public void M()
 		    {
-		        var o = new Point { X = 1 };
-		        var a = new { First = 1, Second = 2 };
+		        var o = new Point
+		        {
+		            X = 1, Y = 2
+		        };
+		        var a = new
+		        {
+		            First = 1, Second = 2
+		        };
 		    }
 		}
 		""",
@@ -139,9 +158,13 @@ public class MemberSeparatorTests : FormattingTest
 		    {
 		        var o = new Point
 		        {
-		            X = 1
+		            X = 1,
+		            Y = 2
 		        };
-		        var a = new { First = 1, Second = 2 };
+		        var a = new
+		        {
+		            First = 1, Second = 2
+		        };
 		    }
 		}
 		""",
@@ -163,12 +186,17 @@ public class MemberSeparatorTests : FormattingTest
 
 	[Test]
 	public Task An_anonymous_type_can_be_asked_for_one_member_per_line() => Formats(
+		// Again: one per line once it is opened out, and no reason to open it.
 		"""
 		public class C
 		{
 		    public void M()
 		    {
-		        var a = new { First = 1, Second = 2 };
+		        var inline = new { First = 1, Second = 2 };
+		        var opened = new
+		        {
+		            First = 1, Second = 2
+		        };
 		    }
 		}
 		""",
@@ -177,7 +205,8 @@ public class MemberSeparatorTests : FormattingTest
 		{
 		    public void M()
 		    {
-		        var a = new
+		        var inline = new { First = 1, Second = 2 };
+		        var opened = new
 		        {
 		            First = 1,
 		            Second = 2
@@ -275,8 +304,14 @@ public class MemberSeparatorTests : FormattingTest
 		{
 		    public void M()
 		    {
-		        var o = new Point { X = 1 };
-		        var a = new { First = 1 };
+		        var o = new Point
+		        {
+		            X = 1, Y = 2
+		        };
+		        var a = new
+		        {
+		            First = 1, Second = 2
+		        };
 		        var q = from x in items select x;
 		    }
 		}
@@ -288,11 +323,13 @@ public class MemberSeparatorTests : FormattingTest
 		    {
 		        var o = new Point
 		        {
-		            X = 1
+		            X = 1,
+		            Y = 2
 		        };
 		        var a = new
 		        {
-		            First = 1
+		            First = 1,
+		            Second = 2
 		        };
 		        var q = from x in items
 		                select x;
