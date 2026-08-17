@@ -113,6 +113,8 @@ public static class OptionCatalog
 			"csharp_blank_lines_around_type",
 			"csharp_blank_lines_around_property",
 			"csharp_blank_lines_around_field",
+			"csharp_blank_lines_inside_type",
+			"csharp_blank_lines_around_namespace",
 			"csharp_blank_lines_after_using_list",
 			"csharp_blank_lines_after_file_scoped_namespace_directive",
 			"csharp_max_initializer_elements_on_line",

@@ -181,6 +181,72 @@ public class BlankLineOptionTests : FormattingTest
 		""",
 		editorConfig: "csharp_blank_lines_around_field = 1\ncsharp_blank_lines_around_property = 1");
 
+	[Test]
+	public Task A_type_can_be_given_air_under_its_opening_brace() => Formats(
+		// `blank_lines_inside_type` governs only the gap between the brace and the first member; the
+		// gap before the closing brace is not offered, because Kerf removes one there by default and
+		// dotnet format leaves that alone.
+		"""
+		public class C
+		{
+		    private int _a;
+		}
+		""",
+		"""
+		public class C
+		{
+
+		    private int _a;
+		}
+		""",
+		editorConfig: "csharp_blank_lines_inside_type = 1");
+
+	[Test]
+	public Task Namespaces_have_their_own_setting() => Formats(
+		"""
+		using System;
+		namespace N
+		{
+		}
+		""",
+		"""
+		using System;
+
+		namespace N
+		{
+		}
+		""",
+		editorConfig: "csharp_blank_lines_around_namespace = 1");
+
+	// ---- what is deliberately not offered ------------------------------------------------------------
+
+	[Test]
+	public Task A_wrapped_member_does_not_take_a_single_line_setting_because_there_is_none() => Formats(
+		// ReSharper's blank_lines_around_single_line_* family is the one part of this category Kerf
+		// does not implement, and it is worth an assertion rather than only a comment.
+		//
+		// "Single line" would have to be read from the source, and reflow moves it: `M` below is one
+		// line in the source and two in the output, so a second run would see a different member than
+		// the first and give it a different number of blank lines. Two corpus files grew a line per
+		// run. Every member therefore takes the ordinary setting, whatever the source looked like.
+		"""
+		public class C
+		{
+		    public int M() => Something(aaaaaaaaaaaaaaaaaaaaaa, bbbbbbbbbbbbbbbbbbbbbb, cccccccccccccccccccc);
+		    public int N() => 1;
+		}
+		""",
+		"""
+		public class C
+		{
+		    public int M() =>
+		        Something(aaaaaaaaaaaaaaaaaaaaaa, bbbbbbbbbbbbbbbbbbbbbb, cccccccccccccccccccc);
+
+		    public int N() => 1;
+		}
+		""",
+		editorConfig: "csharp_blank_lines_around_invocable = 1\nmax_line_length = 100");
+
 	// ---- the file-scoped namespace ------------------------------------------------------------------
 
 	[Test]

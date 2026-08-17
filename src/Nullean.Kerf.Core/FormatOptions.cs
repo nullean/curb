@@ -693,6 +693,28 @@ public readonly record struct FormatOptions
 	public int BlankLinesAfterUsingList { get; init; }
 
 	/// <summary>
+	/// <c>csharp_blank_lines_inside_type</c>: below a type's opening brace and above its closing one.
+	/// </summary>
+	/// <remarks>
+	/// The space the <c>around</c> settings deliberately do not touch. Asking for air around fields
+	/// should not open a gap under every <c>{</c>; this is the setting that does that on purpose.
+	/// </remarks>
+	public int BlankLinesInsideType { get; init; }
+
+	/// <summary><c>csharp_blank_lines_around_namespace</c>, around a namespace declaration.</summary>
+	public int BlankLinesAroundNamespace { get; init; }
+
+	// The blank_lines_around_single_line_* family is deliberately absent, and this is the one place
+	// in the whole blank-line category where the free-ground argument does not hold.
+	//
+	// Whether a member is "single line" would have to be read from the source, and reflow moves it: a
+	// member written on one line and wrapped by the printer is one line on the first pass and two on
+	// the second, so it takes the single-line setting once and the ordinary one after. Two corpus
+	// files grew a blank line per run. Everything else here is safe because a blank-line count cannot
+	// change what a blank-line count is; this one asks a question whose answer the formatter itself
+	// changes.
+
+	/// <summary>
 	/// <c>csharp_blank_lines_after_file_scoped_namespace_directive</c>. One by default, because that
 	/// is what <c>dotnet format</c> writes there and Kerf follows it.
 	/// </summary>

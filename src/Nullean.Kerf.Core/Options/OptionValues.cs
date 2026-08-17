@@ -62,6 +62,8 @@ public static class OptionValues
 		"csharp_blank_lines_around_type" => Lines(options.BlankLinesAroundType),
 		"csharp_blank_lines_around_property" => Lines(options.BlankLinesAroundProperty),
 		"csharp_blank_lines_around_field" => Lines(options.BlankLinesAroundField),
+		"csharp_blank_lines_inside_type" => Lines(options.BlankLinesInsideType),
+		"csharp_blank_lines_around_namespace" => Lines(options.BlankLinesAroundNamespace),
 		"csharp_blank_lines_after_using_list" => Lines(options.BlankLinesAfterUsingList),
 		"csharp_blank_lines_after_file_scoped_namespace_directive" => Lines(options.BlankLinesAfterFileScopedNamespace),
 		"csharp_max_initializer_elements_on_line" => Count(options.MaxInitializerElementsOnLine),
@@ -165,6 +167,7 @@ public static class OptionValues
 	private static string Bool(bool value) => value ? "true" : "false";
 
 	private static string Lines(int value) => value.ToString(CultureInfo.InvariantCulture);
+
 
 	private static string Wrap(WrapStyle? value) => value switch
 	{

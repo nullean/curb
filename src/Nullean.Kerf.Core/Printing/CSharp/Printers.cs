@@ -309,11 +309,13 @@ internal static partial class Printers
 			{
 				arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
 
-				// The minimum parts members from each other, not the first one from the brace above
-				// it — that space is csharp_blank_lines_inside_type's business, and asking for air
-				// around fields should not open a gap under every `{`.
+				// The minimum parts members from each other; the first one is parted from the brace
+				// above it by csharp_blank_lines_inside_type instead, so asking for air around fields
+				// does not open a gap under every `{`.
 				context.BlankLines(context.DeclarationSeparation(
-					previousEnd, EffectiveStart(member), first ? 0 : MinimumBlankLinesFor(member, context)));
+					previousEnd,
+					EffectiveStart(member),
+					first ? context.Options.BlankLinesInsideType : MinimumBlankLinesFor(member, context)));
 				first = false;
 				Node.Print(member, context);
 				previousEnd = member.Span.End;
@@ -322,7 +324,8 @@ internal static partial class Printers
 			if (TokenPrinter.HasLeadingContent(node.CloseBraceToken))
 			{
 				arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
-				context.BlankLines(context.DeclarationSeparation(previousEnd, EffectiveTriviaStart(node.CloseBraceToken)));
+				context.BlankLines(context.DeclarationSeparation(
+					previousEnd, EffectiveTriviaStart(node.CloseBraceToken), context.Options.BlankLinesInsideType));
 				TokenPrinter.PrintLeadingTrivia(node.CloseBraceToken, context, trailingBreak: false);
 			}
 		}
@@ -1472,16 +1475,22 @@ internal static partial class Printers
 	/// Zero unless asked, which leaves the author's own spacing exactly as it was. An indexer and an
 	/// event answer to the property setting, the same grouping dotnet format uses for their braces.
 	/// </remarks>
-	private static int MinimumBlankLinesFor(MemberDeclarationSyntax member, PrintContext context) => member switch
+	private static int MinimumBlankLinesFor(MemberDeclarationSyntax member, PrintContext context)
 	{
-		BaseTypeDeclarationSyntax or DelegateDeclarationSyntax => context.Options.BlankLinesAroundType,
-		MethodDeclarationSyntax or ConstructorDeclarationSyntax or DestructorDeclarationSyntax
-			or OperatorDeclarationSyntax or ConversionOperatorDeclarationSyntax => context.Options.BlankLinesAroundInvocable,
-		PropertyDeclarationSyntax or IndexerDeclarationSyntax or EventDeclarationSyntax
-			or EventFieldDeclarationSyntax => context.Options.BlankLinesAroundProperty,
-		FieldDeclarationSyntax => context.Options.BlankLinesAroundField,
-		_ => 0,
-	};
+		var options = context.Options;
+
+		return member switch
+		{
+			BaseNamespaceDeclarationSyntax => options.BlankLinesAroundNamespace,
+			BaseTypeDeclarationSyntax or DelegateDeclarationSyntax => options.BlankLinesAroundType,
+			MethodDeclarationSyntax or ConstructorDeclarationSyntax or DestructorDeclarationSyntax
+				or OperatorDeclarationSyntax or ConversionOperatorDeclarationSyntax => options.BlankLinesAroundInvocable,
+			PropertyDeclarationSyntax or IndexerDeclarationSyntax or EventDeclarationSyntax
+				or EventFieldDeclarationSyntax => options.BlankLinesAroundProperty,
+			FieldDeclarationSyntax => options.BlankLinesAroundField,
+			_ => 0,
+		};
+	}
 
 	/// <summary>
 	/// True when a token is followed by a line comment, which has already ended the line.
@@ -1621,8 +1630,13 @@ internal static partial class Printers
 		}
 
 		context.Arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
-		if (context.BlankLinesBetween(previousEnd, EffectiveStart(next)) > 0)
-			context.Arena.HardLine();
+
+		// Through the same configuration as every other separator, so a compilation unit's members —
+		// externs, usings, assembly attributes and the namespace itself — obey the caps and minimums
+		// rather than being the one place that still hard-codes a single blank line.
+		var minimum = next is MemberDeclarationSyntax member ? MinimumBlankLinesFor(member, context) : 0;
+		context.BlankLines(context.DeclarationSeparation(previousEnd, EffectiveStart(next), minimum));
+
 		previousEnd = next.Span.End;
 	}
 
