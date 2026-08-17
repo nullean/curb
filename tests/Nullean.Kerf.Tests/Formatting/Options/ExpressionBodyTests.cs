@@ -369,4 +369,31 @@ public class ExpressionBodyTests : FormattingTest
 		}
 		""",
 		editorConfig: "csharp_style_expression_bodied_methods = true:suggestion");
+	[Test]
+	public Task A_throwing_getter_collapses_in_one_pass() => Formats(
+		// Two rewrites that have to compose on the same run: the accessor-level one turns the block
+		// into `get => throw …`, and the property-level one collapses `{ get => … }` to `=> …`. The
+		// property printer recognised a returning block and an arrow but not a throwing block, so the
+		// first run did half the job and the second did the rest — a file that never settled, on 120
+		// roslyn files' worth of shapes like this.
+		"""
+		public class C
+		{
+		    public int Count
+		    {
+		        get
+		        {
+		            throw new System.NotImplementedException();
+		        }
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public int Count => throw new System.NotImplementedException();
+		}
+		""",
+		editorConfig: "csharp_style_expression_bodied_properties = true\ncsharp_style_expression_bodied_accessors = true");
+
 }

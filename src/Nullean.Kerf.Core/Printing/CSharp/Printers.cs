@@ -1215,10 +1215,15 @@ internal static partial class Printers
 			&& !context.AuthorJoined(accessors.SpanStart, accessors.Span.End))
 			return false;
 
-		// Either shape of getter: one already using an arrow, or a block simple enough to become one.
+		// Every shape of getter: one already using an arrow, a block that returns, and a block that
+		// throws. The throw case was missing, and its absence was not a missing feature but a
+		// non-idempotency — the accessor-level rewrite turned the block into `get => throw …` on the
+		// first run, and this printer only recognised the arrow form, so the property collapsed to
+		// `=> throw …` on the second. Two rewrites that have to compose in one pass.
 		ExpressionSyntax? value = null;
 		SyntaxToken semicolon = default;
 		ReturnStatementSyntax? returned = null;
+		ThrowStatementSyntax? thrown = null;
 
 		if (accessor.ExpressionBody is { } arrow)
 		{
@@ -1231,8 +1236,12 @@ internal static partial class Printers
 			semicolon = single.SemicolonToken;
 			returned = single;
 		}
+		else if (accessor.Body is { Statements: [ThrowStatementSyntax { Expression: not null } onlyThrow] })
+		{
+			thrown = onlyThrow;
+		}
 
-		if (value is null || semicolon.RawKind == 0)
+		if (thrown is null && (value is null || semicolon.RawKind == 0))
 			return false;
 
 		if (HasAnyTrivia(accessors.OpenBraceToken)
@@ -1263,12 +1272,19 @@ internal static partial class Printers
 				arena.Line();
 			}
 
-			Node.Print(value, context);
-			TokenPrinter.Print(semicolon, context);
+			if (thrown is not null)
+			{
+				Node.Print(thrown, context);
+			}
+			else
+			{
+				Node.Print(value!, context);
+				TokenPrinter.Print(semicolon, context);
+			}
 		}
 
-		// A getter that already used an arrow carries its own across, so only the block form adds one.
-		if (returned is not null)
+		// A getter that already used an arrow carries its own across, so only the block forms add one.
+		if (returned is not null || thrown is not null)
 			context.ArrowsAdded++;
 
 		// In source order, which is what the verifier walks.
@@ -1279,6 +1295,13 @@ internal static partial class Printers
 		{
 			context.Dropped(accessor.Body!.OpenBraceToken.Span);
 			context.Dropped(returned.ReturnKeyword.Span);
+			context.Dropped(accessor.Body!.CloseBraceToken.Span);
+		}
+		else if (thrown is not null)
+		{
+			// The `throw` keyword stays — it is part of the statement carried across — so only the
+			// accessor's own braces go.
+			context.Dropped(accessor.Body!.OpenBraceToken.Span);
 			context.Dropped(accessor.Body!.CloseBraceToken.Span);
 		}
 
