@@ -97,7 +97,7 @@ internal static class FormattingRun
 		// 4 reader tasks mirror the old gate width. Each races for the next index via an atomic
 		// counter so readers don't need coordination beyond the channel itself.
 		var nextIndex = -1;
-		var readerTasks = Enumerable.Range(0, 4).Select(_ => Task.Run(() =>
+		var readerTasks = Enumerable.Range(0, 4).Select(_ => Task.Run(async () =>
 		{
 			int i;
 			while ((i = Interlocked.Increment(ref nextIndex)) < work.Length)
@@ -107,9 +107,9 @@ internal static class FormattingRun
 				// WriteAllText silently writes none, so `charset` was unobservable at both ends and
 				// every file Kerf touched lost its mark.
 				var bytes = fileSystem.File.ReadAllBytes(item.Path);
-				// WriteAsync blocks (via .GetResult) when the channel is full, which is correct:
-				// the reader backs off rather than accumulating unbounded memory.
-				channel.Writer.WriteAsync((item.Path, item.Options, bytes)).AsTask().GetAwaiter().GetResult();
+				// await WriteAsync so the thread is released (rather than blocked) when the channel
+				// is full; the reader backs off without pinning a thread-pool thread.
+				await channel.Writer.WriteAsync((item.Path, item.Options, bytes));
 			}
 		})).ToArray();
 

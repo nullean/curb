@@ -165,6 +165,13 @@ internal sealed class PrintContext(DocArena arena, SourceText text, FormatOption
 	/// <summary>The last token emitted by <see cref="TokenPrinter.Print"/>, for avoiding a Roslyn tree walk.</summary>
 	public SyntaxToken PreviousToken { get; set; }
 
+	/// <summary>
+	/// Shared trailer buffer for chain printing. Each <c>TryPrintChain</c> frame records its base
+	/// index, appends to this list, and truncates back on exit — nested chains append past the outer
+	/// frame's slice and clean up only what they added, so re-entrancy is safe.
+	/// </summary>
+	public List<SyntaxNode> TrailerBuffer { get; } = [];
+
 	/// <summary>Tokens emitted verbatim because no printer handles their node yet.</summary>
 	public int VerbatimTokens { get; set; }
 

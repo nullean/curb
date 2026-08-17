@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -47,76 +48,90 @@ internal static partial class Printers
 		if (CountLinks(node) < MinimumLinksToBreak && !SpansLines(node, context))
 			return false;
 
-		var links = CollectLinks(node, out var receiver);
-		if (links is null || (links.Count < MinimumLinksToBreak && !SpansLines(node, context)))
-			return false;
-
-
-
-		var arena = context.Arena;
-
-		// The author's own layout wins: a chain they opened out stays opened out, at their dots.
-		var asWritten = SpansLines(node, context);
-
-		Node.Print(receiver, context);
-
-		// `builder.AddProject(…)` reads as one thing, so a plain identifier receiver keeps its first
-		// call rather than being left stranded on a line of its own — but not when the author put
-		// their own break there, which is theirs to keep.
-		//
-		// csharp_wrap_before_first_method_call overrides the judgement in either direction: true
-		// strands every receiver, false attaches every first call.
-		var attached = context.Options.WrapBeforeFirstMethodCall switch
+		// Record the trailer buffer base before collecting. All trailer nodes appended by this
+		// TryPrintChain frame (and restored by the finally below) live at [trailerBase..buffer.Count).
+		// Nested TryPrintChain calls for inner chains append past this frame's slice and truncate only
+		// what they added — the outer frame's slice is untouched throughout.
+		var trailerBase = context.TrailerBuffer.Count;
+		try
 		{
-			true => 0,
-			false => 1,
-			null when !asWritten
-				&& receiver is IdentifierNameSyntax or PredefinedTypeSyntax or ThisExpressionSyntax or BaseExpressionSyntax => 1,
-			_ => 0,
-		};
+			var links = CollectLinks(node, context, out var receiver);
+			if (links is null || (links.Count < MinimumLinksToBreak && !SpansLines(node, context)))
+				return false;
 
-		for (var i = 0; i < attached && i < links.Count; i++)
-			PrintLink(links[i], context);
 
-		// A chain that will not break must not open an indent scope: anything inside it that breaks
-		// on its own — an anonymous type, an initializer — would be pushed a level right of where it
-		// belongs, which is a change dotnet format does not make.
-		if (asWritten && !BreaksAnywhere(links, receiver, attached, context))
-		{
-			for (var i = attached; i < links.Count; i++)
+
+			var arena = context.Arena;
+
+			// The author's own layout wins: a chain they opened out stays opened out, at their dots.
+			var asWritten = SpansLines(node, context);
+
+			Node.Print(receiver, context);
+
+			// `builder.AddProject(…)` reads as one thing, so a plain identifier receiver keeps its first
+			// call rather than being left stranded on a line of its own — but not when the author put
+			// their own break there, which is theirs to keep.
+			//
+			// csharp_wrap_before_first_method_call overrides the judgement in either direction: true
+			// strands every receiver, false attaches every first call.
+			var attached = context.Options.WrapBeforeFirstMethodCall switch
+			{
+				true => 0,
+				false => 1,
+				null when !asWritten
+					&& receiver is IdentifierNameSyntax or PredefinedTypeSyntax or ThisExpressionSyntax or BaseExpressionSyntax => 1,
+				_ => 0,
+			};
+
+			for (var i = 0; i < attached && i < links.Count; i++)
 				PrintLink(links[i], context);
+
+			// A chain that will not break must not open an indent scope: anything inside it that breaks
+			// on its own — an anonymous type, an initializer — would be pushed a level right of where it
+			// belongs, which is a change dotnet format does not make.
+			if (asWritten && !BreaksAnywhere(links, receiver, attached, context))
+			{
+				for (var i = attached; i < links.Count; i++)
+					PrintLink(links[i], context);
+
+				return true;
+			}
+
+			using (arena.Group())
+			using (arena.Indent())
+			{
+				// csharp_wrap_after_dot_in_method_calls puts the dot on the tail of the line it follows
+				// rather than the head of the line it introduces. Only the dot moves; where the chain
+				// breaks is decided exactly as before, which is why the break predicate had to stop asking
+				// about the dot's position first.
+				var dotTrails = context.Options.WrapAfterDotInMethodCalls;
+
+				for (var i = attached; i < links.Count; i++)
+				{
+					var link = links[i];
+
+					if (dotTrails)
+						TokenPrinter.Print(link.DotToken, context);
+
+					// Only the separator is conditional. The link itself is always emitted — dropping it
+					// is how this lost `.Values` from a chain the first time round.
+					if (!asWritten)
+						arena.SoftLine();
+					else if (context.AuthorBroke(PreviousEnd(links, receiver, i), link.Name.SpanStart))
+						arena.HardLine();
+
+					PrintLink(link, context, dotAlreadyPrinted: dotTrails);
+				}
+			}
 
 			return true;
 		}
-
-		using (arena.Group())
-		using (arena.Indent())
+		finally
 		{
-			// csharp_wrap_after_dot_in_method_calls puts the dot on the tail of the line it follows
-			// rather than the head of the line it introduces. Only the dot moves; where the chain
-			// breaks is decided exactly as before, which is why the break predicate had to stop asking
-			// about the dot's position first.
-			var dotTrails = context.Options.WrapAfterDotInMethodCalls;
-
-			for (var i = attached; i < links.Count; i++)
-			{
-				var link = links[i];
-
-				if (dotTrails)
-					TokenPrinter.Print(link.DotToken, context);
-
-				// Only the separator is conditional. The link itself is always emitted — dropping it
-				// is how this lost `.Values` from a chain the first time round.
-				if (!asWritten)
-					arena.SoftLine();
-				else if (context.AuthorBroke(PreviousEnd(links, receiver, i), link.Name.SpanStart))
-					arena.HardLine();
-
-				PrintLink(link, context, dotAlreadyPrinted: dotTrails);
-			}
+			// Restore the buffer to the state it was in before this chain was collected. This frame's
+			// trailer nodes are at [trailerBase..Count) and are no longer needed after printing.
+			context.TrailerBuffer.RemoveRange(trailerBase, context.TrailerBuffer.Count - trailerBase);
 		}
-
-		return true;
 	}
 
 	/// <summary>Counts a chain's links without allocating, so a non-chain costs one walk.</summary>
@@ -180,8 +195,10 @@ internal static partial class Printers
 
 		Node.Print(link.Name, context);
 
-		foreach (var trailer in link.Trailers)
-			Node.Print(trailer, context);
+		var buffer = context.TrailerBuffer;
+		var end = link.TrailersStart + link.TrailersCount;
+		for (var i = link.TrailersStart; i < end; i++)
+			Node.Print(buffer[i], context);
 	}
 
 	/// <summary>
@@ -192,11 +209,19 @@ internal static partial class Printers
 	/// tail hangs off one <c>?.</c> node — and a chain broken across one would need its own rules, so
 	/// it terminates the walk instead of being guessed at.
 	/// </remarks>
-	private static List<ChainLink>? CollectLinks(ExpressionSyntax node, out ExpressionSyntax receiver)
+	/// <remarks>
+	/// Trailers (argument and bracket lists) are appended to <see cref="PrintContext.TrailerBuffer"/>
+	/// rather than allocated per-link. Each link's slice is recorded as <c>(start, count)</c> indices
+	/// into that buffer. The caller (TryPrintChain) truncates the buffer back to its entry point on
+	/// exit, so nested chains that land here mid-print append past the outer frame's slice and only
+	/// clean up what they added.
+	/// </remarks>
+	private static List<ChainLink>? CollectLinks(ExpressionSyntax node, PrintContext context, out ExpressionSyntax receiver)
 	{
 		List<ChainLink>? links = null;
 		var current = node;
-		List<SyntaxNode>? trailers = null;
+		var trailerBuffer = context.TrailerBuffer;
+		var trailersStart = trailerBuffer.Count;
 
 		while (true)
 		{
@@ -204,36 +229,49 @@ internal static partial class Printers
 			{
 				case InvocationExpressionSyntax invocation:
 					// Append outward: innermost trailers arrive last; reversed below before storing.
-					(trailers ??= []).Add(invocation.ArgumentList);
+					trailerBuffer.Add(invocation.ArgumentList);
 					current = invocation.Expression;
 					continue;
 
 				case ElementAccessExpressionSyntax elementAccess:
-					(trailers ??= []).Add(elementAccess.ArgumentList);
+					trailerBuffer.Add(elementAccess.ArgumentList);
 					current = elementAccess.Expression;
 					continue;
 
 				case MemberAccessExpressionSyntax access when access.IsKind(SyntaxKind.SimpleMemberAccessExpression):
-					// Reverse into source order before reading End or converting to array.
-					trailers?.Reverse();
-					(links ??= []).Add(
-						new ChainLink(access.OperatorToken, access.Name, trailers?.ToArray() ?? [], EndOf(access, trailers)));
-					trailers = null;
-					current = access.Expression;
-					continue;
+					{
+						// Reverse the slice for this link into source order in-place.
+						var trailersCount = trailerBuffer.Count - trailersStart;
+						if (trailersCount > 1)
+							CollectionsMarshal.AsSpan(trailerBuffer).Slice(trailersStart, trailersCount).Reverse();
+						var end = trailersCount > 0 ? trailerBuffer[trailersStart + trailersCount - 1].Span.End : access.Span.End;
+						(links ??= []).Add(new ChainLink(access.OperatorToken, access.Name, trailersStart, trailersCount, end));
+						trailersStart = trailerBuffer.Count;
+						current = access.Expression;
+						continue;
+					}
 
 				default:
-					// Anything still pending belongs to the receiver, not to a link of its own.
-					receiver = trailers is null ? current : node;
-					// Links were appended outermost-first; reverse into source order before returning.
-					links?.Reverse();
-					return trailers is null ? links : null;
+					{
+						// Anything still pending belongs to the receiver, not to a link of its own.
+						var hasReceiverTrailers = trailerBuffer.Count > trailersStart;
+						if (hasReceiverTrailers)
+						{
+							// Remove the receiver's pending trailers — they are not part of any link.
+							trailerBuffer.RemoveRange(trailersStart, trailerBuffer.Count - trailersStart);
+							receiver = node;
+						}
+						else
+						{
+							receiver = current;
+						}
+						// Links were appended outermost-first; reverse into source order before returning.
+						links?.Reverse();
+						return hasReceiverTrailers ? null : links;
+					}
 			}
 		}
 	}
-
-	private static int EndOf(MemberAccessExpressionSyntax access, List<SyntaxNode>? trailers) =>
-		trailers is { Count: > 0 } ? trailers[^1].Span.End : access.Span.End;
 
 	private static bool IsChainReceiverOf(SyntaxNode? parent, ExpressionSyntax node) =>
 		parent switch
@@ -245,13 +283,16 @@ internal static partial class Printers
 		};
 
 	/// <summary>One <c>.Name(…)</c> step of a chain.</summary>
-	private readonly struct ChainLink(SyntaxToken dotToken, SimpleNameSyntax name, SyntaxNode[] trailers, int end)
+	private readonly struct ChainLink(SyntaxToken dotToken, SimpleNameSyntax name, int trailersStart, int trailersCount, int end)
 	{
 		public SyntaxToken DotToken { get; } = dotToken;
 		public SimpleNameSyntax Name { get; } = name;
 
-		/// <summary>Argument and bracket lists hanging off this link, in source order.</summary>
-		public SyntaxNode[] Trailers { get; } = trailers;
+		/// <summary>Start index into <see cref="PrintContext.TrailerBuffer"/> for this link's trailers.</summary>
+		public int TrailersStart { get; } = trailersStart;
+
+		/// <summary>Number of trailers for this link in the shared buffer.</summary>
+		public int TrailersCount { get; } = trailersCount;
 
 		/// <summary>Source offset just past this link, for asking where the author broke.</summary>
 		public int End { get; } = end;

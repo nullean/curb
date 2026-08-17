@@ -484,8 +484,8 @@ internal static class TokenStreamComparer
 			else
 			{
 				var children = item.AsNode()!.ChildNodesAndTokens();
-				for (var i = children.Count - 1; i >= 0; i--)
-					stack.Push(children[i]);
+				foreach (var child in children.Reverse())
+					stack.Push(child);
 			}
 		}
 	}

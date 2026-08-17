@@ -628,11 +628,13 @@ internal static partial class Printers
 			var previousEnd = node.OpenBraceToken.Span.End;
 			foreach (var statement in node.Statements)
 			{
+				var start = EffectiveStart(statement);
+
 				// `int y = 1; int z = 2;` — two statements the author put on one line stay there
 				// under csharp_preserve_single_line_statements.
 				if (context.Options.PreserveSingleLineStatements
 					&& previousEnd != node.OpenBraceToken.Span.End
-					&& context.AuthorJoined(previousEnd, EffectiveStart(statement)))
+					&& context.AuthorJoined(previousEnd, start))
 				{
 					arena.Synthetic(SyntheticText.Space);
 					Node.Print(statement, context);
@@ -645,7 +647,7 @@ internal static partial class Printers
 				// started already indented and came out a level too deep. Reindent trims whatever
 				// was left and re-emits this block's own indent, whoever wrote the line ending.
 				arena.HardLine(DocFlags.Reindent);
-				context.BlankLines(context.CodeSeparation(previousEnd, EffectiveStart(statement)));
+				context.BlankLines(context.CodeSeparation(previousEnd, start));
 				Node.Print(statement, context);
 				previousEnd = statement.Span.End;
 			}
@@ -2054,13 +2056,6 @@ internal static partial class Printers
 		return token.SpanStart;
 	}
 
-	private static int EffectiveStart(SyntaxNode node)
-	{
-		foreach (var trivia in node.GetLeadingTrivia())
-		{
-			if (trivia.Kind() is not (SyntaxKind.WhitespaceTrivia or SyntaxKind.EndOfLineTrivia))
-				return trivia.SpanStart;
-		}
-		return node.SpanStart;
-	}
+	private static int EffectiveStart(SyntaxNode node) =>
+		EffectiveTriviaStart(node.GetFirstToken());
 }
