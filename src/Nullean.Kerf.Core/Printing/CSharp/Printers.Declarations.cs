@@ -294,10 +294,13 @@ internal static partial class Printers
 
 		if (node.Initializer is not null)
 		{
-			// ` : base(...)` — the colon needs air on both sides.
+			// ` : base(...)` — the colon needs air on both sides, unless it has been given a line.
 			using (arena.Indent())
 			{
-				arena.Synthetic(SyntheticText.Space);
+				if (context.Options.PlaceConstructorInitializerOnSameLine)
+					arena.Synthetic(SyntheticText.Space);
+				else
+					arena.HardLine();
 				TokenPrinter.Print(node.Initializer.ColonToken, context);
 				arena.Synthetic(SyntheticText.Space);
 				TokenPrinter.Print(node.Initializer.ThisOrBaseKeyword, context);

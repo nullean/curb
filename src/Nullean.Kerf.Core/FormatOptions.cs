@@ -661,6 +661,18 @@ public readonly record struct FormatOptions
 	public bool WrapBeforeExtendsColon { get; init; }
 
 	/// <summary>
+	/// <c>csharp_place_constructor_initializer_on_same_line</c>: keep <c>: base(…)</c> on the
+	/// constructor's own line.
+	/// </summary>
+	/// <remarks>
+	/// On by default, which is what Kerf has always written. Off gives the initializer a line of its
+	/// own, indented under the signature — the same forced placement as
+	/// <see cref="WrapBeforeExtendsColon"/>, and free ground on the same measurement: dotnet format
+	/// neither joins an initializer the author broke nor breaks one they joined.
+	/// </remarks>
+	public bool PlaceConstructorInitializerOnSameLine { get; init; } = true;
+
+	/// <summary>
 	/// <c>csharp_wrap_chained_binary_expressions</c>: give each operand of a long <c>&amp;&amp;</c>
 	/// or <c>||</c> chain a line of its own. Null leaves such a chain unbroken.
 	/// </summary>

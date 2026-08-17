@@ -205,6 +205,79 @@ public class WrapBeforeClauseTests : FormattingTest
 		""",
 		editorConfig: Extends);
 
+	// ---- the constructor initializer ---------------------------------------------------------------------
+
+	private const string Initializer = "csharp_place_constructor_initializer_on_same_line = false";
+
+	[Test]
+	public Task An_initializer_joins_the_signature_by_default() => Formats(
+		"""
+		public class C : B
+		{
+		    public C()
+		        : base(1)
+		    {
+		    }
+		}
+		""",
+		"""
+		public class C : B
+		{
+		    public C() : base(1)
+		    {
+		    }
+		}
+		""");
+
+	[Test]
+	public Task The_key_gives_the_initializer_its_own_line() => WithAndWithout(
+		"""
+		public class C : B
+		{
+		    public C(int x) : this()
+		    {
+		    }
+		}
+		""",
+		"""
+		public class C : B
+		{
+		    public C(int x) : this()
+		    {
+		    }
+		}
+		""",
+		"""
+		public class C : B
+		{
+		    public C(int x)
+		        : this()
+		    {
+		    }
+		}
+		""",
+		Initializer);
+
+	[Test]
+	public Task A_one_line_body_stays_on_the_initializer_line() => Formats(
+		// Where a type's brace has to follow a clause down, a constructor's does not — measured, and
+		// the asymmetry is dotnet format's rather than Kerf's. Asserted so a later change to the type
+		// rule does not quietly get copied here.
+		"""
+		public class C : B
+		{
+		    public C() : base(1) { }
+		}
+		""",
+		"""
+		public class C : B
+		{
+		    public C()
+		        : base(1) { }
+		}
+		""",
+		editorConfig: Initializer);
+
 	// ---- together ---------------------------------------------------------------------------------------
 
 	[Test]
