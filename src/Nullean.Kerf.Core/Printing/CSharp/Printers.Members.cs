@@ -21,11 +21,11 @@ internal static partial class Printers
 
 		if (node.BaseList is not null)
 		{
-			Spacing.BeforeInheritanceColon(context);
-			Node.Print(node.BaseList, context);
+			PrintBaseList(node.BaseList, context);
 		}
 
-		var oneLine = KeepsOneLine(node.OpenBraceToken, node.CloseBraceToken, context);
+		var oneLine = KeepsOneLine(node.OpenBraceToken, node.CloseBraceToken, context)
+			&& !HeaderWasBroken(node.BaseList, constraintCount: 0, context);
 
 		using (arena.ForceFlatIf(oneLine))
 		{
@@ -362,8 +362,7 @@ internal static partial class Printers
 
 		foreach (var constraint in node.ConstraintClauses)
 		{
-			arena.Synthetic(SyntheticText.Space);
-			Node.Print(constraint, context);
+			PrintConstraintClause(constraint, context);
 		}
 
 		TokenPrinter.Print(node.SemicolonToken, context);

@@ -268,13 +268,11 @@ internal static partial class Printers
 
 		if (node.BaseList is not null)
 		{
-			Spacing.BeforeInheritanceColon(context);
-			Node.Print(node.BaseList, context);
+			PrintBaseList(node.BaseList, context);
 		}
 		foreach (var constraint in node.ConstraintClauses)
 		{
-			arena.Synthetic(SyntheticText.Space);
-			Node.Print(constraint, context);
+			PrintConstraintClause(constraint, context);
 		}
 
 		if (node.OpenBraceToken.RawKind == 0)
@@ -283,7 +281,12 @@ internal static partial class Printers
 			return;
 		}
 
-		var oneLine = KeepsOneLine(node.OpenBraceToken, node.CloseBraceToken, context);
+		// A `{ }` body the author kept on one line only stays there while the header is still one
+		// line. Once a clause has been given a line of its own the brace follows it, which is what
+		// dotnet format writes and what two corpus files caught. Safe to ask here because the clause
+		// options force their break unconditionally — this is reading the options, not the layout.
+		var oneLine = KeepsOneLine(node.OpenBraceToken, node.CloseBraceToken, context)
+			&& !HeaderWasBroken(node.BaseList, node.ConstraintClauses.Count, context);
 
 		using (arena.ForceFlatIf(oneLine))
 		{
@@ -360,8 +363,7 @@ internal static partial class Printers
 
 		foreach (var constraint in node.ConstraintClauses)
 		{
-			arena.Synthetic(SyntheticText.Space);
-			Node.Print(constraint, context);
+			PrintConstraintClause(constraint, context);
 		}
 
 		if (node.Body is not null)
@@ -1475,6 +1477,60 @@ internal static partial class Printers
 	/// Zero unless asked, which leaves the author's own spacing exactly as it was. An indexer and an
 	/// event answer to the property setting, the same grouping dotnet format uses for their braces.
 	/// </remarks>
+	/// <summary>
+	/// True when a clause option has put a line into a declaration's header, so nothing after it can
+	/// still be on the declaration's own line.
+	/// </summary>
+	private static bool HeaderWasBroken(BaseListSyntax? baseList, int constraintCount, PrintContext context) =>
+		(context.Options.WrapBeforeExtendsColon && baseList is not null)
+		|| (context.Options.WrapBeforeFirstTypeParameterConstraint && constraintCount > 0);
+
+	/// <summary>Prints a <c>where</c> clause, on the signature line or a line of its own.</summary>
+	/// <remarks>
+	/// <para>
+	/// The break is unconditional when the option is on, so it never has to ask whether the
+	/// declaration wrapped — a question whose answer this run's own output would change.
+	/// </para>
+	/// <para>
+	/// The indent scope covers the clause and not just the line before it. Anything the clause brings
+	/// its own braces for anchors to the line it starts on, and that line is now a level in; closing
+	/// the scope after the break left a nested initializer a level short of where dotnet format puts
+	/// it, which one corpus file caught.
+	/// </para>
+	/// </remarks>
+	private static void PrintConstraintClause(TypeParameterConstraintClauseSyntax constraint, PrintContext context)
+	{
+		if (!context.Options.WrapBeforeFirstTypeParameterConstraint)
+		{
+			context.Arena.Synthetic(SyntheticText.Space);
+			Node.Print(constraint, context);
+			return;
+		}
+
+		using (context.Arena.Indent())
+		{
+			context.Arena.HardLine();
+			Node.Print(constraint, context);
+		}
+	}
+
+	/// <summary>Prints a base list, on the declaration line or a line of its own, colon first.</summary>
+	private static void PrintBaseList(BaseListSyntax baseList, PrintContext context)
+	{
+		if (!context.Options.WrapBeforeExtendsColon)
+		{
+			Spacing.BeforeInheritanceColon(context);
+			Node.Print(baseList, context);
+			return;
+		}
+
+		using (context.Arena.Indent())
+		{
+			context.Arena.HardLine();
+			Node.Print(baseList, context);
+		}
+	}
+
 	private static int MinimumBlankLinesFor(MemberDeclarationSyntax member, PrintContext context)
 	{
 		var options = context.Options;

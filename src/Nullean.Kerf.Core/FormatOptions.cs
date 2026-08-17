@@ -633,6 +633,34 @@ public readonly record struct FormatOptions
 	public bool? WrapBeforeFirstMethodCall { get; init; }
 
 	/// <summary>
+	/// <c>csharp_wrap_before_first_type_parameter_constraint</c>: put a <c>where</c> clause on its own
+	/// line, indented under the declaration it constrains.
+	/// </summary>
+	/// <remarks>
+	/// <para>
+	/// Off by default, which keeps the clause on the signature line. On, it is Rider's own default
+	/// rendering, and one of the few places a real repository's layout differs from Kerf's by a whole
+	/// line rather than by a column.
+	/// </para>
+	/// <para>
+	/// A forced placement, not a width-driven one: the break is always there or never, so nothing here
+	/// reads the source and there is no layout for a second run to read back differently. Where a
+	/// declaration carries several <c>where</c> clauses they each take their own line, since a break
+	/// before the first and none before the rest is a rendering nobody asks for.
+	/// </para>
+	/// </remarks>
+	public bool WrapBeforeFirstTypeParameterConstraint { get; init; }
+
+	/// <summary>
+	/// <c>csharp_wrap_before_extends_colon</c>: put a base list on its own line, colon first.
+	/// </summary>
+	/// <remarks>
+	/// Off by default, keeping <c>class C : B</c> on one line. Forced rather than width-driven, for
+	/// the same reason as <see cref="WrapBeforeFirstTypeParameterConstraint"/>.
+	/// </remarks>
+	public bool WrapBeforeExtendsColon { get; init; }
+
+	/// <summary>
 	/// <c>csharp_wrap_chained_binary_expressions</c>: give each operand of a long <c>&amp;&amp;</c>
 	/// or <c>||</c> chain a line of its own. Null leaves such a chain unbroken.
 	/// </summary>

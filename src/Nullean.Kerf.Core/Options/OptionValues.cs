@@ -55,6 +55,8 @@ public static class OptionValues
 			false => "false",
 			null => "false   # a plain identifier receiver keeps its first call; anything else stands alone",
 		},
+		"csharp_wrap_before_first_type_parameter_constraint" => Bool(options.WrapBeforeFirstTypeParameterConstraint),
+		"csharp_wrap_before_extends_colon" => Bool(options.WrapBeforeExtendsColon),
 		"csharp_wrap_parameters_style" => Wrap(options.WrapParametersStyle),
 		"csharp_keep_blank_lines_in_declarations" => Lines(options.KeepBlankLinesInDeclarations),
 		"csharp_keep_blank_lines_in_code" => Lines(options.KeepBlankLinesInCode),

@@ -599,8 +599,7 @@ internal static partial class Printers
 
 		foreach (var constraint in node.ConstraintClauses)
 		{
-			arena.Synthetic(SyntheticText.Space);
-			Node.Print(constraint, context);
+			PrintConstraintClause(constraint, context);
 		}
 
 		if (node.Body is not null)

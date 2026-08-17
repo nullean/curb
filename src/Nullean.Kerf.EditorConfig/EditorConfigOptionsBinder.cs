@@ -283,6 +283,12 @@ public static class EditorConfigOptionsBinder
 		if (TryPrefixedBool(properties, "wrap_before_first_method_call", diagnostics, out var wrapFirstCall))
 			options = options with { WrapBeforeFirstMethodCall = wrapFirstCall };
 
+		if (TryPrefixedBool(properties, "wrap_before_first_type_parameter_constraint", diagnostics, out var wrapConstraint))
+			options = options with { WrapBeforeFirstTypeParameterConstraint = wrapConstraint };
+
+		if (TryPrefixedBool(properties, "wrap_before_extends_colon", diagnostics, out var wrapExtends))
+			options = options with { WrapBeforeExtendsColon = wrapExtends };
+
 		// Only the parameter list's. wrap_arguments_style, the two initializer styles and
 		// wrap_chained_method_calls are left to the same silence as the several hundred other
 		// ReSharper keys Kerf does not implement: forcing every one of those to break moves

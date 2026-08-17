@@ -104,6 +104,8 @@ public static class OptionCatalog
 			"csharp_style_expression_bodied_indexers",
 			"csharp_using_directive_placement",
 			"csharp_wrap_before_first_method_call",
+			"csharp_wrap_before_first_type_parameter_constraint",
+			"csharp_wrap_before_extends_colon",
 			"csharp_wrap_chained_binary_expressions",
 			"csharp_wrap_before_binary_opsign",
 			"csharp_wrap_parameters_style",
