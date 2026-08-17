@@ -29,42 +29,47 @@ internal static class FormattingSuppression
 	/// Finds the suppressed spans in a file, or null when there are none.
 	/// </summary>
 	/// <remarks>
-	/// Guarded by a plain text scan and then Roslyn's directive index. Files without a pragma
-	/// warning in the source pay only the text scan; files with pragmas but no formatting
-	/// directives pay the text scan plus an O(1) ContainsDirectives flag check; only files that
-	/// actually carry formatting directives walk the directive chain, visiting only directive
-	/// nodes rather than every trivia node in the tree.
+	/// Uses a two-phase approach to avoid walking the full directive chain. Phase one is a plain text
+	/// scan that collects the source offsets of every <c>#pragma warning</c> occurrence — files with
+	/// none pay only this scan. Phase two calls <c>root.FindTrivia(offset)</c> for each collected
+	/// offset; <c>FindTrivia</c> is O(depth), not O(all directives), so it reaches each pragma
+	/// directly without visiting unrelated <c>#if</c>, <c>#region</c>, or <c>#nullable</c> nodes.
+	/// A false-positive offset (e.g. the text inside a string literal) is harmlessly rejected by the
+	/// <c>is not PragmaWarningDirectiveTriviaSyntax</c> guard.
 	/// </remarks>
 	public static List<TextSpan>? Scan(SyntaxNode root, ReadOnlySpan<char> source)
 	{
-		if (!source.Contains("#pragma warning", StringComparison.Ordinal))
+		// Fast text scan: collect offsets of all #pragma warning occurrences.
+		// Files with none pay only this scan.
+		var offsets = CollectPragmaOffsets(source);
+		if (offsets is null)
 			return null;
-
 		if (!root.ContainsDirectives)
 			return null;
 
 		List<TextSpan>? spans = null;
 		var openedAt = -1;
 
-		var directive = root.GetFirstDirective();
-		while (directive is not null)
+		foreach (var offset in offsets)
 		{
-			if (directive is PragmaWarningDirectiveTriviaSyntax pragma && MentionsFormatting(pragma))
-			{
-				if (pragma.DisableOrRestoreKeyword.IsKind(SyntaxKind.DisableKeyword))
-				{
-					// Nested disables are not a thing; the first one opens the region.
-					if (openedAt < 0)
-						openedAt = pragma.FullSpan.Start;
-				}
-				else if (openedAt >= 0)
-				{
-					(spans ??= []).Add(TextSpan.FromBounds(openedAt, pragma.FullSpan.End));
-					openedAt = -1;
-				}
-			}
+			// FindTrivia is O(depth) — walks only the tree path to this offset, not all directives.
+			var trivia = root.FindTrivia(offset);
+			if (trivia.GetStructure() is not PragmaWarningDirectiveTriviaSyntax pragma)
+				continue;
+			if (!MentionsFormatting(pragma))
+				continue;
 
-			directive = directive.GetNextDirective();
+			if (pragma.DisableOrRestoreKeyword.IsKind(SyntaxKind.DisableKeyword))
+			{
+				// Nested disables are not a thing; the first one opens the region.
+				if (openedAt < 0)
+					openedAt = pragma.FullSpan.Start;
+			}
+			else if (openedAt >= 0)
+			{
+				(spans ??= []).Add(TextSpan.FromBounds(openedAt, pragma.FullSpan.End));
+				openedAt = -1;
+			}
 		}
 
 		// A disable never restored runs to the end of the file, which is what the compiler does too.
@@ -72,6 +77,25 @@ internal static class FormattingSuppression
 			(spans ??= []).Add(TextSpan.FromBounds(openedAt, root.FullSpan.End));
 
 		return spans;
+	}
+
+	private static List<int>? CollectPragmaOffsets(ReadOnlySpan<char> source)
+	{
+		const string needle = "#pragma warning";
+		List<int>? offsets = null;
+		var remaining = source;
+		var baseOffset = 0;
+		while (true)
+		{
+			var idx = remaining.IndexOf(needle, StringComparison.Ordinal);
+			if (idx < 0)
+				break;
+			(offsets ??= []).Add(baseOffset + idx);
+			var advance = idx + needle.Length;
+			remaining = remaining[advance..];
+			baseOffset += advance;
+		}
+		return offsets;
 	}
 
 	/// <summary>True when a node sits wholly inside a suppressed region.</summary>

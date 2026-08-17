@@ -85,10 +85,13 @@ internal sealed class DocPrinter
 
 		// Verbatim runs are re-emitted line by line with the configured ending, so when that differs
 		// from the source's own ending the content of a multi-line string literal changes. The
-		// boundary tracking below cannot see that, so rewriting line endings always forces a check.
+		// boundary tracking below cannot see that — but only files that actually contain a verbatim
+		// or raw string literal are at risk, so check for the relevant delimiters before forcing a
+		// round-trip parse.
 		var sourceNewLine = source.Span.IndexOf('\n');
 		var sourceUsesCrLf = sourceNewLine > 0 && source.Span[sourceNewLine - 1] == '\r';
-		RoundTripAtRisk = sourceNewLine >= 0 && sourceUsesCrLf != (_endOfLine == "\r\n");
+		RoundTripAtRisk = sourceNewLine >= 0 && sourceUsesCrLf != (_endOfLine == "\r\n")
+			&& HasVerbatimOrRawString(source.Span);
 
 		_breaks.Run(arena);
 		EnsureGroupModes(arena.Count);
@@ -364,6 +367,26 @@ internal sealed class DocPrinter
 			RoundTripAtRisk = true;
 	}
 
+	/// <summary>
+	/// Returns true when the source contains at least one verbatim or raw string delimiter.
+	/// Only such strings have their line endings rewritten by the verbatim-run emitter, so only
+	/// they can have their token text changed when the configured line ending differs from the
+	/// source's own.
+	/// </summary>
+	private static bool HasVerbatimOrRawString(ReadOnlySpan<char> source)
+	{
+		// Fast exit: no double-quote means no string literals at all.
+		if (source.IndexOf('"') < 0)
+			return false;
+
+		// @"..." and $@"..." both contain the two-character sequence @" (in $@" it appears at
+		// offset 1), so one search covers both. @$"..." has @ followed by $ followed by ", so
+		// it requires its own check. Raw string literals start with """.
+		return source.Contains("@\"", StringComparison.Ordinal)
+			|| source.Contains("@$\"", StringComparison.Ordinal)
+			|| source.Contains("\"\"\"", StringComparison.Ordinal);
+	}
+
 	private void Emit(ReadOnlySpan<char> text, DocFlags flags, bool suppressWidth)
 	{
 		_output.Append(text);
@@ -534,10 +557,6 @@ internal sealed class DocPrinter
 	/// </remarks>
 	private int TextWidth(ReadOnlySpan<char> text)
 	{
-		// Fast path: no tabs and no surrogate pairs — the overwhelming common case in C# source.
-		if (text.IndexOf('\t') < 0 && text.IndexOfAnyInRange('\uD800', '\uDFFF') < 0)
-			return text.Length;
-
 		var width = 0;
 		for (var i = 0; i < text.Length; i++)
 		{

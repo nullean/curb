@@ -131,8 +131,12 @@ public sealed class CSharpFormatter : IDisposable
 
 		// The second parse only ever finds a moved token boundary, and the printer already knows
 		// whether it created that risk. Where it did not, the check is provably redundant.
-		var reordered = context.ReorderedSpans is not null || context.BracesAdded || context.NamespaceUnwrapped
-			|| context.ExpressionBodyAdded;
+		//
+		// ExpressionBodyAdded is intentionally absent: when a block body is converted to an expression
+		// body the dropped tokens are recorded in DroppedSpans (caught by ContentVerifier) and any
+		// adjacency risk from closing the gap is covered by _printer.RoundTripAtRisk. Running
+		// TokenStreamComparer unconditionally for every expression-body rewrite is redundant.
+		var reordered = context.ReorderedSpans is not null || context.BracesAdded || context.NamespaceUnwrapped;
 		verifyRoundTrip = verifyRoundTrip && (forceRoundTrip || reordered || _printer.RoundTripAtRisk);
 
 		var changed = !written.SequenceEqual(source.AsSpan());

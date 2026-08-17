@@ -107,14 +107,10 @@ internal static class ContentVerifier
 
 		while (true)
 		{
-			{
-				var next = source[sourceIndex..].IndexOfAnyExcept(WhitespaceChars);
-				sourceIndex = next < 0 ? source.Length : sourceIndex + next;
-			}
-			{
-				var next = output[outputIndex..].IndexOfAnyExcept(WhitespaceChars);
-				outputIndex = next < 0 ? output.Length : outputIndex + next;
-			}
+			while (sourceIndex < source.Length && IsSkippable(source[sourceIndex]))
+				sourceIndex++;
+			while (outputIndex < output.Length && IsSkippable(output[outputIndex]))
+				outputIndex++;
 
 			// Source a rewrite dropped on purpose. Stepping over it is only safe because what replaced
 			// it is counted: an expression body drops a block and adds one arrow, so the arrows and
