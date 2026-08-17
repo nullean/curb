@@ -566,8 +566,17 @@ internal static partial class Printers
 					using (arena.Indent(indented ? 1 : 0))
 					{
 						arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
+
+						// The same separation a block gives its statements. Without it a switch
+						// section dropped every blank line between its statements — and dropping one
+						// between a trailing comment and the comment below it then let the
+						// align-under-a-trailing-comment rule fire on the *next* run, which is how
+						// most of roslyn's remaining unsettled files began.
+						context.BlankLines(context.CodeSeparation(labelEnd, EffectiveStart(statement)));
 						Node.Print(statement, context);
 					}
+
+					labelEnd = statement.Span.End;
 				}
 			}
 		}
