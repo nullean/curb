@@ -63,6 +63,11 @@ public sealed class CSharpCleaner
 		new AccessibilityModifiers(),
 		new ImplicitObjectCreation(),
 		new ImplicitTypes(),
+		new ReadOnlyStructs(),
+		new ReadOnlyMembers(),
+		new SimplifiedDefaults(),
+		new SimplifiedInterpolations(),
+		new RedundantNullableDirectives(),
 	];
 
 	/// <summary>

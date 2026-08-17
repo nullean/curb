@@ -122,7 +122,8 @@ fixed point; keeping one would make the second pass differ from the first.
 a rule cannot claim to be fixed by a fixer nobody wrote. That test earned its place: the first version of
 the catalog claimed five rules when one had a fixer, and the cleaner skipped the other four in silence.
 
-Five rules today: IDE0005, IDE0007, IDE0040, IDE0044 and IDE0090.
+Ten rules today: IDE0005, IDE0007, IDE0034, IDE0040, IDE0044, IDE0071, IDE0090, IDE0240, IDE0250 and
+IDE0251.
 
 ### IDE0005 — unnecessary using directives
 
@@ -161,7 +162,7 @@ not whitespace, so a comment above or beside the directive keeps its place.
 | IDE1006 / IDE0130 naming | A rename touches every reference site, can compile while changing which overload binds, and breaks reflection and serialisation strings that no compiler check catches. **Never**, not "not yet". |
 | IDE0160 block namespace | Kerf converts *to* file-scoped and never back; removing braces can change what a name resolves to. |
 
-### The other four
+### The other nine
 
 Ordered as they were built, by whether a mistake is loud.
 
@@ -170,7 +171,19 @@ Ordered as they were built, by whether a mistake is loud.
 | **IDE0040** accessibility | Writes out the accessibility C# already applied — `private` inside a type, `public` on an interface member, `internal` on a top-level type. Reads only the parent node. | `Inserted` | Nothing changes; the keyword is the one that was already in force. |
 | **IDE0044** `readonly` | Inserts `readonly` into a field's modifier list. | `Inserted` | A compile error on the next build — a write through `ref`, `Interlocked` or `Unsafe.AsRef` the analyser missed. |
 | **IDE0090** `new()` | Drops the type name after `new`. | `Dropped` | A compile error: if the target type were not known, `new()` is an error, not a different program. |
-| **IDE0007** `var` | Replaces a local's type with `var`. | `Dropped \| Inserted` | **Quiet.** It compiles and changes the declared type — `IEnumerable<int> x = list` becoming `var x = list` narrows `x`. The only one in the slice whose mistake is silent, which is why it was built last and why it leans hardest on the freshness gate. |
+| **IDE0007** `var` | Replaces a local's type with `var`. | `Dropped \| Inserted` | **Quiet.** It compiles and changes the declared type — `IEnumerable<int> x = list` becoming `var x = list` narrows `x`. The only one whose mistake is silent, which is why it was built last and why it leans hardest on the freshness gate. |
+| **IDE0250** readonly struct | Inserts `readonly` on a struct. | `Inserted` | Does not compile if some member mutates. |
+| **IDE0251** readonly member | Inserts `readonly` on a struct member. | `Inserted` | Does not compile if the member mutates. Refused on a class, a static member, or anything already readonly. |
+| **IDE0034** simplify `default` | Drops `(T)` from `default(T)`. | `Dropped` | A bare `default` with no inferable target is an error, not a different program. |
+| **IDE0071** simplify interpolation | Drops a redundant `.ToString()`. | `Dropped` | Refused when the call takes arguments: `{x.ToString("N0")}` becomes `{x:N0}`, which moves the argument into a format clause — two places, not one, and deleting the call alone would silently lose the format. |
+| **IDE0240** redundant `#nullable` | Removes the directive's line. | `Dropped` | **Verified by one net rather than two.** A directive lives in trivia and `DescendantTokens()` does not descend into it, so `TokenStreamComparer` cannot see the change at all. `ContentVerifier` does, because it walks characters. The rule therefore does nothing but remove a whole line it has positively identified. |
+
+**Two rules can each be valid and still conflict.** `bool flag = default(bool)` reports both IDE0007 and
+IDE0034. Apply either alone and the result is fine; apply both from one snapshot and you get
+`var flag = default`, which is CS8716. A real build caught it. IDE0007 now refuses any initialiser `var`
+cannot take a type from — `default`, `default(T)`, `null` — which is a syntactic invariant of `var` rather
+than second-guessing a verdict, and it is the `var` rule that stands down because its mistake is the quiet
+one.
 
 Insertions are declared by their **exact text**, not by a count, so the verifiers permit precisely this
 word, once, here. `DeclaredDeltaTests` asserts that from both sides: an undeclared word, a different
@@ -274,8 +287,8 @@ checkout somebody is working in. It also does not need the corpus to *build*, wh
 whose SDK cannot be resolved locally is still a usable corpus — dotnet/roslyn pins an SDK Arcade
 downloads, and is used anyway.
 
-Measured on dotnet/roslyn: **17,169 files, 140,528 fixes applied across 15,788 files, 652,496 refusals, in
-26 s.**
+Measured on dotnet/roslyn: **17,169 files, 162,540 fixes applied across 16,098 files, 1,719,585 refusals, in
+36 s.**
 
 ### What it found
 
@@ -314,6 +327,50 @@ using global::Microsoft.AspNetCore.Components
 The directive's span runs from `using` to that `;` and contains both `#line`s. Removing it removed them.
 The content verifier caught it, which is the net working — but a rule that has to be caught should have
 declined, since the alternative is deciding which parts of somebody's generated file are load-bearing.
+
+## The conformance gate
+
+`./build.sh cleanupconformance` is the other half, and the only gate that can catch a fix which compiles
+but is wrong: the corpus is built, cleaned, and built again. `cleanupsafety` never compiles anything, so it
+cannot reach this. It clones elastic/docs-builder if `--corpus` is not given — a corpus that builds with the
+SDK in `global.json`, which is why it is not dotnet/roslyn.
+
+Measured: **394 sites across a 1,201-file solution, 398 fixes in 304 files, and the solution still builds.**
+Four sites are left, all IDE0005, all ones Kerf declined out loud because the file has a `#if`. `dotnet
+format style` has exactly those four left to do — it has a compilation and can reason about symbol sets,
+which is precisely why Kerf will not.
+
+The assertion is not "nothing is left". It is the exact claim Kerf can make: **everything not explicitly
+declined was fixed**, and the count fell.
+
+### What it took to make it measure anything
+
+Three separate things made this gate pass while proving nothing. Each is recorded because each would come
+back on the next corpus.
+
+- **`RunAnalyzersDuringBuild`.** docs-builder sets it to `false` unless `CI=true` — sensible for a local
+  build, fatal here. The analysers were in `@(Analyzer)` and never ran, so every rule reported nothing and
+  the run looked clean. The gate's own "all ten must be reported" assertion is what caught it.
+- **`EnforceCodeStyleInBuild` has to be a *global* property.** Set in `Directory.Build.targets` it loaded
+  **zero** IDE analysers: the SDK decides which analysers to add before that file is imported. A global
+  property is set before evaluation, and it also outranks the nested `Directory.Build.props` files a real
+  repository has.
+- **An `.editorconfig` entry for a specific rule outranks a `.globalconfig` one**, whatever `global_level`
+  says — the level only breaks ties between global configs. docs-builder sets
+  `dotnet_diagnostic.IDE0005.severity = none`, so nine rules reported and the tenth did not. Those lines are
+  commented out in the working copy.
+
+Two smaller ones, for anyone writing a similar script: MSBuild reads both `;` **and** `,` in a command-line
+property value as separators between properties, so `-p:NoWarn=A;B` and `-p:NoWarn=A,B` both fail with
+MSB1006 — the escape is `%3B`. And an up-to-date build reports nothing at all, because `CoreCompile` is
+skipped, so anything measuring diagnostics has to force the compile it wants to measure.
+
+### Zero churn, measured
+
+Before the seeded violations, the pristine corpus reports **one** owned rule — IDE0005, which its own
+`.editorconfig` had switched off. Everything else Kerf fixes, docs-builder already satisfies across 1,201
+files. That is the zero-churn promise as a measurement rather than a claim, and it is why the fixing half
+has to be exercised by a seeded file: there is nothing there to fix.
 
 ## Rejected alternatives
 

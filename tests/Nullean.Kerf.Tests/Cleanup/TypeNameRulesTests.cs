@@ -356,6 +356,89 @@ public class TypeNameRulesTests
 		await Task.CompletedTask;
 	}
 
+	[Test]
+	public async Task A_nullable_local_type_becomes_var()
+	{
+		// `string?` is a NullableTypeSyntax wrapping a PredefinedTypeSyntax. Stopping at the inner one made
+		// the type's parent the wrapper rather than the declaration, and every nullable local was refused.
+		const string source = """
+			namespace N;
+
+			public sealed class Widget
+			{
+				public string Describe(string? given)
+				{
+					string? text = given;
+					return text ?? "";
+				}
+			}
+
+			""";
+
+		var result = Clean(source, At("IDE0007", source, "string? text"));
+
+		result.Applied.Should().Be(1);
+		result.Text.Should().Contain("var text = given;");
+
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task An_initialiser_that_infers_nothing_is_refused()
+	{
+		// `var x = default;` and `var x = null;` do not compile. A syntactic invariant of var rather than a
+		// judgement about the verdict, and owning the rewrite means owning it.
+		const string source = """
+			namespace N;
+
+			public sealed class Widget
+			{
+				public bool Flag()
+				{
+					bool flag = default(bool);
+					string? name = null;
+					return flag && name is null;
+				}
+			}
+
+			""";
+
+		var result = Clean(source, At("IDE0007", source, "bool flag"), At("IDE0007", source, "string? name"));
+
+		result.Changed.Should().BeFalse();
+		result.Refusals.Should().HaveCount(2);
+		result.Refusals.Should().AllSatisfy(r => r.Should().Contain("infers no type"));
+
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task Var_and_a_simplified_default_cannot_both_apply()
+	{
+		// The interaction a real build caught, as CS8716. Each fix is valid alone; together they produce
+		// `var flag = default`, which has no target type. IDE0007 stands down so the pair cannot arise.
+		const string source = """
+			namespace N;
+
+			public sealed class Widget
+			{
+				public bool Flag()
+				{
+					bool flag = default(bool);
+					return flag;
+				}
+			}
+
+			""";
+
+		var result = Clean(source, At("IDE0007", source, "bool flag"), At("IDE0034", source, "default(bool)"));
+
+		result.Applied.Should().Be(1, "only the default is simplified");
+		result.Text.Should().Contain("bool flag = default;").And.NotContain("var flag");
+
+		await Task.CompletedTask;
+	}
+
 	// ---- Idempotency ------------------------------------------------------------------------------
 
 	[Test]

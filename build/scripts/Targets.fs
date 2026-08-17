@@ -270,6 +270,314 @@ let private msbuildSmoketest (arguments:ParseResults<Arguments>) =
     printfn ""
     printfn "MSBuild integration verified: formatted before CoreCompile, and IDE0055 fails without it"
 
+/// Cleans a corpus that really builds, then requires that it still builds and that dotnet format style has
+/// nothing left to say about the rules Kerf owns.
+///
+/// The end-to-end claim, and the only gate that can catch a fix which compiles but is wrong. `cleanupsafety`
+/// proves a wrong verdict cannot damage a file; it cannot prove a *right* verdict was applied correctly,
+/// because it never compiles anything. This does: the corpus is built, cleaned, and built again.
+///
+/// Needs a corpus that builds with the SDK in global.json, which is why it is elastic/docs-builder rather
+/// than dotnet/roslyn — Roslyn pins an SDK only its own Arcade bootstrap fetches. Clones it if `--corpus` is
+/// not given.
+let private cleanupConformance (arguments:ParseResults<Arguments>) =
+    let corpus =
+        match arguments.TryGetResult Corpus with
+        | Some c ->
+            let d = DirectoryInfo(c)
+            if not d.Exists then failwithf "corpus not found: %s" d.FullName
+            d
+        | None ->
+            let cached = DirectoryInfo(Path.Combine(Paths.Output.FullName, "corpus", "docs-builder"))
+            if not cached.Exists then
+                printfn "cloning elastic/docs-builder into %s" cached.FullName
+                Directory.CreateDirectory(cached.Parent.FullName) |> ignore
+                exec "git" ["clone"; "--depth"; "1"; "https://github.com/elastic/docs-builder.git"; cached.FullName] |> ignore
+            cached
+
+    let work = DirectoryInfo(Path.Combine(Paths.Output.FullName, "cleanup-conformance"))
+    if work.Exists then work.Delete(true)
+
+    let rec copyTree (source: string) (target: string) =
+        Directory.CreateDirectory target |> ignore
+        for file in Directory.GetFiles source do
+            File.Copy(file, Path.Combine(target, Path.GetFileName file), true)
+        for dir in Directory.GetDirectories source do
+            let name = Path.GetFileName dir
+            if name <> ".git" && name <> "bin" && name <> "obj" && name <> "node_modules" then
+                copyTree dir (Path.Combine(target, name))
+
+    printfn "copying corpus from %s" corpus.FullName
+    copyTree corpus.FullName work.FullName
+
+    // The rules Kerf owns, asked for rather than restated. A second copy of the list here would drift from
+    // the catalog, and the drift would look like a passing gate.
+    let ownedIds =
+        let result = Proc.Start("dotnet", [| "run"; "--project"; "src/Nullean.Kerf.Cli"; "-c"; "Release"; "--"; "rules"; "--cleanup-ids" |])
+        result.ConsoleOut
+        |> Seq.map (fun l -> l.Line.Trim())
+        |> Seq.filter (fun l -> l.StartsWith("IDE", StringComparison.Ordinal))
+        |> Seq.tryHead
+        |> Option.defaultWith (fun () -> failwith "could not read the cleanup rule ids from `kerf rules --cleanup-ids`")
+        |> fun line -> line.Split(' ') |> Array.filter (fun s -> s.Length > 0)
+
+    printfn "rules: %s" (String.concat " " ownedIds)
+
+    // Frontend builds need npm, which a CI runner for a C# repository has no reason to have. Both npm
+    // targets in docs-builder are Inputs/Outputs-gated, so writing their outputs makes MSBuild skip them.
+    // If a future corpus needs something else the build fails loudly, which is the right way to find out.
+    for project in Directory.GetFiles(work.FullName, "package.json", SearchOption.AllDirectories) do
+        let dir = Path.GetDirectoryName(project)
+        if Directory.GetFiles(dir, "*.csproj") |> Array.isEmpty |> not then
+            for relative in [ "node_modules/.install-stamp"; "_static/.build-stamp"; "_static/main.js"; "_static/styles.css" ] do
+                let file = Path.Combine(dir, relative.Replace('/', Path.DirectorySeparatorChar))
+                Directory.CreateDirectory(Path.GetDirectoryName(file)) |> ignore
+                File.WriteAllText(file, "")
+
+    // Escalate the owned rules, and set the preference keys they read so the analyser reports the direction
+    // Kerf fixes.
+    //
+    // A .globalconfig rather than an append to the corpus's .editorconfig. Appending was tried and reported
+    // nothing: a corpus carries its own sections, its own `root=true`, and — because the work tree sits inside
+    // this repository — Kerf's own .editorconfig turns up as an ancestor too. A global config has no globs, no
+    // sections and no walk, so there is nothing left to reason about. It is also what the SDK itself uses to
+    // set these severities, and `global_level` settles ties out loud rather than by file position.
+    let globalConfig = Path.Combine(work.FullName, "kerf-conformance.globalconfig")
+    let severities =
+        ownedIds |> Array.map (sprintf "dotnet_diagnostic.%s.severity = warning") |> String.concat "\n"
+
+    let preferences =
+        [ "csharp_style_var_for_built_in_types = true"
+          "csharp_style_var_when_type_is_apparent = true"
+          "csharp_style_var_elsewhere = true"
+          "dotnet_style_readonly_field = true"
+          "dotnet_style_require_accessibility_modifiers = for_non_interface_members"
+          "csharp_style_implicit_object_creation_when_type_is_apparent = true"
+          "csharp_style_prefer_readonly_struct = true"
+          "csharp_style_prefer_readonly_struct_member = true" ]
+        |> String.concat "\n"
+
+    File.WriteAllText(globalConfig,
+        sprintf "is_global = true\nglobal_level = 100\n\n%s\n%s\n" severities preferences)
+
+    // A .editorconfig entry for a specific rule outranks a global config for that rule, whatever
+    // `global_level` says — the level only breaks ties between global configs. docs-builder sets
+    // `dotnet_diagnostic.IDE0005.severity = none`, so nine rules reported and that one did not. Any such line
+    // in the work tree is commented out so the global config governs.
+    for config in Directory.GetFiles(work.FullName, ".editorconfig", SearchOption.AllDirectories) do
+        let lines = File.ReadAllLines config
+        let neutralised =
+            lines
+            |> Array.map (fun line ->
+                let trimmed = line.TrimStart()
+                if trimmed.StartsWith("dotnet_diagnostic.", StringComparison.OrdinalIgnoreCase)
+                   && ownedIds |> Array.exists (fun id -> trimmed.StartsWith("dotnet_diagnostic." + id + ".", StringComparison.OrdinalIgnoreCase))
+                then "# neutralised by ./build.sh cleanupconformance: " + line
+                else line)
+
+        if neutralised <> lines then
+            printfn "neutralised rule severities in %s" (Paths.RootRelative config)
+            File.WriteAllLines(config, neutralised)
+
+    // Only $(ErrorLog) goes in a file, because it needs $(TargetFramework) — a single path shared by two
+    // inner builds produces two concatenated JSON documents, which the reader refuses. Directory.Build.targets
+    // rather than .props, because the corpus has nested props files (src/, tests/, src/tooling/) that would
+    // override a root one.
+    //
+    // Everything else is a global property on the command line, and that is not a style choice. Measured:
+    // EnforceCodeStyleInBuild set in Directory.Build.targets loaded *zero* IDE analysers — the SDK decides
+    // which analysers to add before that file is imported, so the whole run reported nothing and the gate
+    // would have passed while measuring nothing. A global property is set before evaluation and also
+    // outranks the nested props files, which is what un-escalating their warnings needs.
+    let targets = Path.Combine(work.FullName, "Directory.Build.targets")
+    let targetsXml =
+        [ "<Project>"
+          "  <PropertyGroup Condition=\"'$(TargetFramework)' != ''\">"
+          "    <ErrorLog>$(IntermediateOutputPath)kerf.sarif,version=2.1</ErrorLog>"
+          "  </PropertyGroup>"
+          "  <ItemGroup>"
+          "    <EditorConfigFiles Include=\"$(MSBuildThisFileDirectory)kerf-conformance.globalconfig\" />"
+          "  </ItemGroup>"
+          "</Project>" ]
+        |> String.concat "\n"
+
+    File.WriteAllText(targets, targetsXml)
+
+    let build stage =
+        let result =
+            Proc.Start("dotnet",
+                [| "build"; work.FullName; "-tl:off"; "--nologo"
+                   "-p:EnforceCodeStyleInBuild=true"
+                   // Without this the analysers are loaded and never run. docs-builder sets
+                   // RunAnalyzersDuringBuild=false unless CI=true, which is sensible for a local build and
+                   // fatal for this gate: every rule reported nothing and the run looked clean. The "all ten
+                   // must be reported" assertion below is what caught it.
+                   "-p:RunAnalyzersDuringBuild=true"
+                   "-p:GenerateDocumentationFile=true"
+                   // GenerateDocumentationFile turns every undocumented public member into CS1591, and the
+                   // corpus's own warning policy is not what is being measured.
+                   "-p:TreatWarningsAsErrors=false"
+                   // %3B, not `;` and not `,`: MSBuild reads both as separators between properties on the
+                   // command line, so either spelling fails with MSB1006 before anything is compiled.
+                   "-p:NoWarn=CS1591%3BCS1573%3BCS1574%3BCS1712%3BNU1902%3BNU1903" |])
+        let output = result.ConsoleOut |> Seq.map (fun l -> l.Line) |> String.concat "\n"
+        if result.ExitCode <> 0 then
+            printfn "%s" output
+            failwithf "the corpus must build %s, but it did not" stage
+        output
+
+    printfn "building the corpus"
+    let pristine = build "before anything"
+
+    // What a repository that is already style-clean reports: nothing. docs-builder sets
+    // `dotnet_analyzer_diagnostic.category-Style.severity = warning` and builds warning-free, so every one of
+    // these rules is already satisfied across its 1,200 files. That is the zero-churn promise as a
+    // measurement rather than a claim — and it is why the fixing half has to be exercised by a seeded file,
+    // because there is nothing here to fix.
+    let pristineReports = ownedIds |> Array.filter (fun id -> pristine.Contains(id, StringComparison.Ordinal))
+    printfn "the pristine corpus reports: %s" (if pristineReports.Length = 0 then "(none, as it should)" else String.concat " " pristineReports)
+
+    // One site per rule, in a file of its own, so the fixing half runs against a solution that really
+    // compiles. The 1,200 files around it are what the rebuild and the dotnet-format check are for: cleanup
+    // must not break any of them.
+    let seedProject = Path.Combine(work.FullName, "src", "Elastic.Documentation")
+    if not (Directory.Exists seedProject) then
+        failwithf "the corpus does not have the project this gate seeds into: %s" seedProject
+
+    let seed =
+        [ "#nullable enable"                                  // IDE0240, the project already enables it
+          "using System.Text;"                                // IDE0005, and the next line joins its run
+          "using System.Globalization;"
+          ""
+          "namespace Kerf.ConformanceSeed;"
+          ""
+          "internal struct SeedPoint"                         // IDE0250
+          "{"
+          "	public int X { get; init; }"
+          ""
+          "	public int Doubled() => X * 2;"                  // IDE0251
+          "}"
+          ""
+          "internal sealed class Seed"
+          "{"
+          "	private string _name;"                           // IDE0044
+          "	int _count;"                                     // IDE0040
+          ""
+          "	public Seed() => _name = \"seed\";"
+          ""
+          "	public string Describe()"
+          "	{"
+          "		string text = \"seed \";"                      // IDE0007
+          "		bool flag = default(bool);"                    // IDE0034
+          "		return $\"{text}{_count.ToString()}{_name}{flag}\";"   // IDE0071
+          "	}"
+          ""
+          "	public void Bump() => _count++;"
+          ""
+          "	private static Seed Create() => new Seed();"     // IDE0090
+          ""
+          "	public static Seed Make() => Create();"
+          "}"
+          "" ]
+        |> String.concat "\n"
+
+    let seedFile = Path.Combine(seedProject, "KerfConformanceSeed.cs")
+    File.WriteAllText(seedFile, seed)
+
+    printfn "building with one violation seeded per rule"
+    let before = build "with the seed in place"
+
+    let missing = ownedIds |> Array.filter (fun id -> not (before.Contains(id, StringComparison.Ordinal)))
+    if missing.Length > 0 then
+        failwithf "the build did not report %s, so those rules are not being measured — has the analyser's shape changed?" (String.concat " " missing)
+
+    // Distinct sites, not lines: MSBuild prints each diagnostic twice, once in the stream and once in the
+    // summary, and once per target framework on top of that.
+    // Only the rules Kerf owns. Matching every IDE id counted the corpus's own escalations — IDE0058 alone
+    // contributes 233 sites — and made the assertion below meaningless.
+    let ownedPattern =
+        sprintf @"([^\s(]+\.cs)\((\d+),(\d+)\): warning (%s)" (String.concat "|" ownedIds)
+
+    let sites (output: string) =
+        Text.RegularExpressions.Regex.Matches(output, ownedPattern)
+        |> Seq.map (fun m -> m.Groups[1].Value + m.Groups[2].Value + m.Groups[3].Value + m.Groups[4].Value)
+        |> Set.ofSeq
+
+    let tally (output: string) =
+        Text.RegularExpressions.Regex.Matches(output, ownedPattern)
+        |> Seq.map (fun m -> m.Groups[4].Value, m.Groups[1].Value + m.Groups[2].Value + m.Groups[3].Value)
+        |> Seq.distinct
+        |> Seq.countBy fst
+        |> Seq.sortBy fst
+        |> Seq.map (fun (id, n) -> sprintf "%s=%d" id n)
+        |> String.concat " "
+
+    let sitesBefore = sites before
+    printfn "reported: all %d rules, %d distinct site(s)" ownedIds.Length sitesBefore.Count
+    printfn "  before: %s" (tally before)
+
+    printfn "cleaning"
+    let cleanup = Proc.Start("dotnet", [| "run"; "--project"; "src/Nullean.Kerf.Cli"; "-c"; "Release"; "--"; "cleanup"; work.FullName |])
+    let cleanupOutput = cleanup.ConsoleOut |> Seq.map (fun l -> l.Line) |> String.concat "\n"
+    printfn "%s" cleanupOutput
+    if cleanup.ExitCode <> 0 then failwith "kerf cleanup failed on the corpus"
+
+    // Churn, published rather than asserted, the way layout-decisions requires of anything that rewrites
+    // files. Taken from cleanup's own summary rather than from git, so the copy does not need to carry the
+    // corpus's history — which is most of its size.
+    let summary = Text.RegularExpressions.Regex.Match(cleanupOutput, @"(\d+) fix\(es\) in (\d+) file\(s\), (\d+) refused")
+    if not summary.Success || summary.Groups[1].Value = "0" then
+        failwith "cleanup changed nothing, so the gate proves nothing"
+
+    let refused = int summary.Groups[3].Value
+    printfn "churn: %s fix(es) across %s file(s), %d refused" summary.Groups[1].Value summary.Groups[2].Value refused
+
+    // The gate that only a real build can be: a fix that compiles but is wrong shows up here and nowhere
+    // else. cleanupsafety never compiles anything, so it cannot reach this.
+    printfn "rebuilding the cleaned corpus"
+    let after = build "after cleanup"
+    let sitesAfter = sites after
+
+    // Not "nothing is left": Kerf declines some sites on purpose — a file with a `#if` keeps its using
+    // directives, because the compiler decided for one symbol set. So the claim is the exact one it can
+    // make: everything that was not explicitly declined was fixed.
+    printfn "after cleanup: %d site(s) left, %d declined" sitesAfter.Count refused
+    printfn "  after:  %s" (tally after)
+    if sitesAfter.Count > refused then
+        let leftOver = ownedIds |> Array.filter (fun id -> after.Contains(id, StringComparison.Ordinal))
+        failwithf "%d site(s) survived but only %d were declined, so something went unfixed without saying so: %s"
+            sitesAfter.Count refused (String.concat " " leftOver)
+
+    // What was fixed has to have actually gone, not merely been counted.
+    if sitesAfter.Count >= sitesBefore.Count then
+        failwithf "cleanup reported %s fixes but the site count did not fall (%d then %d)"
+            summary.Groups[1].Value sitesBefore.Count sitesAfter.Count
+
+    // And what the reference implementation makes of the result. Reported rather than gated, because it will
+    // also want to fix the sites Kerf declined — it has a compilation and can reason about symbol sets.
+    printfn "asking dotnet format style what it would still do"
+    let verify =
+        Proc.Start("dotnet",
+            Array.concat [
+                [| "format"; "style"; work.FullName; "--verify-no-changes"; "--no-restore"
+                   "--severity"; "info"; "--diagnostics" |]
+                ownedIds
+            ])
+
+    if verify.ExitCode = 0 then
+        printfn "dotnet format style: nothing left at all"
+    else
+        let remaining =
+            verify.ConsoleOut
+            |> Seq.map (fun l -> l.Line)
+            |> Seq.filter (fun l -> ownedIds |> Array.exists (fun id -> l.Contains(id, StringComparison.Ordinal)))
+            |> Seq.length
+        printfn "dotnet format style: %d line(s) still to fix, which should be the declined ones" remaining
+
+    printfn ""
+    printfn "cleanup conformance verified: %d site(s) fixed across a solution that still builds, %d declined and said so"
+        (sitesBefore.Count - sitesAfter.Count) sitesAfter.Count
+
 /// Feeds a corpus verdicts Kerf has no business trusting, and requires that none of them damages a file.
 ///
 /// The counterpart to `conformance`, for the half of cleanup that conformance cannot reach. Every other
@@ -626,6 +934,7 @@ let Setup (parsed:ParseResults<Arguments>) (subCommand:Arguments) =
     cmd MsbuildSmoketest.Name (Some [Build.Name]) None <| fun _ -> msbuildSmoketest parsed
     cmd CleanupSmoketest.Name (Some [Build.Name]) None <| fun _ -> cleanupSmoketest parsed
     cmd CleanupSafety.Name (Some [Build.Name]) None <| fun _ -> cleanupSafety parsed
+    cmd CleanupConformance.Name (Some [Build.Name]) None <| fun _ -> cleanupConformance parsed
     cmd VerifyExpectations.Name (Some [Build.Name]) None <| fun _ -> verifyExpectations parsed
 
     step PristineCheck.Name pristineCheck

@@ -19,6 +19,7 @@ if (args.Length == 0 || args[0] is "-h" or "--help")
 	Console.WriteLine();
 	Console.WriteLine("  kerf cleanup [path]        apply the code style fixes a build already reported");
 	Console.WriteLine("  kerf rules                 show which code style rules Kerf fixes, and which it does not");
+	Console.WriteLine("  kerf rules --cleanup-ids   the ids cleanup fixes, space separated, for scripting");
 	Console.WriteLine();
 	Console.WriteLine("  --diagnostics <path>       the log to read, instead of searching <path> for kerf.sarif");
 	Console.WriteLine("  --check                    with cleanup: report what would be fixed, change nothing");
@@ -90,6 +91,15 @@ switch (args[0])
 				explicitFiles: explicitFiles,
 				forward: args.Contains("--forward"));
 		}
+
+	case "rules" when args.Contains("--cleanup-ids"):
+		// Machine-readable, so the build scripts do not carry a second copy of the list that can drift from
+		// the catalog.
+		Console.WriteLine(string.Join(' ', RuleCatalog.All
+			.Where(entry => entry.Owner == RuleOwner.Cleanup)
+			.Select(entry => entry.Id)));
+
+		return 0;
 
 	case "rules":
 		{

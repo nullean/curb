@@ -221,14 +221,20 @@ public class CleanupCorpusTests
 
 				case MethodDeclarationSyntax method:
 					Add("IDE0040", method.Identifier.Span, withEnd: true);
+					Add("IDE0251", method.Identifier.Span, withEnd: true);
 					break;
 
 				case PropertyDeclarationSyntax property:
 					Add("IDE0040", property.Identifier.Span, withEnd: true);
+					Add("IDE0251", property.Identifier.Span, withEnd: true);
 					break;
 
 				case BaseTypeDeclarationSyntax type:
 					Add("IDE0040", type.Identifier.Span, withEnd: true);
+
+					// IDE0250, at the type's name. Claimed on classes and interfaces too, so the rule's own
+					// gate is what has to refuse them.
+					Add("IDE0250", type.Identifier.Span, withEnd: true);
 					break;
 
 				// IDE0090, at the `new` keyword.
@@ -244,7 +250,26 @@ public class CleanupCorpusTests
 				case ForEachStatementSyntax loop:
 					Add("IDE0007", loop.Type.Span, withEnd: true);
 					break;
+
+				// IDE0034, at the `default` keyword.
+				case DefaultExpressionSyntax @default:
+					Add("IDE0034", @default.Keyword.Span, withEnd: true);
+					break;
+
+				// IDE0071, at the dot of the call. Claimed for every member access, not only ToString, so the
+				// rule's own gate is what has to reject the rest.
+				case MemberAccessExpressionSyntax access when access.Parent is InvocationExpressionSyntax:
+					Add("IDE0071", access.OperatorToken.Span, withEnd: true);
+					break;
 			}
+		}
+
+		// IDE0240, at the `#` of every nullable directive. Trivia, so it comes from a trivia walk rather than
+		// the node walk above.
+		foreach (var trivia in root.DescendantTrivia(descendIntoTrivia: true))
+		{
+			if (trivia.IsKind(SyntaxKind.NullableDirectiveTrivia))
+				Add("IDE0240", trivia.Span, withEnd: true);
 		}
 
 		return diagnostics;

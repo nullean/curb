@@ -190,6 +190,21 @@ jobs:
       - name: No wrong verdict damages a file
         run: ./build.sh cleanupsafety -s true --corpus /tmp/corpus
 
+      # The other half, and the only gate that can catch a fix which compiles but is wrong: the corpus is
+      # built, cleaned, and built again. cleanupsafety never compiles anything, so it cannot reach this.
+      #
+      # Measured on elastic/docs-builder: 394 sites across a 1,201-file solution, 398 fixes in 304 files, and
+      # the solution still builds — with 4 sites left, all of them ones Kerf declined out loud because the
+      # file has a `#if`.
+      #
+      # Three things had to be forced before it measured anything, each of which made it pass while proving
+      # nothing: RunAnalyzersDuringBuild, which the corpus turns off outside CI; EnforceCodeStyleInBuild as a
+      # *global* property, since the SDK picks its analysers before Directory.Build.targets is read; and
+      # neutralising the corpus's own `dotnet_diagnostic.IDE0005.severity = none`, because an .editorconfig
+      # entry for a specific rule outranks a .globalconfig one whatever global_level says.
+      - name: Cleaning a real solution leaves it building
+        run: ./build.sh cleanupconformance -s true --corpus /tmp/corpus
+
       # Every expectation the suite asserts, written out and run through dotnet format. Until this
       # existed only the corpus proved the fixed-point property; the hand-written expectations proved
       # only that Kerf agrees with itself, so one written from a wrong belief would pass forever — it

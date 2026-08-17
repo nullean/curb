@@ -310,3 +310,108 @@ internal sealed class AccessibilityModifiers : ICleanupRule
 		};
 	}
 }
+
+/// <summary>
+/// IDE0250 — marks a struct <c>readonly</c> when nothing in it mutates.
+/// </summary>
+/// <remarks>
+/// Reported at the type's name, like the field rules. A mistake does not compile: if some member did
+/// assign to a field, <c>readonly struct</c> is an error rather than a different program.
+/// </remarks>
+internal sealed class ReadOnlyStructs : ICleanupRule
+{
+	public string RuleId => "IDE0250";
+
+	public bool NeedsSpan => false;
+
+	public bool TryFix(CleanupContext context, in CleanupDiagnostic diagnostic, TextSpan span, ICollection<PlannedFix> into, out string? refusal)
+	{
+		if (!Modifiers.TryFindMember(context, span, out var member, out refusal))
+			return false;
+
+		// `record struct` is a RecordDeclarationSyntax, and `readonly record struct` is valid, so both
+		// shapes count — but a class or an interface does not.
+		var isStruct = member switch
+		{
+			StructDeclarationSyntax => true,
+			RecordDeclarationSyntax record => record.ClassOrStructKeyword.IsKind(SyntaxKind.StructKeyword),
+			_ => false,
+		};
+
+		if (!isStruct)
+		{
+			refusal = $"a {member.Kind()} cannot be readonly; only a struct can";
+			return false;
+		}
+
+		if (member.Modifiers.Any(SyntaxKind.ReadOnlyKeyword))
+		{
+			refusal = "the struct is already readonly, so the log describes a file that has changed";
+			return false;
+		}
+
+		refusal = null;
+		into.Add(PlannedFix.InsertKeyword(Modifiers.InsertionPoint(member, SyntaxKind.ReadOnlyKeyword), "readonly"));
+		return true;
+	}
+}
+
+/// <summary>
+/// IDE0251 — marks a struct member <c>readonly</c> when it does not mutate the instance.
+/// </summary>
+/// <remarks>
+/// <para>
+/// The same insertion as IDE0250, one level down, and reported at the member's name.
+/// </para>
+/// <para>
+/// <c>readonly</c> on a member of an already-<c>readonly</c> struct compiles — checked, since applying
+/// IDE0250 and IDE0251 to the same type in one pass would otherwise be a conflict. In practice the
+/// analyser stops reporting the member once the type is readonly, so the pair rarely arrives together.
+/// </para>
+/// </remarks>
+internal sealed class ReadOnlyMembers : ICleanupRule
+{
+	public string RuleId => "IDE0251";
+
+	public bool NeedsSpan => false;
+
+	public bool TryFix(CleanupContext context, in CleanupDiagnostic diagnostic, TextSpan span, ICollection<PlannedFix> into, out string? refusal)
+	{
+		if (!Modifiers.TryFindMember(context, span, out var member, out refusal))
+			return false;
+
+		if (member is not (MethodDeclarationSyntax or PropertyDeclarationSyntax or EventDeclarationSyntax))
+		{
+			refusal = $"a {member.Kind()} is not a member this applies to";
+			return false;
+		}
+
+		if (member.Modifiers.Any(SyntaxKind.ReadOnlyKeyword))
+		{
+			refusal = "the member is already readonly, so the log describes a file that has changed";
+			return false;
+		}
+
+		// A static member has no instance to leave alone, and `static readonly` on a method does not
+		// compile. Cheap to check, and it is the shape a stale position would most likely land on.
+		if (member.Modifiers.Any(SyntaxKind.StaticKeyword))
+		{
+			refusal = "a static member has no instance state, so readonly does not apply";
+			return false;
+		}
+
+		// Only inside a struct. On a class member `readonly` is an error, so a log that has drifted onto
+		// one must not be applied.
+		if (member.Parent is not TypeDeclarationSyntax parent
+			|| !(parent is StructDeclarationSyntax
+				|| (parent is RecordDeclarationSyntax record && record.ClassOrStructKeyword.IsKind(SyntaxKind.StructKeyword))))
+		{
+			refusal = "the member is not declared in a struct, where readonly would not compile";
+			return false;
+		}
+
+		refusal = null;
+		into.Add(PlannedFix.InsertKeyword(Modifiers.InsertionPoint(member, SyntaxKind.ReadOnlyKeyword), "readonly"));
+		return true;
+	}
+}

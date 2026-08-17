@@ -110,7 +110,19 @@ internal sealed class ImplicitTypes : ICleanupRule
 			return false;
 		}
 
-		if (token.Parent?.FirstAncestorOrSelf<TypeSyntax>() is not { } type || type.Span.Start != span.Start)
+		if (token.Parent?.FirstAncestorOrSelf<TypeSyntax>() is not { } type)
+		{
+			refusal = "the reported position is not the start of a type";
+			return false;
+		}
+
+		// Out to the outermost type at this position. `string?` is a NullableTypeSyntax wrapping a
+		// PredefinedTypeSyntax, and stopping at the inner one made every nullable local refuse — the type's
+		// parent was the wrapper rather than the declaration. Arrays and pointers nest the same way.
+		while (type.Parent is TypeSyntax outer && outer.Span.Start == type.Span.Start)
+			type = outer;
+
+		if (type.Span.Start != span.Start)
 		{
 			refusal = "the reported position is not the start of a type";
 			return false;
@@ -159,6 +171,21 @@ internal sealed class ImplicitTypes : ICleanupRule
 			return false;
 		}
 
+		// An initialiser that infers nothing. `var x = default;` and `var x = null;` do not compile whatever
+		// the analyser thought, so this is a syntactic invariant of `var` rather than second-guessing a
+		// verdict — and owning the rewrite means owning that.
+		//
+		// `default(T)` is the case a real build caught. On its own `var flag = default(bool)` is fine, and on
+		// its own IDE0034 turning `default(bool)` into `default` is fine. Applied together in one pass they
+		// produce `var flag = default`, which is CS8716. The two rules are in tension on exactly this shape,
+		// and `var` is the one that stands down: its mistake is the quiet one, and keeping an explicit type
+		// next to a `default` is what anyone would have written anyway.
+		if (Initialiser(type) is { } value && InfersNothing(value))
+		{
+			refusal = "the initialiser infers no type, so var would not compile — `default` and `null` need the type written";
+			return false;
+		}
+
 		var dropped = new List<TextSpan>();
 		PlannedFix.CollectTokens(type, dropped);
 
@@ -174,4 +201,16 @@ internal sealed class ImplicitTypes : ICleanupRule
 		into.Add(new PlannedFix(type.Span, "var", dropped, ["var"]));
 		return true;
 	}
+
+	/// <summary>The initialiser a type belongs to, when it has one.</summary>
+	private static ExpressionSyntax? Initialiser(TypeSyntax type) =>
+		type.Parent is VariableDeclarationSyntax { Variables.Count: 1 } declaration
+			? declaration.Variables[0].Initializer?.Value
+			: null;
+
+	/// <summary>True for an initialiser <c>var</c> cannot take its type from.</summary>
+	private static bool InfersNothing(ExpressionSyntax value) =>
+		value is DefaultExpressionSyntax
+			|| value.IsKind(SyntaxKind.DefaultLiteralExpression)
+			|| value.IsKind(SyntaxKind.NullLiteralExpression);
 }

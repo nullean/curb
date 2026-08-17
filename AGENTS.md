@@ -15,6 +15,7 @@ width-aware reflow. It ships as a native-AOT `dotnet tool`.
 ./build.sh msbuildsmoketest              # formatter runs before CoreCompile
 ./build.sh cleanupsmoketest              # cleanup fixes what a build reported
 ./build.sh cleanupsafety --corpus <path> # feed a corpus wrong verdicts; none may damage a file
+./build.sh cleanupconformance            # clean a solution that builds; it must still build
 ./build.sh verifyexpectations            # expectations survive dotnet format
 ```
 
@@ -101,11 +102,13 @@ the diagnostic does not carry, it is not a cleanup rule — record why and stop.
 5. Add cases to `tests/Nullean.Kerf.Tests/Cleanup/`, with the diagnostic supplied by hand. One per thing
    it fixes, and **one per thing it refuses** — a rule that fixes the right thing and also the wrong thing
    passes half a suite.
-6. Run `./build.sh cleanupsafety --corpus <path>` before claiming it is done, and record the numbers in
+6. Run **both** corpus gates before claiming it is done, and record the numbers in
    `docs/cleanup.md` rather than the intent. It claims every rule fires everywhere it could, so it feeds
    deliberately wrong verdicts and requires that none of them damages a file. **It found four defects on
-   its first run that no unit test reached**, listed in that document. Nothing below this rung green-lights
-   a rule that changes tokens — the same discipline as
+   its first run that no unit test reached**, listed in that document. `cleanupconformance` is the other
+   half and the only one that compiles anything, so it is the only one that can catch a fix which compiles
+   but is wrong — it caught an IDE0007/IDE0034 interaction producing CS8716. Nothing below these two rungs
+   green-lights a rule that changes tokens — the same discipline as
    [docs/layout-decisions.md](docs/layout-decisions.md), for the same reason.
 
 A refusal is a first-class outcome, not an error. Report it with its reason so "Kerf declined" is
