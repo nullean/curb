@@ -1,3 +1,5 @@
+using System.Buffers;
+using System.Runtime.CompilerServices;
 using Microsoft.CodeAnalysis.Text;
 
 namespace Nullean.Kerf.Verification;
@@ -105,10 +107,14 @@ internal static class ContentVerifier
 
 		while (true)
 		{
-			while (sourceIndex < source.Length && IsSkippable(source[sourceIndex]))
-				sourceIndex++;
-			while (outputIndex < output.Length && IsSkippable(output[outputIndex]))
-				outputIndex++;
+			{
+				var next = source[sourceIndex..].IndexOfAnyExcept(WhitespaceChars);
+				sourceIndex = next < 0 ? source.Length : sourceIndex + next;
+			}
+			{
+				var next = output[outputIndex..].IndexOfAnyExcept(WhitespaceChars);
+				outputIndex = next < 0 ? output.Length : outputIndex + next;
+			}
 
 			// Source a rewrite dropped on purpose. Stepping over it is only safe because what replaced
 			// it is counted: an expression body drops a block and adds one arrow, so the arrows and
@@ -296,8 +302,10 @@ internal static class ContentVerifier
 			if (IsSkippable(expected))
 				continue;
 
-			while (outputIndex < output.Length && IsSkippable(output[outputIndex]))
-				outputIndex++;
+			{
+				var skip = output[outputIndex..].IndexOfAnyExcept(WhitespaceChars);
+				outputIndex = skip < 0 ? output.Length : outputIndex + skip;
+			}
 
 			if (outputIndex >= output.Length || output[outputIndex] != expected)
 			{
@@ -326,9 +334,9 @@ internal static class ContentVerifier
 		if (index >= text.Length || text[index] != ',')
 			return false;
 
-		var next = index + 1;
-		while (next < text.Length && IsSkippable(text[next]))
-			next++;
+		var skipStart = index + 1;
+		var skip = skipStart < text.Length ? text[skipStart..].IndexOfAnyExcept(WhitespaceChars) : -1;
+		var next = skip < 0 ? text.Length : skipStart + skip;
 
 		if (next >= text.Length || text[next] is not ('}' or ']'))
 			return false;
@@ -377,10 +385,10 @@ internal static class ContentVerifier
 	{
 		for (var taken = 0; taken < into.Length; taken++)
 		{
-			while (index < text.Length && IsSkippable(text[index]))
-				index++;
-			if (index >= text.Length)
+			var skip = text[index..].IndexOfAnyExcept(WhitespaceChars);
+			if (skip < 0)
 				return false;
+			index += skip;
 			into[taken] = text[index++];
 		}
 
@@ -390,15 +398,22 @@ internal static class ContentVerifier
 	private static int CountContent(ReadOnlySpan<char> text)
 	{
 		var count = 0;
-		foreach (var value in text)
+		var remaining = text;
+		while (!remaining.IsEmpty)
 		{
-			if (!IsSkippable(value))
-				count++;
+			var next = remaining.IndexOfAnyExcept(WhitespaceChars);
+			if (next < 0)
+				break;
+			count++;
+			remaining = remaining[(next + 1)..];
 		}
 
 		return count;
 	}
 
+	private static readonly SearchValues<char> WhitespaceChars = SearchValues.Create(" \t\r\n");
+
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	private static bool IsSkippable(char value) => value is ' ' or '\t' or '\r' or '\n';
 
 	/// <summary>

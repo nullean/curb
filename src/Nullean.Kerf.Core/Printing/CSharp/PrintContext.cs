@@ -162,6 +162,9 @@ internal sealed class PrintContext(DocArena arena, SourceText text, FormatOption
 
 	public int PrintedTokens { get; set; }
 
+	/// <summary>The last token emitted by <see cref="TokenPrinter.Print"/>, for avoiding a Roslyn tree walk.</summary>
+	public SyntaxToken PreviousToken { get; set; }
+
 	/// <summary>Tokens emitted verbatim because no printer handles their node yet.</summary>
 	public int VerbatimTokens { get; set; }
 

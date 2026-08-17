@@ -23,6 +23,7 @@ internal sealed class BreakPropagation
 	private int[] _hardPrefix = [];
 	private ulong[] _broken = [];
 	private int[] _forceFlatEnds = [];
+	private readonly List<int> _groupIndices = [];
 
 	/// <summary>True if the group at <paramref name="index"/> must print broken.</summary>
 	public bool IsBroken(int index) => (_broken[index >> 6] & (1UL << (index & 63))) != 0;
@@ -31,6 +32,9 @@ internal sealed class BreakPropagation
 	{
 		var count = arena.Count;
 		EnsureCapacity(count);
+
+		var docs = arena.Docs;
+		_groupIndices.Clear();
 
 		// ---- pass 1: prefix sum of unconditional breaks -----------------------------------------
 		// A hard line inside a ForceFlat does not break anything, because ForceFlat wins. A literal
@@ -44,7 +48,7 @@ internal sealed class BreakPropagation
 			while (forceFlatDepth > 0 && i >= _forceFlatEnds[forceFlatDepth - 1])
 				forceFlatDepth--;
 
-			var doc = arena[i];
+			var doc = docs[i];
 
 			if (doc.Kind == DocKind.ForceFlat)
 			{
@@ -52,6 +56,9 @@ internal sealed class BreakPropagation
 					Array.Resize(ref _forceFlatEnds, Math.Max(8, _forceFlatEnds.Length * 2));
 				_forceFlatEnds[forceFlatDepth++] = i + doc.Length;
 			}
+
+			if (doc.Kind is DocKind.Group or DocKind.ConditionalGroup)
+				_groupIndices.Add(i);
 
 			var counts = doc.IsBreakish
 				&& (forceFlatDepth == 0 || (doc.Kind == DocKind.Line && doc.LineType == LineType.Literal));
@@ -65,12 +72,9 @@ internal sealed class BreakPropagation
 		// ---- pass 2: a group breaks if its subtree contains any --------------------------------
 		Array.Clear(_broken, 0, (count >> 6) + 1);
 
-		for (var i = 0; i < count; i++)
+		foreach (var i in _groupIndices)
 		{
-			var doc = arena[i];
-			if (doc.Kind is not (DocKind.Group or DocKind.ConditionalGroup))
-				continue;
-
+			var doc = docs[i];
 			if (_hardPrefix[i + doc.Length] - _hardPrefix[i] > 0)
 				_broken[i >> 6] |= 1UL << (i & 63);
 		}

@@ -73,8 +73,8 @@ internal static class TokenStreamComparer
 			producedUsings = DirectiveRegion(reparsed.Root);
 		}
 
-		using var original = originalRoot.DescendantTokens().GetEnumerator();
-		using var produced = reparsed.Root.DescendantTokens().GetEnumerator();
+		using var original = TokenWalker(originalRoot);
+		using var produced = TokenWalker(reparsed.Root);
 
 		var index = 0;
 
@@ -284,15 +284,22 @@ internal static class TokenStreamComparer
 			// grammar allows at most one, so stepping over it once and re-comparing is exact. Any
 			// other mismatch, including a comma anywhere but immediately before a `}` or `]`, still
 			// fails.
-			if (trailingCommas && Mismatch(originalText, before, formattedText, after))
+			var isMismatch = Mismatch(originalText, before, formattedText, after);
+			if (trailingCommas && isMismatch)
 			{
 				if (IsComma(before) && IsCloser(after) && Next(original, originalUsings, out var nextBefore))
+				{
 					before = nextBefore;
+					isMismatch = Mismatch(originalText, before, formattedText, after);
+				}
 				else if (IsCloser(before) && IsComma(after) && Next(produced, producedUsings, out var nextAfter))
+				{
 					after = nextAfter;
+					isMismatch = Mismatch(originalText, before, formattedText, after);
+				}
 			}
 
-			if (Mismatch(originalText, before, formattedText, after))
+			if (isMismatch)
 			{
 				failure =
 					$"formatting changed token {index}: '{Text(originalText, before)}' became "
@@ -453,6 +460,33 @@ internal static class TokenStreamComparer
 		return start == int.MaxValue ? TextSpan.FromBounds(0, 0) : TextSpan.FromBounds(start, end);
 	}
 
-	private static ReadOnlySpan<char> Text(ReadOnlySpan<char> source, SyntaxToken token) =>
-		source.Slice(token.Span.Start, token.Span.Length);
+	private static ReadOnlySpan<char> Text(ReadOnlySpan<char> source, SyntaxToken token)
+	{
+		var span = token.Span;
+		return source.Slice(span.Start, span.Length);
+	}
+
+	/// <summary>
+	/// Walks a syntax tree and yields every token via an explicit stack over ChildNodesAndTokens(),
+	/// avoiding the LINQ Where/Select overhead that DescendantTokens() carries.
+	/// </summary>
+	private static IEnumerator<SyntaxToken> TokenWalker(SyntaxNode root)
+	{
+		var stack = new Stack<SyntaxNodeOrToken>();
+		stack.Push(root);
+		while (stack.Count > 0)
+		{
+			var item = stack.Pop();
+			if (item.IsToken)
+			{
+				yield return item.AsToken();
+			}
+			else
+			{
+				var children = item.AsNode()!.ChildNodesAndTokens();
+				for (var i = children.Count - 1; i >= 0; i--)
+					stack.Push(children[i]);
+			}
+		}
+	}
 }

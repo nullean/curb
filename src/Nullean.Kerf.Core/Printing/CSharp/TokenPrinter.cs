@@ -26,11 +26,13 @@ internal static class TokenPrinter
 	{
 		PrintLeadingTrivia(token, context);
 
-		if (token.Span.Length > 0)
-			context.Arena.SourceText(token.Span.Start, token.Span.Length);
+		var span = token.Span;
+		if (span.Length > 0)
+			context.Arena.SourceText(span.Start, span.Length);
 
 		PrintTrailingTrivia(token, context);
 		context.PrintedTokens++;
+		context.PreviousToken = token;
 	}
 
 	/// <summary>Emits a token and its trailing trivia, but not its leading trivia.</summary>
@@ -41,11 +43,13 @@ internal static class TokenPrinter
 	/// </remarks>
 	public static void PrintWithoutLeadingTrivia(SyntaxToken token, PrintContext context)
 	{
-		if (token.Span.Length > 0)
-			context.Arena.SourceText(token.Span.Start, token.Span.Length);
+		var span = token.Span;
+		if (span.Length > 0)
+			context.Arena.SourceText(span.Start, span.Length);
 
 		PrintTrailingTrivia(token, context);
 		context.PrintedTokens++;
+		context.PreviousToken = token;
 	}
 
 	/// <summary>True when a token carries a comment or directive ahead of it.</summary>
@@ -145,7 +149,7 @@ internal static class TokenPrinter
 					// writes nor stable: the ragged result read back differently on the next run.
 					var startsAligned = !emittedAnything
 						&& priorNewLines == 0
-						&& AlignsUnderTrailingComment(token, trivia, context);
+						&& AlignsUnderTrailingComment(trivia, context);
 
 					if (startsAligned || (alignedRun && priorNewLines <= 1))
 					{
@@ -216,9 +220,9 @@ internal static class TokenPrinter
 	/// Walking to the previous token allocates, so it is asked only of a token that actually carries
 	/// a leading comment — which is uncommon, and never in the middle of an expression.
 	/// </remarks>
-	private static bool AlignsUnderTrailingComment(SyntaxToken token, SyntaxTrivia comment, PrintContext context)
+	private static bool AlignsUnderTrailingComment(SyntaxTrivia comment, PrintContext context)
 	{
-		var previous = token.GetPreviousToken();
+		var previous = context.PreviousToken;
 		if (previous.RawKind == 0)
 			return false;
 
