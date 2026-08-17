@@ -27,7 +27,15 @@ public sealed class CSharpSource
 	/// <summary>The parsed compilation unit.</summary>
 	public SyntaxNode Root { get; }
 
-	private static readonly CSharpParseOptions ParseOptions = new(LanguageVersion.Preview);
+	/// <remarks>
+	/// <c>FileBasedProgram</c> is on because <c>#:</c> directives are shipping C# — the header of a
+	/// <c>dotnet run app.cs</c> single-file program — and without the feature Roslyn reports them as
+	/// an error, so Kerf refused every such file outright while dotnet format formatted it. The flag
+	/// only makes previously-invalid syntax valid; a file without <c>#:</c> parses identically.
+	/// </remarks>
+	private static readonly CSharpParseOptions ParseOptions =
+		new CSharpParseOptions(LanguageVersion.Preview)
+			.WithFeatures([new KeyValuePair<string, string>("FileBasedProgram", "true")]);
 
 	/// <summary>
 	/// True when the file announces itself as generated in its opening comment.

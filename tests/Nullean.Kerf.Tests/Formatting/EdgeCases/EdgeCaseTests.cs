@@ -209,6 +209,28 @@ public class EdgeCaseTests : FormattingTest
 		""");
 
 	[Test]
+	public Task A_file_based_program_is_formatted_like_any_other() => Formats(
+		// `#:` directives head a `dotnet run app.cs` single-file program. Roslyn reports them as an
+		// error unless the FileBasedProgram feature is on, so Kerf refused every one of these
+		// outright while dotnet format formatted them happily. Shipping C#, and a growing shape.
+		"""
+		#:sdk Microsoft.NET.Sdk
+		#:package Humanizer@2.14.1
+
+		using Humanizer;
+
+		Console.WriteLine( "hello".Humanize( ) );
+		""",
+		"""
+		#:sdk Microsoft.NET.Sdk
+		#:package Humanizer@2.14.1
+
+		using Humanizer;
+
+		Console.WriteLine("hello".Humanize());
+		""");
+
+	[Test]
 	public Task Source_that_does_not_parse_is_refused() =>
 		Rejects("public class C { void M( { }");
 
