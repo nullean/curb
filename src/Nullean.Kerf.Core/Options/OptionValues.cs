@@ -60,6 +60,8 @@ public static class OptionValues
 		"csharp_place_constructor_initializer_on_same_line" => Bool(options.PlaceConstructorInitializerOnSameLine),
 		"csharp_wrap_before_arrow_with_expressions" => Bool(options.WrapBeforeArrowWithExpressions),
 		"csharp_wrap_after_dot_in_method_calls" => Bool(options.WrapAfterDotInMethodCalls),
+		"csharp_place_simple_enum_on_single_line" => Bool(options.PlaceSimpleEnumOnSingleLine),
+		"csharp_place_simple_accessorholder_on_single_line" => Bool(options.PlaceSimpleAccessorholderOnSingleLine),
 		"csharp_wrap_parameters_style" => Wrap(options.WrapParametersStyle),
 		"csharp_keep_blank_lines_in_declarations" => Lines(options.KeepBlankLinesInDeclarations),
 		"csharp_keep_blank_lines_in_code" => Lines(options.KeepBlankLinesInCode),

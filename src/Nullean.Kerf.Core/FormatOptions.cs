@@ -702,6 +702,29 @@ public readonly record struct FormatOptions
 	public bool WrapAfterDotInMethodCalls { get; init; }
 
 	/// <summary>
+	/// <c>csharp_place_simple_enum_on_single_line</c>: allow an enum body the author wrote on one line
+	/// to stay there.
+	/// </summary>
+	/// <remarks>
+	/// On by default, which is what Kerf has always done. Off expands every enum body, unconditionally
+	/// — so it never has to ask whether one would fit, and a second run has nothing left to decide.
+	/// Finer-grained than <see cref="PreserveSingleLineBlocks"/>, which says the same thing about every
+	/// block at once.
+	/// </remarks>
+	public bool PlaceSimpleEnumOnSingleLine { get; init; } = true;
+
+	/// <summary>
+	/// <c>csharp_place_simple_accessorholder_on_single_line</c>: allow <c>{ get; set; }</c> to stay on
+	/// the property's line.
+	/// </summary>
+	/// <remarks>
+	/// On by default. Off expands every accessor list the author kept on one line, the same expansion
+	/// <see cref="PreserveSingleLineBlocks"/> performs, but without also expanding every other block in
+	/// the file.
+	/// </remarks>
+	public bool PlaceSimpleAccessorholderOnSingleLine { get; init; } = true;
+
+	/// <summary>
 	/// <c>csharp_wrap_chained_binary_expressions</c>: give each operand of a long <c>&amp;&amp;</c>
 	/// or <c>||</c> chain a line of its own. Null leaves such a chain unbroken.
 	/// </summary>

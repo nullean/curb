@@ -175,10 +175,17 @@ internal static partial class Printers
 	{
 		var arena = context.Arena;
 
-		// Written on one line, this is a block like any other, so turning preservation off expands it
-		// rather than leaving it to whether it happens to fit.
-		var expand = !context.Options.PreserveSingleLineBlocks
-			&& context.OnSameLine(node.OpenBraceToken.SpanStart, node.CloseBraceToken.Span.End);
+		// Neither key that expands an accessor list may be guarded on the source still having it on
+		// one line, because unlike every other block this printer *joins* a list that fits. Guarding
+		// is self-cancelling: expanding on the first run leaves the source multi-line, so the second
+		// run declines to expand and the group flattens it straight back.
+		//
+		// That was already true of preserve_single_line_blocks before either of these keys existed —
+		// measured on the corpus at 455 non-idempotent files and 43 that dotnet format then moved.
+		// Dropping the guard takes those to 2 and 41, so it is an improvement on both axes rather than
+		// a trade; the remaining two are a separate shape and left standing.
+		var expand = !context.Options.PlaceSimpleAccessorholderOnSingleLine
+			|| !context.Options.PreserveSingleLineBlocks;
 
 		using (arena.Group())
 		{

@@ -25,6 +25,7 @@ internal static partial class Printers
 		}
 
 		var oneLine = KeepsOneLine(node.OpenBraceToken, node.CloseBraceToken, context)
+			&& context.Options.PlaceSimpleEnumOnSingleLine
 			&& !HeaderWasBroken(node.BaseList, constraintCount: 0, context);
 
 		using (arena.ForceFlatIf(oneLine))

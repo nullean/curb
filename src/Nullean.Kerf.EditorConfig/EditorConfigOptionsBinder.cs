@@ -298,6 +298,12 @@ public static class EditorConfigOptionsBinder
 		if (TryPrefixedBool(properties, "wrap_after_dot_in_method_calls", diagnostics, out var wrapAfterDot))
 			options = options with { WrapAfterDotInMethodCalls = wrapAfterDot };
 
+		if (TryPrefixedBool(properties, "place_simple_enum_on_single_line", diagnostics, out var placeEnum))
+			options = options with { PlaceSimpleEnumOnSingleLine = placeEnum };
+
+		if (TryPrefixedBool(properties, "place_simple_accessorholder_on_single_line", diagnostics, out var placeAccessors))
+			options = options with { PlaceSimpleAccessorholderOnSingleLine = placeAccessors };
+
 		// Only the parameter list's. wrap_arguments_style, the two initializer styles and
 		// wrap_chained_method_calls are left to the same silence as the several hundred other
 		// ReSharper keys Kerf does not implement: forcing every one of those to break moves

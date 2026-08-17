@@ -109,6 +109,8 @@ public static class OptionCatalog
 			"csharp_place_constructor_initializer_on_same_line",
 			"csharp_wrap_before_arrow_with_expressions",
 			"csharp_wrap_after_dot_in_method_calls",
+			"csharp_place_simple_enum_on_single_line",
+			"csharp_place_simple_accessorholder_on_single_line",
 			"csharp_wrap_chained_binary_expressions",
 			"csharp_wrap_before_binary_opsign",
 			"csharp_wrap_parameters_style",
