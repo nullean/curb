@@ -140,13 +140,21 @@ public sealed class CSharpFormatter : IDisposable
 		verifyRoundTrip = verifyRoundTrip && (forceRoundTrip || reordered || _printer.RoundTripAtRisk);
 
 		var changed = !written.SequenceEqual(source.AsSpan());
-		var text = produceText || verifyRoundTrip ? _output.ToString() : null;
+
+		// Only materialise the formatted text when the caller needs to write it; for verify-only
+		// runs (check mode) the span is passed directly and the string is created inside Verify
+		// only when TryParse needs it, so check runs that do not reach the re-parse never allocate.
+		var text = produceText ? _output.ToString() : null;
 
 		if (verifyRoundTrip)
 		{
 			RoundTripsChecked++;
+			// Pass the span and the already-materialised string (null when produceText is off).
+			// Verify will call ToString() on the span only if formattedStr is null, so the string
+			// is never created twice when both produceText and verifyRoundTrip are true.
 			if (!TokenStreamComparer.Verify(
-				parsed.Root, source.AsSpan(), text!, out var roundTripFailure,
+				parsed.Root, source.AsSpan(), text is not null ? text.AsSpan() : _output.Written, text,
+				out var roundTripFailure,
 				context.UsingsReordered, options.RewritesTrailingCommas, context.ModifiersReordered,
 				context.BracesAdded, context.NamespaceUnwrapped, context.DroppedSpans, context.ArrowsAdded))
 				return new FormatResult(FormatStatus.VerificationFailed, false, null, context.Coverage, roundTripFailure);
@@ -155,7 +163,7 @@ public sealed class CSharpFormatter : IDisposable
 		return new FormatResult(
 			FormatStatus.Formatted,
 			changed,
-			produceText ? text : null,
+			text,
 			context.Coverage,
 			null);
 	}

@@ -176,7 +176,7 @@ public sealed class CSharpCleaner
 		if (!ContentVerifier.Verify(source, output, out var contentFailure, dropped: _dropped, inserted: _inserted))
 			return new CleanupResult(CleanupStatus.VerificationFailed, false, null, 0, [.. _refusals], [.. diagnostics], contentFailure);
 
-		if (!TokenStreamComparer.Verify(parsed.Root, source, output, out var tokenFailure, dropped: _dropped, inserted: _inserted))
+		if (!TokenStreamComparer.Verify(parsed.Root, source, output.AsSpan(), output, out var tokenFailure, dropped: _dropped, inserted: _inserted))
 			return new CleanupResult(CleanupStatus.VerificationFailed, false, null, 0, [.. _refusals], [.. diagnostics], tokenFailure);
 
 		return new CleanupResult(CleanupStatus.Cleaned, true, output, _appliedDiagnostics, [.. _refusals], [.. _unfixed], null);

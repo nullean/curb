@@ -40,7 +40,8 @@ internal static class TokenStreamComparer
 	public static bool Verify(
 		SyntaxNode originalRoot,
 		ReadOnlySpan<char> originalText,
-		string formatted,
+		ReadOnlySpan<char> formatted,
+		string? formattedStr,
 		out string? failure,
 		bool usingsReordered = false,
 		bool trailingCommas = false,
@@ -51,7 +52,9 @@ internal static class TokenStreamComparer
 		int arrowsAdded = 0,
 		IReadOnlyList<InsertedToken>? inserted = null)
 	{
-		if (!CSharpSource.TryParse(formatted, out var reparsed, out var errors))
+		// Parse needs a string; reuse the caller's if it has one, otherwise materialize once.
+		formattedStr ??= formatted.ToString();
+		if (!CSharpSource.TryParse(formattedStr, out var reparsed, out var errors))
 		{
 			failure = errors.Count > 0
 				? $"formatted output no longer parses: {errors[0].GetMessage(System.Globalization.CultureInfo.InvariantCulture)}"
@@ -59,7 +62,7 @@ internal static class TokenStreamComparer
 			return false;
 		}
 
-		var formattedText = formatted.AsSpan();
+		var formattedText = formatted;
 
 		var originalUsings = TextSpan.FromBounds(0, 0);
 		var producedUsings = TextSpan.FromBounds(0, 0);
@@ -467,12 +470,18 @@ internal static class TokenStreamComparer
 	}
 
 	/// <summary>
-	/// Walks a syntax tree and yields every token via an explicit stack over ChildNodesAndTokens(),
-	/// avoiding the LINQ Where/Select overhead that DescendantTokens() carries.
+	/// Walks a syntax tree and yields every token via an explicit stack over ChildNodesAndTokens().
 	/// </summary>
+	/// <remarks>
+	/// Children are collected forward (O(n) sequential) into a reused buffer and pushed onto the
+	/// stack in reverse so they come off in source order. This avoids the O(n²) slot-scan that
+	/// <c>ChildSyntaxList.Reversed.Enumerator.Current</c> pays by resolving each child by index.
+	/// </remarks>
 	private static IEnumerator<SyntaxToken> TokenWalker(SyntaxNode root)
 	{
 		var stack = new Stack<SyntaxNodeOrToken>();
+		// Reused across all nodes in this walk so the per-node list allocation is paid once.
+		var childBuffer = new List<SyntaxNodeOrToken>();
 		stack.Push(root);
 		while (stack.Count > 0)
 		{
@@ -483,9 +492,11 @@ internal static class TokenStreamComparer
 			}
 			else
 			{
-				var children = item.AsNode()!.ChildNodesAndTokens();
-				foreach (var child in children.Reverse())
-					stack.Push(child);
+				childBuffer.Clear();
+				foreach (var child in item.AsNode()!.ChildNodesAndTokens())
+					childBuffer.Add(child);
+				for (var i = childBuffer.Count - 1; i >= 0; i--)
+					stack.Push(childBuffer[i]);
 			}
 		}
 	}
