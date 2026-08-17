@@ -534,6 +534,10 @@ internal sealed class DocPrinter
 	/// </remarks>
 	private int TextWidth(ReadOnlySpan<char> text)
 	{
+		// Fast path: no tabs and no surrogate pairs — the overwhelming common case in C# source.
+		if (text.IndexOf('\t') < 0 && text.IndexOfAnyInRange('\uD800', '\uDFFF') < 0)
+			return text.Length;
+
 		var width = 0;
 		for (var i = 0; i < text.Length; i++)
 		{
