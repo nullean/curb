@@ -16,6 +16,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../../src/Nullean.Kerf.Core/Nullean.Kerf.Core.csproj" />
+    <ProjectReference Include="../../src/Nullean.Kerf.Cleanup/Nullean.Kerf.Cleanup.csproj" />
     <ProjectReference Include="../../src/Nullean.Kerf.EditorConfig/Nullean.Kerf.EditorConfig.csproj" />
   </ItemGroup>
 

@@ -10,6 +10,11 @@ width-aware reflow. It ships as a native-AOT `dotnet tool`.
 ./build.sh test           # runs tests/Nullean.Kerf.Tests via `dotnet run`
 ./build.sh benchmark      # BenchmarkDotNet suite
 ./build.sh generatepackages
+./build.sh conformance --corpus <path>   # byte-identity with dotnet format whitespace
+./build.sh perf --corpus <path>          # times the AOT binary; gates on allocations
+./build.sh msbuildsmoketest              # formatter runs before CoreCompile
+./build.sh cleanupsmoketest              # cleanup fixes what a build reported
+./build.sh verifyexpectations            # expectations survive dotnet format
 ```
 
 Requires the .NET 10 SDK (pinned in `global.json`). Test projects are `OutputType=Exe` and run on
@@ -20,11 +25,15 @@ Microsoft.Testing.Platform, so they are launched with `dotnet run`, not `dotnet 
 | Path | What |
 |---|---|
 | `src/Nullean.Kerf.Core` | The engine: document IR, layout printer, syntax printers, verifier. **No IO, no config source.** |
+| `src/Nullean.Kerf.Cleanup` | Applies code style fixes from diagnostics a build reported. **No IO, no compilation.** |
 | `src/Nullean.Kerf.EditorConfig` | Binds `.editorconfig` to formatting options. Owns the `IFileSystem` dependency. |
 | `src/Nullean.Kerf.Cli` | The `kerf` tool. Native-AOT, packed per RID. |
 | `tests/Nullean.Kerf.Tests` | Golden files, option matrix, document-IR units, `MockFileSystem` tests. |
 | `tests/Nullean.Kerf.Benchmarks` | BenchmarkDotNet, `[MemoryDiagnoser]`. |
+| `src/Nullean.Kerf.MSBuild` | Props and targets only, nothing compiled. Runs the formatter before `CoreCompile`, and asks the compiler for an error log. |
 | `examples/kerf-aot-smoketest` | Publishes AOT and runs; the CI gate on every RID. Never packed. |
+| `examples/kerf-msbuild-smoketest` | Proves the formatter runs before `CoreCompile`. Not in the solution. |
+| `examples/kerf-cleanup-smoketest` | Proves cleanup fixes what a build reported, and only that. Not in the solution. |
 | `build/scripts` | F# Bullseye build runner. |
 
 ## Non-negotiables
@@ -71,16 +80,55 @@ the fixtures.
 Printers must never read options directly; they call a helper. That is what keeps an option's
 footprint to one place.
 
+## Adding a cleanup rule
+
+A rule is admissible only if its fix is derivable from `(ruleId, span)` plus syntax. If it needs anything
+the diagnostic does not carry, it is not a cleanup rule — record why and stop.
+
+1. Confirm the shape against a real build before writing anything. Escalate the rule in a scratch project,
+   build with `-p:ErrorLog=x.sarif,version=2.1`, and read the actual span. **Where the position lands is
+   not obvious**: IDE0044 and IDE0040 report the field *identifier*, IDE0007 the *type*, IDE0090 the `new`
+   keyword, IDE0005 the first `using` of a whole run. The fixer walks up from there.
+2. Add the fixer under `src/Nullean.Kerf.Cleanup/Rules/`, implementing `ICleanupRule`. It must declare
+   `NeedsSpan`, and it must gate on node kind — the reported position has to resolve to the syntax the
+   rule owns, or it refuses. **That gate is what makes a stale log harmless**, so it is not optional.
+3. Add it to `CSharpCleaner.Rules`, and flip its `RuleCatalog` row to `RuleOwner.Cleanup` with its
+   `TokenDelta` **in the same change**. `RuleCatalogTests` fails if the two disagree.
+4. If the delta is new, teach `ContentVerifier` and `TokenStreamComparer` about it — and add negative
+   tests to `CleanupDeltaTests` from **both** sides. A widening that is too generous is invisible: every
+   test still passes and the net quietly stops catching what it exists for.
+5. Add cases to `tests/Nullean.Kerf.Tests/Cleanup/`, with the diagnostic supplied by hand. One per thing
+   it fixes, and **one per thing it refuses** — a rule that fixes the right thing and also the wrong thing
+   passes half a suite.
+6. Measure churn on a corpus before claiming it is done, against a **measured** baseline, and record the
+   number in `docs/cleanup.md` rather than the intent. Same discipline as
+   [docs/layout-decisions.md](docs/layout-decisions.md), for the same reason.
+
+A refusal is a first-class outcome, not an error. Report it with its reason so "Kerf declined" is
+distinguishable from "Kerf is broken."
+
 ## Scope boundary
 
-Kerf never loads a compilation and never uses the semantic model. That is what lets it run on a bare
-folder with no restore and no build.
+**Kerf never computes semantics.** It never loads a compilation, never resolves a reference and never
+uses the semantic model. That is what lets `kerf format` run on a bare folder with no restore and no
+build, and it is why Core's only package reference is the exact-pinned parser.
 
-- **In scope:** IDE0055 formatting, plus syntax-only code style (braces, expression bodies,
-  file-scoped namespaces, modifier order, redundant parentheses).
-- **Out of scope, permanently:** anything needing binding — `var` (IDE0007/8), unused usings
-  (IDE0005), unused members (IDE0051), readonly fields (IDE0044), naming (IDE1006). Report these and
-  point the user at `dotnet format style`.
+- **`kerf format`, in scope:** IDE0055 formatting, plus syntax-only code style (braces, expression
+  bodies, file-scoped namespaces, modifier order, redundant parentheses).
+- **`kerf cleanup`, in scope:** semantic code style rules — but only ones a build has already reported,
+  and only where the fix is derivable from the diagnostic's position plus syntax. It *consumes a verdict*
+  rather than deriving one. See [docs/cleanup.md](docs/cleanup.md).
+- **Out of scope, permanently:** any fix that deletes a declaration (IDE0051/0052) or renames a symbol
+  (IDE1006/IDE0130), and any fix the diagnostic does not carry enough information to make (IDE0008 needs
+  a type name). Report these and point the user at `dotnet format style`.
+
+**Never add `Microsoft.CodeAnalysis.Workspaces`, to any project, and never construct a
+`CSharpCompilation`.** Not to Core, not to Cleanup, not temporarily. The bare-folder and AOT stories rest
+on it, and `docs/cleanup.md` records why hosting the SDK's own analysers cannot be made version-safe.
+
+`RuleCatalog` names all 116 IDE rules the SDK can report and who fixes each. A row claims `Cleanup` only
+once a fixer exists — never because one is planned — and `RuleCatalogTests` holds the two together, so a
+rule cannot claim to be fixed by a fixer nobody wrote.
 
 ## Correctness
 

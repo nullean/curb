@@ -270,6 +270,130 @@ let private msbuildSmoketest (arguments:ParseResults<Arguments>) =
     printfn ""
     printfn "MSBuild integration verified: formatted before CoreCompile, and IDE0055 fails without it"
 
+/// Proves `kerf cleanup` fixes what a build reported, and nothing else.
+///
+/// Four assertions, where the MSBuild formatting smoke test needs two. Two of them are the same idea —
+/// it works, and it would have failed without us, because an assertion that passes when the analysers
+/// are switched off proves nothing. The other two exist because cleanup can be wrong in ways a
+/// formatter cannot: it could silence a rule instead of fixing it, and it could rewrite a repository
+/// that never asked for anything.
+let private cleanupSmoketest (arguments:ParseResults<Arguments>) =
+    exec "dotnet" ["publish"; "src/Nullean.Kerf.Cli"; "-c"; "Release"; "-o"; ".artifacts/cleanup-smoketest/kerf"
+                   "-p:PublishAot=false"; "-p:SelfContained=false"] |> ignore
+
+    let kerfDll = Path.GetFullPath(Path.Combine(".artifacts", "cleanup-smoketest", "kerf", "Nullean.Kerf.Cli.dll"))
+
+    let sample = Path.Combine("examples", "kerf-cleanup-smoketest")
+    let source = Path.Combine(sample, "Widget.cs")
+    let pristine = Path.Combine(sample, "Widget.unclean")
+    let editorConfig = Path.Combine(sample, ".editorconfig")
+    let pristineConfig = File.ReadAllText(editorConfig)
+
+    let restore () =
+        File.Copy(pristine, source, true)
+        // File.Copy carries the source's timestamp across. That would leave the file looking older than
+        // it is, and cleanup's freshness gate — which refuses a file edited after the build wrote its
+        // log — reads exactly that timestamp, so the harness has to set it rather than inherit it.
+        File.SetLastWriteTimeUtc(source, DateTime.UtcNow)
+
+    let build () =
+        let args = ["build"; sample; "-c"; "Debug"; "--nologo"; "-tl:off"; sprintf "-p:Kerf_Dll=%s" kerfDll]
+        let result = Proc.Start("dotnet", List.toArray args)
+        let output = result.ConsoleOut |> Seq.map (fun l -> l.Line) |> String.concat "\n"
+        result.ExitCode, output
+
+    // The repository sets UseArtifactsOutput, so the sample's $(IntermediateOutputPath) is under
+    // .artifacts rather than beside its project file. Found rather than assumed, because which of the two
+    // layouts a consumer uses is not this test's business — and `kerf cleanup` run from a repository root
+    // finds the log either way.
+    let findLogs () =
+        Directory.GetFiles(".", "kerf.sarif", SearchOption.AllDirectories)
+        |> Array.filter (fun p -> p.Contains "kerf-cleanup-smoketest")
+
+    let clearLogs () = findLogs () |> Array.iter File.Delete
+
+    let cleanup (extra: string list) =
+        let logs = findLogs () |> Array.toList |> List.collect (fun l -> ["--diagnostics"; l])
+        let args = ["exec"; kerfDll; "cleanup"; sample] @ logs @ extra
+        let result = Proc.Start("dotnet", List.toArray args)
+        let output = result.ConsoleOut |> Seq.map (fun l -> l.Line) |> String.concat "\n"
+        result.ExitCode, output
+
+    try
+        // 1. The build fails. IDE0005 is an error here and nothing has fixed it, so if this succeeds the
+        //    analysers are not running and the rest of the test is measuring nothing.
+        restore ()
+        clearLogs ()
+        printfn "building the sample dirty"
+        let dirtyCode, dirtyOutput = build ()
+        if dirtyCode = 0 then
+            failwith "the sample built clean while still holding unnecessary usings, so this proves nothing — is EnforceCodeStyleInBuild still on, and GenerateDocumentationFile?"
+        // Every rule in the slice, not just the first. A fixture that only exercises one would let the
+        // others rot without anything noticing.
+        for rule in [ "IDE0005"; "IDE0007"; "IDE0040"; "IDE0044"; "IDE0090" ] do
+            if not (dirtyOutput.Contains rule) then
+                failwithf "expected %s from the dirty build, got:\n%s" rule dirtyOutput
+
+        // The compiler writes its error log even when it fails. That is the fact a post-build MSBuild
+        // target could not have used, because it would never have run.
+        if Array.isEmpty (findLogs ()) then
+            failwith "the failing build wrote no kerf.sarif, so cleanup has nothing to read"
+
+        // 2. Cleanup reads that log and the source changes.
+        printfn "running kerf cleanup"
+        let cleanCode, cleanOutput = cleanup []
+        if cleanCode <> 0 then failwithf "kerf cleanup failed:\n%s" cleanOutput
+        let cleaned = File.ReadAllText(source)
+        if cleaned = File.ReadAllText(pristine) then
+            failwithf "kerf cleanup changed nothing:\n%s" cleanOutput
+        if cleaned.Contains "System.Globalization" || cleaned.Contains "System.Numerics" then
+            failwithf "kerf cleanup left part of a run behind — it read the start of the span and not its end:\n%s" cleaned
+        if not (cleaned.Contains "System.Text.RegularExpressions") then
+            failwith "kerf cleanup removed a directive the file needs; the run's extent was read wrong"
+
+        // The other four rules, asserted on the output rather than only on the exit code. Each is a
+        // different delta — a modifier inserted, a type name dropped, a type name swapped for a keyword —
+        // and a rule that silently stopped firing would otherwise look like a clean run.
+        for expected in [ "private readonly string _name"; "private int _count"; "var text = "; "=> new()" ] do
+            if not (cleaned.Contains expected) then
+                failwithf "kerf cleanup did not produce %s:\n%s" expected cleaned
+
+        // 3. The next build is clean, and IDE0005 is absent rather than downgraded. Kerf never writes a
+        //    severity; a muted rule and a fixed one look the same from the exit code alone, so the
+        //    output is checked too.
+        printfn "building the sample again"
+        let cleanBuildCode, cleanBuildOutput = build ()
+        if cleanBuildCode <> 0 then
+            failwithf "the sample must build after cleanup, but it failed:\n%s" cleanBuildOutput
+        for rule in [ "IDE0005"; "IDE0007"; "IDE0040"; "IDE0044"; "IDE0090" ] do
+            if cleanBuildOutput.Contains rule then
+                failwithf "%s is still reported after cleanup, so it was not actually fixed:\n%s" rule cleanBuildOutput
+
+        // 4. With nothing escalated, cleanup changes nothing. Measured: with EnforceCodeStyleInBuild on
+        //    and no severity set, the compiler reports no IDE rule at all — so the opt-in is structural
+        //    and this is what holds it that way.
+        printfn "building and cleaning with no severity escalated"
+        restore ()
+        let withoutSeverities =
+            pristineConfig.Split('\n')
+            |> Array.filter (fun line -> not (line.StartsWith("dotnet_diagnostic.", StringComparison.Ordinal)))
+            |> String.concat "\n"
+        File.WriteAllText(editorConfig, withoutSeverities)
+        clearLogs ()
+        let defaultCode, defaultOutput = build ()
+        if defaultCode <> 0 then failwithf "the sample must build when nothing is escalated:\n%s" defaultOutput
+        let before = File.ReadAllText(source)
+        cleanup [] |> ignore
+        if File.ReadAllText(source) <> before then
+            failwith "cleanup rewrote a file nobody asked it to; the fixed set must be the reported set"
+
+        printfn ""
+        printfn "kerf cleanup verified: fixes what the build reported, whole runs, nothing else, and nothing unasked"
+    finally
+        // Leave the sample unclean and escalated, which is how it is checked in.
+        File.WriteAllText(editorConfig, pristineConfig)
+        File.Copy(pristine, source, true)
+
 /// Proves that every expectation the test suite asserts is a fixed point of dotnet format.
 ///
 /// Until this existed only the corpus proved that. The hand-written expectations proved only that
@@ -463,6 +587,7 @@ let Setup (parsed:ParseResults<Arguments>) (subCommand:Arguments) =
     cmd Conformance.Name (Some [Build.Name]) None <| fun _ -> conformance parsed
     cmd Perf.Name (Some [Build.Name]) None <| fun _ -> perf parsed
     cmd MsbuildSmoketest.Name (Some [Build.Name]) None <| fun _ -> msbuildSmoketest parsed
+    cmd CleanupSmoketest.Name (Some [Build.Name]) None <| fun _ -> cleanupSmoketest parsed
     cmd VerifyExpectations.Name (Some [Build.Name]) None <| fun _ -> verifyExpectations parsed
 
     step PristineCheck.Name pristineCheck

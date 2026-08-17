@@ -48,7 +48,8 @@ internal static class TokenStreamComparer
 		bool bracesAdded = false,
 		bool namespaceUnwrapped = false,
 		IReadOnlyList<TextSpan>? dropped = null,
-		int arrowsAdded = 0)
+		int arrowsAdded = 0,
+		IReadOnlyList<string>? inserted = null)
 	{
 		if (!CSharpSource.TryParse(formatted, out var reparsed, out var errors))
 		{
@@ -93,6 +94,9 @@ internal static class TokenStreamComparer
 		var nextDropped = 0;
 		var arrowsOwed = arrowsAdded;
 
+		// Insertions arrive in output order and are consulted only where the streams diverge.
+		var nextInserted = 0;
+
 		while (true)
 		{
 			// The using block has been checked as a set; walking it in order would only re-discover
@@ -130,8 +134,26 @@ internal static class TokenStreamComparer
 					return false;
 				}
 
+				if (inserted is not null && nextInserted != inserted.Count)
+				{
+					failure = $"{inserted.Count - nextInserted} declared insertion(s) never appeared in the output";
+					return false;
+				}
+
 				failure = null;
 				return true;
+			}
+
+			// A token the output carries and the source does not, declared by its exact text. The original
+			// token is carried forward rather than consumed, so it is still compared on the next turn —
+			// which is what keeps this an insertion rather than a substitution.
+			if (inserted is not null && nextInserted < inserted.Count && hasProduced
+				&& (!hasOriginal || Mismatch(originalText, before, formattedText, after))
+				&& formattedText.Slice(after.Span.Start, after.Span.Length).SequenceEqual(inserted[nextInserted]))
+			{
+				nextInserted++;
+				carryOriginal = hasOriginal;
+				continue;
 			}
 
 			// The tail of an added brace pair, settled by count for the same reason as in the content

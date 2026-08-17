@@ -34,6 +34,43 @@
 
   </PropertyGroup>
 
+  <Target Name="KerfDiagnostics" BeforeTargets="CoreCompile" Condition="'$(Kerf_Diagnostics)' != 'false'">
+    <!--
+      Ask the compiler to write down what it reported, so `kerf cleanup` can fix the semantic rules Kerf
+      cannot decide from syntax. This is the whole of cleanup's involvement in a build: no target that
+      rewrites anything, no Exec, nothing that runs after the compiler. A code clean tool does not own
+      building — someone runs `dotnet build`, and if style diagnostics come back they run `kerf cleanup`.
+
+      Why the log and not the console output: MSBuild reports a diagnostic's start but not its end, and
+      IDE0005 is one diagnostic per contiguous run of unnecessary using directives. Measured, on five
+      directives where the third was needed: the log gave two results spanning lines 1-2 and 4-5. From
+      start positions alone the run's extent is not recoverable — one unused directive, then a needed
+      one, then an unused one reports two starts, while two unused then a needed one reports a single
+      start — so a console-driven fix would delete a directive something needs.
+
+      Set here rather than in the PropertyGroup at the top of this file, because $(ErrorLog) and
+      $(IntermediateOutputPath) are not set until the SDK's own targets have been imported.
+    -->
+    <PropertyGroup Condition="'$(ErrorLog)' == '' and '$(TargetFramework)' != '' and '$(Kerf_Bypass)' != 'true'">
+      <!--
+        Only when the project has not set one. A consumer's own error log feeds their own tooling, and
+        fighting over a single-valued property would break it.
+
+        $(TargetFramework) has to be non-empty so the outer build of a multi-targeting project does not
+        set a path both inner builds then write to. Measured: they do not coordinate, and the result is
+        two SARIF documents concatenated into one file that no JSON reader will accept.
+        $(IntermediateOutputPath) is already per target framework, which is why it is the right place.
+      -->
+      <ErrorLog>$(IntermediateOutputPath)kerf.sarif,version=2.1</ErrorLog>
+      <Kerf_WroteDiagnostics>true</Kerf_WroteDiagnostics>
+    </PropertyGroup>
+
+    <!-- So `dotnet clean` takes it away again. Only the log this target asked for, never a consumer's. -->
+    <ItemGroup Condition="'$(Kerf_WroteDiagnostics)' == 'true'">
+      <FileWrites Include="$(IntermediateOutputPath)kerf.sarif" />
+    </ItemGroup>
+  </Target>
+
   <Target Name="KerfPrepare">
     <!--
       Both of these are resolved here rather than in the PropertyGroup above, because that is

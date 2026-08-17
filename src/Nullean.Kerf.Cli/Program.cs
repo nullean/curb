@@ -17,7 +17,15 @@ if (args.Length == 0 || args[0] is "-h" or "--help")
 	Console.WriteLine("  kerf doc-tree <file>       dump the document IR for a file");
 	Console.WriteLine("  kerf --version");
 	Console.WriteLine();
+	Console.WriteLine("  kerf cleanup [path]        apply the code style fixes a build already reported");
+	Console.WriteLine("  kerf rules                 show which code style rules Kerf fixes, and which it does not");
+	Console.WriteLine();
+	Console.WriteLine("  --diagnostics <path>       the log to read, instead of searching <path> for kerf.sarif");
+	Console.WriteLine("  --check                    with cleanup: report what would be fixed, change nothing");
 	Console.WriteLine("  --no-verify   skip re-parsing output to prove the token stream is unchanged");
+	Console.WriteLine();
+	Console.WriteLine("Cleanup never builds. Build first, then run it:");
+	Console.WriteLine("  dotnet build && kerf cleanup");
 	return 0;
 }
 
@@ -60,6 +68,56 @@ switch (args[0])
 			verify: !args.Contains("--no-verify"),
 			coverageReport: args.Contains("--coverage"),
 			explicitFiles: explicitFiles);
+
+	case "cleanup":
+		{
+			// `--diagnostics` may be given more than once, so a solution's per-project logs can all be
+			// handed over in one run.
+			var explicitLogs = new List<string>();
+			for (var i = 1; i < args.Length - 1; i++)
+			{
+				if (args[i] == "--diagnostics")
+					explicitLogs.Add(args[i + 1]);
+			}
+
+			var path = args.Length > 1 && !args[1].StartsWith('-') ? args[1] : ".";
+
+			return CleanupRun.Execute(fileSystem, path,
+				write: !args.Contains("--check"),
+				logs: [.. explicitLogs],
+				explicitFiles: explicitFiles);
+		}
+
+	case "rules":
+		{
+			// Driven by the catalog rather than a hand-written list, for the same reason print-config is:
+			// a rule Kerf stops fixing, or starts fixing, should change this output without anyone
+			// remembering to edit it.
+			var groups = new (RuleOwner Owner, string Heading)[]
+			{
+				(RuleOwner.Cleanup, "fixed by `kerf cleanup`, from a diagnostic your build reported"),
+				(RuleOwner.Formatting, "already satisfied by `kerf format`, before the compiler looks"),
+				(RuleOwner.Never, "never fixed by Kerf"),
+				(RuleOwner.DotnetFormatStyle, "not Kerf's — use `dotnet format style`"),
+			};
+
+			foreach (var (owner, heading) in groups)
+			{
+				var entries = RuleCatalog.All.Where(entry => entry.Owner == owner).ToArray();
+				Console.WriteLine($"# {entries.Length} rule(s) {heading}");
+
+				foreach (var entry in entries)
+				{
+					Console.WriteLine($"  {entry.Id}  {entry.Title}");
+					if (entry.Refusal is { } refusal)
+						Console.WriteLine($"            {refusal}");
+				}
+
+				Console.WriteLine();
+			}
+
+			return 0;
+		}
 
 	case "doc-tree" when args.Length > 1:
 		{

@@ -26,8 +26,9 @@ public class DeclaredDeltaTests
 		string output,
 		IReadOnlyList<TextSpan>? reordered = null,
 		bool trailingCommas = false,
-		bool bracesAdded = false) =>
-		ContentVerifier.Verify(source, output, out _, reordered, trailingCommas, bracesAdded);
+		bool bracesAdded = false,
+		IReadOnlyList<string>? inserted = null) =>
+		ContentVerifier.Verify(source, output, out _, reordered, trailingCommas, bracesAdded, inserted: inserted);
 
 	// ---- no delta declared ------------------------------------------------------------------------
 
@@ -44,6 +45,87 @@ public class DeclaredDeltaTests
 		Verify("var a = new[] { 1, 2 };", "var a = new[] { 1, 2, };").Should().BeFalse("a comma appeared");
 		Verify("public static void M()", "static public void M()").Should().BeFalse("modifiers moved");
 		Verify("if (a) Foo();", "if (a) { Foo(); }").Should().BeFalse("braces appeared");
+		await Task.CompletedTask;
+	}
+
+	// ---- inserted words ---------------------------------------------------------------------------
+	//
+	// What the cleanup modifier rules declare. Given as exact text rather than a count, so the allowance
+	// is "precisely this word, once" — which is what these assertions are checking has teeth.
+
+	[Test]
+	public async Task A_declared_word_may_appear()
+	{
+		Verify("private string _n;", "private readonly string _n;", inserted: ["readonly"]).Should().BeTrue();
+		Verify("int _n;", "private int _n;", inserted: ["private"]).Should().BeTrue();
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task Several_declared_words_may_appear()
+	{
+		Verify("string _n; int _c;", "private string _n; private int _c;", inserted: ["private", "private"])
+			.Should().BeTrue();
+
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task A_word_that_was_not_declared_is_still_damage()
+	{
+		Verify("private string _n;", "private readonly string _n;").Should().BeFalse("nothing was declared");
+		Verify("private string _n;", "private static readonly string _n;", inserted: ["readonly"])
+			.Should().BeFalse("only one of the two words was declared");
+
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task A_declared_word_does_not_excuse_a_different_one()
+	{
+		Verify("int _n;", "private int _n;", inserted: ["internal"]).Should().BeFalse();
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task A_declared_word_must_be_a_whole_word()
+	{
+		// Without the boundary check a declared `readonly` would be satisfied by `readonlyish`, which is a
+		// different identifier and a different program.
+		Verify("private string _n;", "private readonlyish string _n;", inserted: ["readonly"]).Should().BeFalse();
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task A_declared_word_that_never_appears_is_a_failure()
+	{
+		// The insertion has to be used. Otherwise a rule could declare an allowance, fail to make the edit,
+		// and still be told the output was fine.
+		Verify("int _n;", "int _n;", inserted: ["private"]).Should().BeFalse();
+		Verify("string _n; int _c;", "private string _n; int _c;", inserted: ["private", "private"])
+			.Should().BeFalse("only one of the two declared insertions was made");
+
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task A_declared_word_does_not_excuse_losing_content()
+	{
+		Verify("private string _n;", "private readonly string;", inserted: ["readonly"])
+			.Should().BeFalse("the field name went missing");
+
+		Verify("private string _n; int _c;", "private readonly string _n;", inserted: ["readonly"])
+			.Should().BeFalse("a whole declaration went missing");
+
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task A_declared_word_does_not_excuse_altering_content()
+	{
+		Verify("private string _n;", "private readonly string _m;", inserted: ["readonly"])
+			.Should().BeFalse("the field was renamed");
+
 		await Task.CompletedTask;
 	}
 

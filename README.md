@@ -28,10 +28,13 @@ Kerf's goal on that same repo is **zero**, unless you ask for reflow.
 | All 39 IDE0055 formatting options | ✅ | ✅ | ✅ |
 | **Reflow to `max_line_length`** | ❌ | ❌ | ✅ |
 | Syntax-only code style (braces, expression bodies, file-scoped namespaces) | ❌ | ✅ | ✅ |
-| Semantic code style (`var`, unused usings, naming) | ❌ | ✅ | ❌ *by design* |
+| Semantic code style (unused usings, `var`, naming) | ❌ | ✅ | ⚠️ *`kerf cleanup`, from what a build reported* |
 
-Kerf never loads a compilation. That is what keeps it fast, and it is why the semantic half of code style stays
-out of scope — use `dotnet format style` for those.
+Kerf never *computes* semantics — no compilation, no semantic model — which is what keeps it fast and what lets it run
+on a bare folder. `kerf cleanup` closes part of the gap without giving that up: it reads the diagnostics your build
+already reported and applies the fixes derivable from a rule id and a span. So it fixes exactly what the build told you
+about, which means nothing to silence and nothing changed in a repository that asked for nothing. See
+[docs/cleanup.md](docs/cleanup.md). For the rest, `dotnet format style`.
 
 ## Install
 
@@ -48,6 +51,9 @@ a portable fallback. ~10 ms startup.
 kerf format ./src          # format in place
 kerf check ./src           # exit non-zero if anything would change
 kerf print-config Foo.cs   # show every resolved option and where it came from
+
+dotnet build && kerf cleanup   # fix the code style rules your build reported
+kerf rules                     # which rules Kerf fixes, and which it does not
 ```
 
 Configuration is your `.editorconfig` — there is no second config file to learn.

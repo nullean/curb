@@ -30,6 +30,7 @@ let AotRuntimeIdentifiers = ["linux-x64"; "linux-arm64"; "win-x64"; "win-arm64";
 let mapProjectToNuget =
     Map.empty
         .Add("Nullean.Kerf.Core", "Nullean.Kerf.Core")
+        .Add("Nullean.Kerf.Cleanup", "Nullean.Kerf.Cleanup")
         .Add("Nullean.Kerf.EditorConfig", "Nullean.Kerf.EditorConfig")
         .Add("Nullean.Kerf.MSBuild", "Nullean.Kerf.MSBuild")
 

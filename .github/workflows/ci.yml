@@ -166,6 +166,15 @@ jobs:
       - name: MSBuild integration runs before the compiler
         run: ./build.sh msbuildsmoketest -s true
 
+      # Four-sided, where the formatting smoke test above needs two. Two of them are the same idea —
+      # cleanup works, and the build would have failed without it. The other two exist because cleanup
+      # can be wrong in ways a formatter cannot: it could silence a rule instead of fixing it, so the
+      # second build's output is checked for IDE0005 rather than only its exit code; and it could rewrite
+      # a repository that asked for nothing, so the sample is also built with no severity escalated and
+      # the source must come out byte-identical.
+      - name: Cleanup fixes what the build reported, and only that
+        run: ./build.sh cleanupsmoketest -s true
+
       # Every expectation the suite asserts, written out and run through dotnet format. Until this
       # existed only the corpus proved the fixed-point property; the hand-written expectations proved
       # only that Kerf agrees with itself, so one written from a wrong belief would pass forever — it

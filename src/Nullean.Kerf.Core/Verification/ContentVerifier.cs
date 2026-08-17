@@ -64,6 +64,13 @@ internal static class ContentVerifier
 	/// does not. They are counted rather than merely allowed: an opening brace with no closing one, or
 	/// a closing one that was never opened, is still a failure.
 	/// </param>
+	/// <param name="inserted">
+	/// Exact token texts the output carries and the source does not, in output order — a modifier a
+	/// cleanup rule added, for instance. Given as the text rather than a count, so the allowance is
+	/// "precisely this word, once, here" and not "some extra content somewhere". Consumed only at a
+	/// point where the two sides already disagree, and every entry has to be used by the end of the
+	/// file.
+	/// </param>
 	public static bool Verify(
 		ReadOnlySpan<char> source,
 		ReadOnlySpan<char> output,
@@ -74,7 +81,8 @@ internal static class ContentVerifier
 		bool namespaceUnwrapped = false,
 		IReadOnlyList<TextSpan>? dropped = null,
 		int arrowsAdded = 0,
-		string? headerAdded = null)
+		string? headerAdded = null,
+		IReadOnlyList<string>? inserted = null)
 	{
 		var sourceIndex = 0;
 		var outputIndex = 0;
@@ -92,6 +100,9 @@ internal static class ContentVerifier
 
 		var nextDropped = 0;
 		var arrowsOwed = arrowsAdded;
+
+		// Insertions arrive in output order and are consulted only at a mismatch, so one cursor is enough.
+		var nextInserted = 0;
 
 		while (true)
 		{
@@ -193,8 +204,29 @@ internal static class ContentVerifier
 				continue;
 			}
 
+			// A word the output has and the source does not, declared exactly. Gated on the two sides
+			// already disagreeing, which for a modifier is guaranteed: at the insertion point the output
+			// holds a keyword the source does not, so this can never fire where the file already matched.
+			//
+			// Unlike a brace, an inserted word cannot be confused with one that was already there — which
+			// is why this can be settled locally where `bracesAdded` has to be settled by count.
+			if (inserted is not null && nextInserted < inserted.Count && !outputDone
+				&& (sourceDone || source[sourceIndex] != output[outputIndex])
+				&& StartsWithWord(output, outputIndex, inserted[nextInserted]))
+			{
+				outputIndex += inserted[nextInserted].Length;
+				nextInserted++;
+				continue;
+			}
+
 			if (sourceDone && outputDone)
 			{
+				if (inserted is not null && nextInserted != inserted.Count)
+				{
+					failure = $"{inserted.Count - nextInserted} declared insertion(s) never appeared in the output";
+					return false;
+				}
+
 				if (arrowsOwed != 0)
 				{
 					failure = "an expression body dropped a block without putting an arrow in its place";
@@ -371,6 +403,22 @@ internal static class ContentVerifier
 	}
 
 	private static bool IsSkippable(char value) => value is ' ' or '\t' or '\r' or '\n';
+
+	/// <summary>
+	/// True when <paramref name="text"/> sits at <paramref name="at"/> as a whole word.
+	/// </summary>
+	/// <remarks>
+	/// The word boundary matters: without it a declared insertion of <c>readonly</c> would also be
+	/// satisfied by an output that wrote <c>readonlyish</c>, which is a different identifier.
+	/// </remarks>
+	private static bool StartsWithWord(ReadOnlySpan<char> output, int at, string text)
+	{
+		if (!output[at..].StartsWith(text, StringComparison.Ordinal))
+			return false;
+
+		var after = at + text.Length;
+		return after >= output.Length || (!char.IsLetterOrDigit(output[after]) && output[after] != '_');
+	}
 
 	private static string Excerpt(ReadOnlySpan<char> text, int start)
 	{

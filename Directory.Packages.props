@@ -14,7 +14,12 @@
          trees for new language features and therefore change formatting output. Treat a bump as a
          behaviour change requiring a corpus diff review, not a routine dependency update.
 
-         Validated 5.6.0 under native AOT: links, 10.7 MB binary, ~27 MB/s parse. -->
+         Validated 5.6.0 under native AOT: links, 10.7 MB binary, ~27 MB/s parse.
+
+         5.6.0 is also head-of-published: nuget has nothing newer. The compiler inside the SDK is a
+         different thing and is always ahead — SDK 10.0.400 carries 5.900.26.38015, which is not on nuget
+         and structurally never will be. Matching it is deliberately not attempted; see docs/cleanup.md
+         for why that rules out hosting the SDK's own code style analysers. -->
     <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="[5.6.0]" />
     <PackageVersion Include="editorconfig" Version="0.17.0" />
     <PackageVersion Include="System.IO.Abstractions" Version="22.2.0" />
