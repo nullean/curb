@@ -250,6 +250,12 @@ public static class EditorConfigOptionsBinder
 			&& !string.Equals(header, "unset", StringComparison.OrdinalIgnoreCase))
 			options = options with { FileHeaderTemplate = header };
 
+		if (TryPrefixedBool(properties, "wrap_before_declaration_rpar", diagnostics, out var declarationRpar))
+			options = options with { WrapBeforeDeclarationRpar = declarationRpar };
+
+		if (TryPrefixedBool(properties, "wrap_before_invocation_rpar", diagnostics, out var invocationRpar))
+			options = options with { WrapBeforeInvocationRpar = invocationRpar };
+
 		if (properties.TryGetValue("csharp_using_directive_placement", out var usingPlacement))
 		{
 			var colon = usingPlacement.LastIndexOf(':');

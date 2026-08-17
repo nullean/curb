@@ -535,6 +535,29 @@ public readonly record struct FormatOptions
 	/// </remarks>
 	public string? FileHeaderTemplate { get; init; }
 
+	/// <summary>
+	/// <c>csharp_wrap_before_declaration_rpar</c>: put a broken parameter list's <c>)</c> on a line
+	/// of its own. Null leaves the decision where it has always been.
+	/// </summary>
+	/// <remarks>
+	/// <para>
+	/// ReSharper's key. Kerf has always had the behaviour without the control: when reflow decides a
+	/// parameter list must break, the closing parenthesis goes on its own line, and when the author
+	/// broke the list themselves, whatever they did is reproduced. Setting this takes the decision
+	/// away from both — <c>true</c> gives it a line whenever the list breaks, <c>false</c> keeps it
+	/// beside the last parameter.
+	/// </para>
+	/// <para>
+	/// Worth knowing what it moves with it: an expression body's arrow follows the closing
+	/// parenthesis, so a hugged <c>)</c> puts a <c>switch</c> body a level deeper. That is
+	/// <c>dotnet format</c>'s rule and it holds either way this is set.
+	/// </para>
+	/// </remarks>
+	public bool? WrapBeforeDeclarationRpar { get; init; }
+
+	/// <summary><c>csharp_wrap_before_invocation_rpar</c>, the same for an argument list.</summary>
+	public bool? WrapBeforeInvocationRpar { get; init; }
+
 	/// <summary>True when either trailing-comma option asked for anything.</summary>
 	/// <remarks>
 	/// Gates both the printer work and the verifier's allowance for a comma that appears or vanishes,

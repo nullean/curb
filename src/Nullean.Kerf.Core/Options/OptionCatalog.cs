@@ -103,6 +103,8 @@ public static class OptionCatalog
 			"csharp_style_expression_bodied_properties",
 			"csharp_style_expression_bodied_indexers",
 			"csharp_using_directive_placement",
+			"csharp_wrap_before_declaration_rpar",
+			"csharp_wrap_before_invocation_rpar",
 			"file_header_template",
 
 			// IDE0036 and IDE0011, which dotnet format can only apply with a full compilation.

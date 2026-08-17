@@ -388,7 +388,13 @@ internal static partial class Printers
 			// with `)` still hugging the last parameter leaves it a level deeper, and the body follows
 			// it down. Read from the source, where the two are already distinguishable, rather than
 			// from a layout being decided on this same run.
-			using (arena.IndentIf(ClosingParenHugsTheLastParameter(node, context)))
+			// Where the `)` is left to the source, the source answers. Where an option forces it to
+			// hug, the arrow is a level deeper exactly when the list breaks — which is this run's
+			// decision, so it is asked of the list's own group rather than of the text.
+			var forced = context.Options.WrapBeforeDeclarationRpar;
+			using (forced == false
+				? arena.IndentIfBroken(context.ParameterListGroup)
+				: arena.IndentIf(forced is null && ClosingParenHugsTheLastParameter(node, context)))
 			{
 				arena.Synthetic(SyntheticText.Space);
 				Node.Print(node.Expression, context);
@@ -424,9 +430,10 @@ internal static partial class Printers
 			_ => null,
 		};
 
-		return parameters is { Parameters.Count: > 0 }
-			&& SpansLines(parameters, context)
-			&& context.OnSameLine(parameters.Parameters[^1].Span.End, parameters.CloseParenToken.SpanStart);
+		if (parameters is not { Parameters.Count: > 0 } || !SpansLines(parameters, context))
+			return false;
+
+		return context.OnSameLine(parameters.Parameters[^1].Span.End, parameters.CloseParenToken.SpanStart);
 	}
 
 	public static void TypeParameterList(TypeParameterListSyntax node, PrintContext context)
@@ -486,8 +493,14 @@ internal static partial class Printers
 					PrintSeparated(node.Parameters, context, asWritten);
 				}
 
-				if (!asWritten)
+				// csharp_wrap_before_declaration_rpar takes the decision away from both the author and
+				// reflow when it is set: a breakable line puts the `)` on its own whenever the list
+				// breaks, and the plain spacing keeps it beside the last parameter whatever happens.
+				var rpar = context.Options.WrapBeforeDeclarationRpar;
+				if (rpar == true || (rpar is null && !asWritten))
 					Spacing.InsideDeclarationParensBreakable(context);
+				else if (rpar == false)
+					Spacing.InsideDeclarationParens(context);
 				else if (!context.OnSameLine(node.Parameters[^1].Span.End, node.Span.End))
 					arena.HardLine();
 				else
@@ -650,8 +663,11 @@ internal static partial class Printers
 					PrintSeparated(node.Arguments, context, asWritten, node.OpenParenToken.Span.End);
 				}
 
-				if (!asWritten)
+				var rpar = context.Options.WrapBeforeInvocationRpar;
+				if (rpar == true || (rpar is null && !asWritten))
 					Spacing.InsideCallParensBreakable(context);
+				else if (rpar == false)
+					Spacing.InsideCallParens(context);
 				else if (!context.OnSameLine(node.Arguments[^1].Span.End, node.Span.End))
 					arena.HardLine();
 				else

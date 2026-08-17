@@ -45,6 +45,8 @@ public static class OptionValues
 		"csharp_style_expression_bodied_properties" => Expression(options.ExpressionBodiedProperties),
 		"csharp_style_expression_bodied_indexers" => Expression(options.ExpressionBodiedIndexers),
 		"file_header_template" => options.FileHeaderTemplate ?? "   # no header is required",
+		"csharp_wrap_before_declaration_rpar" => Rpar(options.WrapBeforeDeclarationRpar),
+		"csharp_wrap_before_invocation_rpar" => Rpar(options.WrapBeforeInvocationRpar),
 		"csharp_using_directive_placement" => options.UsingPlacement switch
 		{
 			UsingPlacement.InsideNamespace => "inside_namespace",
@@ -138,6 +140,13 @@ public static class OptionValues
 	};
 
 	private static string Bool(bool value) => value ? "true" : "false";
+
+	private static string Rpar(bool? value) => value switch
+	{
+		true => "true",
+		false => "false",
+		null => "true   # when reflow breaks the list; an author's own arrangement is reproduced",
+	};
 
 	private static string Expression(ExpressionBodyStyle value) => value switch
 	{
