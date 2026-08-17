@@ -1,3 +1,8 @@
+---
+navigation_title: Agent instructions
+description: The block to paste into your repository's AGENTS.md, and why it is shaped the way it is.
+---
+
 # Instructions for a coding agent
 
 Paste the block below into your repository's `AGENTS.md` or `CLAUDE.md`. It is deliberately short: the
@@ -41,7 +46,7 @@ So:
 - **`kerf cleanup` takes no arguments in the common case.** It finds the logs itself.
 - **The second build is not overhead.** It is the verify step the agent was going to run after any edit,
   and it is what catches a bad fix — as a compile error, immediately.
-- **Nothing is silenced.** A diagnostic that is still reported after cleanup is one Kerf genuinely cannot
+- **Nothing is silenced.** A diagnostic that is still reported after cleanup is one {{product}} genuinely cannot
   fix, so the agent's attention goes where it is actually needed rather than to a mechanical offence.
 
 ## What the agent will see
@@ -69,7 +74,7 @@ diagnostic's position refers to the bytes the compiler read, and applying it to 
 tool corrupts source. Build again and it will be picked up. This is normal when the agent edited a file
 between building and cleaning.
 
-**`refused`** means Kerf understood the diagnostic and declined, with a reason on stderr. The common one
+**`refused`** means {{product}} understood the diagnostic and declined, with a reason on stderr. The common one
 is a file containing `#if`: the compiler decided for one set of symbols, and a using directive needed
 only under another would be reported as unnecessary and then lost. A refusal is a correct outcome, not a
 failure.

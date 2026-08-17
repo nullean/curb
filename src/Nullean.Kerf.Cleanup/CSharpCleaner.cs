@@ -199,7 +199,7 @@ public sealed class CSharpCleaner
 	/// <remarks>
 	/// Both, not one. Dropping one and keeping the other would make a second pass produce different
 	/// output from the first, and one pass being the whole story is the contract
-	/// <c>docs/layout-decisions.md</c> is built on. Dropping both means the next pass sees the same
+	/// <c>docs/contribute/layout-decisions.md</c> is built on. Dropping both means the next pass sees the same
 	/// overlap and drops it again, so the output is a fixed point.
 	/// </remarks>
 	private void DropOverlaps()

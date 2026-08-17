@@ -102,10 +102,16 @@ order, using placement and file headers are also fixed by the build, but only fo
 {{product}} defaults to leaving your code as written, so it fixes exactly what you configured and
 nothing else.
 
-**Not handled here — the semantic remainder.** `var`, unused usings, naming, unused members and the
-analyzer rules need a compilation, so they surface as diagnostics rather than being silently repaired.
-Some are auto-fixable by tooling that does load a compilation; the rest are genuinely a judgement call.
-Either way, that is the work you want the agent doing.
+**Handled after the build — most of the semantic remainder.** `var`, unused usings, `readonly` and six
+more need a compilation to decide, so the build cannot fix them before the compiler runs. It does not have
+to: the compiler already decided, and `kerf cleanup` reads its answer and applies the rewrite. One command
+after the build, and those diagnostics are gone without {{product}} ever loading a compilation of its own.
+See [Cleanup](cleanup.md).
+
+**Not handled at all — and deliberately.** Naming, unused members and unread assignments are left. Their
+fixes delete declarations or rename symbols, which can compile and still change which overload binds or
+break a reflection string no compiler check sees. {{product}} reports them and says why rather than
+guessing. That remainder is genuinely a judgement call, and it is the work you want the agent doing.
 
 ## The rest of the loop
 

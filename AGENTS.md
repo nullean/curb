@@ -110,7 +110,7 @@ the diagnostic does not carry, it is not a cleanup rule — record why and stop.
    half and the only one that compiles anything, so it is the only one that can catch a fix which compiles
    but is wrong — it caught an IDE0007/IDE0034 interaction producing CS8716. Nothing below these two rungs
    green-lights a rule that changes tokens — the same discipline as
-   [docs/layout-decisions.md](docs/layout-decisions.md), for the same reason.
+   [docs/contribute/layout-decisions.md](docs/contribute/layout-decisions.md), for the same reason.
 
 A refusal is a first-class outcome, not an error. Report it with its reason so "Kerf declined" is
 distinguishable from "Kerf is broken."

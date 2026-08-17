@@ -22,6 +22,8 @@ toc:
     children:
       - file: ai-native.md
       - file: msbuild.md
+      - file: cleanup.md
+      - file: agent-instructions.md
   - folder: getting-started
     children:
       - file: index.md
