@@ -102,14 +102,16 @@ public class RoundTripRiskTests
 	[Test]
 	public async Task Fires_when_line_endings_are_being_rewritten()
 	{
-		// Verbatim runs are re-emitted with the configured ending, which changes the content of a
-		// multi-line literal. Boundary tracking cannot see that, so it is forced.
+		// Verbatim string content is re-emitted with the configured ending, which changes the value
+		// of a multi-line literal. Only files that actually contain a verbatim or raw string need
+		// the second parse — the guard prevents unnecessary re-parses on files that have none.
 		var arena = new DocArena();
 		arena.SourceText(0, 3);
 
 		using var output = new OutputBuffer();
 		var printer = new DocPrinter();
-		printer.Print(arena, "a\r\nb".AsMemory(), new FormatOptions { EndOfLine = EndOfLine.Lf }, output);
+		// Source contains @" so HasVerbatimOrRawString fires; CRLF source with LF target triggers the risk.
+		printer.Print(arena, "@\"a\r\nb\"".AsMemory(), new FormatOptions { EndOfLine = EndOfLine.Lf }, output);
 
 		printer.RoundTripAtRisk.Should().BeTrue();
 		await Task.CompletedTask;
