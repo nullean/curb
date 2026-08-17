@@ -796,6 +796,24 @@ public readonly record struct FormatOptions
 	/// <summary><c>csharp_blank_lines_around_namespace</c>, around a namespace declaration.</summary>
 	public int BlankLinesAroundNamespace { get; init; }
 
+	// The place_*_attribute_on_same_line family is absent too, and it fails the same way.
+	//
+	// Two of its six keys are inadmissible outright: dotnet format lifts a *type's* attribute and an
+	// *accessor's* onto their own line, so `always` there could never be a fixed point. For the other
+	// four it declines to decide — which is what made them look like free ground.
+	//
+	// They are not. dotnet format keeps an attribute beside its member exactly when the whole member
+	// is on one line, so plain `always` was measured at 347 corpus files it then moved. Implementing
+	// the narrower `if_owner_is_single_line` instead restored conformance to baseline on a corpus
+	// without reflow — but with reflow on, 68 files stopped settling and 16 lost their fixed point,
+	// because Kerf's own wrapping decides whether a member is one line. A property whose body Kerf
+	// joins becomes single-line on the run after the one that read it as multi-line, and the attribute
+	// follows it down a run late.
+	//
+	// That is the same trap as the single-line blank-line family above, reached from a different
+	// direction, and it is worth noting the sequence: a small hand-written probe said free ground, the
+	// corpus without reflow agreed, and only the corpus with reflow disagreed.
+
 	// The blank_lines_around_single_line_* family is deliberately absent, and this is the one place
 	// in the whole blank-line category where the free-ground argument does not hold.
 	//
