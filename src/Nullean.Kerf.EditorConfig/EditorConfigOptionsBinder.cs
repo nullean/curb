@@ -295,6 +295,9 @@ public static class EditorConfigOptionsBinder
 		if (TryPrefixedBool(properties, "wrap_before_arrow_with_expressions", diagnostics, out var wrapArrow))
 			options = options with { WrapBeforeArrowWithExpressions = wrapArrow };
 
+		if (TryPrefixedBool(properties, "wrap_after_dot_in_method_calls", diagnostics, out var wrapAfterDot))
+			options = options with { WrapAfterDotInMethodCalls = wrapAfterDot };
+
 		// Only the parameter list's. wrap_arguments_style, the two initializer styles and
 		// wrap_chained_method_calls are left to the same silence as the several hundred other
 		// ReSharper keys Kerf does not implement: forcing every one of those to break moves

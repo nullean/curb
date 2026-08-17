@@ -92,18 +92,27 @@ internal static partial class Printers
 		using (arena.Group())
 		using (arena.Indent())
 		{
+			// csharp_wrap_after_dot_in_method_calls puts the dot on the tail of the line it follows
+			// rather than the head of the line it introduces. Only the dot moves; where the chain
+			// breaks is decided exactly as before, which is why the break predicate had to stop asking
+			// about the dot's position first.
+			var dotTrails = context.Options.WrapAfterDotInMethodCalls;
+
 			for (var i = attached; i < links.Count; i++)
 			{
 				var link = links[i];
+
+				if (dotTrails)
+					TokenPrinter.Print(link.DotToken, context);
 
 				// Only the separator is conditional. The link itself is always emitted — dropping it
 				// is how this lost `.Values` from a chain the first time round.
 				if (!asWritten)
 					arena.SoftLine();
-				else if (!context.OnSameLine(PreviousEnd(links, receiver, i), link.DotToken.SpanStart))
+				else if (!context.OnSameLine(PreviousEnd(links, receiver, i), link.Name.SpanStart))
 					arena.HardLine();
 
-				PrintLink(link, context);
+				PrintLink(link, context, dotAlreadyPrinted: dotTrails);
 			}
 		}
 
@@ -143,6 +152,12 @@ internal static partial class Printers
 		index == 0 ? receiver.Span.End : links[index - 1].End;
 
 	/// <summary>True when the author put a break before any link this printer is responsible for.</summary>
+	/// <remarks>
+	/// Asked of the link's *name*, not its dot, so that it sees a break whichever side of it the
+	/// author left the dot on. Asking about the dot missed `foo.` / `Bar()` entirely — the dot is on
+	/// the previous line there, so the link read as unbroken and the whole chain was joined back up,
+	/// against the rule that nothing joins lines the author broke.
+	/// </remarks>
 	private static bool BreaksAnywhere(
 		List<ChainLink> links,
 		ExpressionSyntax receiver,
@@ -151,16 +166,18 @@ internal static partial class Printers
 	{
 		for (var i = from; i < links.Count; i++)
 		{
-			if (!context.OnSameLine(PreviousEnd(links, receiver, i), links[i].DotToken.SpanStart))
+			if (!context.OnSameLine(PreviousEnd(links, receiver, i), links[i].Name.SpanStart))
 				return true;
 		}
 
 		return false;
 	}
 
-	private static void PrintLink(in ChainLink link, PrintContext context)
+	private static void PrintLink(in ChainLink link, PrintContext context, bool dotAlreadyPrinted = false)
 	{
-		TokenPrinter.Print(link.DotToken, context);
+		if (!dotAlreadyPrinted)
+			TokenPrinter.Print(link.DotToken, context);
+
 		Node.Print(link.Name, context);
 
 		foreach (var trailer in link.Trailers)

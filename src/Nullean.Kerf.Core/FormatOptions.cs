@@ -691,6 +691,17 @@ public readonly record struct FormatOptions
 	public bool WrapBeforeArrowWithExpressions { get; init; }
 
 	/// <summary>
+	/// <c>csharp_wrap_after_dot_in_method_calls</c>: when a chain breaks, leave the dot at the end of
+	/// the line it follows rather than the start of the line it introduces.
+	/// </summary>
+	/// <remarks>
+	/// Off by default. Only the dot moves — where a chain breaks, and whether it breaks at all, are
+	/// decided exactly as they were. Free ground: dotnet format leaves a chain alone whichever side of
+	/// the break its dots sit on.
+	/// </remarks>
+	public bool WrapAfterDotInMethodCalls { get; init; }
+
+	/// <summary>
 	/// <c>csharp_wrap_chained_binary_expressions</c>: give each operand of a long <c>&amp;&amp;</c>
 	/// or <c>||</c> chain a line of its own. Null leaves such a chain unbroken.
 	/// </summary>
