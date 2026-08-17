@@ -35,7 +35,8 @@ entirely by MSBuild when nothing changed — so nobody has to decide when to run
 
 **Your `.editorconfig` is the configuration.** Around 90 keys, and no new ones invented: where Rider
 already had an opinion, {{product}} reads Rider's key rather than adding a rival. On a repository that
-is already IDE0055-clean it changes nothing, unless you ask for reflow.
+is already IDE0055-clean the diff is small, and confined to whitespace within lines until you ask for
+reflow.
 → [The two passes](concepts/index.md)
 
 **It coexists with what you already run.** {{product}}'s output is a fixed point of `dotnet format`,

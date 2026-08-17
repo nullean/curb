@@ -62,7 +62,7 @@ internal static partial class Printers
 				context.UsingsReordered = true;
 			}
 
-			Node.Print(member, context);
+			PrintMember(member, context);
 		}
 
 		// Trivia hanging off the end-of-file token is not a member, so no separator ran for it and
@@ -233,7 +233,7 @@ internal static partial class Printers
 		foreach (var member in node.Members)
 		{
 			Separate(context, ref previousEnd, member);
-			Node.Print(member, context);
+			PrintMember(member, context);
 		}
 	}
 
@@ -320,7 +320,7 @@ internal static partial class Printers
 					EffectiveStart(member),
 					first ? context.Options.BlankLinesInsideType : MinimumBlankLinesFor(member, context)));
 				first = false;
-				Node.Print(member, context);
+				PrintMember(member, context);
 				previousEnd = member.Span.End;
 			}
 
@@ -399,11 +399,15 @@ internal static partial class Printers
 		//
 		// Stable for the same reason the chain's is: Kerf reproduces the break, so the next run reads
 		// the same answer back.
+		// Both answer false under deterministic layout, where there is no author to ask — and this is the
+		// one construct where that costs nothing at all, because csharp_wrap_before_arrow_with_expressions
+		// and the group already decide the arrow's side of the break between them. It is the exemplar the
+		// layout note uses for a rule aimed at a group rather than at the source.
 		var hugs = node.Expression is SwitchExpressionSyntax or QueryExpressionSyntax;
 		var breakBeforeArrow = !hugs
-			&& !context.OnSameLine(node.ArrowToken.GetPreviousToken().Span.End, node.ArrowToken.SpanStart);
+			&& context.AuthorBroke(node.ArrowToken.GetPreviousToken().Span.End, node.ArrowToken.SpanStart);
 		var breakAfterArrow = !hugs
-			&& !context.OnSameLine(node.ArrowToken.Span.End, node.Expression.SpanStart);
+			&& context.AuthorBroke(node.ArrowToken.Span.End, node.Expression.SpanStart);
 
 		var arrowLeadsTheBody = !hugs && (context.Options.WrapBeforeArrowWithExpressions || breakBeforeArrow);
 
@@ -489,7 +493,7 @@ internal static partial class Printers
 		if (parameters is not { Parameters.Count: > 0 } || !SpansLines(parameters, context))
 			return false;
 
-		return context.OnSameLine(parameters.Parameters[^1].Span.End, parameters.CloseParenToken.SpanStart);
+		return context.AuthorJoined(parameters.Parameters[^1].Span.End, parameters.CloseParenToken.SpanStart);
 	}
 
 	public static void TypeParameterList(TypeParameterListSyntax node, PrintContext context)
@@ -549,7 +553,7 @@ internal static partial class Printers
 				{
 					if (!asWritten)
 						Spacing.InsideDeclarationParensBreakable(context);
-					else if (!context.OnSameLine(node.SpanStart, node.Parameters[0].SpanStart))
+					else if (context.AuthorBroke(node.SpanStart, node.Parameters[0].SpanStart))
 						arena.HardLine();
 					else
 						Spacing.InsideDeclarationParens(context);
@@ -565,7 +569,7 @@ internal static partial class Printers
 					Spacing.InsideDeclarationParensBreakable(context);
 				else if (rpar == false)
 					Spacing.InsideDeclarationParens(context);
-				else if (!context.OnSameLine(node.Parameters[^1].Span.End, node.Span.End))
+				else if (context.AuthorBroke(node.Parameters[^1].Span.End, node.Span.End))
 					arena.HardLine();
 				else
 					Spacing.InsideDeclarationParens(context);
@@ -609,7 +613,7 @@ internal static partial class Printers
 				// under csharp_preserve_single_line_statements.
 				if (context.Options.PreserveSingleLineStatements
 					&& previousEnd != node.OpenBraceToken.Span.End
-					&& context.OnSameLine(previousEnd, EffectiveStart(statement)))
+					&& context.AuthorJoined(previousEnd, EffectiveStart(statement)))
 				{
 					arena.Synthetic(SyntheticText.Space);
 					Node.Print(statement, context);
@@ -701,26 +705,40 @@ internal static partial class Printers
 		if (node.Arguments.Count == 1 && EndsWithOwnBlock(node.Arguments[0].Expression))
 		{
 			Spacing.InsideCallParens(context);
+			context.OwnBlockGroup = 0;
 			Node.Print(node.Arguments[0], context);
 			Spacing.InsideCallParens(context);
 			TokenPrinter.Print(node.CloseParenToken, context);
+
+			// This path opens no group of its own, so a trailing initializer on the creation aims at the
+			// argument's instead: `new HttpClient(new SocketsHttpHandler { … }) { Timeout = t }` puts its
+			// outer brace on a line of its own exactly when the inner one opened out.
+			context.ArgumentListGroup = context.OwnBlockGroup;
 			return;
 		}
+
+		// Named so that an initializer hanging off the creation this list belongs to can put its brace
+		// on its own line exactly when this list wrapped. Published on the way out rather than on the
+		// way in: these lists nest, and it is the outermost one the creation is asking about.
+		var group = arena.NextGroupId();
 
 		if (node.Arguments.Count > 0)
 		{
 			var asWritten = SpansLines(node, context);
 
-			using (arena.Group())
+			using (arena.Group(group))
 			{
-				if (context.Options.MaxArgumentsOnLine is { } limit && node.Arguments.Count > limit)
+				// chop_always is the same decision as the count with no count to reach. Deterministic
+				// mode only — the binder drops it otherwise, and records why.
+				if (context.Options.WrapArgumentsStyle == WrapStyle.ChopAlways
+					|| (context.Options.MaxArgumentsOnLine is { } limit && node.Arguments.Count > limit))
 					arena.BreakParent();
 
 				using (arena.Indent())
 				{
 					if (!asWritten)
 						Spacing.InsideCallParensBreakable(context);
-					else if (!context.OnSameLine(node.SpanStart, node.Arguments[0].SpanStart))
+					else if (context.AuthorBroke(node.SpanStart, node.Arguments[0].SpanStart))
 						arena.HardLine();
 					else
 						Spacing.InsideCallParens(context);
@@ -733,7 +751,7 @@ internal static partial class Printers
 					Spacing.InsideCallParensBreakable(context);
 				else if (rpar == false)
 					Spacing.InsideCallParens(context);
-				else if (!context.OnSameLine(node.Arguments[^1].Span.End, node.Span.End))
+				else if (context.AuthorBroke(node.Arguments[^1].Span.End, node.Span.End))
 					arena.HardLine();
 				else
 					Spacing.InsideCallParens(context);
@@ -743,6 +761,7 @@ internal static partial class Printers
 			Spacing.InsideEmptyCallParens(context);
 
 		TokenPrinter.Print(node.CloseParenToken, context);
+		context.ArgumentListGroup = node.Arguments.Count > 0 ? group : (ushort)0;
 	}
 
 	public static void Argument(ArgumentSyntax node, PrintContext context)
@@ -858,14 +877,107 @@ internal static partial class Printers
 		context.Arena.Synthetic(SyntheticText.Space);
 	}
 
+	/// <summary>
+	/// Prints one member, inside a group when something needs to measure the whole of it.
+	/// </summary>
+	/// <remarks>
+	/// The group exists for <c>csharp_place_*_attribute_on_same_line = if_owner_is_single_line</c> and
+	/// nothing else, so it is opened only when that value is actually configured. A group changes which
+	/// decision the plain lines inside it resolve against, and paying that for every member of every file
+	/// to serve one option is the wrong trade — it also means the default configuration emits byte-for-byte
+	/// the document it emitted before this family existed.
+	/// </remarks>
+	private static void PrintMember(MemberDeclarationSyntax member, PrintContext context)
+	{
+		if (!context.Options.MeasuresWholeMembers)
+		{
+			Node.Print(member, context);
+			return;
+		}
+
+		var group = context.Arena.NextGroupId();
+		context.MemberGroup = group;
+
+		using (context.Arena.Group(group))
+			Node.Print(member, context);
+	}
+
+	/// <summary>
+	/// Emits a member's attribute sections and whatever separates them from the member.
+	/// </summary>
+	/// <remarks>
+	/// The <c>csharp_place_*_attribute_on_same_line</c> family lives here rather than in each of the
+	/// fourteen printers that has attributes: the owning node says which of the four keys applies, so
+	/// wiring a new member kind into the family is a line in <see cref="PlacementFor"/> rather than a hunt.
+	/// </remarks>
 	private static void PrintAttributeLists(SyntaxList<AttributeListSyntax> attributeLists, PrintContext context)
 	{
-		foreach (var attributeList in attributeLists)
+		if (attributeLists.Count == 0)
+			return;
+
+		// Consumed once, by the member it was set for — see PrintContext.MemberGroup.
+		var memberGroup = context.MemberGroup;
+		context.MemberGroup = 0;
+
+		var placement = PlacementFor(attributeLists[0].Parent, context);
+		var arena = context.Arena;
+
+		for (var i = 0; i < attributeLists.Count; i++)
 		{
-			Node.Print(attributeList, context);
-			context.Arena.HardLine();
+			Node.Print(attributeLists[i], context);
+
+			// Between two sections, never a space: dotnet format *removes* it and writes `[A][B]`, which is
+			// one of the few layout questions it decides rather than declines — hence no option for it, and
+			// hence ten corpus files lost to putting a space here.
+			//
+			// Whether the sections share a line at all is the same question as whether the attribute joins
+			// the member, so it is aimed at the same group. Answering it separately collapsed a `[Theory]`
+			// with nine `[InlineData]`s onto one line, which dotnet format then took apart again — it only
+			// closes up a gap between sections already sharing a line, it never moves them onto one.
+			var last = i == attributeLists.Count - 1;
+
+			switch (placement)
+			{
+				// One decision for the whole unit. Between sections a bare aimed line, so they glue when the
+				// unit is flat; before the member a space as well, which the break trims back off when it
+				// fires — the same pairing the trailing-initializer brace uses. An aimed line is left out of
+				// break propagation, so none of this can force the group it is asking about to break.
+				case AttributePlacement.IfOwnerIsSingleLine when memberGroup != 0:
+					if (last)
+						arena.Synthetic(SyntheticText.Space);
+					arena.LineIfBroken(memberGroup);
+					break;
+
+				// OwnLine, and the fallback for a member with no group of its own — a local function nested in
+				// a method body, which has attributes but is not printed through PrintMember.
+				default:
+					arena.HardLine();
+					break;
+			}
 		}
 	}
+
+	/// <summary>Which of the four <c>place_*_attribute_on_same_line</c> keys governs this owner.</summary>
+	/// <remarks>
+	/// The groupings are Roslyn's and ReSharper's, not Kerf's: a local function answers to the method key
+	/// for the same reason it answers to <c>csharp_style_expression_bodied_local_functions</c>' sibling,
+	/// and an indexer to the property key because that is how dotnet format treats it everywhere else.
+	/// Anything unlisted keeps its own line — types and accessors are there deliberately, because dotnet
+	/// format moves those onto their own line and so no other answer could be a fixed point.
+	/// </remarks>
+	private static AttributePlacement PlacementFor(SyntaxNode? owner, PrintContext context) => owner switch
+	{
+		MethodDeclarationSyntax
+			or LocalFunctionStatementSyntax
+			or ConstructorDeclarationSyntax
+			or DestructorDeclarationSyntax
+			or OperatorDeclarationSyntax
+			or ConversionOperatorDeclarationSyntax => context.Options.PlaceMethodAttributeOnSameLine,
+		FieldDeclarationSyntax => context.Options.PlaceFieldAttributeOnSameLine,
+		PropertyDeclarationSyntax or IndexerDeclarationSyntax => context.Options.PlacePropertyAttributeOnSameLine,
+		EventFieldDeclarationSyntax or EventDeclarationSyntax => context.Options.PlaceEventAttributeOnSameLine,
+		_ => AttributePlacement.OwnLine,
+	};
 
 	/// <summary>
 	/// Emits whatever separates a construct's header from its opening brace.
@@ -894,16 +1006,75 @@ internal static partial class Printers
 	/// Emits a construct's braced body, keeping it on one line when the author wrote it on one.
 	/// </summary>
 	/// <remarks>
+	/// <para>
 	/// <c>csharp_preserve_single_line_blocks</c> beats <c>csharp_new_line_before_open_brace</c>: a
 	/// preserved body keeps its brace on the header line rather than taking one of its own. The
 	/// source span is a sufficient test on its own — a line comment inside the braces would end the
 	/// line, so a body that occupies one line cannot contain one.
+	/// </para>
+	/// <para>
+	/// <b>This one has no deterministic counterpart, and that is a conclusion rather than an omission.</b>
+	/// Both candidate answers are wrong. Always-expand — what deterministic mode does today — throws the
+	/// option's intent away. Flatten-if-it-fits, the accessor list's trick at
+	/// <c>Printers.Declarations.cs</c>, would collapse every short <c>if</c> body into a one-liner, an
+	/// opinion nobody asked for and one <c>dotnet format</c> never produces. Even restricting it to an
+	/// empty <c>{ }</c> fails: <c>dotnet format</c> keeps a collapsed empty pair but never *joins* an
+	/// expanded one, so that rule is preservation-flavoured too — tried, and it broke 20+ expectations
+	/// that assert exactly that.
+	/// </para>
+	/// <para>
+	/// The capability belongs to ReSharper's <c>place_simple_*_on_single_line</c> family, which asks about
+	/// width rather than about the author. Kerf implements two of them:
+	/// <c>place_simple_accessorholder_on_single_line</c> works in both modes, and
+	/// <c>place_simple_enum_on_single_line</c> is still guarded on this predicate and so is preservation-only.
+	/// Making the enum one deterministic would collapse every enum that fits, in both modes and by default —
+	/// a real ReSharper behaviour with its own churn, and so its own measurement, not a rider on this.
+	/// </para>
 	/// </remarks>
 	/// <summary>True when the author wrote this brace pair on a single line and asked to keep it.</summary>
 	internal static bool KeepsOneLine(SyntaxToken openBrace, SyntaxToken closeBrace, PrintContext context) =>
 		context.Options.PreserveSingleLineBlocks
 		&& openBrace.RawKind != 0
-		&& context.OnSameLine(openBrace.SpanStart, closeBrace.Span.End);
+		&& context.AuthorJoined(openBrace.SpanStart, closeBrace.Span.End);
+
+	/// <summary>The same question of a body, so every caller goes through one predicate.</summary>
+	/// <remarks>
+	/// <see cref="PrintBody"/> and <see cref="PrintStatementBody"/> used to spell this test out themselves,
+	/// which is the same condition written three times.
+	/// </remarks>
+	internal static bool KeepsOneLine(SyntaxNode body, PrintContext context) =>
+		body is BlockSyntax block
+			? KeepsOneLine(block.OpenBraceToken, block.CloseBraceToken, context)
+			: context.Options.PreserveSingleLineBlocks && context.AuthorJoined(body.SpanStart, body.Span.End);
+
+	/// <summary>
+	/// True when an empty brace pair should print as <c>{ }</c> rather than opened out.
+	/// </summary>
+	/// <remarks>
+	/// <para>
+	/// The one single-line body deterministic layout can decide for itself. An expanded empty pair carries
+	/// no information a collapsed one does not, so there is no question to answer differently on the next
+	/// run, and it is the difference between <c>add { }</c> and a two-line <c>add</c> in every repository
+	/// that names a width. Without it the mode's default output is visibly poor.
+	/// </para>
+	/// <para>
+	/// It collapses the pair and <b>never moves it</b> — where the brace goes stays
+	/// <c>csharp_new_line_before_open_brace</c>'s decision. That distinction is measured, not tidiness:
+	/// collapsing onto the header as well put <c>), IAppDataFileSystem { }</c> on one line and
+	/// <c>dotnet format</c> wrote <c>), IAppDataFileSystem</c> then <c>{ }</c>, costing three corpus files.
+	/// It keeps a collapsed pair; it does not accept a joined header.
+	/// </para>
+	/// <para>
+	/// Deterministic mode only, and still gated on <c>csharp_preserve_single_line_blocks</c>. Collapsing
+	/// unconditionally would *join* a pair the author expanded, which <c>dotnet format</c> never does —
+	/// 20-plus expectations assert exactly that.
+	/// </para>
+	/// </remarks>
+	internal static bool CollapsesEmptyBraces(SyntaxNode body, PrintContext context) =>
+		!context.Options.KeepExistingLinebreaks
+		&& context.Options.PreserveSingleLineBlocks
+		&& body is BlockSyntax { Statements.Count: 0 } block
+		&& !TokenPrinter.HasLeadingContent(block.CloseBraceToken);
 
 	/// <summary>
 	/// Emits a block body as an expression body, when the configuration asked and the block allows.
@@ -928,7 +1099,12 @@ internal static partial class Printers
 
 		// Asked of the source, which reflow cannot move. Asking whether the result fits would let one
 		// run's width decide the next run's tokens.
-		if (style == ExpressionBodyStyle.WhenOnSingleLine && !context.OnSameLine(body.SpanStart, body.Span.End))
+		//
+		// With csharp_keep_existing_linebreaks off there is no source layout to ask, and the answer
+		// becomes "decline" — when_on_single_line rewrites nothing in deterministic mode. It has to be
+		// that way round rather than "rewrite everything": run 1 would join a block that fits, run 2
+		// would then see a single-line block and turn it into an arrow. Reported; see KERF1004.
+		if (style == ExpressionBodyStyle.WhenOnSingleLine && !context.AuthorJoined(body.SpanStart, body.Span.End))
 			return false;
 
 		var statement = body.Statements[0];
@@ -1017,7 +1193,7 @@ internal static partial class Printers
 			return false;
 
 		if (style == ExpressionBodyStyle.WhenOnSingleLine
-			&& !context.OnSameLine(accessors.SpanStart, accessors.Span.End))
+			&& !context.AuthorJoined(accessors.SpanStart, accessors.Span.End))
 			return false;
 
 		// Either shape of getter: one already using an arrow, or a block simple enough to become one.
@@ -1154,7 +1330,7 @@ internal static partial class Printers
 		PrintContext context,
 		ushort ownerGroup = 0)
 	{
-		if (context.Options.PreserveSingleLineBlocks && context.OnSameLine(body.SpanStart, body.Span.End))
+		if (KeepsOneLine(body, context))
 		{
 			var arena = context.Arena;
 
@@ -1179,8 +1355,10 @@ internal static partial class Printers
 			return;
 		}
 
+		// The brace still goes wherever csharp_new_line_before_open_brace puts it; only the pair collapses.
 		BeforeOpenBrace(construct, context);
-		Node.Print(body, context);
+		using (context.Arena.ForceFlatIf(CollapsesEmptyBraces(body, context)))
+			Node.Print(body, context);
 	}
 
 	/// <summary>
@@ -1195,7 +1373,7 @@ internal static partial class Printers
 	/// </remarks>
 	internal static void PrintStatementBody(SyntaxNode body, BraceStyle construct, PrintContext context)
 	{
-		var flat = context.Options.PreserveSingleLineBlocks && context.OnSameLine(body.SpanStart, body.Span.End);
+		var flat = KeepsOneLine(body, context) || CollapsesEmptyBraces(body, context);
 
 		BeforeOpenBrace(construct, context);
 		using (context.Arena.ForceFlatIf(flat))
@@ -1211,7 +1389,7 @@ internal static partial class Printers
 	/// happens once the contents no longer fit. With the flag off the brace can never break away, so
 	/// the separator degrades to a plain space.
 	/// </remarks>
-	internal static void BeforeOpenBraceWhenBroken(BraceStyle construct, PrintContext context)
+	internal static void BeforeOpenBraceWhenBroken(BraceStyle construct, PrintContext context, DocFlags flags = DocFlags.None)
 	{
 		if (!context.Options.NewLineBeforeOpenBrace.HasFlag(construct))
 		{
@@ -1220,7 +1398,35 @@ internal static partial class Printers
 		}
 
 		using (context.Arena.IndentIf(context.Options.IndentBraces))
-			context.Arena.Line();
+			context.Arena.Line(flags);
+	}
+
+	/// <summary>
+	/// The <see cref="BeforeOpenBraceWhenBroken"/> variant aimed at the group of the construct the
+	/// brace hangs off, rather than at the brace's own.
+	/// </summary>
+	/// <remarks>
+	/// <para>
+	/// For <c>new C(a, b) { X = 1 }</c>. dotnet format moves that <c>{</c> onto its own line whenever the
+	/// creation opened out, whatever the initializer itself does — so the question is about the argument
+	/// list's break, and a <see cref="DocArena.Line"/> cannot ask it: a line resolves against the group
+	/// enclosing it, and the initializer's own group may well be flat inside a broken list.
+	/// </para>
+	/// <para>
+	/// Emitted *outside* the initializer's group for that reason, and paired with
+	/// <see cref="DocFlags.OnlyIfNotAtLineStart"/> on the in-group line so that the two cannot both fire
+	/// and produce a blank line. Nothing at all when the owner stayed flat, which is what
+	/// <see cref="DocArena.LineIfBroken"/> is for; an aimed line is excluded from break propagation, so
+	/// this cannot force the list it is asking about to break.
+	/// </para>
+	/// </remarks>
+	internal static void BeforeOpenBraceWhenOwnerBroke(BraceStyle construct, ushort ownerGroup, PrintContext context)
+	{
+		if (ownerGroup == 0 || !context.Options.NewLineBeforeOpenBrace.HasFlag(construct))
+			return;
+
+		using (context.Arena.IndentIf(context.Options.IndentBraces))
+			context.Arena.LineIfBroken(ownerGroup);
 	}
 
 	/// <summary>
@@ -1444,11 +1650,18 @@ internal static partial class Printers
 			// back off; on a line of its own it is already the right depth and must be left alone.
 			// An argument inline and the same argument on its own line differ for that reason alone,
 			// and dotnet format distinguishes them the same way.
+			//
+			// This is the one site where the deterministic answer is not the same shape as the
+			// preserving one. Whether the argument ends up inline is the enclosing list's group
+			// decision, so the rule wants aiming at that group rather than at the author — and under
+			// csharp_keep_existing_linebreaks = false it currently stands down instead, never
+			// compensating. That is stable and it is the conservative direction; whether it is also
+			// right is a corpus question, not one to guess at here.
 			var previousEnd = i == 0 ? anchorEnd : list[i - 1].Span.End;
 			var ownBlock = list[i] is ArgumentSyntax { Expression: var value }
 				&& EndsWithOwnBlock(value)
 				&& previousEnd >= 0
-				&& context.OnSameLine(previousEnd, list[i].SpanStart);
+				&& context.AuthorJoined(previousEnd, list[i].SpanStart);
 
 			using (arena.IndentIf(ownBlock, -1))
 				Node.Print(list[i], context);
@@ -1465,7 +1678,7 @@ internal static partial class Printers
 				continue;
 			}
 
-			if (context.OnSameLine(list[i].Span.End, list[i + 1].SpanStart))
+			if (context.AuthorJoined(list[i].Span.End, list[i + 1].SpanStart))
 				Spacing.AfterComma(context);
 			else
 				arena.HardLine();
@@ -1717,9 +1930,13 @@ internal static partial class Printers
 	/// too long, not to gather up one somebody deliberately opened out — collapsing a laid-out
 	/// argument list and then re-breaking it somewhere else is the single largest source of churn a
 	/// formatter can inflict on a repository it is being introduced to.
+	///
+	/// False throughout under <c>csharp_keep_existing_linebreaks = false</c>, which is most of what
+	/// deterministic mode means at the list printers: each of them already has a width-driven branch
+	/// for a construct the author left on one line, and this makes that the only branch.
 	/// </remarks>
 	internal static bool SpansLines(SyntaxNode node, PrintContext context) =>
-		!context.OnSameLine(node.SpanStart, node.Span.End);
+		context.AuthorBroke(node.SpanStart, node.Span.End);
 
 	/// <summary>
 	/// True when the block an expression finishes with is one that positions its own contents.

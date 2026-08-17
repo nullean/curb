@@ -41,7 +41,7 @@ internal static partial class Printers
 
 		// A statement that shared its header's line keeps sharing it, braces and all. This beats
 		// csharp_preserve_single_line_blocks: `if (a) { return; }` stays whole even with that off.
-		if (context.Options.PreserveSingleLineStatements && context.OnSameLine(headerEnd, statement.Span.End))
+		if (context.Options.PreserveSingleLineStatements && context.AuthorJoined(headerEnd, statement.Span.End))
 		{
 			arena.Synthetic(SyntheticText.Space);
 			using (arena.ForceFlat())
@@ -66,6 +66,7 @@ internal static partial class Printers
 	/// Whether this body should be given braces it was not written with.
 	/// </summary>
 	/// <remarks>
+	/// <para>
 	/// Never for a body that already has them, and never for the <c>if</c> of an <c>else if</c> —
 	/// Roslyn braces the chain's bodies, not the chain.
 	///
@@ -87,6 +88,13 @@ internal static partial class Printers
 	///
 	/// Either way it is a fact about the source and cannot change under reflow; asking whether the
 	/// printed body breaks would let one run's layout decide the next run's tokens.
+	/// </para>
+	/// <para>
+	/// Under deterministic layout there is no such fact, and <c>when_multiline</c> degrades to
+	/// <c>always</c> — every unbraced body gets braces. That is the conservative direction and, more to
+	/// the point, the stable one: leaving it reading the source would let run 1 join a body onto one line
+	/// and run 2 unbrace it. Reported rather than silent; see KERF1004.
+	/// </para>
 	/// </remarks>
 	private static bool WantsBraces(StatementSyntax statement, PrintContext context)
 	{
@@ -96,7 +104,7 @@ internal static partial class Printers
 		return context.Options.PreferBraces switch
 		{
 			BraceRequirement.Always => true,
-			BraceRequirement.WhenMultiline => !context.OnSameLine(statement.SpanStart, statement.Span.End),
+			BraceRequirement.WhenMultiline => !context.AuthorJoined(statement.SpanStart, statement.Span.End),
 			BraceRequirement.AsWritten => false,
 			_ => false,
 		};
@@ -341,7 +349,7 @@ internal static partial class Printers
 		// `try { Call(); } catch { }` written on one line stays on one line. A try whose blocks the
 		// author broke does not, even where a brace and the following `catch` share a line — what
 		// the option preserves is a single-line statement, not a single-line join.
-		if (context.Options.PreserveSingleLineStatements && context.OnSameLine(node.SpanStart, node.Span.End))
+		if (context.Options.PreserveSingleLineStatements && context.AuthorJoined(node.SpanStart, node.Span.End))
 		{
 			using (context.Arena.ForceFlat())
 				PrintTryStatement(node, context);
@@ -542,7 +550,7 @@ internal static partial class Printers
 				{
 					// `case 1: break;` — a statement on its label's line stays there.
 					if (context.Options.PreserveSingleLineStatements
-						&& context.OnSameLine(labelEnd, statement.Span.End))
+						&& context.AuthorJoined(labelEnd, statement.Span.End))
 					{
 						arena.Synthetic(SyntheticText.Space);
 						using (arena.ForceFlat())

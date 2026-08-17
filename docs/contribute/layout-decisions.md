@@ -11,10 +11,26 @@ cause combined, and about the architectural fork underneath it.
 Read this before adding any option that decides *where a line break goes*. Spacing options are not
 affected; this is only about rules that add, remove or move breaks.
 
+Kerf has **two layout modes**, and which one you are writing for changes what is admissible. **The mode
+is selected by `max_line_length`**: asking for reflow is asking Kerf to decide layout, so it is one
+opt-in rather than two.
+
+| | no `max_line_length` | a width (**the default with one**) | a width plus `csharp_keep_existing_linebreaks = true` |
+|---|---|---|---|
+| Where breaks come from | the author's, reproduced | width alone | the author's; width decides the rest |
+| The rule below | **binding** | does not apply — no such layout to read | **binding** |
+| Fixed point of `dotnet format` | 1196/1196 | **1196/1196** | 1195/1196 |
+| `format(format(x)) == format(x)` | by measurement | **by construction** | by measurement |
+| Corpus churn | 742 files, 17,035 changed lines | 892 files, ~47,000 | 742 files, 17,580 |
+
+Note which column is cleanest against `dotnet format`: the deterministic one, because it has no source
+arrangement to disagree about. The rule below is therefore about the *other two* columns — and it is
+still binding there, because those are what a repository with no width, or an explicit opt-out, gets.
+
 ## The rule
 
-> A layout rule may read the **tokens**, and it may read **layout the author owns**.
-> It may never read **layout Kerf itself decides**.
+> In preservation mode, a layout rule may read the **tokens**, and it may read **layout the author
+> owns**. It may never read **layout Kerf itself decides**.
 
 Everything below is that sentence, with evidence.
 
@@ -80,12 +96,16 @@ answer to its own question.
 Every one of these was implemented, measured on the 1,196-file corpus, and reverted. The numbers are
 kept so nobody re-derives them.
 
-| Rule | What it read | Result |
-|---|---|---|
-| `blank_lines_around_single_line_*` | is the member one line | 2 files never settle |
-| `place_*_attribute_on_same_line` | is the member one line | 68 never settle, 16 lose the fixed point |
-| initializer joining (`keep_existing_initializer_arrangement`) | does the initializer fit | 5–7 files never settle, 1182–1191/1196 conformance, across four attempts |
-| `chop_always` for arguments / chains / initializers | the enclosing construct's layout | reverted, same class |
+| Rule | What it read | Result | In deterministic mode |
+|---|---|---|---|
+| `blank_lines_around_single_line_*` | is the member one line | 2 files never settle | still blocked — see below |
+| `place_*_attribute_on_same_line` | is the member one line | 68 never settle, 16 lose the fixed point | **shipped**, 0 / 100% |
+| initializer joining (`keep_existing_initializer_arrangement`) | does the initializer fit | 5–7 files never settle, 1182–1191/1196 conformance, across four attempts | **implicit** — no key needed |
+| `chop_always` for arguments / initializers | the enclosing construct's layout | 140 files never settle | **shipped**, 0 / 100% |
+| `chop_always` for chains | the enclosing construct's layout | 156 files never settle | not attempted |
+
+The right-hand column is the point of the whole note. Nothing in the middle column was a bad idea; each
+was a rule asking a question the mode it was written for could not answer.
 
 The attribute family is the one worth studying, because the cheap measurements cleared it:
 
@@ -203,6 +223,11 @@ changes line counts.
 | 3 | corpus, reflow **off** | the attribute family, at baseline conformance |
 | 4 | corpus, reflow **on** | — killed the attribute family |
 | 5 | second format pass over the corpus | — killed the blank-line family |
+| 6 | corpus in **both** modes | — caught the attribute-section space, at 10 files, and `= true`, at 347 |
+
+Rung 6 is not optional now that there are two modes. Both of the things it caught were invisible in the
+other one: `[A] [B]` looked right until `dotnet format` glued it, and unconditional joining looked right
+until it was asked of a member that spans lines.
 
 Two traps in running these, both hit for real:
 
@@ -212,45 +237,142 @@ Two traps in running these, both hit for real:
   nearly discarded because 41 failures were compared against an assumed baseline of 1; the measured
   baseline was 43.
 
-## The other mode, and why it is not the default
+## Deterministic layout, which a width selects
 
-The whole class dissolves if layout is a pure function of tokens and width:
+Layout becomes a pure function of tokens and width:
 
 ```
 layout = f(tokens, width)
 ```
 
 Tokens are invariant under formatting, so `f(f(x)) == f(x)` holds by construction. There is no layout
-question to answer differently, because none is asked. Every rule in the case-file table becomes
-implementable. It would likely also be *faster*: `OnSameLine` / `SpansLines` hit
-`Text.Lines.GetLineFromPosition` on the hot path, and that mode deletes those calls.
+question to answer differently, because none is asked.
 
-It even has a key already, so Kerf would still invent nothing:
-**`csharp_keep_existing_linebreaks = false`** (with `csharp_keep_user_linebreaks` alongside it).
+**It cannot be reached without a width, and that is the design.** With `max_line_length = off` the
+printer treats the width as infinite and every unbroken group prints flat, so deterministic layout with
+no width would join every construct that fits — the largest diff Kerf can produce rather than the
+smallest. That used to be papered over with an implied 160, a magic number nobody typed. Gating the mode
+on the width instead makes the bad configuration unreachable: `csharp_keep_existing_linebreaks = false`
+with no width is refused outright (**KERF1007**) rather than given a width to reflow against.
 
-Ordering alone is *not* enough, and this is worth understanding before anyone tries the halfway
-house. "Normalise first, then decide" fixes the author-input half and leaves the width feedback: pass
-B joins an attribute onto a member's line, which makes the line longer, which changes what pass A
-wraps on the next run. The loop is smaller, not gone. The property has to be *not read*, not *read
-later*.
+### Why the width, and not everywhere
 
-**Decision: not the default, and not now.**
+The measurement that decided it. By **files** deterministic layout looks like a 20% step from
+preservation (742 → 892 of 1,196). By **changed lines** it is 2.7× — 17,035 → ~47,000 — because with no
+width Kerf never touches a line's *length*, so its diff is confined to blank lines and spacing, while a
+width rewraps the shape of every construct.
 
-Onboarding with zero or near-zero churn is the product promise — for repositories with an existing
-`.editorconfig` and for those without. A formatter that rewrites every file the moment it is
-installed does not get installed twice. Current default churn is **742 of 1,196** corpus files;
-preservation is what bought that (the plan records the earlier figure at 897 files / −4,562 lines
-before preservation work). A deterministic mode is the largest diff available and its churn is
-unmeasured.
+A repository that never named a width has not asked for that, and a key spelled *keep existing
+linebreaks* is not where anyone would look for the reason it happened. File count would have hidden the
+whole difference; it is the wrong metric for this decision and it is worth remembering which metric
+answered it.
 
-It is worth revisiting as an **opt-in mode** once the default story is settled. When someone does:
-measure its churn and publish it before it ships, and expect the dead rules above to come back to
-life inside it.
+One correction while measuring this, which matters for anyone quoting the README: **the zero-churn claim
+was already false.** Kerf rewrites 742 corpus files with reflow off, almost all of it collapsing runs of
+blank lines to one — `csharp_keep_blank_lines_in_*`, which are ReSharper keys rather than IDE0055 ones,
+so free ground Kerf chose to occupy. The baseline was never zero.
+
+### What it is measured at
+
+All of it gated in CI, `./build.sh conformance` and `./build.sh churn`:
+
+| | no width | width 160 (default) | width 120 | width 160, `--preserve` |
+|---|---|---|---|---|
+| Fixed point of `dotnet format` | 1196/1196 | **1196/1196** | 1195/1196 | 1195/1196 |
+| Files that never settle | 0 | **0** | 0 | 0 |
+| Churn | 742 files, 17,035 lines | 892 files, ~47,000 | 920 files | 742 files, 17,580 |
+
+Deterministic layout is the **better** fixed point of `dotnet format`, not a worse one. The two columns
+that lose a file lose the *same* file — a property-pattern brace `dotnet format` moves to its own line,
+recorded as held rather than chased.
+
+### What it unlocks
+
+Three of the five entries in the case-file table, plus two keys the binder used to refuse:
+
+- `csharp_place_method_attribute_on_same_line` — and field, property, event —
+  `= if_owner_is_single_line`. The family that cost 68 files and 16 fixed points. It works now because
+  the attribute and the member are inside **one group**, so "does this fit on a line" is asked once with
+  the join already counted. Ordering alone would not have done it: the width feedback is the second half
+  of the loop, and putting the two in one measurement is what closes it.
+- `csharp_wrap_arguments_style` and `csharp_wrap_object_and_collection_initializer_style` =
+  `chop_always`. 140 files never settled in preservation mode. Zero here.
+- Initializer joining, with no key at all. In this mode there is no existing arrangement to keep.
+
+### What it does not unlock
+
+- **`csharp_place_*_attribute_on_same_line = true`.** Expressible, idempotent, and still refused —
+  KERF1006. `dotnet format` *moves* an attribute back off a member that spans lines, so joining
+  unconditionally came back changed on **347 of 1,196** files (849/1,196 conformance). Its own rule turns
+  out to be `if_owner_is_single_line`. This is the cleanest measured example of the *decides the other
+  way* case: no amount of care inside Kerf can fix a value the reference implementation overrules.
+- **`align_multiline_*`.** Its failure is unrelated and determinism does not touch it — see
+  [Alignment](#alignment-is-a-different-failure-do-not-confuse-them). Do not expect it here.
+- **A type's or an accessor's attribute placement.** Same reason as always: `dotnet format` decides
+  those the other way, in either mode.
+- **`csharp_wrap_chained_method_calls`.** 156 files in preservation mode and unmeasured here. Likely
+  fine; say so with a number before shipping it.
+- **`blank_lines_around_single_line_*`**, and the reason is worth knowing because it is not the usual
+  one. The rule is admissible — "is this member one line" is a fair question here — but it cannot be
+  *asked*, because the blank lines are emitted **before** the member, and a group's mode is only known
+  once the printing walk reaches it. `LineIfBroken` and friends read `_groupModes`, which is filled
+  forward; aiming at a group that comes later reads an unset slot. What it needs is a flat-width
+  estimate taken from the tokens before printing — still `f(tokens, width)`, so still admissible, but
+  new machinery rather than a new key. That is the whole of what is missing.
+
+### Known gap
+
+`if_owner_is_single_line` does not join an attribute above a member carrying a **doc comment**. The
+comment is leading trivia on the attribute's first token, so its hard lines are inside the member group
+and mark it broken. The behaviour is conservative and stable — the join is skipped, never wrongly
+applied — but it means the option does nothing for most public API. Closing it means excluding leading
+trivia from the group, which is a change to the trivia path rather than to this family. Measured, not
+chased.
+
+### The two IDE0055 keys this costs
+
+`csharp_preserve_single_line_blocks` and `csharp_preserve_single_line_statements` are the one place the
+default flip costs a capability rather than churn, and the attempt to give them deterministic meanings
+failed for a reason worth recording — see `Printers.KeepsOneLine`. Both candidate answers are wrong:
+always-expand throws the option's intent away, and flatten-if-it-fits would collapse every short `if`
+body into a one-liner, which `dotnet format` never produces. Even the narrow empty-`{ }` case fails,
+because `dotnet format` keeps a *collapsed* empty pair but never joins an expanded one — so that rule is
+preservation-flavoured too, and trying it broke 20-plus expectations asserting exactly that.
+
+What did land is the deterministic slice of it: with a width, an empty brace pair prints `{ }` rather
+than opening out. It **collapses the pair and never moves it** — putting it on the header line as well
+wrote `), IAppDataFileSystem { }` where `dotnet format` wanted the brace on its own line, and cost three
+corpus files. Where a brace goes stays `csharp_new_line_before_open_brace`'s decision.
+
+So both keys are reported (**KERF1004**) with what they actually do rather than a blanket "no effect" —
+and note `preserve_single_line_blocks` is only *partly* inert, because the accessor-list printer reads it
+as a plain option. The capability properly belongs to ReSharper's `place_simple_*_on_single_line` family,
+of which `place_simple_accessorholder_on_single_line` already works in both modes and
+`place_simple_enum_on_single_line` is still preservation-gated. Making the enum one deterministic would
+collapse every enum that fits, by default, in both modes — a real ReSharper behaviour with its own churn,
+so its own measurement rather than a rider on this.
+
+### Onboarding
+
+Adoption with a width set is one large commit: `kerf check` reports most files on the first run and the
+MSBuild task rewrites on the first compile. A repository that wants to adopt gradually can start with no
+`max_line_length` — Kerf is then a `dotnet format whitespace` equivalent — and add a width when it is
+ready for the reflow commit.
+
+The promise deterministic layout *can* keep is **zero churn for a repository already formatted by a
+deterministic formatter whose keys Kerf honours**: Rider with `csharp_keep_existing_linebreaks = false`,
+or CSharpier at a matching width. That is why the ReSharper key surface is worth implementing.
 
 ## Checklist for a new layout rule
 
-1. Does it read any source layout? If no, it is safe — go.
-2. If yes: can Kerf's own output change that property? If yes, **stop** — aim it at a group instead.
-3. Classify against `dotnet format`: declines to decide, or decides the other way?
-4. Corpus with reflow **on**, formatted twice. Both numbers, against a **measured** baseline.
-5. If it fails, revert and record the numbers here rather than the intent.
+1. **Which mode is it for?** If deterministic only, the binder should say so — KERF1005 — rather than
+   letting it half-work in the other one.
+2. Does it read any source layout? If no, it is safe — go.
+3. If yes: can Kerf's own output change that property? If yes, **stop** — aim it at a group instead. If
+   the question spans two constructs (an attribute and its member), put both in **one** group rather than
+   asking twice; asking twice is what collapsed a `[Theory]` and nine `[InlineData]`s onto one line.
+4. Classify against `dotnet format`: declines to decide, or decides the other way? Measure it — the
+   attribute family passed a hand-written probe and failed at 347 files.
+5. Corpus with reflow **on**, formatted twice, in **both** modes. Every number, against a **measured**
+   baseline. `./build.sh conformance` and `./build.sh churn` both take `--deterministic`.
+6. If it fails, revert and record the numbers here rather than the intent.

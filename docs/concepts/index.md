@@ -52,7 +52,8 @@ stream it parsed, on every file, and refuses to write a file that fails. See
 The 39 formatting options of code style rule
 [IDE0055](https://learn.microsoft.com/dotnet/fundamentals/code-analysis/style-rules/ide0055) are all
 layout rules, and {{product}} implements all of them. So is reflow, which is the one thing IDE0055 has
-no opinion about and no .NET tool does.
+no opinion about and no .NET tool does — and which also decides who picks the line breaks. See
+[Reflow](reflow.md).
 
 ### Syntax style
 

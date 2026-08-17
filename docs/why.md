@@ -27,13 +27,19 @@ rewrites **996 of the 1,196 files**.
 Not because those files were wrong. Because the tool disagrees with the `.editorconfig` the team had
 already settled on.
 
-{{product}}'s number on that same repository is **zero**, unless you ask for reflow.
+{{product}}'s number on that same repository is **669 files** — and every one of them is whitespace
+*within* a line, because without a width {{product}} never changes how long a line is. Most of it is one
+choice: collapsing runs of blank lines to one, which `csharp_keep_blank_lines_in_code` turns off.
+
+Ask for reflow and it is 892 files, because that is what wrapping to a width means. What you do not lose
+by asking is agreement with `dotnet format` — see below.
 
 ## What Kerf does
 
 Reflow to a line width, the way Prettier does — while honouring the complete .NET formatting option
 surface. Defaults are Roslyn's defaults, so {{product}} agrees with your IDE out of the box instead of
-fighting it. `max_line_length` is the single opt-in on top.
+fighting it. `max_line_length` is the single opt-in on top, and it decides both the width and who picks the line
+breaks — see [Reflow](concepts/reflow.md).
 
 | | `dotnet format whitespace` | `dotnet format style` | **{{product}}** |
 |---|---|---|---|
@@ -53,8 +59,11 @@ measurement, gated in CI on every push against that 1,196-file corpus:
 
 - With reflow off, {{product}}'s output is **byte-identical to `dotnet format whitespace`** — 100%,
   enforced as a build gate.
-- With reflow on, **99.9%**. One file falls short: a property pattern that reflow breaks, and whose
-  brace `dotnet format` then moves. It is measured and held rather than quietly rounded up.
+- With reflow on, also **100%** — deterministic layout has no arrangement inherited from the source for
+  `dotnet format` to disagree with, so it is the cleaner of the two.
+- With reflow on *and* `csharp_keep_existing_linebreaks = true`, **99.9%**. One file falls short: a
+  property pattern that reflow breaks, and whose brace `dotnet format` then moves. Measured and held
+  rather than quietly rounded up.
 - **Zero** failed or unparsable files across the corpus, also gated.
 
 The framing matters: what is measured is that {{product}}'s output is a *fixed point* of `dotnet format`

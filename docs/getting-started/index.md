@@ -31,8 +31,7 @@ use. On a repository that is already IDE0055-clean, `kerf format` should change 
 
 ## Turn on reflow
 
-Reflow is the one thing {{product}} does that no other .NET formatter does, and it is opt-in — because
-turning it on is the only way {{product}} will disagree with `dotnet format`.
+Reflow is the one thing {{product}} does that no other .NET formatter does, and it is opt-in.
 
 ```ini
 [*.cs]
@@ -41,6 +40,24 @@ max_line_length = 120
 
 Omit the key, or set it to `off`, and {{product}} will never wrap a line for you.
 
+This key does two things, and the second one surprises people: it sets the width, and it hands
+{{product}} the line breaks. With a width, where a line breaks is decided from your tokens and that
+width — not from where the previous author pressed return. That is what makes formatting idempotent by
+construction, and it is what unlocks the ReSharper wrapping keys.
+
+It also means the first run on an existing repository is a large commit: on a 1,196-file corpus, 892
+files against 669 with no width — and about three times the changed lines, since only this mode rewraps
+anything. If you want reflow without that, keep your own arrangement:
+
+```ini
+[*.cs]
+max_line_length = 120
+csharp_keep_existing_linebreaks = true
+```
+
+`kerf print-config Foo.cs` says which mode you are in and what selected it. [Reflow](../concepts/reflow.md)
+has the full picture, including which keys need a width.
+
 ## Configure it
 
 There is no second config file to learn. {{product}} reads your `.editorconfig`:
@@ -48,7 +65,7 @@ There is no second config file to learn. {{product}} reads your `.editorconfig`:
 ```ini
 [*.cs]
 indent_style = tab
-max_line_length = 120                      # omit, or set `off`, to disable reflow entirely
+max_line_length = 120                      # omit, or set `off`, for no reflow and preserved line breaks
 csharp_new_line_before_open_brace = all
 csharp_space_after_cast = false
 csharp_preserve_single_line_blocks = true

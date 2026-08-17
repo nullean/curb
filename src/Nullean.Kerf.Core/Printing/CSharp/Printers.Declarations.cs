@@ -99,7 +99,17 @@ internal static partial class Printers
 		// The test is where the value *starts*, not whether it spans lines. Reflow may have broken
 		// after the `=` itself on an earlier run, and asking "does this span lines" would then read
 		// Kerf's own output back as intent and hug it — formatting twice would not settle.
-		if (BringsOwnBlock(node.Value) || context.OnSameLine(node.EqualsToken.Span.End, node.Value.SpanStart))
+		// The third case is deterministic mode's, and it is the same reasoning one step further out: the
+		// hanging indent exists so that a value with nowhere to break has somewhere to go. A call or a
+		// member chain has its own break opportunities and positions its own continuations, so breaking
+		// after the `=` as well buys a wasted line and — worse — makes the value fit, which is how
+		// `var ok = a && b && c;` stopped chopping when csharp_wrap_chained_binary_expressions asked it to.
+		//
+		// Only when there is no author to ask. In preservation mode a value the author put below the `=`
+		// has to stay there, and this would join it.
+		if (BringsOwnBlock(node.Value)
+			|| context.AuthorJoined(node.EqualsToken.Span.End, node.Value.SpanStart)
+			|| (!context.Options.KeepExistingLinebreaks && BreaksWithoutHelp(node.Value)))
 		{
 			arena.Synthetic(SyntheticText.Space);
 			Node.Print(node.Value, context);
@@ -113,6 +123,23 @@ internal static partial class Printers
 			Node.Print(node.Value, context);
 		}
 	}
+
+	/// <summary>
+	/// True for a value that carries break opportunities of its own, so it needs no hanging indent.
+	/// </summary>
+	/// <remarks>
+	/// Weaker than <see cref="BringsOwnBlock"/>: these do not position their *contents* at a level of their
+	/// own, they merely have somewhere to break. That is enough to make the break after the <c>=</c>
+	/// redundant, and consulted in deterministic mode only — see the call site for why.
+	/// </remarks>
+	private static bool BreaksWithoutHelp(ExpressionSyntax? value) =>
+		value is InvocationExpressionSyntax
+			or MemberAccessExpressionSyntax
+			or ElementAccessExpressionSyntax
+			or ConditionalAccessExpressionSyntax
+			or BinaryExpressionSyntax
+			or ObjectCreationExpressionSyntax
+			or ImplicitObjectCreationExpressionSyntax;
 
 	/// <summary>True for values whose own layout supplies the indentation of their contents.</summary>
 	internal static bool BringsOwnBlock(ExpressionSyntax? value) =>
@@ -217,7 +244,7 @@ internal static partial class Printers
 					// author wrote together together: `{ get; set; }` becomes three lines, not four.
 					if (i == 0)
 						Edge();
-					else if (expand && context.OnSameLine(previousEnd, accessor.SpanStart))
+					else if (expand && context.AuthorJoined(previousEnd, accessor.SpanStart))
 						arena.Synthetic(SyntheticText.Space);
 					else
 						arena.Line();

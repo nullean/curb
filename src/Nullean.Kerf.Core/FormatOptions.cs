@@ -80,6 +80,34 @@ public enum Charset : byte
 	Utf8Bom = 2,
 }
 
+/// <summary>Where a member's attribute section goes, for the <c>csharp_place_*_attribute_on_same_line</c> family.</summary>
+public enum AttributePlacement
+{
+	/// <summary>Its own line, always. The default, and what <c>dotnet format</c> leaves alone.</summary>
+	OwnLine,
+
+	// ReSharper's `true` — the member's line unconditionally — is deliberately absent, and this is the
+	// clearest measured case of the "decides the other way" classification in docs/contribute/layout-decisions.md.
+	// Joining every attribute is idempotent in Kerf and still inadmissible: dotnet format *moves* an
+	// attribute back off a member that spans lines, so 347 of 1,196 corpus files came back changed by the
+	// next Format Document. Its real rule turns out to be IfOwnerIsSingleLine, which is why that value is
+	// clean at 100% where this one sits at 849/1,196. The binder refuses `true` and says so.
+
+	/// <summary>
+	/// The member's line when the member itself comes out on one line.
+	/// </summary>
+	/// <remarks>
+	/// ReSharper's <c>if_owner_is_single_line</c>, and the reason this family took three attempts. Asked
+	/// of the source it is the textbook non-idempotent rule: run 1 sees a member spanning two lines and
+	/// leaves the attribute above it, reflow then joins the member, and run 2 answers the same question
+	/// differently — 68 corpus files never settled and 16 lost their fixed point. Asked of the group that
+	/// encloses the attribute *and* the member, it is one question answered once, and the width feedback
+	/// that made it circular is inside the measurement rather than spread across two runs. Needs
+	/// <see cref="FormatOptions.KeepExistingLinebreaks"/> off for that reason.
+	/// </remarks>
+	IfOwnerIsSingleLine,
+}
+
 /// <summary>Line ending to emit.</summary>
 public enum EndOfLine : byte
 {
@@ -100,6 +128,11 @@ public enum EndOfLine : byte
 /// formatter that rewrites every file the moment it is installed does not get installed twice.
 /// </para>
 /// <para>
+/// <see cref="MaxLineLength"/> carries a second job: it selects the layout mode. See
+/// <see cref="KeepExistingLinebreaks"/>. Asking for a width is asking Kerf to decide layout, so it is the
+/// same opt-in rather than a second one.
+/// </para>
+/// <para>
 /// Storage becomes generated bit-packed fields when the option catalog lands and this grows to the
 /// full 39-key surface; the shape is a struct now so that change stays behind these accessors.
 /// </para>
@@ -108,6 +141,11 @@ public readonly record struct FormatOptions
 {
 	/// <summary>Value of <see cref="MaxLineLength"/> meaning "never reflow".</summary>
 	public const int Off = int.MaxValue;
+
+	// There is no implied width. Deterministic layout used to supply 160 when the configuration named
+	// none, which was the weakest part of that design — a magic number nobody typed, reflowing a
+	// repository that never asked. Gating the mode on the width instead makes it unreachable: no width
+	// means preservation, so there is nothing left to imply.
 
 	public FormatOptions() { }
 
@@ -316,6 +354,47 @@ public readonly record struct FormatOptions
 	/// therefore kept by this option even with the block option off.
 	/// </remarks>
 	public bool PreserveSingleLineStatements { get; init; } = true;
+
+	/// <summary>
+	/// <c>csharp_keep_existing_linebreaks</c> exactly as written, or null when it was not mentioned.
+	/// </summary>
+	/// <remarks>
+	/// Kept separately from <see cref="KeepExistingLinebreaks"/> so the resolved value can depend on
+	/// <see cref="MaxLineLength"/> while an explicit setting still overrides it in both directions.
+	/// </remarks>
+	public bool? KeepExistingLinebreaksOption { get; init; }
+
+	/// <summary>
+	/// Whether the author's own line breaks are an input to layout. Resolved from
+	/// <c>csharp_keep_existing_linebreaks</c>, and from <c>max_line_length</c> when that is absent.
+	/// </summary>
+	/// <remarks>
+	/// <para>
+	/// True is preservation: a construct the author opened out stays opened out at their breaks, and only
+	/// one they left on a single line is handed to width. False is deterministic layout, where
+	/// <c>layout = f(tokens, width)</c>. Tokens are invariant under formatting, so
+	/// <c>format(format(x)) == format(x)</c> holds by construction rather than by measurement, and the
+	/// whole class of bug documented in <c>docs/layout-decisions.md</c> — a rule whose answer its own
+	/// output changes — cannot be written, because there is no layout to ask about. Deterministic mode is
+	/// also the better fixed point of <c>dotnet format</c>: 100% of the corpus against preservation's
+	/// 99.92% with reflow on.
+	/// </para>
+	/// <para>
+	/// <b>The default is the width.</b> <c>max_line_length</c> already means "Kerf may decide layout", so
+	/// asking for reflow is asking for deterministic reflow — one switch rather than two, and no third
+	/// blended behaviour in between. No width and Kerf is an IDE0055 whitespace formatter that never
+	/// touches a line's length; a width and Kerf owns the layout. Measured on the 1,196-file corpus, that
+	/// is the difference between a 17,035-line diff and a 46,907-line one, which is why it must not happen
+	/// to a repository that never named a width — the 894-versus-742 file count hides a 2.7× cost.
+	/// </para>
+	/// <para>
+	/// This is the one option that changes what every other layout rule is allowed to read, which is why
+	/// it is a mode rather than a preference. It makes <see cref="PreserveSingleLineStatements"/> inert and
+	/// <see cref="PreserveSingleLineBlocks"/> partly so; both are reported rather than silently dropped,
+	/// and <c>Printers.KeepsOneLine</c> records why neither has a deterministic counterpart.
+	/// </para>
+	/// </remarks>
+	public bool KeepExistingLinebreaks => KeepExistingLinebreaksOption ?? (MaxLineLength == Off);
 
 	/// <summary>
 	/// Whether and how <c>using</c> directives are reordered.
@@ -638,8 +717,62 @@ public readonly record struct FormatOptions
 	/// </remarks>
 	public WrapStyle? WrapParametersStyle { get; init; }
 
-	// wrap_arguments_style, the two initializer styles and wrap_chained_method_calls are deliberately
-	// absent. See EditorConfigOptionsBinder for the measurement that rules them out.
+	/// <summary>
+	/// <c>csharp_wrap_arguments_style</c>: the same for an argument list.
+	/// </summary>
+	/// <remarks>
+	/// <para>
+	/// Honoured only under <see cref="KeepExistingLinebreaks"/> <c>= false</c>, and the asymmetry with
+	/// the parameter key is measured rather than chosen. Forcing every argument list to break moves
+	/// constructs whose indentation other rules read from the source, and the file then formats
+	/// differently on its second pass — 140 corpus files for arguments against none for parameters.
+	/// Deterministic layout has no such rules, so the key becomes admissible there and nowhere else.
+	/// </para>
+	/// <para>
+	/// Set in preservation mode it is reported, not silently dropped.
+	/// </para>
+	/// </remarks>
+	public WrapStyle? WrapArgumentsStyle { get; init; }
+
+	/// <summary>
+	/// <c>csharp_wrap_object_and_collection_initializer_style</c>: one element per line whether or not
+	/// the initializer fits.
+	/// </summary>
+	/// <remarks>
+	/// Deterministic mode only, for the same measured reason as <see cref="WrapArgumentsStyle"/>. The
+	/// count-based half of this family — <see cref="MaxInitializerElementsOnLine"/> — is admissible in
+	/// both modes, because a count is not a layout question.
+	/// </remarks>
+	public WrapStyle? WrapObjectAndCollectionInitializerStyle { get; init; }
+
+	// wrap_chained_method_calls stays absent: 156 corpus files stopped settling in preservation mode,
+	// and unlike the two above it has not been measured under deterministic layout.
+
+	/// <summary>
+	/// <c>csharp_place_method_attribute_on_same_line</c>. Covers constructors, operators, destructors and
+	/// local functions too, the same grouping <c>csharp_style_expression_bodied_methods</c> uses.
+	/// </summary>
+	/// <remarks>
+	/// Deterministic mode only — see <see cref="AttributePlacement.IfOwnerIsSingleLine"/> for why, and
+	/// note that <c>same_line</c> is held to the same rule as the conditional value: it changes what the
+	/// enclosing group is measuring, so it is not admissible while other rules read the source.
+	/// </remarks>
+	public AttributePlacement PlaceMethodAttributeOnSameLine { get; init; }
+
+	/// <summary><c>csharp_place_field_attribute_on_same_line</c>.</summary>
+	public AttributePlacement PlaceFieldAttributeOnSameLine { get; init; }
+
+	/// <summary><c>csharp_place_property_attribute_on_same_line</c>. Indexers answer to it too.</summary>
+	public AttributePlacement PlacePropertyAttributeOnSameLine { get; init; }
+
+	/// <summary><c>csharp_place_event_attribute_on_same_line</c>.</summary>
+	public AttributePlacement PlaceEventAttributeOnSameLine { get; init; }
+
+	// place_type_attribute_on_same_line and place_accessorholder_attribute_on_same_line are absent for a
+	// reason no mode changes: dotnet format *moves* a type's attribute and an accessor's onto their own
+	// line, so neither `same_line` nor the conditional value could ever be a fixed point. This is the
+	// "decides the other way" half of the classification in docs/layout-decisions.md, not the
+	// "declines to decide" half the four keys above sit in.
 
 	/// <summary>
 	/// <c>csharp_wrap_before_first_method_call</c>: when a chain breaks at its dots, break before the
@@ -886,6 +1019,20 @@ public readonly record struct FormatOptions
 	// key does not draw that distinction, so honouring it either way would mean changing behaviour
 	// that is already right in one of the two cases. Left alone rather than half-mapped.
 
+	/// <summary>
+	/// True when some option needs a whole member measured as one unit, so the printer has to group it.
+	/// </summary>
+	/// <remarks>
+	/// Only <see cref="AttributePlacement.IfOwnerIsSingleLine"/> does. Gating on it keeps the group — and
+	/// the change in what the lines inside a member resolve against — off every file that has not asked
+	/// for the family, the same way <see cref="RewritesTrailingCommas"/> gates its own cost.
+	/// </remarks>
+	public bool MeasuresWholeMembers =>
+		PlaceMethodAttributeOnSameLine == AttributePlacement.IfOwnerIsSingleLine
+		|| PlaceFieldAttributeOnSameLine == AttributePlacement.IfOwnerIsSingleLine
+		|| PlacePropertyAttributeOnSameLine == AttributePlacement.IfOwnerIsSingleLine
+		|| PlaceEventAttributeOnSameLine == AttributePlacement.IfOwnerIsSingleLine;
+
 	/// <summary>True when either trailing-comma option asked for anything.</summary>
 	/// <remarks>
 	/// Gates both the printer work and the verifier's allowance for a comma that appears or vanishes,
@@ -905,6 +1052,11 @@ public readonly record struct FormatOptions
 	public bool Excluded { get; init; }
 
 	/// <summary>True when reflow is disabled, which lets the printer skip fit measurement entirely.</summary>
+	/// <remarks>
+	/// Also implies preservation, because <see cref="KeepExistingLinebreaks"/> resolves from the same width.
+	/// The two can only disagree if the configuration asked for deterministic layout with no width, which
+	/// the binder refuses — see KERF1007.
+	/// </remarks>
 	public bool ReflowDisabled => MaxLineLength == Off;
 
 	/// <summary>Resolves <see cref="EndOfLine.Auto"/> by sniffing the source.</summary>

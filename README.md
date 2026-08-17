@@ -18,9 +18,32 @@ Existing tools each solve one half of the problem:
   layout decision is fixed by the tool.
 
 So a team that has settled its house style in `.editorconfig` cannot adopt a reflowing formatter without
-abandoning that style. Measured on [elastic/docs-builder](https://github.com/elastic/docs-builder) — 1,196 files,
-193k LOC, a repo that is already 100% IDE0055-clean — a Prettier-style formatter rewrites **996 of 1,196 files**.
-Kerf's goal on that same repo is **zero**, unless you ask for reflow.
+abandoning that style. Kerf's answer is that **`max_line_length` is the whole decision**:
+
+- **No `max_line_length`.** Kerf is an IDE0055 whitespace formatter. It never changes a line's length, and its
+  output is byte-identical to `dotnet format whitespace` on every file of the corpus below.
+- **`max_line_length` set.** You have asked Kerf to decide layout, so it decides all of it: line breaks are a
+  function of your tokens and your width, not of where the previous author happened to press return. Formatting
+  is idempotent by construction, and the ReSharper wrap keys become available to tune the result.
+
+One switch, two coherent behaviours. `csharp_keep_existing_linebreaks = true` alongside a width is the opt-out
+if you want reflow but want your own arrangement kept.
+
+### What it costs, measured
+
+On [elastic/docs-builder](https://github.com/elastic/docs-builder) — 1,196 files, 193k LOC, already 100%
+IDE0055-clean — against a Prettier-style formatter's **996 of 1,196 files** rewritten:
+
+| Kerf on that repo | Files | Changed lines | Fixed point of `dotnet format` |
+|---|---|---|---|
+| no width | 742 | 17,035 | 1196/1196 |
+| `max_line_length = 160` (what the repo sets) | 892 | ~47,000 | 1196/1196 |
+| `= 160` plus the preservation opt-out | 742 | 17,580 | 1195/1196 |
+
+Two things worth being straight about. The no-width number is **not zero** — it is 742 files, and almost all of
+it is Kerf collapsing runs of blank lines to one. And file count flatters the width column: it is +20% by files
+but roughly 2.7× by changed lines, because only that column rewraps anything. Both numbers are reproduced by
+`./build.sh churn`, and neither is a projection.
 
 | | `dotnet format whitespace` | `dotnet format style` | **Kerf** |
 |---|---|---|---|
@@ -55,11 +78,15 @@ Configuration is your `.editorconfig` — there is no second config file to lear
 ```ini
 [*.cs]
 indent_style = tab
-max_line_length = 120                      # omit, or set `off`, to disable reflow entirely
+max_line_length = 120                      # omit, or set `off`, for no reflow and preserved line breaks
+csharp_keep_existing_linebreaks = true     # reflow, but keep the breaks you wrote
 csharp_new_line_before_open_brace = all
 csharp_space_after_cast = false
 csharp_preserve_single_line_blocks = true
 ```
+
+`kerf print-config Foo.cs` prints every resolved option, and says which layout mode you are in and what
+selected it — worth running first on a repository you are about to reformat.
 
 Unrecognised or not-yet-implemented keys are reported rather than silently ignored.
 

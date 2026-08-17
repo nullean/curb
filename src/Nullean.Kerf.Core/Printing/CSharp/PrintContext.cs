@@ -62,6 +62,52 @@ internal sealed class PrintContext(DocArena arena, SourceText text, FormatOption
 	/// </remarks>
 	public ushort ParameterListGroup { get; set; }
 
+	/// <summary>
+	/// The group id of the argument list most recently finished, or 0 if it had none.
+	/// </summary>
+	/// <remarks>
+	/// <para>
+	/// The same trick as <see cref="ParameterListGroup"/>, for the object creation that has to decide
+	/// where its trailing initializer's brace goes: <c>dotnet format</c> puts that brace on its own line
+	/// whenever the creation opened out, and "did the creation open out" is a decision taken on this run.
+	/// </para>
+	/// <para>
+	/// Written as the last act of printing a list, which is what makes it the *outermost* list's id.
+	/// Argument lists nest, so an inner list writes its own id first and the enclosing one overwrites
+	/// it on the way out — which is the id the creation printer is asking about.
+	/// </para>
+	/// </remarks>
+	public ushort ArgumentListGroup { get; set; }
+
+	/// <summary>
+	/// The group of the most recently printed construct that brings its own braces, or 0.
+	/// </summary>
+	/// <remarks>
+	/// For the shape an argument list declines to lay out: <c>new HttpClient(new SocketsHttpHandler
+	/// { … })</c> gets no list group at all, because the sole argument positions its own contents. The
+	/// creation's trailing initializer still has to know whether any of that opened out, so what it aims
+	/// at is the argument's own group instead of the list's.
+	/// </remarks>
+	public ushort OwnBlockGroup { get; set; }
+
+	/// <summary>
+	/// The group enclosing the type member about to be printed, attribute sections included, or 0.
+	/// </summary>
+	/// <remarks>
+	/// <para>
+	/// What <c>csharp_place_*_attribute_on_same_line = if_owner_is_single_line</c> aims at. The attribute
+	/// has to be inside the same measurement as the member, or the question is circular: joining the
+	/// attribute lengthens the line, which changes whether the member fits, which decides whether to join
+	/// the attribute. One group makes that a single decision instead of an argument between two runs.
+	/// </para>
+	/// <para>
+	/// Cleared by the first reader, which is what keeps it to the member it was set for. A local function
+	/// nested in a method body has attributes of its own and no group of its own, and would otherwise aim
+	/// at whatever member it happened to be inside.
+	/// </para>
+	/// </remarks>
+	public ushort MemberGroup { get; set; }
+
 	/// <summary>Source spans a rewrite legitimately dropped, or null when nothing was dropped.</summary>
 	/// <remarks>
 	/// Expression bodies are the only thing that drops source today: a block's braces and its
@@ -145,9 +191,42 @@ internal sealed class PrintContext(DocArena arena, SourceText text, FormatOption
 	public double Coverage =>
 		PrintedTokens + VerbatimTokens == 0 ? 1 : (double)PrintedTokens / (PrintedTokens + VerbatimTokens);
 
-	/// <summary>True when the two positions sit on the same source line.</summary>
-	public bool OnSameLine(int start, int end) =>
+	/// <summary>
+	/// True when the two positions sit on the same source line, whatever the configuration says.
+	/// </summary>
+	/// <remarks>
+	/// Private, which is the point. A printer deciding <em>where a line break goes</em> has to go through
+	/// <see cref="AuthorBroke"/> or <see cref="AuthorJoined"/>, both of which answer "no evidence" under
+	/// <c>csharp_keep_existing_linebreaks = false</c> so that the call site falls through to width. Leaving
+	/// this reachable made that a review rule; hiding it makes it a compile error. Anything genuinely
+	/// needing the raw answer — how far apart two comments are — reads <c>Text.Lines</c> itself, as
+	/// <c>TokenPrinter</c> does.
+	/// </remarks>
+	private bool OnSameLine(int start, int end) =>
 		Text.Lines.GetLineFromPosition(start).LineNumber == Text.Lines.GetLineFromPosition(end).LineNumber;
+
+	/// <summary>The author put a break between these positions, and Kerf honours it.</summary>
+	/// <remarks>
+	/// <para>
+	/// One of the two doors onto the author's layout, and the reason they exist is
+	/// <c>docs/layout-decisions.md</c>: a break rule may read layout the author owns and never layout
+	/// Kerf decides. Routing every such question through a named predicate is what makes the rule
+	/// checkable — <c>OnSameLine</c> appearing in a break decision is now visible in review.
+	/// </para>
+	/// <para>
+	/// False whenever <c>csharp_keep_existing_linebreaks</c> is off, so each call site falls through to
+	/// the width-driven branch it already has. Which of the two predicates a site wants is decided by
+	/// what it does with the answer, not by how the condition reads: a site that stays flat when the
+	/// answer is true wants <see cref="AuthorJoined"/>.
+	/// </para>
+	/// </remarks>
+	public bool AuthorBroke(int start, int end) =>
+		Options.KeepExistingLinebreaks && !OnSameLine(start, end);
+
+	/// <summary>The author kept these positions on one line, and Kerf honours it.</summary>
+	/// <remarks>The other door; see <see cref="AuthorBroke"/>. Also false in deterministic mode.</remarks>
+	public bool AuthorJoined(int start, int end) =>
+		Options.KeepExistingLinebreaks && OnSameLine(start, end);
 
 	/// <summary>Blank lines between two positions, capped at one — runs of blank lines collapse.</summary>
 	public int BlankLinesBetween(int endOfPrevious, int startOfNext)

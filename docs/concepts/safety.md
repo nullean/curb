@@ -80,7 +80,8 @@ These are enforced on every push, against a 1,196-file, 6.5 MB corpus:
 
 - Zero failed files and zero unparsable files.
 - Two format passes produce identical output.
-- Byte-identical to `dotnet format whitespace` with reflow off; 99.9% with reflow on.
+- Byte-identical to `dotnet format whitespace` with reflow off, and with reflow on; 99.9% with reflow on
+  and `csharp_keep_existing_linebreaks = true`.
 - A native-AOT publish on all five supported platforms, each smoke-tested before packing.
 - An allocation-ratio ceiling, measured on the AOT binary rather than the JIT build.
 

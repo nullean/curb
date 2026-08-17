@@ -137,13 +137,51 @@ jobs:
       - name: Conformance with dotnet format
         run: ./build.sh conformance -s true --corpus /tmp/corpus --minimum 100
 
-      # The same property with the corpus's own widths, so reflow is part of the measurement rather
-      # than excluded from it. One file short of clean: a property pattern that reflow breaks, whose
-      # brace dotnet format then moves to its own line. Fixing it by keying on the source misses that
-      # case entirely, and restructuring the clause to key on the printed layout cost two files
-      # elsewhere — so it is measured and held rather than chased.
-      - name: Conformance with reflow on
-        run: ./build.sh conformance -s true --corpus /tmp/corpus --reflow --minimum 99.9
+      # The corpus sets max_line_length = 160, so --reflow is the *default* path for it: a width selects
+      # deterministic layout as well as the column. Held at 100 rather than the 99.9 this gate used to
+      # sit at, and that is the change rather than an oversight — deterministic layout has no source
+      # arrangement for dotnet format to disagree with, so it is strictly cleaner than the preserving
+      # reflow it replaced. If this ever drops, the default is not shippable however good its churn looks.
+      - name: Conformance with a width (deterministic, the default)
+        run: ./build.sh conformance -s true --corpus /tmp/corpus --reflow --minimum 100
+
+      # At 120, one file differs: a property pattern whose brace dotnet format moves to its own line.
+      # The same file the preserving gate below loses, so this is parity with a known held defect rather
+      # than a new one — fixing it by keying on the source misses the case entirely, and restructuring
+      # the clause to key on the printed layout cost two files elsewhere.
+      - name: Conformance with a width of 120 columns
+        run: ./build.sh conformance -s true --corpus /tmp/corpus --width 120 --minimum 99.9
+
+      # The opt-out, which has to stay measurable now that a width no longer selects it. 99.92% — the
+      # number the default used to be held to, on the same one file.
+      - name: Conformance with the preservation opt-out
+        run: ./build.sh conformance -s true --corpus /tmp/corpus --reflow --preserve --minimum 99.9
+
+      # Idempotency is what the default now buys by construction rather than by measurement: layout is a
+      # function of tokens and width, and tokens do not move. A failure here means something in the
+      # printer is reading its own output back as intent.
+      - name: Verify formatting with a width is idempotent
+        run: |
+          cp -R /tmp/corpus /tmp/det1
+          dotnet run --project src/Nullean.Kerf.Cli -c Release -- format /tmp/det1 >/dev/null
+          cp -R /tmp/det1 /tmp/det2
+          dotnet run --project src/Nullean.Kerf.Cli -c Release -- format /tmp/det1 >/dev/null
+          diff -rq /tmp/det2 /tmp/det1 \
+            || (echo "::error::formatting is not idempotent with a width set" && exit 1)
+
+      # Reported, not gated. Churn is the cost of adopting Kerf on a repository that already has a layout,
+      # and it used to live in a docs paragraph as "742 of 1,196" with no way to re-derive it — while being
+      # the stated reason for the largest design decision in the printer.
+      #
+      # Three configurations, because the pair is what makes either number mean anything, and because file
+      # count alone is misleading here: the default and the opt-out differ by 150 files but by 2.7x in
+      # changed lines. The no-width run is the "zero churn on an IDE0055-clean repository" claim, which the
+      # README makes and which is worth keeping honest — it is 742 files of blank-line collapsing today.
+      - name: Churn, all three configurations
+        run: |
+          ./build.sh churn -s true --corpus /tmp/corpus
+          ./build.sh churn -s true --corpus /tmp/corpus --reflow
+          ./build.sh churn -s true --corpus /tmp/corpus --reflow --preserve
 
       # Publishes native AOT and measures that, not the JIT build. On a run this short JIT
       # compilation dominates, so `dotnet run` reports several times the real cost and reads as a

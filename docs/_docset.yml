@@ -16,6 +16,7 @@ toc:
   - folder: concepts
     children:
       - file: index.md
+      - file: reflow.md
       - file: safety.md
   - folder: workflow
     children:

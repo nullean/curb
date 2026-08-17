@@ -91,12 +91,46 @@ folder with no restore and no build.
   `format(format(x)) == format(x)`, and the `#if` symbol-set loop passes.
 - The conformance gate: with `max_line_length = off`, Kerf output must be **byte-identical to
   `dotnet format whitespace`**. That number is the product claim; keep it at 100%.
+- `./build.sh churn --corpus <path>` reports the other half: how many of a repository's files adoption
+  rewrites. Not a gate, but it must be published for any change that moves it.
+
+## The two layout modes
+
+**`max_line_length` selects the layout mode**, and the mode changes what an option is allowed to do. This
+is not a preference among others.
+
+- **No width — preservation.** A construct the author opened out stays opened out at their breaks; only one
+  they left on a single line is handed to width. Kerf never changes a line's length; output is byte-identical
+  to `dotnet format whitespace`. 742/1,196 corpus files of churn, almost all blank-line collapsing.
+- **A width — deterministic.** `layout = f(tokens, width)`, so idempotency holds by construction rather than
+  by measurement, and it is the *better* fixed point of `dotnet format` (1196/1196 against preservation's
+  1195/1196 with reflow). 892 files of churn but ~2.7× the changed lines, which is the number that decided
+  the gating — file count hides it almost entirely.
+- **`csharp_keep_existing_linebreaks`** overrides the resolution in either direction. `= false` with no width
+  is refused (KERF1007): with an infinite width every group that fits would be joined.
+
+Practical consequences when adding an option:
+
+- Two named predicates carry every break decision that reads the author's layout: `PrintContext.AuthorBroke`
+  and `AuthorJoined`. Both answer false in deterministic mode, so each call site falls through to the
+  width-driven branch it already has. **A bare `OnSameLine` in a break decision is a review failure** —
+  it is for questions that are not break decisions.
+- An option may be admissible in one mode only. Say so through a diagnostic — `KERF1004` for a key
+  deterministic layout makes inert, `KERF1005` for one only it can honour, `KERF1006` for a value
+  `dotnet format` would undo, `KERF1007` for deterministic layout without a width — rather than letting it
+  half-work. Say what it degrades *to*, and per construct rather than per key: "no effect" was wrong for
+  `preserve_single_line_blocks`, which accessor lists still honour.
+- The mode resolves from `MaxLineLength`, so `csharp_keep_existing_linebreaks` must be bound immediately
+  after `max_line_length` in `EditorConfigOptionsBinder`. The diagnostic helpers read the resolved mode
+  mid-binding; either order but that one makes them see the wrong thing.
+- Measure both modes. `conformance` and `churn` take `--reflow`, `--preserve` and `--width`; with the
+  corpus's own width, `--reflow` *is* the default path and `--preserve` is the opt-out.
 
 **Before adding any option that moves a line break, read
-[docs/contribute/layout-decisions.md](docs/contribute/layout-decisions.md).** A layout rule may read the tokens and it may
-read layout the author owns; it may never read layout Kerf itself decides. That one mistake has
-killed more features than every other cause combined, and the note carries the measurements so they
-are not re-derived.
+[docs/contribute/layout-decisions.md](docs/contribute/layout-decisions.md).** In preservation mode a layout rule may read the
+tokens and layout the author owns, and never layout Kerf itself decides. That one mistake has killed more
+features than every other cause combined; the note carries the measurements so they are not re-derived,
+and records which of them deterministic mode has since brought back.
 
 ## Style
 

@@ -64,35 +64,91 @@ let private docs (arguments:ParseResults<Arguments>) =
     else
         Documentation.serve (arguments.TryGetResult Port |> Option.defaultValue 8080)
 
+let private corpusFrom (arguments:ParseResults<Arguments>) (target:string) =
+    match arguments.TryGetResult Corpus with
+    | Some path ->
+        let corpus = DirectoryInfo path
+        if not corpus.Exists then failwithf "corpus not found: %s" corpus.FullName
+        corpus
+    | None -> failwithf "%s needs --corpus <path> pointing at a C# checkout" target
+
+let rec private copyTree (source: string) (target: string) =
+    Directory.CreateDirectory target |> ignore
+    for file in Directory.GetFiles source do
+        File.Copy(file, Path.Combine(target, Path.GetFileName file), true)
+    for dir in Directory.GetDirectories source do
+        let name = Path.GetFileName dir
+        if name <> ".git" && name <> "bin" && name <> "obj" then
+            copyTree dir (Path.Combine(target, name))
+
+/// Rewrites every `.editorconfig` under a working tree to the configuration being measured.
+///
+/// Shared by conformance and churn so the two cannot drift into measuring different configurations,
+/// which would make their numbers incomparable — and comparing them is the whole point of having
+/// both. Every switch here is additive on top of whatever the corpus already says.
+let private configureCorpus (arguments:ParseResults<Arguments>) (work:string) =
+    let deterministic = arguments.Contains Deterministic
+    let preserve = arguments.Contains Preserve
+    let trailingCommas = arguments.Contains TrailingCommas
+    // Both mode switches imply keeping the corpus's own widths, because with the width off there is no
+    // mode to choose: no width means preservation whatever either key says, so forcing it off would make
+    // --deterministic a no-op the binder rejects and --preserve a no-op that changes nothing.
+    let keepWidths = arguments.Contains Reflow || deterministic || preserve
+    let width = arguments.TryGetResult Width
+
+    for config in Directory.GetFiles(work, ".editorconfig", SearchOption.AllDirectories) do
+        let text = File.ReadAllText config
+        // A config with no max_line_length already gets the default, which is off.
+        let widths =
+            match width, keepWidths with
+            | Some columns, _ ->
+                Text.RegularExpressions.Regex.Replace(
+                    text, @"max_line_length\s*=\s*\S+", sprintf "max_line_length = %d" columns)
+            | None, true -> text
+            | None, false ->
+                Text.RegularExpressions.Regex.Replace(text, @"max_line_length\s*=\s*\S+", "max_line_length = off")
+
+        // Appended in its own section so it wins over anything the corpus set, whatever order the
+        // corpus's own sections are in.
+        let appended = Text.StringBuilder(widths)
+        if trailingCommas || deterministic || preserve || (width.IsSome && not (widths.Contains "max_line_length")) then
+            appended.Append("\n[*.cs]\n") |> ignore
+        if trailingCommas then appended.Append("csharp_trailing_comma_in_multiline_lists = true\n") |> ignore
+        if deterministic then appended.Append("csharp_keep_existing_linebreaks = false\n") |> ignore
+        if preserve then appended.Append("csharp_keep_existing_linebreaks = true\n") |> ignore
+        match width with
+        | Some columns when not (widths.Contains "max_line_length") ->
+            appended.Append(sprintf "max_line_length = %d\n" columns) |> ignore
+        | _ -> ()
+
+        File.WriteAllText(config, appended.ToString())
+
+/// A one-line description of the configuration measured, for the report line.
+let private modeLabel (arguments:ParseResults<Arguments>) =
+    [ if arguments.Contains Deterministic then "deterministic"
+      if arguments.Contains Preserve then "preserving"
+      if arguments.Contains TrailingCommas then "trailing commas"
+      if arguments.Contains Reflow && not (arguments.Contains Deterministic) then "reflow"
+      match arguments.TryGetResult Width with
+      | Some columns -> sprintf "width %d" columns
+      | None -> () ]
+    |> function
+       | [] -> ""
+       | parts -> sprintf " (%s)" (String.Join(", ", parts))
+
 /// Measures how far Kerf's output is from dotnet format's, which is the product claim made
 /// checkable. Reflow is forced off so that every difference is an option disagreement rather than a
 /// deliberate wrap: with max_line_length off, Kerf should be a fixed point of dotnet format.
 let private conformance (arguments:ParseResults<Arguments>) =
-    let corpus =
-        match arguments.TryGetResult Corpus with
-        | Some path -> DirectoryInfo(path)
-        | None -> failwith "conformance needs --corpus <path> pointing at a C# checkout"
-    if not corpus.Exists then failwithf "corpus not found: %s" corpus.FullName
+    let corpus = corpusFrom arguments "conformance"
 
     let root = Path.Combine(Paths.Output.FullName, "conformance")
     if Directory.Exists root then Directory.Delete(root, true)
     let work = Path.Combine(root, "kerf")
     let reference = Path.Combine(root, "reference")
 
-    let rec copyTree (source: string) (target: string) =
-        Directory.CreateDirectory target |> ignore
-        for file in Directory.GetFiles source do
-            File.Copy(file, Path.Combine(target, Path.GetFileName file), true)
-        for dir in Directory.GetDirectories source do
-            let name = Path.GetFileName dir
-            if name <> ".git" && name <> "bin" && name <> "obj" then
-                copyTree dir (Path.Combine(target, name))
-
     printfn "copying corpus from %s" corpus.FullName
     copyTree corpus.FullName work
-
-    let trailingCommas = arguments.Contains TrailingCommas
-    let keepWidths = arguments.Contains Reflow
 
     // What this measures is dotnet_format(kerf(x)) = kerf(x) — that Kerf's output is a *fixed point*
     // of dotnet format, not that the two agree on the same input. That is the stronger property and
@@ -104,19 +160,13 @@ let private conformance (arguments:ParseResults<Arguments>) =
     // fixed point. So --opinionated is gated by this same number: it may change many files, it may
     // not change this.
     //
+    // It is also why deterministic layout is measurable at all. --deterministic changes which breaks
+    // Kerf picks, not whether dotnet format tolerates them, so this number has to hold in both modes
+    // — and if it does not, deterministic mode is inadmissible however good its churn looks.
+    //
     // Reflow is forced off by default so a difference is an option disagreement rather than a wrap
     // Kerf chose; --reflow keeps the corpus's own widths, which is the configuration people run.
-    for config in Directory.GetFiles(work, ".editorconfig", SearchOption.AllDirectories) do
-        let text = File.ReadAllText config
-        // A config with no max_line_length already gets the default, which is off.
-        let widths =
-            if keepWidths then text
-            else Text.RegularExpressions.Regex.Replace(text, @"max_line_length\s*=\s*\S+", "max_line_length = off")
-        let rewritten =
-            if trailingCommas then
-                widths + "\n[*.cs]\ncsharp_trailing_comma_in_multiline_lists = true\n"
-            else widths
-        File.WriteAllText(config, rewritten)
+    configureCorpus arguments work
 
     exec "dotnet" ["run"; "--project"; "src/Nullean.Kerf.Cli"; "-c"; "Release"; "--"; "format"; work] |> ignore
     copyTree work reference
@@ -133,13 +183,7 @@ let private conformance (arguments:ParseResults<Arguments>) =
     let agreeing = total - differing.Length
     let percentage = 100.0 * float agreeing / float total
     printfn ""
-    let mode =
-        match arguments.Contains TrailingCommas, arguments.Contains Reflow with
-        | false, false -> ""
-        | true, false -> " (trailing commas)"
-        | false, true -> " (reflow)"
-        | true, true -> " (trailing commas, reflow)"
-    printfn "conformance with dotnet format%s: %d/%d files (%.2f%%)" mode agreeing total percentage
+    printfn "conformance with dotnet format%s: %d/%d files (%.2f%%)" (modeLabel arguments) agreeing total percentage
     if differing.Length > 0 then
         printfn ""
         printfn "first differing files:"
@@ -152,6 +196,73 @@ let private conformance (arguments:ParseResults<Arguments>) =
     match arguments.TryGetResult Minimum with
     | Some floor when percentage < floor ->
         failwithf "conformance %.2f%% is below the required %.2f%%" percentage floor
+    | _ -> ()
+
+/// Measures what adopting Kerf costs a repository: how many of its files the first run rewrites.
+///
+/// The other side of conformance, and a different question. Conformance asks whether Kerf's output
+/// survives dotnet format — a property about the output alone. Churn asks how far that output is from
+/// what the repository already has, which is the number that decides whether anybody installs it. A
+/// formatter can be a perfect fixed point of dotnet format and still rewrite every file it touches.
+///
+/// It exists because that number was folklore. It lived in a docs paragraph as "742 of 1,196" with no
+/// way to re-derive it, at the same time as being the stated reason for the largest design decision in
+/// the printer. A number that governs a decision that size has to be reproducible on demand.
+///
+/// Unlike conformance this compares against the *pristine* corpus, which is read and never written.
+/// Copying a reference into the tree about to be formatted is the trap the layout notes record: both
+/// sides get normalised and the diff comes out empty by construction.
+let private churn (arguments:ParseResults<Arguments>) =
+    let corpus = corpusFrom arguments "churn"
+
+    let root = Path.Combine(Paths.Output.FullName, "churn")
+    if Directory.Exists root then Directory.Delete(root, true)
+    let work = Path.Combine(root, "kerf")
+
+    printfn "copying corpus from %s" corpus.FullName
+    copyTree corpus.FullName work
+    configureCorpus arguments work
+
+    let sourceFiles = Directory.GetFiles(work, "*.cs", SearchOption.AllDirectories)
+    let before =
+        sourceFiles
+        |> Array.map (fun file -> file, File.ReadAllText file)
+        |> Map.ofArray
+
+    exec "dotnet" ["run"; "--project"; "src/Nullean.Kerf.Cli"; "-c"; "Release"; "--"; "format"; work] |> ignore
+
+    let lineCount (text:string) = text.Split('\n').Length
+    let changed =
+        sourceFiles
+        |> Array.choose (fun file ->
+            let original = before.[file]
+            let formatted = File.ReadAllText file
+            if original = formatted then None
+            else Some (file, lineCount formatted - lineCount original))
+
+    let total = sourceFiles.Length
+    let percentage = 100.0 * float changed.Length / float total
+    let lineDelta = changed |> Array.sumBy snd
+
+    printfn ""
+    printfn "churn%s: %d/%d files rewritten (%.2f%%), %+d lines"
+        (modeLabel arguments) changed.Length total percentage lineDelta
+    if changed.Length > 0 then
+        printfn ""
+        printfn "largest line deltas:"
+        changed
+        |> Array.sortByDescending (fun (_, delta) -> abs delta)
+        |> Array.truncate 10
+        |> Array.iter (fun (file, delta) -> printfn "  %+5d  %s" delta (Path.GetRelativePath(work, file)))
+        printfn ""
+        printfn "compare with: diff -ru %s %s" corpus.FullName work
+
+    // A ceiling rather than a floor, which is the one difference from conformance: churn going *up*
+    // is the regression. Reported unless a ceiling is asked for, because there is no agreed number to
+    // hold deterministic mode to yet — publishing it is the point of this target's first few runs.
+    match arguments.TryGetResult Maximum with
+    | Some ceiling when percentage > ceiling ->
+        failwithf "churn %.2f%% is above the permitted %.2f%%" percentage ceiling
     | _ -> ()
 
 /// Times the shipped binary over a corpus.
@@ -470,6 +581,7 @@ let Setup (parsed:ParseResults<Arguments>) (subCommand:Arguments) =
     cmd Test.Name (Some [Build.Name]) None <| fun _ -> test parsed
     cmd Benchmark.Name (Some [Build.Name]) None <| fun _ -> benchmark parsed
     cmd Conformance.Name (Some [Build.Name]) None <| fun _ -> conformance parsed
+    cmd Churn.Name (Some [Build.Name]) None <| fun _ -> churn parsed
     cmd Perf.Name (Some [Build.Name]) None <| fun _ -> perf parsed
     cmd MsbuildSmoketest.Name (Some [Build.Name]) None <| fun _ -> msbuildSmoketest parsed
 

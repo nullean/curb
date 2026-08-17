@@ -25,6 +25,8 @@ public static class OptionValues
 		"indent_style" => options.UseTabs ? "tab" : "space",
 		"indent_size" => options.IndentSize.ToString(CultureInfo.InvariantCulture),
 		"tab_width" => options.TabWidth.ToString(CultureInfo.InvariantCulture),
+		// This key selects the layout mode as well as the width, so it says which one. Somebody looking at
+		// 894 changed files needs to see the mode they are in and what put them there.
 		"max_line_length" => options.ReflowDisabled
 			? "off"
 			: options.MaxLineLength.ToString(CultureInfo.InvariantCulture),
@@ -69,6 +71,29 @@ public static class OptionValues
 		"csharp_place_simple_enum_on_single_line" => Bool(options.PlaceSimpleEnumOnSingleLine),
 		"csharp_place_simple_accessorholder_on_single_line" => Bool(options.PlaceSimpleAccessorholderOnSingleLine),
 		"csharp_wrap_parameters_style" => Wrap(options.WrapParametersStyle),
+		"csharp_wrap_arguments_style" => options.KeepExistingLinebreaks
+			? "chop_if_long   # chop_always needs a max_line_length"
+			: Wrap(options.WrapArgumentsStyle),
+		"csharp_wrap_object_and_collection_initializer_style" => options.KeepExistingLinebreaks
+			? "chop_if_long   # chop_always needs a max_line_length"
+			: Wrap(options.WrapObjectAndCollectionInitializerStyle),
+		"csharp_place_method_attribute_on_same_line" =>
+			Placement(options.PlaceMethodAttributeOnSameLine, options.KeepExistingLinebreaks),
+		"csharp_place_field_attribute_on_same_line" =>
+			Placement(options.PlaceFieldAttributeOnSameLine, options.KeepExistingLinebreaks),
+		"csharp_place_property_attribute_on_same_line" =>
+			Placement(options.PlacePropertyAttributeOnSameLine, options.KeepExistingLinebreaks),
+		"csharp_place_event_attribute_on_same_line" =>
+			Placement(options.PlaceEventAttributeOnSameLine, options.KeepExistingLinebreaks),
+		// The one key whose value is usually nobody's explicit choice, so it says where it came from.
+		// Somebody staring at a large diff needs to see the mode and what selected it.
+		"csharp_keep_existing_linebreaks" => (options.KeepExistingLinebreaks, options.KeepExistingLinebreaksOption) switch
+		{
+			(true, null) => "true    # from max_line_length being off",
+			(true, _) => "true    # reflow on, but your own line breaks win",
+			(false, null) => "false   # from max_line_length being set",
+			(false, _) => "false",
+		},
 		"csharp_keep_blank_lines_in_declarations" => Lines(options.KeepBlankLinesInDeclarations),
 		"csharp_keep_blank_lines_in_code" => Lines(options.KeepBlankLinesInCode),
 		"csharp_blank_lines_around_invocable" => Lines(options.BlankLinesAroundInvocable),
@@ -181,6 +206,14 @@ public static class OptionValues
 
 	private static string Lines(int value) => value.ToString(CultureInfo.InvariantCulture);
 
+
+	private static string Placement(AttributePlacement value, bool keepsLinebreaks) => value switch
+	{
+		AttributePlacement.IfOwnerIsSingleLine => "if_owner_is_single_line",
+		AttributePlacement.OwnLine when keepsLinebreaks => "false   # if_owner_is_single_line needs a max_line_length",
+		AttributePlacement.OwnLine => "false",
+		_ => "false",
+	};
 
 	private static string Wrap(WrapStyle? value) => value switch
 	{
