@@ -640,6 +640,53 @@ public readonly record struct FormatOptions
 	/// </summary>
 	public bool WrapBeforeBinaryOpsign { get; init; } = true;
 
+	// ---- blank lines ------------------------------------------------------------------------------
+	//
+	// ReSharper's family, and free ground in a way almost nothing else is: `dotnet format` adds no
+	// blank line, removes none and collapses none, measured in both directions. So whatever Kerf does
+	// here it may keep doing, and every one of these is a fixed point whatever it is set to.
+	//
+	// The defaults reproduce what Kerf did before they existed, so nobody's repository moves.
+
+	/// <summary>
+	/// <c>csharp_keep_blank_lines_in_declarations</c>: how many consecutive blank lines survive
+	/// between members. One by default, which is the collapsing Kerf has always done.
+	/// </summary>
+	public int KeepBlankLinesInDeclarations { get; init; } = 1;
+
+	/// <summary><c>csharp_keep_blank_lines_in_code</c>, the same between statements.</summary>
+	public int KeepBlankLinesInCode { get; init; } = 1;
+
+	/// <summary>
+	/// <c>csharp_blank_lines_around_invocable</c>: how many blank lines a method or constructor is
+	/// given, whether or not the author left any. Zero asks for none, which leaves the author's.
+	/// </summary>
+	public int BlankLinesAroundInvocable { get; init; }
+
+	/// <summary><c>csharp_blank_lines_around_type</c>, the same for a type declaration.</summary>
+	public int BlankLinesAroundType { get; init; }
+
+	/// <summary><c>csharp_blank_lines_around_property</c>, the same for a property, indexer or event.</summary>
+	public int BlankLinesAroundProperty { get; init; }
+
+	/// <summary><c>csharp_blank_lines_around_field</c>, the same for a field.</summary>
+	public int BlankLinesAroundField { get; init; }
+
+	/// <summary><c>csharp_blank_lines_after_using_list</c>: below the last using directive.</summary>
+	public int BlankLinesAfterUsingList { get; init; }
+
+	/// <summary>
+	/// <c>csharp_blank_lines_after_file_scoped_namespace_directive</c>. One by default, because that
+	/// is what <c>dotnet format</c> writes there and Kerf follows it.
+	/// </summary>
+	public int BlankLinesAfterFileScopedNamespace { get; init; } = 1;
+
+	// csharp_remove_blank_lines_near_braces_in_declarations and _in_code are deliberately absent.
+	// Kerf already drops a bare blank line above a closing brace, and keeps the one above a *comment*
+	// that sits there, because that blank belongs to the comment rather than to the brace. ReSharper's
+	// key does not draw that distinction, so honouring it either way would mean changing behaviour
+	// that is already right in one of the two cases. Left alone rather than half-mapped.
+
 	/// <summary>True when either trailing-comma option asked for anything.</summary>
 	/// <remarks>
 	/// Gates both the printer work and the verifier's allowance for a comma that appears or vanishes,

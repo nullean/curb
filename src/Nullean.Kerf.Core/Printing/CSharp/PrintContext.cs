@@ -156,6 +156,35 @@ internal sealed class PrintContext(DocArena arena, SourceText text, FormatOption
 			return 0;
 		var previousLine = Text.Lines.GetLineFromPosition(endOfPrevious).LineNumber;
 		var nextLine = Text.Lines.GetLineFromPosition(startOfNext).LineNumber;
-		return nextLine - previousLine > 1 ? 1 : 0;
+		return Math.Max(0, nextLine - previousLine - 1);
+	}
+
+	/// <summary>
+	/// How many blank lines to emit between two members, given what the author left and what the
+	/// configuration asks for.
+	/// </summary>
+	/// <remarks>
+	/// The author's count, raised to <paramref name="minimum"/> and capped at
+	/// <c>csharp_keep_blank_lines_in_declarations</c>. Both default to leaving Kerf where it was: a
+	/// minimum of none and a cap of one, which is the collapsing it has always done.
+	/// </remarks>
+	public int DeclarationSeparation(int endOfPrevious, int startOfNext, int minimum = 0)
+	{
+		var written = BlankLinesBetween(endOfPrevious, startOfNext);
+		return Math.Min(Math.Max(written, minimum), Options.KeepBlankLinesInDeclarations);
+	}
+
+	/// <summary>The same between statements, capped by <c>csharp_keep_blank_lines_in_code</c>.</summary>
+	public int CodeSeparation(int endOfPrevious, int startOfNext)
+	{
+		var written = BlankLinesBetween(endOfPrevious, startOfNext);
+		return Math.Min(written, Options.KeepBlankLinesInCode);
+	}
+
+	/// <summary>Emits <paramref name="count"/> blank lines.</summary>
+	public void BlankLines(int count)
+	{
+		for (var i = 0; i < count; i++)
+			Arena.HardLine();
 	}
 }

@@ -208,11 +208,14 @@ internal static partial class Printers
 		// the author. Every file in the corpus already had one, so nothing there disagreed; the first
 		// real project to consume the MSBuild package had a file that did not, and IDE0055 survived
 		// the build — which is precisely the thing that integration exists to make impossible.
+		//
+		// How many is csharp_blank_lines_after_file_scoped_namespace_directive's business now, and it
+		// defaults to the one dotnet format writes.
 		if (node.Usings.Count > 0 || node.Members.Count > 0)
 		{
 			var arena = context.Arena;
 			arena.HardLine();
-			arena.HardLine();
+			context.BlankLines(context.Options.BlankLinesAfterFileScopedNamespace);
 
 			// Negative means "nothing precedes this", so the separator below adds nothing on top.
 			previousEnd = -1;
@@ -301,11 +304,17 @@ internal static partial class Printers
 		using (arena.Indent())
 		{
 			var previousEnd = node.OpenBraceToken.Span.End;
+			var first = true;
 			foreach (var member in node.Members)
 			{
 				arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
-				if (context.BlankLinesBetween(previousEnd, EffectiveStart(member)) > 0)
-					arena.HardLine();
+
+				// The minimum parts members from each other, not the first one from the brace above
+				// it — that space is csharp_blank_lines_inside_type's business, and asking for air
+				// around fields should not open a gap under every `{`.
+				context.BlankLines(context.DeclarationSeparation(
+					previousEnd, EffectiveStart(member), first ? 0 : MinimumBlankLinesFor(member, context)));
+				first = false;
 				Node.Print(member, context);
 				previousEnd = member.Span.End;
 			}
@@ -313,8 +322,7 @@ internal static partial class Printers
 			if (TokenPrinter.HasLeadingContent(node.CloseBraceToken))
 			{
 				arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
-				if (context.BlankLinesBetween(previousEnd, EffectiveTriviaStart(node.CloseBraceToken)) > 0)
-					arena.HardLine();
+				context.BlankLines(context.DeclarationSeparation(previousEnd, EffectiveTriviaStart(node.CloseBraceToken)));
 				TokenPrinter.PrintLeadingTrivia(node.CloseBraceToken, context, trailingBreak: false);
 			}
 		}
@@ -564,8 +572,7 @@ internal static partial class Printers
 				// started already indented and came out a level too deep. Reindent trims whatever
 				// was left and re-emits this block's own indent, whoever wrote the line ending.
 				arena.HardLine(DocFlags.Reindent);
-				if (context.BlankLinesBetween(previousEnd, EffectiveStart(statement)) > 0)
-					arena.HardLine();
+				context.BlankLines(context.CodeSeparation(previousEnd, EffectiveStart(statement)));
 				Node.Print(statement, context);
 				previousEnd = statement.Span.End;
 			}
@@ -1454,6 +1461,24 @@ internal static partial class Printers
 		NamespaceDeclarationSyntax block => block.OpenBraceToken.Span.End,
 		FileScopedNamespaceDeclarationSyntax scoped => scoped.SemicolonToken.Span.End,
 		_ => member.SpanStart,
+	};
+
+	/// <summary>
+	/// How many blank lines the configuration wants around a member of this kind.
+	/// </summary>
+	/// <remarks>
+	/// Zero unless asked, which leaves the author's own spacing exactly as it was. An indexer and an
+	/// event answer to the property setting, the same grouping dotnet format uses for their braces.
+	/// </remarks>
+	private static int MinimumBlankLinesFor(MemberDeclarationSyntax member, PrintContext context) => member switch
+	{
+		BaseTypeDeclarationSyntax or DelegateDeclarationSyntax => context.Options.BlankLinesAroundType,
+		MethodDeclarationSyntax or ConstructorDeclarationSyntax or DestructorDeclarationSyntax
+			or OperatorDeclarationSyntax or ConversionOperatorDeclarationSyntax => context.Options.BlankLinesAroundInvocable,
+		PropertyDeclarationSyntax or IndexerDeclarationSyntax or EventDeclarationSyntax
+			or EventFieldDeclarationSyntax => context.Options.BlankLinesAroundProperty,
+		FieldDeclarationSyntax => context.Options.BlankLinesAroundField,
+		_ => 0,
 	};
 
 	/// <summary>

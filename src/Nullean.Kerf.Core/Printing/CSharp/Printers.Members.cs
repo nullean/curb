@@ -51,8 +51,7 @@ internal static partial class Printers
 			for (var i = 0; i < node.Members.Count; i++)
 			{
 				arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
-				if (context.BlankLinesBetween(previousEnd, EffectiveStart(node.Members[i])) > 0)
-					arena.HardLine();
+				context.BlankLines(context.DeclarationSeparation(previousEnd, EffectiveStart(node.Members[i])));
 
 				Node.Print(node.Members[i], context);
 				previousEnd = node.Members[i].Span.End;
@@ -322,11 +321,15 @@ internal static partial class Printers
 
 			PrintUsings(node, node.Usings, context, ref previousEnd);
 
+			// The first member is separated from the brace above it, not from a member — see the type
+			// declaration for why the minimum does not apply there.
+			var first = true;
 			foreach (var member in node.Members)
 			{
 				arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
-				if (context.BlankLinesBetween(previousEnd, EffectiveStart(member)) > 0)
-					arena.HardLine();
+				context.BlankLines(context.DeclarationSeparation(
+					previousEnd, EffectiveStart(member), first ? 0 : MinimumBlankLinesFor(member, context)));
+				first = false;
 				Node.Print(member, context);
 				previousEnd = member.Span.End;
 			}

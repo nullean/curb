@@ -55,6 +55,14 @@ public static class OptionValues
 			false => "false",
 			null => "false   # a plain identifier receiver keeps its first call; anything else stands alone",
 		},
+		"csharp_keep_blank_lines_in_declarations" => Lines(options.KeepBlankLinesInDeclarations),
+		"csharp_keep_blank_lines_in_code" => Lines(options.KeepBlankLinesInCode),
+		"csharp_blank_lines_around_invocable" => Lines(options.BlankLinesAroundInvocable),
+		"csharp_blank_lines_around_type" => Lines(options.BlankLinesAroundType),
+		"csharp_blank_lines_around_property" => Lines(options.BlankLinesAroundProperty),
+		"csharp_blank_lines_around_field" => Lines(options.BlankLinesAroundField),
+		"csharp_blank_lines_after_using_list" => Lines(options.BlankLinesAfterUsingList),
+		"csharp_blank_lines_after_file_scoped_namespace_directive" => Lines(options.BlankLinesAfterFileScopedNamespace),
 		"csharp_max_initializer_elements_on_line" => Count(options.MaxInitializerElementsOnLine),
 		"csharp_max_array_initializer_elements_on_line" => Count(options.MaxArrayInitializerElementsOnLine),
 		"csharp_max_formal_parameters_on_line" => Count(options.MaxParametersOnLine),
@@ -154,6 +162,8 @@ public static class OptionValues
 	};
 
 	private static string Bool(bool value) => value ? "true" : "false";
+
+	private static string Lines(int value) => value.ToString(CultureInfo.InvariantCulture);
 
 	private static string Count(int? value) =>
 		value?.ToString(CultureInfo.InvariantCulture) ?? "   # no limit; width alone breaks a list";

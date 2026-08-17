@@ -283,6 +283,30 @@ public static class EditorConfigOptionsBinder
 		if (TryPrefixedBool(properties, "wrap_before_first_method_call", diagnostics, out var wrapFirstCall))
 			options = options with { WrapBeforeFirstMethodCall = wrapFirstCall };
 
+		if (TryPrefixedLines(properties, "keep_blank_lines_in_declarations", diagnostics, out var keepDeclarations))
+			options = options with { KeepBlankLinesInDeclarations = keepDeclarations };
+
+		if (TryPrefixedLines(properties, "keep_blank_lines_in_code", diagnostics, out var keepCode))
+			options = options with { KeepBlankLinesInCode = keepCode };
+
+		if (TryPrefixedLines(properties, "blank_lines_around_invocable", diagnostics, out var aroundInvocable))
+			options = options with { BlankLinesAroundInvocable = aroundInvocable };
+
+		if (TryPrefixedLines(properties, "blank_lines_around_type", diagnostics, out var aroundType))
+			options = options with { BlankLinesAroundType = aroundType };
+
+		if (TryPrefixedLines(properties, "blank_lines_around_property", diagnostics, out var aroundProperty))
+			options = options with { BlankLinesAroundProperty = aroundProperty };
+
+		if (TryPrefixedLines(properties, "blank_lines_around_field", diagnostics, out var aroundField))
+			options = options with { BlankLinesAroundField = aroundField };
+
+		if (TryPrefixedLines(properties, "blank_lines_after_using_list", diagnostics, out var afterUsings))
+			options = options with { BlankLinesAfterUsingList = afterUsings };
+
+		if (TryPrefixedLines(properties, "blank_lines_after_file_scoped_namespace_directive", diagnostics, out var afterFileScoped))
+			options = options with { BlankLinesAfterFileScopedNamespace = afterFileScoped };
+
 		if (TryPrefixedCount(properties, "max_initializer_elements_on_line", diagnostics, out var maxElements))
 			options = options with { MaxInitializerElementsOnLine = maxElements };
 
@@ -539,6 +563,33 @@ public static class EditorConfigOptionsBinder
 					key, raw, "true, false or when_on_single_line"));
 				return ExpressionBodyStyle.AsWritten;
 		}
+	}
+
+	/// <summary>Reads a blank-line count, which unlike the wrapping limits may legitimately be zero.</summary>
+	private static bool TryPrefixedLines(
+		IReadOnlyDictionary<string, string> properties,
+		string key,
+		ICollection<KerfDiagnostic>? diagnostics,
+		out int value)
+	{
+		foreach (var prefix in ReSharperPrefixes)
+		{
+			if (!properties.TryGetValue(prefix + key, out var raw))
+				continue;
+
+			// Capped rather than trusted. A file is not improved by two hundred blank lines, and a
+			// typo in a config should not be able to ask for them.
+			if (int.TryParse(raw.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out value)
+				&& value is >= 0 and <= 8)
+				return true;
+
+			diagnostics?.Add(KerfDiagnostic.UnrecognisedValue(prefix + key, raw, "a number from 0 to 8"));
+			value = 0;
+			return false;
+		}
+
+		value = 0;
+		return false;
 	}
 
 	/// <summary>Reads a positive count under ReSharper's four spellings.</summary>
