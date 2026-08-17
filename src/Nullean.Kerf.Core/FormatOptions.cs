@@ -796,6 +796,30 @@ public readonly record struct FormatOptions
 	/// <summary><c>csharp_blank_lines_around_namespace</c>, around a namespace declaration.</summary>
 	public int BlankLinesAroundNamespace { get; init; }
 
+	// The align_multiline_* family is absent, and this is the reason rather than a note that nobody
+	// got to it. csharp_align_multiline_argument was built and measured.
+	//
+	// It is free ground — dotnet format leaves an aligned continuation exactly where it finds it —
+	// and the primitives are already here: Anchor captures an output column, AlignedLine breaks to
+	// one, and a register file indexed by nesting depth handles lists inside lists. Alignment itself
+	// came out correct, nested calls included.
+	//
+	// What it does not survive is anything nested inside an aligned list. dotnet format anchors a
+	// construct that brings its own braces to the indentation of the line it starts on; under
+	// alignment that line's indentation *is* the anchor column, so the construct wants a column-valued
+	// indent. Kerf's indent stack holds levels, and the two do not compose: an aligned list one level
+	// deep and an aligned list forty columns deep are the same to it.
+	//
+	// Measured on the corpus, each step recovering some of the gap and none closing it: 76 files
+	// losing their fixed point and 22 not settling; 39 and 16 once the list stopped compensating for
+	// an indent scope it no longer opens; 24 and 15 once lists holding a brace-bringing argument stood
+	// down entirely. The tail continues because it is not about arguments — every nested construct
+	// that anchors meets the same mismatch.
+	//
+	// So the cost is not a printer change, it is making indentation column-valued throughout, which is
+	// the one thing the hot path cannot absorb quietly. Standing down at 24 rather than shipping a
+	// key that is a fixed point most of the time.
+
 	// The place_*_attribute_on_same_line family is absent too, and it fails the same way.
 	//
 	// Two of its six keys are inadmissible outright: dotnet format lifts a *type's* attribute and an
