@@ -29,41 +29,42 @@ internal static class FormattingSuppression
 	/// Finds the suppressed spans in a file, or null when there are none.
 	/// </summary>
 	/// <remarks>
-	/// Guarded by a plain text scan first. Almost no file contains a pragma at all — none of the
-	/// 1,196 in the corpus do — so the usual cost is one scan of the source rather than a walk of
-	/// every trivia node in the tree.
+	/// Guarded by a plain text scan and then Roslyn's directive index. Files without a pragma
+	/// warning in the source pay only the text scan; files with pragmas but no formatting
+	/// directives pay the text scan plus an O(1) ContainsDirectives flag check; only files that
+	/// actually carry formatting directives walk the directive chain, visiting only directive
+	/// nodes rather than every trivia node in the tree.
 	/// </remarks>
 	public static List<TextSpan>? Scan(SyntaxNode root, ReadOnlySpan<char> source)
 	{
 		if (!source.Contains("#pragma warning", StringComparison.Ordinal))
 			return null;
 
+		if (!root.ContainsDirectives)
+			return null;
+
 		List<TextSpan>? spans = null;
 		var openedAt = -1;
 
-		foreach (var trivia in root.DescendantTrivia(descendIntoTrivia: true))
+		var directive = root.GetFirstDirective();
+		while (directive is not null)
 		{
-			if (!trivia.IsKind(SyntaxKind.PragmaWarningDirectiveTrivia))
-				continue;
-
-			var pragma = (PragmaWarningDirectiveTriviaSyntax)trivia.GetStructure()!;
-			if (!MentionsFormatting(pragma))
-				continue;
-
-			if (pragma.DisableOrRestoreKeyword.IsKind(SyntaxKind.DisableKeyword))
+			if (directive is PragmaWarningDirectiveTriviaSyntax pragma && MentionsFormatting(pragma))
 			{
-				// Nested disables are not a thing; the first one opens the region.
-				if (openedAt < 0)
-					openedAt = pragma.FullSpan.Start;
-
-				continue;
+				if (pragma.DisableOrRestoreKeyword.IsKind(SyntaxKind.DisableKeyword))
+				{
+					// Nested disables are not a thing; the first one opens the region.
+					if (openedAt < 0)
+						openedAt = pragma.FullSpan.Start;
+				}
+				else if (openedAt >= 0)
+				{
+					(spans ??= []).Add(TextSpan.FromBounds(openedAt, pragma.FullSpan.End));
+					openedAt = -1;
+				}
 			}
 
-			if (openedAt < 0)
-				continue;
-
-			(spans ??= []).Add(TextSpan.FromBounds(openedAt, pragma.FullSpan.End));
-			openedAt = -1;
+			directive = directive.GetNextDirective();
 		}
 
 		// A disable never restored runs to the end of the file, which is what the compiler does too.

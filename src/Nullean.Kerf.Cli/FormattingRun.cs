@@ -87,16 +87,26 @@ internal static class FormattingRun
 		var allocatedBefore = GC.GetTotalAllocatedBytes(precise: true);
 		var stopwatch = Stopwatch.StartNew();
 
-		Parallel.ForEach(
-			work,
+		// Decouple I/O from formatting. All workers sharing the file system simultaneously causes
+		// kernel-level serialisation on small-file reads; a bounded read phase with fewer concurrent
+		// readers drains that bottleneck before the CPU-bound formatters start.
+		var fileBytes = new byte[work.Length][];
+		Parallel.For(0, work.Length,
+			new ParallelOptions { MaxDegreeOfParallelism = Math.Min(4, Environment.ProcessorCount) },
+			i => fileBytes[i] = fileSystem.File.ReadAllBytes(work[i].Path));
+
+		Parallel.For(
+			0,
+			work.Length,
 			new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount },
 			() => new CSharpFormatter { UnhandledByKind = coverageReport ? [] : null },
-			(item, _, formatter) =>
+			(i, _, formatter) =>
 			{
+				var item = work[i];
 				// Read bytes rather than text: ReadAllText silently swallows a byte-order mark and
 				// WriteAllText silently writes none, so `charset` was unobservable at both ends and
 				// every file Kerf touched lost its mark.
-				var bytes = fileSystem.File.ReadAllBytes(item.Path);
+				var bytes = fileBytes[i];
 				var hadBom = bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF;
 				var source = Utf8.GetString(hadBom ? bytes.AsSpan(3) : bytes);
 

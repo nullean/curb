@@ -106,19 +106,30 @@ public sealed class CSharpSource
 		var tree = CSharpSyntaxTree.ParseText(text, ParseOptions);
 		var root = tree.GetRoot();
 
-		var diagnostics = tree.GetDiagnostics()
-			.Where(d => d.Severity == DiagnosticSeverity.Error)
-			.ToArray();
-
-		if (diagnostics.Length > 0)
+		// O(1) green-node flag: the vast majority of files parse cleanly.
+		if (!root.ContainsDiagnostics)
 		{
-			parsed = null!;
-			errors = diagnostics;
-			return false;
+			parsed = new CSharpSource(text, root);
+			errors = [];
+			return true;
 		}
 
-		parsed = new CSharpSource(text, root);
-		errors = [];
-		return true;
+		List<Diagnostic>? diagnostics = null;
+		foreach (var d in tree.GetDiagnostics())
+		{
+			if (d.Severity == DiagnosticSeverity.Error)
+				(diagnostics ??= []).Add(d);
+		}
+
+		if (diagnostics is null)
+		{
+			parsed = new CSharpSource(text, root);
+			errors = [];
+			return true;
+		}
+
+		parsed = null!;
+		errors = diagnostics;
+		return false;
 	}
 }

@@ -203,18 +203,20 @@ internal static partial class Printers
 			switch (current)
 			{
 				case InvocationExpressionSyntax invocation:
-					(trailers ??= []).Insert(0, invocation.ArgumentList);
+					// Append outward: innermost trailers arrive last; reversed below before storing.
+					(trailers ??= []).Add(invocation.ArgumentList);
 					current = invocation.Expression;
 					continue;
 
 				case ElementAccessExpressionSyntax elementAccess:
-					(trailers ??= []).Insert(0, elementAccess.ArgumentList);
+					(trailers ??= []).Add(elementAccess.ArgumentList);
 					current = elementAccess.Expression;
 					continue;
 
 				case MemberAccessExpressionSyntax access when access.IsKind(SyntaxKind.SimpleMemberAccessExpression):
-					(links ??= []).Insert(
-						0,
+					// Reverse into source order before reading End or converting to array.
+					trailers?.Reverse();
+					(links ??= []).Add(
 						new ChainLink(access.OperatorToken, access.Name, trailers?.ToArray() ?? [], EndOf(access, trailers)));
 					trailers = null;
 					current = access.Expression;
@@ -223,6 +225,8 @@ internal static partial class Printers
 				default:
 					// Anything still pending belongs to the receiver, not to a link of its own.
 					receiver = trailers is null ? current : node;
+					// Links were appended outermost-first; reverse into source order before returning.
+					links?.Reverse();
 					return trailers is null ? links : null;
 			}
 		}
