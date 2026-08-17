@@ -673,6 +673,24 @@ public readonly record struct FormatOptions
 	public bool PlaceConstructorInitializerOnSameLine { get; init; } = true;
 
 	/// <summary>
+	/// <c>csharp_wrap_before_arrow_with_expressions</c>: when an expression body wraps, put the
+	/// <c>=&gt;</c> at the head of the new line rather than the tail of the old one.
+	/// </summary>
+	/// <remarks>
+	/// <para>
+	/// Off by default. Unlike the three clause options this one is width-driven, but it is still not
+	/// reading any layout: it moves the arrow across a break the printer was already going to make on
+	/// this run, so a body that fits prints identically either way and the option can never be what
+	/// causes a wrap.
+	/// </para>
+	/// <para>
+	/// A switch or query body is exempt, because that path does not break at the arrow at all — it
+	/// hugs, and where it anchors is the one rule holding the last two points of reflow conformance.
+	/// </para>
+	/// </remarks>
+	public bool WrapBeforeArrowWithExpressions { get; init; }
+
+	/// <summary>
 	/// <c>csharp_wrap_chained_binary_expressions</c>: give each operand of a long <c>&amp;&amp;</c>
 	/// or <c>||</c> chain a line of its own. Null leaves such a chain unbroken.
 	/// </summary>

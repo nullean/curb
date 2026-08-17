@@ -385,7 +385,16 @@ internal static partial class Printers
 	public static void ArrowExpressionClause(ArrowExpressionClauseSyntax node, PrintContext context)
 	{
 		var arena = context.Arena;
-		TokenPrinter.Print(node.ArrowToken, context);
+
+		// csharp_wrap_before_arrow_with_expressions moves the arrow to the far side of the break, so
+		// a body that wraps reads `M()` / `=> expr` rather than `M() =>` / `expr`. Only the break
+		// moves: flat, both spellings print `M() => expr`, so the option costs nothing on a body that
+		// fits and cannot make one wrap that would not have.
+		var arrowLeadsTheBody = context.Options.WrapBeforeArrowWithExpressions
+			&& node.Expression is not (SwitchExpressionSyntax or QueryExpressionSyntax);
+
+		if (!arrowLeadsTheBody)
+			TokenPrinter.Print(node.ArrowToken, context);
 
 		// Narrower than an initializer's rule. dotnet format leaves `=> x switch { … }` level with
 		// the member but indents `=> new() { … }` one further, so only the constructs that own a
@@ -419,7 +428,19 @@ internal static partial class Printers
 		using (arena.Group())
 		using (arena.Indent())
 		{
-			arena.Line();
+			// A soft line rather than a line: the caller has already put the space before the clause,
+			// so flat this must collapse to nothing or the arrow ends up with two.
+			if (arrowLeadsTheBody)
+			{
+				arena.SoftLine();
+				TokenPrinter.Print(node.ArrowToken, context);
+				arena.Synthetic(SyntheticText.Space);
+			}
+			else
+			{
+				arena.Line();
+			}
+
 			Node.Print(node.Expression, context);
 		}
 	}
@@ -906,13 +927,29 @@ internal static partial class Printers
 
 		var arena = context.Arena;
 
+		// The same arrow placement ArrowExpressionClause applies. A body synthesised here never
+		// reaches that printer, so leaving it out made a converted member print the arrow trailing on
+		// the run that converted it and leading on the next — thirteen corpus files, and none of the
+		// unit tests, which all started from a body that already had its arrow.
+		var arrowLeadsTheBody = context.Options.WrapBeforeArrowWithExpressions;
+
 		arena.Synthetic(SyntheticText.Space);
-		arena.Synthetic(SyntheticText.Arrow);
+		if (!arrowLeadsTheBody)
+			arena.Synthetic(SyntheticText.Arrow);
 
 		using (arena.Group())
 		using (arena.Indent())
 		{
-			arena.Line();
+			if (arrowLeadsTheBody)
+			{
+				arena.SoftLine();
+				arena.Synthetic(SyntheticText.Arrow);
+				arena.Synthetic(SyntheticText.Space);
+			}
+			else
+			{
+				arena.Line();
+			}
 
 			if (throws)
 				Node.Print(statement, context);
@@ -988,13 +1025,27 @@ internal static partial class Printers
 
 		var arena = context.Arena;
 
+		// The third place an arrow is emitted, and it takes the same placement as the other two.
+		var arrowLeadsTheBody = context.Options.WrapBeforeArrowWithExpressions;
+
 		arena.Synthetic(SyntheticText.Space);
-		arena.Synthetic(SyntheticText.Arrow);
+		if (!arrowLeadsTheBody)
+			arena.Synthetic(SyntheticText.Arrow);
 
 		using (arena.Group())
 		using (arena.Indent())
 		{
-			arena.Line();
+			if (arrowLeadsTheBody)
+			{
+				arena.SoftLine();
+				arena.Synthetic(SyntheticText.Arrow);
+				arena.Synthetic(SyntheticText.Space);
+			}
+			else
+			{
+				arena.Line();
+			}
+
 			Node.Print(value, context);
 			TokenPrinter.Print(semicolon, context);
 		}

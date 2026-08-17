@@ -292,6 +292,9 @@ public static class EditorConfigOptionsBinder
 		if (TryPrefixedBool(properties, "place_constructor_initializer_on_same_line", diagnostics, out var placeInitializer))
 			options = options with { PlaceConstructorInitializerOnSameLine = placeInitializer };
 
+		if (TryPrefixedBool(properties, "wrap_before_arrow_with_expressions", diagnostics, out var wrapArrow))
+			options = options with { WrapBeforeArrowWithExpressions = wrapArrow };
+
 		// Only the parameter list's. wrap_arguments_style, the two initializer styles and
 		// wrap_chained_method_calls are left to the same silence as the several hundred other
 		// ReSharper keys Kerf does not implement: forcing every one of those to break moves

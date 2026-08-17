@@ -1,20 +1,28 @@
 namespace Nullean.Kerf.Tests.Formatting.Options;
 
 /// <summary>
-/// <c>csharp_wrap_before_first_type_parameter_constraint</c> and <c>csharp_wrap_before_extends_colon</c>.
+/// The four keys that decide where a clause sits relative to the declaration it belongs to.
 /// </summary>
 /// <remarks>
 /// <para>
-/// Two clauses Kerf joins onto the signature line whatever the author wrote, which makes them the
-/// places a Rider-formatted repository differs from Kerf by a whole line rather than by a column.
-/// Rider puts both on their own line by default.
+/// Three of them — <c>csharp_wrap_before_first_type_parameter_constraint</c>,
+/// <c>csharp_wrap_before_extends_colon</c> and
+/// <c>csharp_place_constructor_initializer_on_same_line</c> — govern clauses Kerf joins onto the
+/// signature line whatever the author wrote. Rider gives all three a line of their own, which makes
+/// them the places a Rider-formatted repository differs from Kerf by a whole line rather than by a
+/// column. The fourth, <c>csharp_wrap_before_arrow_with_expressions</c>, moves the <c>=&gt;</c> to
+/// the far side of a break the printer was making anyway.
 /// </para>
 /// <para>
 /// Free ground, measured in both directions: <c>dotnet format</c> neither joins a clause the author
-/// broke nor breaks one they joined, so either rendering is a fixed point. And both are forced rather
-/// than width-driven — the break is always there or never — so neither asks a question about layout
-/// that this run's own output would change the answer to. That is what separates them from the
-/// single-line blank-line family, which had to be dropped for exactly that reason.
+/// broke nor breaks one they joined, so either rendering is a fixed point.
+/// </para>
+/// <para>
+/// None of them reads layout. The first three force their break unconditionally, so it is always
+/// there or never; the arrow's is width-driven but only relocates a break already decided on this
+/// run, and prints identically where the body fits. That is what separates them from the single-line
+/// blank-line family, which had to be dropped for asking a question this run's own output changed
+/// the answer to.
 /// </para>
 /// </remarks>
 public class WrapBeforeClauseTests : FormattingTest
@@ -277,6 +285,88 @@ public class WrapBeforeClauseTests : FormattingTest
 		}
 		""",
 		editorConfig: Initializer);
+
+	// ---- the arrow -----------------------------------------------------------------------------------
+
+	private const string Arrow = "csharp_wrap_before_arrow_with_expressions = true\nmax_line_length = 70";
+
+	[Test]
+	public Task A_body_that_fits_prints_the_same_either_way() => Formats(
+		// The option moves the arrow across a break; where there is no break there is nothing to move,
+		// so it can never be what causes a wrap.
+		"""
+		public class C
+		{
+		    int M() => 1;
+		}
+		""",
+		"""
+		public class C
+		{
+		    int M() => 1;
+		}
+		""",
+		editorConfig: Arrow);
+
+	[Test]
+	public Task A_body_that_wraps_takes_the_arrow_with_it() => WithAndWithout(
+		"""
+		public class C
+		{
+		    int M() => Something(aaaaaaaaaaaaaaaaa, bbbbbbbbbbbbbbbbb, ccccccccc);
+		}
+		""",
+		"""
+		public class C
+		{
+		    int M() =>
+		        Something(aaaaaaaaaaaaaaaaa, bbbbbbbbbbbbbbbbb, ccccccccc);
+		}
+		""",
+		"""
+		public class C
+		{
+		    int M()
+		        => Something(aaaaaaaaaaaaaaaaa, bbbbbbbbbbbbbbbbb, ccccccccc);
+		}
+		""",
+		Arrow,
+		"max_line_length = 70");
+
+	[Test]
+	public Task A_body_converted_from_a_block_takes_the_arrow_too() => Formats(
+		// The arrow is emitted from three places, and a body converted from a block reaches none of
+		// the same code as one written with an arrow already. Missing two of the three made a
+		// converted member print the arrow trailing on the run that converted it and leading on the
+		// next — thirteen corpus files, and nothing in this class, because every other case here
+		// starts from a body that already had its arrow.
+		"""
+		public class C
+		{
+		    int M()
+		    {
+		        return Something(aaaaaaaaaaaaaaaaa, bbbbbbbbbbbbbbbbb, ccccccccc);
+		    }
+
+		    int P
+		    {
+		        get { return Something(aaaaaaaaaaaaaaaaa, bbbbbbbbbbbbbbbbb, ccccccccc); }
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    int M()
+		        => Something(aaaaaaaaaaaaaaaaa, bbbbbbbbbbbbbbbbb, ccccccccc);
+
+		    int P
+		        => Something(aaaaaaaaaaaaaaaaa, bbbbbbbbbbbbbbbbb, ccccccccc);
+		}
+		""",
+		editorConfig: Arrow
+			+ "\ncsharp_style_expression_bodied_methods = true"
+			+ "\ncsharp_style_expression_bodied_properties = true");
 
 	// ---- together ---------------------------------------------------------------------------------------
 
