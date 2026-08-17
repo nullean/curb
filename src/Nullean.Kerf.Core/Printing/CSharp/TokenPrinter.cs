@@ -327,9 +327,46 @@ internal static class TokenPrinter
 		var span = trivia.FullSpan;
 		var length = TrimTrailingNewLines(context, span.Start, span.Length);
 		if (length > 0)
-			context.Arena.SourceText(span.Start, length, flags);
+			EmitSourceLines(span.Start, length, context, flags);
 
 		return CountNewLines(context, span.Start + length, span.Length - length);
+	}
+
+	/// <summary>
+	/// Emits a span of source, re-issuing any line ending inside it through the printer.
+	/// </summary>
+	/// <remarks>
+	/// Roslyn groups consecutive <c>///</c> lines into a single trivia node, so a doc comment arrives
+	/// here as one span with its own newlines in it. Emitted verbatim, those keep whatever the source
+	/// used while every break Kerf writes uses <c>end_of_line</c> — which left files with both, and
+	/// cost efcore 3,189 of its fixed points and log4net 322 of theirs.
+	///
+	/// A literal line is the right break: it carries no indent, so the continuation lines keep the
+	/// leading whitespace they already have inside the span. Single-line trivia never finds a newline
+	/// and takes the same single call it always did.
+	/// </remarks>
+	private static void EmitSourceLines(int start, int length, PrintContext context, DocFlags flags)
+	{
+		var text = context.Text;
+		var end = start + length;
+		var chunk = start;
+
+		for (var i = start; i < end; i++)
+		{
+			if (text[i] != '\n')
+				continue;
+
+			// Back off a CR so it is not emitted as content; the printer supplies the ending.
+			var stop = i > chunk && text[i - 1] == '\r' ? i - 1 : i;
+			if (stop > chunk)
+				context.Arena.SourceText(chunk, stop - chunk, flags);
+
+			context.Arena.LiteralLine();
+			chunk = i + 1;
+		}
+
+		if (end > chunk)
+			context.Arena.SourceText(chunk, end - chunk, flags);
 	}
 
 	/// <summary>Counts the line endings in a range, treating CRLF as one.</summary>

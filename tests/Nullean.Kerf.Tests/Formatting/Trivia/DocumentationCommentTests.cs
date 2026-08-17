@@ -147,4 +147,14 @@ public class DocumentationCommentTests : FormattingTest
 		    public int Value;
 		}
 		""");
+	[Test]
+	public Task A_doc_comment_takes_the_configured_line_ending() => Formats(
+		// Roslyn groups consecutive `///` lines into one trivia node, so a doc comment reaches the
+		// printer as a single span with its own newlines inside it. Emitted verbatim they kept
+		// whatever the source used, while every break Kerf writes uses end_of_line — leaving files
+		// with both endings, which cost efcore 3,189 fixed points and log4net 322 of theirs.
+		"public class C\n{\n    /// <summary>\n    /// One.\n    /// </summary>\n    public int P { get; }\n}\n",
+		"public class C\r\n{\r\n    /// <summary>\r\n    /// One.\r\n    /// </summary>\r\n    public int P { get; }\r\n}\r\n",
+		editorConfig: "end_of_line = crlf");
+
 }
