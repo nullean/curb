@@ -210,4 +210,127 @@ public class ClosingParenthesisTests : FormattingTest
 		}
 		""",
 		editorConfig: Narrow + "\ncsharp_wrap_before_declaration_rpar = false");
+
+	// ---- the numeric limits ---------------------------------------------------------------------------
+
+	[Test]
+	public Task A_parameter_count_over_the_limit_chops_the_list() => WithAndWithout(
+		// A count, not a column. This fits comfortably on one line and is chopped anyway, because the
+		// question the key asks is how many things are on the line rather than how long it is.
+		"""
+		public class C
+		{
+		    public void M(int a, int b, int c)
+		    {
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M(int a, int b, int c)
+		    {
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M(
+		        int a,
+		        int b,
+		        int c
+		    )
+		    {
+		    }
+		}
+		""",
+		"csharp_max_formal_parameters_on_line = 2");
+
+	[Test]
+	public Task A_list_at_the_limit_is_left_alone() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M(int a, int b)
+		    {
+		    }
+		}
+		""",
+		editorConfig: "csharp_max_formal_parameters_on_line = 2");
+
+	[Test]
+	public Task The_invocation_limit_is_separate() => Formats(
+		"""
+		public class C
+		{
+		    public void M(int a, int b, int c)
+		    {
+		        Call(x, y, z);
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M(int a, int b, int c)
+		    {
+		        Call(
+		            x,
+		            y,
+		            z
+		        );
+		    }
+		}
+		""",
+		editorConfig: "csharp_max_invocation_arguments_on_line = 2");
+
+	[Test]
+	public Task The_count_and_the_parenthesis_keys_compose() => Formats(
+		// The count decides whether to chop; the parenthesis key decides where the `)` lands.
+		"""
+		public class C
+		{
+		    public void M(int a, int b, int c)
+		    {
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M(
+		        int a,
+		        int b,
+		        int c)
+		    {
+		    }
+		}
+		""",
+		editorConfig: "csharp_max_formal_parameters_on_line = 2\ncsharp_wrap_before_declaration_rpar = false");
+
+	[Test]
+	public Task A_body_kept_on_one_line_still_moves_down_when_the_header_wraps() => Formats(
+		// csharp_preserve_single_line_blocks keeps `{ }` collapsed, but dotnet format will not let it
+		// share a line with a `)` that ended a wrapped header. Whether the header wrapped is this
+		// run's decision when a count forced it, so the body asks the list's group rather than the
+		// source — the case that made this option violate the fixed point until it did.
+		"""
+		public class C
+		{
+		    public C(int a, int b, int c) { }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public C(
+		        int a,
+		        int b,
+		        int c
+		    )
+		    { }
+		}
+		""",
+		editorConfig: "csharp_max_formal_parameters_on_line = 2");
 }

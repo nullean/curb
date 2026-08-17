@@ -45,6 +45,8 @@ public static class OptionValues
 		"csharp_style_expression_bodied_properties" => Expression(options.ExpressionBodiedProperties),
 		"csharp_style_expression_bodied_indexers" => Expression(options.ExpressionBodiedIndexers),
 		"file_header_template" => options.FileHeaderTemplate ?? "   # no header is required",
+		"csharp_max_formal_parameters_on_line" => Count(options.MaxParametersOnLine),
+		"csharp_max_invocation_arguments_on_line" => Count(options.MaxArgumentsOnLine),
 		"csharp_wrap_before_declaration_rpar" => Rpar(options.WrapBeforeDeclarationRpar),
 		"csharp_wrap_before_invocation_rpar" => Rpar(options.WrapBeforeInvocationRpar),
 		"csharp_using_directive_placement" => options.UsingPlacement switch
@@ -140,6 +142,9 @@ public static class OptionValues
 	};
 
 	private static string Bool(bool value) => value ? "true" : "false";
+
+	private static string Count(int? value) =>
+		value?.ToString(CultureInfo.InvariantCulture) ?? "   # no limit; width alone breaks a list";
 
 	private static string Rpar(bool? value) => value switch
 	{

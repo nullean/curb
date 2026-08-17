@@ -558,6 +558,22 @@ public readonly record struct FormatOptions
 	/// <summary><c>csharp_wrap_before_invocation_rpar</c>, the same for an argument list.</summary>
 	public bool? WrapBeforeInvocationRpar { get; init; }
 
+	/// <summary>
+	/// <c>csharp_max_formal_parameters_on_line</c>: chop a parameter list carrying more than this
+	/// many, whatever the width says. Null leaves width the only thing that breaks a list.
+	/// </summary>
+	/// <remarks>
+	/// A count rather than a column, which is the point of it: <c>max_line_length</c> asks whether
+	/// the line is too long, and this asks whether there are too many things on it. A four-parameter
+	/// list that fits in eighty columns is still four parameters, and some repositories would rather
+	/// see them stacked. Composes with
+	/// <see cref="WrapBeforeDeclarationRpar"/>, which then decides where the <c>)</c> lands.
+	/// </remarks>
+	public int? MaxParametersOnLine { get; init; }
+
+	/// <summary><c>csharp_max_invocation_arguments_on_line</c>, the same for an argument list.</summary>
+	public int? MaxArgumentsOnLine { get; init; }
+
 	/// <summary>True when either trailing-comma option asked for anything.</summary>
 	/// <remarks>
 	/// Gates both the printer work and the verifier's allowance for a comma that appears or vanishes,

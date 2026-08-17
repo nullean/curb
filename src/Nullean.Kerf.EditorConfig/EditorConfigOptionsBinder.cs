@@ -250,6 +250,12 @@ public static class EditorConfigOptionsBinder
 			&& !string.Equals(header, "unset", StringComparison.OrdinalIgnoreCase))
 			options = options with { FileHeaderTemplate = header };
 
+		if (TryPrefixedCount(properties, "max_formal_parameters_on_line", diagnostics, out var maxParameters))
+			options = options with { MaxParametersOnLine = maxParameters };
+
+		if (TryPrefixedCount(properties, "max_invocation_arguments_on_line", diagnostics, out var maxArguments))
+			options = options with { MaxArgumentsOnLine = maxArguments };
+
 		if (TryPrefixedBool(properties, "wrap_before_declaration_rpar", diagnostics, out var declarationRpar))
 			options = options with { WrapBeforeDeclarationRpar = declarationRpar };
 
@@ -494,6 +500,30 @@ public static class EditorConfigOptionsBinder
 					key, raw, "true, false or when_on_single_line"));
 				return ExpressionBodyStyle.AsWritten;
 		}
+	}
+
+	/// <summary>Reads a positive count under ReSharper's four spellings.</summary>
+	private static bool TryPrefixedCount(
+		IReadOnlyDictionary<string, string> properties,
+		string key,
+		ICollection<KerfDiagnostic>? diagnostics,
+		out int value)
+	{
+		foreach (var prefix in ReSharperPrefixes)
+		{
+			if (!properties.TryGetValue(prefix + key, out var raw))
+				continue;
+
+			if (int.TryParse(raw.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out value) && value > 0)
+				return true;
+
+			diagnostics?.Add(KerfDiagnostic.UnrecognisedValue(prefix + key, raw, "a positive integer"));
+			value = 0;
+			return false;
+		}
+
+		value = 0;
+		return false;
 	}
 
 	/// <summary>

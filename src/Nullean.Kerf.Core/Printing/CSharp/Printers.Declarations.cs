@@ -302,14 +302,22 @@ internal static partial class Printers
 				arena.Synthetic(SyntheticText.Space);
 				TokenPrinter.Print(node.Initializer.ThisOrBaseKeyword, context);
 				Spacing.BeforeCallParens(context);
-				Node.Print(node.Initializer.ArgumentList, context);
+
+				// Named, because when there is an initializer it is *its* closing parenthesis the body
+				// follows, not the parameter list's. Wrapping it here rather than reading whichever
+				// argument list happened to be printed last, which a nested call would win.
+				var initializerGroup = context.Arena.NextGroupId();
+				using (context.Arena.Group(initializerGroup))
+					Node.Print(node.Initializer.ArgumentList, context);
+
+				context.ParameterListGroup = initializerGroup;
 			}
 		}
 
 		if (node.Body is not null)
 		{
 			if (!TryPrintExpressionBody(node.Body, context.Options.ExpressionBodiedConstructors, context))
-				PrintBody(node.Body, BraceStyle.Methods, context);
+				PrintBody(node.Body, BraceStyle.Methods, context, context.ParameterListGroup);
 			return;
 		}
 

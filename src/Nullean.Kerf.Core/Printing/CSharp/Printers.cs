@@ -356,7 +356,7 @@ internal static partial class Printers
 		if (node.Body is not null)
 		{
 			if (!TryPrintExpressionBody(node.Body, context.Options.ExpressionBodiedMethods, context))
-				PrintBody(node.Body, BraceStyle.Methods, context);
+				PrintBody(node.Body, BraceStyle.Methods, context, context.ParameterListGroup);
 			return;
 		}
 
@@ -481,6 +481,12 @@ internal static partial class Printers
 
 			using (arena.Group(group))
 			{
+				// A count, not a column: csharp_max_formal_parameters_on_line asks whether there are
+				// too many parameters rather than whether the line is too long, so it breaks the
+				// group outright instead of leaving it to fit measurement.
+				if (context.Options.MaxParametersOnLine is { } limit && node.Parameters.Count > limit)
+					arena.BreakParent();
+
 				using (arena.Indent())
 				{
 					if (!asWritten)
@@ -648,9 +654,11 @@ internal static partial class Printers
 		{
 			var asWritten = SpansLines(node, context);
 
-
 			using (arena.Group())
 			{
+				if (context.Options.MaxArgumentsOnLine is { } limit && node.Arguments.Count > limit)
+					arena.BreakParent();
+
 				using (arena.Indent())
 				{
 					if (!asWritten)
@@ -1044,12 +1052,42 @@ internal static partial class Printers
 		return false;
 	}
 
-	internal static void PrintBody(SyntaxNode body, BraceStyle construct, PrintContext context)
+	/// <param name="body">The braced body to emit.</param>
+	/// <param name="construct">Which csharp_new_line_before_open_brace flag governs its brace.</param>
+	/// <param name="context">Per-file printing state.</param>
+	/// <param name="ownerGroup">
+	/// The group of the parameter list this body hangs off, or 0. A body kept on one line by
+	/// csharp_preserve_single_line_blocks still takes a line of its own when the *header* wrapped —
+	/// `)` and `{ }` do not share a line — and whether the header wrapped is this run's decision when
+	/// a count or a width forced it, so it is asked of the list's group rather than of the source.
+	/// </param>
+	internal static void PrintBody(
+		SyntaxNode body,
+		BraceStyle construct,
+		PrintContext context,
+		ushort ownerGroup = 0)
 	{
 		if (context.Options.PreserveSingleLineBlocks && context.OnSameLine(body.SpanStart, body.Span.End))
 		{
-			context.Arena.Synthetic(SyntheticText.Space);
-			using (context.Arena.ForceFlat())
+			var arena = context.Arena;
+
+			if (ownerGroup != 0)
+			{
+				arena.LineIfBroken(ownerGroup);
+
+				// The space only where that line printed nothing, so a body that moved down does not
+				// arrive with one in front of it.
+				using var ifBreak = arena.IfBreak(ownerGroup);
+				using (ifBreak.Branch())
+					arena.Synthetic(SyntheticText.Space);
+				using (ifBreak.Branch())
+				{
+				}
+			}
+			else
+				arena.Synthetic(SyntheticText.Space);
+
+			using (arena.ForceFlat())
 				Node.Print(body, context);
 			return;
 		}
