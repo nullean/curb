@@ -16,7 +16,7 @@ internal static partial class Printers
 		// A break the author put after `is` is theirs, the same as one between two alternatives of the
 		// pattern that follows. Without this, `x is` / `A or` / `B` kept its `or` breaks and lost the
 		// first one, which reads worse than either preserving all of them or none.
-		if (!context.OnSameLine(node.IsKeyword.Span.End, node.Pattern.SpanStart))
+		if (context.AuthorBroke(node.IsKeyword.Span.End, node.Pattern.SpanStart))
 			context.Arena.HardLine();
 		else
 			context.Arena.Synthetic(SyntheticText.Space);
@@ -114,14 +114,14 @@ internal static partial class Printers
 		// side of the operator they broke it. A long `is A or B or C` written one alternative per line
 		// was closed up onto a single line, because nothing here asked. That shape is everywhere in
 		// analyzer code and was among the largest sources of churn measured on roslyn.
-		if (!context.OnSameLine(node.Left.Span.End, node.OperatorToken.SpanStart))
+		if (context.AuthorBroke(node.Left.Span.End, node.OperatorToken.SpanStart))
 			context.Arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
 		else
 			context.Arena.Synthetic(SyntheticText.Space);
 
 		TokenPrinter.Print(node.OperatorToken, context);
 
-		if (!context.OnSameLine(node.OperatorToken.Span.End, node.Right.SpanStart))
+		if (context.AuthorBroke(node.OperatorToken.Span.End, node.Right.SpanStart))
 			context.Arena.HardLine();
 		else
 			context.Arena.Synthetic(SyntheticText.Space);

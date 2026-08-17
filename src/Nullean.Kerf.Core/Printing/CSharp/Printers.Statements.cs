@@ -211,13 +211,19 @@ internal static partial class Printers
 		// Safe to read from the source because it asks about exactly the two positions this printer
 		// reproduces: if Kerf does break after the `(`, the next run sees that break and keeps it.
 		var breakAfterOpen = condition is not null
-			&& !context.OnSameLine(openParen.Span.End, condition.SpanStart);
+			&& context.AuthorBroke(openParen.Span.End, condition.SpanStart);
 		var breakBeforeClose = condition is not null
-			&& !context.OnSameLine(condition.Span.End, closeParen.SpanStart);
+			&& context.AuthorBroke(condition.Span.End, closeParen.SpanStart);
 
 		TokenPrinter.Print(keyword, context);
 		Spacing.AfterControlFlowKeyword(context);
 		TokenPrinter.Print(openParen, context);
+
+		// Under deterministic layout there is no author to hug, and the parentheses are the only
+		// break the header has: without them a condition too wide for the line has nowhere to go.
+		// So the break opportunity comes back exactly where the reason for removing it does not
+		// apply.
+		var hugsTheParens = context.Options.KeepExistingLinebreaks;
 
 		using (arena.Group())
 		{
@@ -225,16 +231,20 @@ internal static partial class Printers
 			{
 				if (breakAfterOpen)
 					arena.HardLine();
-				else
+				else if (hugsTheParens)
 					Spacing.InsideControlFlowParens(context);
+				else
+					Spacing.InsideControlFlowParensBreakable(context);
 
 				Node.Print(condition, context);
 			}
 
 			if (breakBeforeClose)
 				arena.HardLine();
-			else
+			else if (hugsTheParens)
 				Spacing.InsideControlFlowParens(context);
+			else
+				Spacing.InsideControlFlowParensBreakable(context);
 		}
 
 		TokenPrinter.Print(closeParen, context);

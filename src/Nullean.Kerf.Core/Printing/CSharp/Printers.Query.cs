@@ -86,7 +86,7 @@ internal static partial class Printers
 			// came apart at the `into`.
 			if (asWritten)
 			{
-				if (context.OnSameLine(previousEnd, nextStart))
+				if (context.AuthorJoined(previousEnd, nextStart))
 					arena.Synthetic(SyntheticText.Space);
 				else
 					arena.AlignedLine(QueryAnchor);
