@@ -117,17 +117,22 @@ public class ExperimentalBlankLineTests : FormattingTest
 
 	[Test]
 	public Task IDE2006_no_blank_line_after_an_arrow() => Formats(
+		// A blank line, which is what IDE2006 is about — not a line break, which is the author's and
+		// is now kept. This test used to feed a plain break and assert Kerf closed it up, conflating
+		// the two and quietly asserting that Kerf joined lines the author had broken.
 		"""
 		public class C
 		{
 		    public int M() =>
+
 		        1;
 		}
 		""",
 		"""
 		public class C
 		{
-		    public int M() => 1;
+		    public int M() =>
+		        1;
 		}
 		""");
 

@@ -190,6 +190,25 @@ public class EdgeCaseTests : FormattingTest
 		""");
 
 	[Test]
+	public Task An_empty_anonymous_object_has_nothing_to_lay_out() => Formats(
+		// `new { }` is valid C#, and both ends of the anonymous-type printer indexed the initializer
+		// list without checking it had any. Because the CLI formats in parallel and does not isolate a
+		// file's exceptions, this one expression aborted the entire run — found on MassTransit, efcore
+		// and roslyn, which is to say the three largest repositories in the comparison corpus.
+		"""
+		public class C
+		{
+		    void M() => Publish(new {});
+		}
+		""",
+		"""
+		public class C
+		{
+		    void M() => Publish(new { });
+		}
+		""");
+
+	[Test]
 	public Task Source_that_does_not_parse_is_refused() =>
 		Rejects("public class C { void M( { }");
 

@@ -54,6 +54,25 @@ public static class EditorConfigOptionsBinder
 				diagnostics?.Add(KerfDiagnostic.UnrecognisedValue("max_line_length", maxLineLength, "a positive integer or 'off'"));
 		}
 
+		if (properties.TryGetValue("charset", out var charset))
+		{
+			switch (charset.Trim().ToLowerInvariant())
+			{
+				case "utf-8":
+					options = options with { Charset = Charset.Utf8 };
+					break;
+				case "utf-8-bom":
+					options = options with { Charset = Charset.Utf8Bom };
+					break;
+				default:
+					// latin1, utf-16le and utf-16be are documented by EditorConfig and not supported
+					// here: Kerf reads and writes UTF-8, and re-encoding a file is not a formatting
+					// change. Said out loud rather than silently ignored.
+					diagnostics?.Add(KerfDiagnostic.UnrecognisedValue("charset", charset, "utf-8 or utf-8-bom"));
+					break;
+			}
+		}
+
 		if (properties.TryGetValue("end_of_line", out var endOfLine))
 		{
 			switch (endOfLine.ToLowerInvariant())

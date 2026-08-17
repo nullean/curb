@@ -149,7 +149,16 @@ internal static class UsingOrganiser
 				return system;
 		}
 
-		return string.CompareOrdinal(Name(left), Name(right));
+		// Case-insensitive, with ordinal only to break a tie. Ordinal alone sorts every upper-case
+		// letter before every lower-case one, which puts `Microsoft.CodeAnalysis.CSharp.CodeStyle`
+		// ahead of `Microsoft.CodeAnalysis.CodeStyle` — 'S' below 'o'. Verified against the tool
+		// rather than against Roslyn's source: `dotnet format` on a project with
+		// dotnet_sort_system_directives_first produces the case-insensitive order.
+		//
+		// It is the largest single source of churn Kerf had on the roslyn repository, whose 17,000
+		// files are sorted the other way by Roslyn's own tooling.
+		var name = string.Compare(Name(left), Name(right), StringComparison.OrdinalIgnoreCase);
+		return name != 0 ? name : string.CompareOrdinal(Name(left), Name(right));
 	}
 
 	private static int Rank(UsingDirectiveSyntax directive)

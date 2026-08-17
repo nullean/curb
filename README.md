@@ -6,7 +6,7 @@ Kerf reflows C# to a line width, the way Prettier does, while honouring the **co
 options** (code style rule [IDE0055](https://learn.microsoft.com/dotnet/fundamentals/code-analysis/style-rules/ide0055)).
 Its defaults are Roslyn's defaults, so it agrees with Visual Studio and Rider out of the box instead of fighting them.
 
-> **Status: early development.** Not yet usable. See [the milestones](#milestones).
+📖 **[Documentation](https://mpdreamz.github.io/formatter/)** — why it exists, the scope boundary, and the build integration.
 
 ## Why
 
@@ -63,6 +63,19 @@ csharp_preserve_single_line_blocks = true
 
 Unrecognised or not-yet-implemented keys are reported rather than silently ignored.
 
+### Or let the build do it
+
+```xml
+<PackageReference Include="Nullean.Kerf.MSBuild" Version="*" PrivateAssets="all" />
+```
+
+Kerf then runs before `CoreCompile`, so the compiler reads source that is already formatted — rewriting
+in `Debug`, checking in `Release`. With `EnforceCodeStyleInBuild` set, the only style diagnostics left
+are the ones that genuinely need a compilation to decide. Whoever is editing the code — a person or a
+coding agent — gets the mechanical offences fixed underneath them and only has to think about the
+semantic remainder. See
+[the build integration](https://mpdreamz.github.io/formatter/workflow/msbuild/).
+
 ## Design
 
 - **Full re-print, not a whitespace patcher.** The source is parsed to a syntax tree and printed from scratch
@@ -87,14 +100,28 @@ cd kerf
 
 ## Milestones
 
-| | |
-|---|---|
-| M0 | Spike and scaffolding — **in progress** |
-| M1 | Vertical slice: arena, printer, CLI, test harness |
-| M2 | Syntax printer coverage |
-| M3 | The 39 formatting options, onboarded one at a time |
-| M4 | Parallelism, caching, conformance and corpus CI |
-| M5 | Syntax-only code style rules |
+| | | |
+|---|---|---|
+| M0 | Spike and scaffolding | ✅ |
+| M1 | Vertical slice: arena, printer, CLI, test harness | ✅ |
+| M2 | Syntax printer coverage | ✅ — `UnhandledNode` remains the safety net; `kerf check --coverage` reports where |
+| M3 | The 39 formatting options, onboarded one at a time | ✅ — all 39, plus 43 further keys |
+| M4 | Parallelism, conformance and corpus CI | ✅ |
+| M5 | Syntax-only code style rules | ✅ — braces, expression bodies, file-scoped namespaces, modifier order, using placement, file headers |
+
+Not done: redundant parentheses (IDE0047/0048), the `wrap_if_long` fill layout, and the option-catalog
+generator that will produce a per-option reference. Several ReSharper option families were built,
+measured and deliberately reverted — see
+[docs/contribute/layout-decisions.md](docs/contribute/layout-decisions.md).
+
+### What CI gates on every push
+
+Against [elastic/docs-builder](https://github.com/elastic/docs-builder) — 1,196 files, 6.5 MB:
+
+- Byte-identical to `dotnet format whitespace` with reflow off (**100%**), and **99.9%** with reflow on.
+- Zero failed and zero unparsable files; two format passes produce identical output.
+- Native-AOT publish on all five RIDs, each smoke-tested before packing.
+- An allocation-ratio ceiling, measured on the AOT binary rather than the JIT build.
 
 ## Credits
 

@@ -545,30 +545,40 @@ internal static partial class Printers
 
 			TokenPrinter.Print(node.OpenBraceToken, context);
 
+			// `new { }` is valid C# and has nothing to lay out. Both ends of the block below index the
+			// initializer list, so an empty one crashed the printer — and because the CLI formats in
+			// parallel without isolating a file's exceptions, that one expression aborted the whole
+			// run. Found on MassTransit, efcore and roslyn, which is to say the three largest
+			// repositories measured.
 			using (arena.Indent())
 			{
-				InsideBrace(node.OpenBraceToken.Span.End, node.Initializers[0].SpanStart);
-				for (var i = 0; i < node.Initializers.Count; i++)
+				if (node.Initializers.Count > 0)
 				{
-					Node.Print(node.Initializers[i], context);
-					if (i >= node.Initializers.SeparatorCount)
-						continue;
+					InsideBrace(node.OpenBraceToken.Span.End, node.Initializers[0].SpanStart);
+					for (var i = 0; i < node.Initializers.Count; i++)
+					{
+						Node.Print(node.Initializers[i], context);
+						if (i >= node.Initializers.SeparatorCount)
+							continue;
 
-					if (rewritesComma && i == node.Initializers.Count - 1)
-						continue;
+						if (rewritesComma && i == node.Initializers.Count - 1)
+							continue;
 
-					Spacing.BeforeComma(context);
-					TokenPrinter.Print(node.Initializers.GetSeparator(i), context);
-					if (i < node.Initializers.Count - 1)
-						Separator(node.Initializers[i].Span.End, node.Initializers[i + 1].SpanStart);
+						Spacing.BeforeComma(context);
+						TokenPrinter.Print(node.Initializers.GetSeparator(i), context);
+						if (i < node.Initializers.Count - 1)
+							Separator(node.Initializers[i].Span.End, node.Initializers[i + 1].SpanStart);
+					}
+
+					if (rewritesComma)
+						PrintTrailingComma(context);
 				}
-
-				if (rewritesComma)
-					PrintTrailingComma(context);
 			}
 
 			using (arena.IndentIf(context.Options.IndentBraces))
-				InsideBrace(node.Initializers[^1].Span.End, node.CloseBraceToken.SpanStart);
+				InsideBrace(
+					node.Initializers.Count > 0 ? node.Initializers[^1].Span.End : node.OpenBraceToken.Span.End,
+					node.CloseBraceToken.SpanStart);
 
 			TokenPrinter.Print(node.CloseBraceToken, context);
 		}

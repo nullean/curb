@@ -1,3 +1,8 @@
+---
+navigation_title: Layout decisions
+description: What a layout rule is allowed to read, and the measured failures behind that constraint.
+---
+
 # Layout decisions — what a rule is allowed to read
 
 A development note about the one class of bug that has killed more Kerf features than every other
@@ -23,7 +28,8 @@ kerf check   file.cs    # -> "this file needs formatting"
 That is the failure mode. Kerf's own output is rejected by Kerf. CI runs `check`, so a repository
 formatted by Kerf would fail its own build, and the MSBuild task would rewrite files on every
 compile. `format(format(x)) == format(x)` is asserted on every fixture and on the whole corpus for
-exactly this reason — see **Correctness** in [AGENTS.md](../AGENTS.md).
+exactly this reason — see **Correctness** in
+[AGENTS.md](https://github.com/Mpdreamz/formatter/blob/main/AGENTS.md).
 
 Note that a rule can fail this while still *converging*. The attribute family below settles by the
 third run. One pass is the contract, so converging late is still broken.

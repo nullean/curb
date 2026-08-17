@@ -55,6 +55,15 @@ let private test (arguments:ParseResults<Arguments>) =
 let private benchmark (arguments:ParseResults<Arguments>) =
     exec "dotnet" ["run"; "--project"; "tests/Nullean.Kerf.Benchmarks"; "-c"; "Release"] |> ignore
 
+/// Builds docs/ the way the workflow does — including the landing page override, which is the whole
+/// reason `docs-builder serve` is not enough on its own — and serves the result.
+let private docs (arguments:ParseResults<Arguments>) =
+    Documentation.build ()
+    if arguments.Contains NoServe then
+        printfn "built; --no-serve given, not serving"
+    else
+        Documentation.serve (arguments.TryGetResult Port |> Option.defaultValue 8080)
+
 /// Measures how far Kerf's output is from dotnet format's, which is the product claim made
 /// checkable. Reflow is forced off so that every difference is an option disagreement rather than a
 /// deliberate wrap: with max_line_length off, Kerf should be a fixed point of dotnet format.
@@ -463,6 +472,10 @@ let Setup (parsed:ParseResults<Arguments>) (subCommand:Arguments) =
     cmd Conformance.Name (Some [Build.Name]) None <| fun _ -> conformance parsed
     cmd Perf.Name (Some [Build.Name]) None <| fun _ -> perf parsed
     cmd MsbuildSmoketest.Name (Some [Build.Name]) None <| fun _ -> msbuildSmoketest parsed
+
+    // No dependency on build: the documentation is markdown and one static HTML file, and waiting on
+    // a Release compile to preview a paragraph would make nobody run it.
+    step Docs.Name docs
     cmd VerifyExpectations.Name (Some [Build.Name]) None <| fun _ -> verifyExpectations parsed
 
     step PristineCheck.Name pristineCheck

@@ -10,6 +10,7 @@ type Arguments =
     | [<CliPrefix(CliPrefix.None);SubCommand>] Benchmark
     | [<CliPrefix(CliPrefix.None);SubCommand>] Conformance
     | [<CliPrefix(CliPrefix.None);SubCommand>] Perf
+    | [<CliPrefix(CliPrefix.None);SubCommand>] Docs
 
     | [<CliPrefix(CliPrefix.None);Hidden;SubCommand>] PristineCheck
     | [<CliPrefix(CliPrefix.None);Hidden;SubCommand>] GeneratePackages
@@ -29,6 +30,8 @@ type Arguments =
 
     | [<Inherit>] TrailingCommas
     | [<Inherit>] Reflow
+    | [<Inherit>] Port of int
+    | [<Inherit>] NoServe
     | [<Inherit;AltCommandLine("-s")>] SingleTarget of bool
     | [<Inherit>] Token of string
     | [<Inherit;AltCommandLine("-c")>] CleanCheckout of bool
@@ -42,6 +45,9 @@ with
             | Benchmark -> "runs the BenchmarkDotNet suite against the AOT-published binary"
             | Conformance -> "measures agreement with dotnet format over a corpus (--corpus <path>)"
             | Perf -> "times the AOT binary over a corpus (--corpus <path>); never measure the JIT build"
+            | Docs -> "builds the public docs, applies the landing page override, and serves them"
+            | Port _ -> "port to serve the documentation on (default 8080)"
+            | NoServe -> "build the documentation without serving it"
             | Corpus _ -> "path to a checkout to measure conformance against"
             | Minimum _ -> "fail if conformance falls below this percentage"
             | MaxAllocationRatio _ -> "fail if perf allocates more than this multiple of the source size"

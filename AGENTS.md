@@ -9,6 +9,7 @@ width-aware reflow. It ships as a native-AOT `dotnet tool`.
 ./build.sh build          # dotnet build -c Release
 ./build.sh test           # runs tests/Nullean.Kerf.Tests via `dotnet run`
 ./build.sh benchmark      # BenchmarkDotNet suite
+./build.sh docs           # builds docs/ and serves it at http://localhost:8080/formatter/
 ./build.sh generatepackages
 ```
 
@@ -92,7 +93,7 @@ folder with no restore and no build.
   `dotnet format whitespace`**. That number is the product claim; keep it at 100%.
 
 **Before adding any option that moves a line break, read
-[docs/layout-decisions.md](docs/layout-decisions.md).** A layout rule may read the tokens and it may
+[docs/contribute/layout-decisions.md](docs/contribute/layout-decisions.md).** A layout rule may read the tokens and it may
 read layout the author owns; it may never read layout Kerf itself decides. That one mistake has
 killed more features than every other cause combined, and the note carries the measurements so they
 are not re-derived.

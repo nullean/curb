@@ -33,7 +33,13 @@ public static class OptionValues
 		"trim_trailing_whitespace" => Bool(options.TrimTrailingWhitespace),
 
 		// Read and written but never a layout decision, so there is nothing resolved to report.
-		"charset" => "utf-8",
+		"charset" => options.Charset switch
+		{
+			Charset.Utf8 => "utf-8",
+			Charset.Utf8Bom => "utf-8-bom",
+			Charset.Preserve => "   # the byte-order mark each file arrived with is kept",
+			_ => "   # the byte-order mark each file arrived with is kept",
+		},
 
 		"csharp_trailing_comma_in_multiline_lists" => Bool(options.TrailingCommaInMultilineLists),
 		"csharp_trailing_comma_in_singleline_lists" => Bool(options.TrailingCommaInSinglelineLists),

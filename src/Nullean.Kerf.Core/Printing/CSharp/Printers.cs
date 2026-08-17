@@ -390,8 +390,22 @@ internal static partial class Printers
 		// a body that wraps reads `M()` / `=> expr` rather than `M() =>` / `expr`. Only the break
 		// moves: flat, both spellings print `M() => expr`, so the option costs nothing on a body that
 		// fits and cannot make one wrap that would not have.
-		var arrowLeadsTheBody = context.Options.WrapBeforeArrowWithExpressions
-			&& node.Expression is not (SwitchExpressionSyntax or QueryExpressionSyntax);
+		// A break the author put around the arrow is theirs, exactly as a member chain's is, and which
+		// side they put it on is theirs too. Without this the group simply fitted — with reflow off it
+		// always fits — and every wrapped expression body was pulled back onto one line: 217
+		// characters in one roslyn case, on a repository that sets no width at all. It also
+		// contradicted the rule the rest of the printer is built on, that nothing joins lines the
+		// author broke.
+		//
+		// Stable for the same reason the chain's is: Kerf reproduces the break, so the next run reads
+		// the same answer back.
+		var hugs = node.Expression is SwitchExpressionSyntax or QueryExpressionSyntax;
+		var breakBeforeArrow = !hugs
+			&& !context.OnSameLine(node.ArrowToken.GetPreviousToken().Span.End, node.ArrowToken.SpanStart);
+		var breakAfterArrow = !hugs
+			&& !context.OnSameLine(node.ArrowToken.Span.End, node.Expression.SpanStart);
+
+		var arrowLeadsTheBody = !hugs && (context.Options.WrapBeforeArrowWithExpressions || breakBeforeArrow);
 
 		if (!arrowLeadsTheBody)
 			TokenPrinter.Print(node.ArrowToken, context);
@@ -432,9 +446,17 @@ internal static partial class Printers
 			// so flat this must collapse to nothing or the arrow ends up with two.
 			if (arrowLeadsTheBody)
 			{
-				arena.SoftLine();
+				if (breakBeforeArrow)
+					arena.HardLine();
+				else
+					arena.SoftLine();
+
 				TokenPrinter.Print(node.ArrowToken, context);
 				arena.Synthetic(SyntheticText.Space);
+			}
+			else if (breakAfterArrow)
+			{
+				arena.HardLine();
 			}
 			else
 			{

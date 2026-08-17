@@ -64,6 +64,22 @@ public enum BraceRequirement
 	WhenMultiline,
 }
 
+/// <summary>What <c>charset</c> asks for, to the extent Kerf writes it.</summary>
+public enum Charset : byte
+{
+	/// <summary>
+	/// No <c>charset</c> key. The file keeps whatever byte-order mark it arrived with, which is what
+	/// dotnet format does when nothing asks otherwise and is the least churn.
+	/// </summary>
+	Preserve = 0,
+
+	/// <summary>UTF-8 with no byte-order mark.</summary>
+	Utf8 = 1,
+
+	/// <summary>UTF-8 with a byte-order mark.</summary>
+	Utf8Bom = 2,
+}
+
 /// <summary>Line ending to emit.</summary>
 public enum EndOfLine : byte
 {
@@ -106,6 +122,16 @@ public readonly record struct FormatOptions
 
 	/// <summary>Reflow target. <c>max_line_length</c>. <see cref="Off"/> disables reflow entirely.</summary>
 	public int MaxLineLength { get; init; } = Off;
+
+	/// <summary>
+	/// <c>charset</c>. Governs the byte-order mark only; Kerf reads and writes UTF-8 either way.
+	/// </summary>
+	/// <remarks>
+	/// Defaults to <see cref="Charset.Preserve"/>, so a file keeps the mark it had. Kerf used to write
+	/// every file without one, which silently stripped the mark from any repository asking for
+	/// <c>utf-8-bom</c> — 17,000 files on roslyn, which sets it on every source file.
+	/// </remarks>
+	public Charset Charset { get; init; } = Charset.Preserve;
 
 	/// <summary><c>end_of_line</c>.</summary>
 	public EndOfLine EndOfLine { get; init; } = EndOfLine.Auto;
