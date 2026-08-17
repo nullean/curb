@@ -250,6 +250,9 @@ public static class EditorConfigOptionsBinder
 			&& !string.Equals(header, "unset", StringComparison.OrdinalIgnoreCase))
 			options = options with { FileHeaderTemplate = header };
 
+		if (TryPrefixedBool(properties, "wrap_before_first_method_call", diagnostics, out var wrapFirstCall))
+			options = options with { WrapBeforeFirstMethodCall = wrapFirstCall };
+
 		if (TryPrefixedCount(properties, "max_formal_parameters_on_line", diagnostics, out var maxParameters))
 			options = options with { MaxParametersOnLine = maxParameters };
 

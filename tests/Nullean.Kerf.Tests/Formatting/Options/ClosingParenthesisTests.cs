@@ -333,4 +333,73 @@ public class ClosingParenthesisTests : FormattingTest
 		}
 		""",
 		editorConfig: "csharp_max_formal_parameters_on_line = 2");
+
+	// ---- the chain head -------------------------------------------------------------------------------
+
+	[Test]
+	public Task A_plain_receiver_keeps_its_first_call_by_default() => Unchanged(
+		// `source.Where(…)` reads as one thing, so the receiver is not left stranded.
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        var r = source.Where(x => x.Active)
+		            .Select(x => x.Name)
+		            .ToList();
+		    }
+		}
+		""",
+		editorConfig: Narrow);
+
+	[Test]
+	public Task Wrapping_before_the_first_call_strands_the_receiver() => WithAndWithout(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        var r = source.Where(x => x.Active).Select(x => x.Name).ToList();
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        var r = source.Where(x => x.Active)
+		            .Select(x => x.Name)
+		            .ToList();
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        var r = source
+		            .Where(x => x.Active)
+		            .Select(x => x.Name)
+		            .ToList();
+		    }
+		}
+		""",
+		"csharp_wrap_before_first_method_call = true",
+		editorConfig: Narrow);
+
+	[Test]
+	public Task A_chain_that_fits_is_not_broken_by_the_key() => Unchanged(
+		// It decides where a break goes, not whether there is one.
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        var r = source.Where(x).ToList();
+		    }
+		}
+		""",
+		editorConfig: Narrow + "\ncsharp_wrap_before_first_method_call = true");
 }

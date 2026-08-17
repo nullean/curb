@@ -103,6 +103,7 @@ public static class OptionCatalog
 			"csharp_style_expression_bodied_properties",
 			"csharp_style_expression_bodied_indexers",
 			"csharp_using_directive_placement",
+			"csharp_wrap_before_first_method_call",
 			"csharp_max_formal_parameters_on_line",
 			"csharp_max_invocation_arguments_on_line",
 			"csharp_wrap_before_declaration_rpar",

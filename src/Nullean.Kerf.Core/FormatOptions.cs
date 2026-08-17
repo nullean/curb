@@ -574,6 +574,23 @@ public readonly record struct FormatOptions
 	/// <summary><c>csharp_max_invocation_arguments_on_line</c>, the same for an argument list.</summary>
 	public int? MaxArgumentsOnLine { get; init; }
 
+	/// <summary>
+	/// <c>csharp_wrap_before_first_method_call</c>: when a chain breaks at its dots, break before the
+	/// first call too, leaving the receiver on a line of its own.
+	/// </summary>
+	/// <remarks>
+	/// <para>
+	/// Null keeps what Kerf does: a plain identifier receiver keeps its first call, because
+	/// <c>builder.AddProject(…)</c> reads as one thing, while anything more involved is left to
+	/// stand alone. <c>true</c> strands every receiver; <c>false</c> attaches every first call.
+	/// </para>
+	/// <para>
+	/// An author's own break at that dot is theirs either way — this decides what Kerf does when it
+	/// is the one introducing the breaks.
+	/// </para>
+	/// </remarks>
+	public bool? WrapBeforeFirstMethodCall { get; init; }
+
 	/// <summary>True when either trailing-comma option asked for anything.</summary>
 	/// <remarks>
 	/// Gates both the printer work and the verifier's allowance for a comma that appears or vanishes,

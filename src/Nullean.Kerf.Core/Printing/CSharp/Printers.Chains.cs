@@ -61,10 +61,17 @@ internal static partial class Printers
 		// `builder.AddProject(…)` reads as one thing, so a plain identifier receiver keeps its first
 		// call rather than being left stranded on a line of its own — but not when the author put
 		// their own break there, which is theirs to keep.
-		var attached = !asWritten
-			&& receiver is IdentifierNameSyntax or PredefinedTypeSyntax or ThisExpressionSyntax or BaseExpressionSyntax
-			? 1
-			: 0;
+		//
+		// csharp_wrap_before_first_method_call overrides the judgement in either direction: true
+		// strands every receiver, false attaches every first call.
+		var attached = context.Options.WrapBeforeFirstMethodCall switch
+		{
+			true => 0,
+			false => 1,
+			null when !asWritten
+				&& receiver is IdentifierNameSyntax or PredefinedTypeSyntax or ThisExpressionSyntax or BaseExpressionSyntax => 1,
+			_ => 0,
+		};
 
 		for (var i = 0; i < attached && i < links.Count; i++)
 			PrintLink(links[i], context);
