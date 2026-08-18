@@ -12,7 +12,7 @@ placement.
 ## It's fast
 
 350 ms CPU on a 1,196-file, 6.5 MB corpus — within measurement noise of the Roslyn parse floor.
-`dotnet format whitespace` on the same files: ~12,000 ms. CSharpier: ~14,000 ms.
+`dotnet format whitespace` on the same files: ~12,000 ms.
 
 Speed is what makes running on every build viable. The [build integration](workflow/msbuild.md)
 skips unchanged projects entirely; on a project where nothing changed, no process starts.

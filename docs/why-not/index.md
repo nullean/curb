@@ -11,14 +11,13 @@ The short answer: you probably do not have to choose.
 
 What is different is what each tool covers:
 
-| | {{product}} | `dotnet format` | CSharpier | Rider/ReSharper cleanup |
-|---|---|---|---|---|
-| Layout + reflow | ✅ | ❌ (whitespace only) | ✅ | ✅ |
-| All 39 IDE0055 formatting options | ✅ | ✅ | read only a few | ✅ |
-| No build needed | ✅ | ✅ (whitespace) / ❌ (style) | ✅ | ❌ |
-| Runs inside `dotnet build` | ✅ | ❌ | ❌ | ❌ |
-| Reads ReSharper `.editorconfig` keys | ✅ | ❌ | ❌ | ✅ |
-| On-disk cache | ❌ | ❌ | ✅ | — |
-| MSBuild incremental (no-op when nothing changed) | ✅ | ❌ | ❌ | ❌ |
+| | {{product}} | `dotnet format` | Rider/ReSharper cleanup |
+|---|---|---|---|
+| Layout + reflow | ✅ | ❌ (whitespace only) | ✅ |
+| All 39 IDE0055 formatting options | ✅ | ✅ | ✅ |
+| No build needed | ✅ | ✅ (whitespace) / ❌ (style) | ❌ |
+| Runs inside `dotnet build` | ✅ | ❌ | ❌ |
+| Reads ReSharper `.editorconfig` keys | ✅ | ❌ | ✅ |
+| MSBuild incremental (no-op when nothing changed) | ✅ | ❌ | ❌ |
 
 The four pages below go into each comparison in detail.

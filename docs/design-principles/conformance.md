@@ -17,5 +17,4 @@ What is measured is that {{product}}'s output is a *fixed point* of `dotnet form
 over a {{product}}-formatted file and nothing changes. That is what decides whether Format Document in
 your IDE will fight your formatter.
 
-The same measurement run over twelve real repositories and 41,000 files, against CSharpier and
-`dotnet format` as well, is in [the benchmarks](../benchmarks/index.md).
+The same measurement over twelve real repositories and 41,000 files is in [the benchmarks](../benchmarks/index.md).

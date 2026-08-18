@@ -26,7 +26,7 @@ csharp_trailing_comma_in_multiline_lists = true
 
 {{product}} honours all of them. The defaults leave everything off — so a repository that never set them is unchanged — and a repository that set them for Rider gets the same layout from {{product}}.
 
-`dotnet format` does not read any of these keys. CSharpier does not read them either. If you want wrapping and blank-line rules from your `.editorconfig` to be enforced consistently across the command line, the build, and CI, {{product}} is currently the only way to do that.
+`dotnet format` does not read any of these keys. If you want wrapping and blank-line rules from your `.editorconfig` enforced consistently across the command line, the build, and CI, {{product}} is currently the only way to do that.
 
 ## Where Rider does more
 
