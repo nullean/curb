@@ -11,6 +11,8 @@ type Arguments =
     | [<CliPrefix(CliPrefix.None);SubCommand>] Conformance
     | [<CliPrefix(CliPrefix.None);SubCommand>] Churn
     | [<CliPrefix(CliPrefix.None);SubCommand>] Perf
+    | [<CliPrefix(CliPrefix.None);SubCommand>] Compare
+    | [<CliPrefix(CliPrefix.None);SubCommand>] Options
     | [<CliPrefix(CliPrefix.None);SubCommand>] Docs
 
     | [<CliPrefix(CliPrefix.None);Hidden;SubCommand>] PristineCheck
@@ -54,10 +56,12 @@ with
             | Conformance -> "measures agreement with dotnet format over a corpus (--corpus <path>)"
             | Churn -> "measures how many of a corpus's files Kerf rewrites (--corpus <path>)"
             | Perf -> "times the AOT binary over a corpus (--corpus <path>); never measure the JIT build"
+            | Compare -> "times kerf, csharpier and dotnet format over a directory of repos (--corpus <dir>)"
+            | Options -> "generates docs/reference/options/**/*.md by running Kerf against each option's snippet"
             | Docs -> "builds the public docs, applies the landing page override, and serves them"
             | Port _ -> "port to serve the documentation on (default 8080)"
             | NoServe -> "build the documentation without serving it"
-            | Corpus _ -> "path to a checkout to measure conformance against"
+            | Corpus _ -> "path to a checkout (or a directory of checkouts for compare)"
             | Minimum _ -> "fail if conformance falls below this percentage"
             | Maximum _ -> "fail if churn rises above this percentage of files"
             | MaxAllocationRatio _ -> "fail if perf allocates more than this multiple of the source size"

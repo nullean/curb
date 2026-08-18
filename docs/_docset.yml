@@ -13,6 +13,11 @@ subs:
 toc:
   - file: index.md
   - file: why.md
+  - folder: getting-started
+    children:
+      - file: index.md
+      - file: installation.md
+  - file: design-principles.md
   - folder: concepts
     children:
       - file: index.md
@@ -24,9 +29,50 @@ toc:
       - file: msbuild.md
       - file: cleanup.md
       - file: agent-instructions.md
-  - folder: getting-started
+  - folder: why-not
     children:
       - file: index.md
+      - file: csharpier.md
+      - file: dotnet-format.md
+      - file: rider-resharper.md
+      - file: editorconfig-analyzers.md
+  - folder: reference
+    children:
+      - file: index.md
+      - file: options/index.md
+      - folder: options/core
+        children:
+          - file: index.md
+      - folder: options/new-lines
+        children:
+          - file: index.md
+      - folder: options/indentation
+        children:
+          - file: index.md
+      - folder: options/spacing
+        children:
+          - file: index.md
+      - folder: options/wrapping
+        children:
+          - file: index.md
+      - folder: options/blank-lines
+        children:
+          - file: index.md
+      - folder: options/expression-bodies
+        children:
+          - file: index.md
+      - folder: options/usings
+        children:
+          - file: index.md
+      - folder: options/modifiers-and-braces
+        children:
+          - file: index.md
+      - folder: options/trailing-commas
+        children:
+          - file: index.md
+      - folder: options/suppression
+        children:
+          - file: index.md
   - folder: contribute
     children:
       - file: layout-decisions.md

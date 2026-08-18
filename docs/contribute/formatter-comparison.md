@@ -21,6 +21,8 @@ onboarding case for a repository that has never configured anything.
 
 ## Results
 
+<!-- RESULTS -->
+
 ```
 repo               files  ec |     kerf     csp     dnf |    kerf    csp    dnf |   kerf   csp |   2nd
                              |     --- seconds ---      |  -- files changed --  |  not fixpt   |  idem
@@ -37,6 +39,8 @@ MassTransit         5502   1 |     1.31    6.54    9.30 |    5289   5328    411 
 efcore              5761   4 |     5.54   21.43   20.70 |    5279   5427   5343 |   3221   128 |    96
 roslyn             17169  38 |    14.17   76.94   41.80 |   11510  15093      0 |      0     0 |   642
 ```
+
+<!-- /RESULTS -->
 
 `ec` = number of `.editorconfig` files. `2nd idem` = files that change on a second Kerf run; it must
 be zero.
@@ -168,5 +172,11 @@ and only a hand check tells you which case you are in.
 
 ## Reproducing
 
-`bench.sh` and `rerun.sh` in the session scratchpad drive the whole run; the repositories are shallow
-clones. Roughly 40 minutes wall clock, dominated by `dotnet format` on roslyn and efcore.
+Shallow-clone the twelve repositories into a single directory, then:
+
+```sh
+./build.sh compare --corpus /path/to/repos
+```
+
+The results table above is written back into this file automatically. The run takes roughly 40 minutes
+wall clock, dominated by `dotnet format` on roslyn and efcore.

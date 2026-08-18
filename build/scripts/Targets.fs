@@ -12,6 +12,11 @@ let exec binary args =
     // Proc 0.14+: Exec passes args directly to the OS (no shell expansion) and throws on failure.
     Proc.Exec (binary, List.toArray args) |> ignore
 
+/// Like exec but returns the exit code rather than throwing on failure.
+let private execResult binary args =
+    let result = Proc.Start(binary, List.toArray args)
+    result.ExitCode
+
 let private restoreTools = lazy(exec "dotnet" ["tool"; "restore"])
 
 let private currentVersion =
@@ -1027,6 +1032,224 @@ let private createReleaseOnGithub (arguments:ParseResults<Arguments>) =
 
     exec "dotnet" (["release-notes"] @ releaseArgs) |> ignore
 
+/// Timings and metrics for one repository in the compare run.
+type private RepoResult = {
+    Name: string
+    Files: int
+    Configs: int
+    KerfSeconds: float
+    CspSeconds: float
+    DnfSeconds: float
+    KerfChanged: int
+    CspChanged: int
+    DnfChanged: int
+    KerfNotFixpt: int
+    CspNotFixpt: int
+    KerfSecond: int
+}
+
+/// Times Kerf, CSharpier and dotnet-format-whitespace over every sub-directory of a corpus dir
+/// and writes a refreshed results table to docs/contribute/formatter-comparison.md.
+///
+/// --corpus must point at a directory whose immediate children are C# repository checkouts. Every
+/// subdirectory that contains at least one .cs file is measured. Each tool runs on a fresh copy so
+/// no tool sees the other's output.
+///
+/// The result table is written both to stdout and into docs/contribute/formatter-comparison.md
+/// between the <!-- RESULTS --> ... <!-- /RESULTS --> marker comments, so the doc stays current
+/// without a manual edit.
+let private compare (arguments:ParseResults<Arguments>) =
+    let corpusDir =
+        match arguments.TryGetResult Corpus with
+        | Some path ->
+            let d = DirectoryInfo path
+            if not d.Exists then failwithf "compare: corpus not found: %s" d.FullName
+            d
+        | None -> failwith "compare needs --corpus <dir-of-repos>"
+
+    // Publish the native binary exactly as `perf` does.
+    let rid =
+        let os =
+            if OperatingSystem.IsWindows() then "win"
+            elif OperatingSystem.IsMacOS() then "osx"
+            else "linux"
+        let arch =
+            match Runtime.InteropServices.RuntimeInformation.ProcessArchitecture with
+            | Runtime.InteropServices.Architecture.Arm64 -> "arm64"
+            | Runtime.InteropServices.Architecture.X64 -> "x64"
+            | other -> failwithf "no RID mapping for %O" other
+        sprintf "%s-%s" os arch
+
+    printfn "publishing native AOT for %s" rid
+    exec "dotnet" ["publish"; "src/Nullean.Kerf.Cli"; "-c"; "Release"; "-r"; rid] |> ignore
+
+    let binary =
+        let name = if OperatingSystem.IsWindows() then "Nullean.Kerf.Cli.exe" else "Nullean.Kerf.Cli"
+        Path.GetFullPath(Path.Combine(".artifacts", "publish", "Nullean.Kerf.Cli", sprintf "release_%s" rid, name))
+    if not (File.Exists binary) then failwithf "expected a native binary at %s" binary
+
+    // Scratch space under the build output so it never pollutes the corpus.
+    let scratch = Path.Combine(Paths.Output.FullName, "compare")
+    if Directory.Exists scratch then Directory.Delete(scratch, true)
+    Directory.CreateDirectory scratch |> ignore
+
+    let countChanged (original: string) (formatted: string) =
+        Directory.GetFiles(original, "*.cs", SearchOption.AllDirectories)
+        |> Array.filter (fun f ->
+            let rel = Path.GetRelativePath(original, f)
+            let other = Path.Combine(formatted, rel)
+            not (File.Exists other) || File.ReadAllText f <> File.ReadAllText other)
+        |> Array.length
+
+    let countNotFixpt (formatted: string) =
+        let check = Path.Combine(scratch, "fixpt_" + Guid.NewGuid().ToString("N"))
+        copyTree formatted check
+        execResult "dotnet" ["format"; "whitespace"; check; "--folder"] |> ignore
+        let diffs = countChanged formatted check
+        if Directory.Exists check then Directory.Delete(check, true)
+        diffs
+
+    // Find every immediate child directory that has at least one .cs file.
+    let repos =
+        corpusDir.GetDirectories()
+        |> Array.filter (fun d -> Directory.GetFiles(d.FullName, "*.cs", SearchOption.AllDirectories).Length > 0)
+        |> Array.sortBy (fun d -> Directory.GetFiles(d.FullName, "*.cs", SearchOption.AllDirectories).Length)
+
+    printfn "%d repos found in %s" repos.Length corpusDir.FullName
+
+    let results = System.Collections.Generic.List<RepoResult>()
+
+    for repo in repos do
+        printfn ""
+        printfn "=== %s ===" repo.Name
+        let files = Directory.GetFiles(repo.FullName, "*.cs", SearchOption.AllDirectories).Length
+        let configs = Directory.GetFiles(repo.FullName, ".editorconfig", SearchOption.AllDirectories).Length
+
+        // Fresh copies — one per tool so no tool sees the other's output.
+        let kerfDir = Path.Combine(scratch, repo.Name + "_kerf")
+        let cspDir  = Path.Combine(scratch, repo.Name + "_csp")
+        let dnfDir  = Path.Combine(scratch, repo.Name + "_dnf")
+        copyTree repo.FullName kerfDir
+        copyTree repo.FullName cspDir
+        copyTree repo.FullName dnfDir
+        configureCorpus arguments kerfDir
+        configureCorpus arguments cspDir
+        configureCorpus arguments dnfDir
+
+        // Kerf — best of 3.
+        // Uses execResult (not exec) so a verification failure on one file does not abort the run.
+        // Exit code 3 means a file could not be verified and was left untouched — expected on repos
+        // with raw string literals or BOM handling; the changed-file count still reflects what happened.
+        let kerfSec =
+            [ for _ in 1..3 ->
+                let sw = Diagnostics.Stopwatch.StartNew()
+                execResult binary ["format"; kerfDir] |> ignore
+                sw.Stop()
+                sw.Elapsed.TotalSeconds ]
+            |> List.min
+
+        // CSharpier — best of 3 (re-copy each time so the second run is not a no-op over formatted output)
+        let cspSec =
+            [ for i in 1..3 ->
+                if i > 1 then
+                    if Directory.Exists cspDir then Directory.Delete(cspDir, true)
+                    copyTree repo.FullName cspDir
+                    configureCorpus arguments cspDir
+                let sw = Diagnostics.Stopwatch.StartNew()
+                execResult "csharpier" ["format"; cspDir] |> ignore
+                sw.Stop()
+                sw.Elapsed.TotalSeconds ]
+            |> List.min
+
+        // dotnet format whitespace — best of 3
+        let dnfSec =
+            [ for i in 1..3 ->
+                if i > 1 then
+                    if Directory.Exists dnfDir then Directory.Delete(dnfDir, true)
+                    copyTree repo.FullName dnfDir
+                    configureCorpus arguments dnfDir
+                let sw = Diagnostics.Stopwatch.StartNew()
+                execResult "dotnet" ["format"; "whitespace"; dnfDir; "--folder"] |> ignore
+                sw.Stop()
+                sw.Elapsed.TotalSeconds ]
+            |> List.min
+
+        // Files changed vs pristine
+        let kerfChanged = countChanged repo.FullName kerfDir
+        let cspChanged  = countChanged repo.FullName cspDir
+        let dnfChanged  = countChanged repo.FullName dnfDir
+
+        // Not-fixed-point: how many of each tool's outputs are changed by dotnet format whitespace
+        printfn "checking fixed-point for kerf..."
+        let kerfNotFixpt = countNotFixpt kerfDir
+        printfn "checking fixed-point for csharpier..."
+        let cspNotFixpt = countNotFixpt cspDir
+
+        // Kerf idempotency: second pass over own output
+        printfn "checking kerf idempotency..."
+        let kerfDir2 = Path.Combine(scratch, repo.Name + "_kerf2")
+        copyTree kerfDir kerfDir2
+        execResult binary ["format"; kerfDir2] |> ignore
+        let kerfSecond = countChanged kerfDir kerfDir2
+        if Directory.Exists kerfDir2 then Directory.Delete(kerfDir2, true)
+
+        // Clean up work dirs to keep disk usage bounded.
+        for d in [kerfDir; cspDir; dnfDir] do
+            if Directory.Exists d then Directory.Delete(d, true)
+
+        let r = {
+            Name = repo.Name; Files = files; Configs = configs
+            KerfSeconds = kerfSec; CspSeconds = cspSec; DnfSeconds = dnfSec
+            KerfChanged = kerfChanged; CspChanged = cspChanged; DnfChanged = dnfChanged
+            KerfNotFixpt = kerfNotFixpt; CspNotFixpt = cspNotFixpt; KerfSecond = kerfSecond
+        }
+        results.Add(r)
+        printfn "%s: kerf %.2f s, csp %.2f s, dnf %.2f s; changed %d/%d/%d; not-fixpt %d/%d; 2nd %d"
+            r.Name r.KerfSeconds r.CspSeconds r.DnfSeconds r.KerfChanged r.CspChanged r.DnfChanged
+            r.KerfNotFixpt r.CspNotFixpt r.KerfSecond
+
+    // Emit the table.
+    let header =
+        "```\n" +
+        "repo               files  ec |     kerf     csp     dnf |    kerf    csp    dnf |   kerf   csp |   2nd\n" +
+        "                             |     --- seconds ---      |  -- files changed --  |  not fixpt   |  idem"
+    let rows =
+        results
+        |> Seq.map (fun r ->
+            sprintf "%-18s %5d %3d | %8.2f %7.2f %7.2f | %7d %6d %6d | %6d %5d | %5d"
+                r.Name r.Files r.Configs
+                r.KerfSeconds r.CspSeconds r.DnfSeconds
+                r.KerfChanged r.CspChanged r.DnfChanged
+                r.KerfNotFixpt r.CspNotFixpt r.KerfSecond)
+        |> String.concat "\n"
+    let table = sprintf "%s\n%s\n```" header rows
+
+    printfn ""
+    printfn "%s" table
+
+    // Splice into the doc between the marker comments.
+    let docPath = "docs/contribute/formatter-comparison.md"
+    if File.Exists docPath then
+        let content = File.ReadAllText docPath
+        let startMarker = "<!-- RESULTS -->"
+        let endMarker = "<!-- /RESULTS -->"
+        let startIdx = content.IndexOf(startMarker, StringComparison.Ordinal)
+        let endIdx = content.IndexOf(endMarker, StringComparison.Ordinal)
+        if startIdx >= 0 && endIdx > startIdx then
+            let before = content.[..startIdx + startMarker.Length - 1]
+            let after = content.[endIdx..]
+            let updated = sprintf "%s\n\n%s\n\n%s" before table after
+            File.WriteAllText(docPath, updated)
+            printfn ""
+            printfn "updated %s" docPath
+        else
+            printfn "warning: %s has no <!-- RESULTS --> / <!-- /RESULTS --> markers; table not spliced" docPath
+    else
+        printfn "warning: %s not found; table not written" docPath
+
+let private options (_:ParseResults<Arguments>) =
+    exec "dotnet" ["run"; "--project"; "tools/Nullean.Kerf.OptionDocs"; "-c"; "Release"] |> ignore
+
 let private release (arguments:ParseResults<Arguments>) = printfn "release"
 
 let private publish (arguments:ParseResults<Arguments>) = printfn "publish"
@@ -1052,6 +1275,8 @@ let Setup (parsed:ParseResults<Arguments>) (subCommand:Arguments) =
     cmd Conformance.Name (Some [Build.Name]) None <| fun _ -> conformance parsed
     cmd Churn.Name (Some [Build.Name]) None <| fun _ -> churn parsed
     cmd Perf.Name (Some [Build.Name]) None <| fun _ -> perf parsed
+    cmd Compare.Name (Some [Build.Name]) None <| fun _ -> compare parsed
+    cmd Options.Name (Some [Build.Name]) None <| fun _ -> options parsed
     cmd MsbuildSmoketest.Name (Some [Build.Name]) None <| fun _ -> msbuildSmoketest parsed
     cmd CleanupSmoketest.Name (Some [Build.Name]) None <| fun _ -> cleanupSmoketest parsed
     cmd CleanupSafety.Name (Some [Build.Name]) None <| fun _ -> cleanupSafety parsed
