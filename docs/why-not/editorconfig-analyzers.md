@@ -15,7 +15,7 @@ With `EnforceCodeStyleInBuild = true` and no formatter in the build, every mecha
 
 {{product}} runs at `BeforeTargets="CoreCompile"`. By the time `CoreCompile` evaluates the analyzers, {{product}} has already rewritten every file it can format. The only IDE0055 diagnostics that survive are things {{product}} has not implemented — which are reported explicitly rather than silently skipped.
 
-The [MSBuild smoketest](../contribute/layout-decisions.md) verifies both directions: building the sample with {{product}} in the path must succeed even with `EnforceCodeStyleInBuild = true` and deliberately misformatted source; building without {{product}} must report IDE0055 errors. Only the pair proves anything.
+The MSBuild smoketest verifies both directions: building the sample with {{product}} in the path must succeed even with `EnforceCodeStyleInBuild = true` and deliberately misformatted source; building without {{product}} must report IDE0055 errors. Only the pair proves anything.
 
 ## The semantic remainder
 

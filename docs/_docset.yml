@@ -17,15 +17,19 @@ toc:
     children:
       - file: index.md
       - file: installation.md
-  - file: design-principles.md
-  - folder: concepts
+  - folder: design-principles
     children:
       - file: index.md
+      - file: conformance.md
+      - file: performance.md
       - file: reflow.md
       - file: safety.md
+      - file: ai-native.md
+      - file: existing-tooling.md
+      - file: syntax-and-semantic.md
   - folder: workflow
     children:
-      - file: ai-native.md
+      - file: integrations.md
       - file: msbuild.md
       - file: cleanup.md
       - file: agent-instructions.md
@@ -44,5 +48,5 @@ toc:
     island: false
   - folder: contribute
     children:
-      - file: layout-decisions.md
       - file: formatter-comparison.md
+      - file: known-limitations.md

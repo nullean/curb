@@ -1,12 +1,12 @@
 ---
 navigation_title: Formatter comparison
-description: A measurement run over 41,000 files of real .NET source, and the six defects it found.
+description: A measurement run over 41,000 files of real .NET source across twelve repositories.
 ---
 
 # Kerf vs CSharpier vs dotnet format, on twelve real repositories
 
-A development note recording a measurement run over 41,000 files of real .NET source, and the six
-defects it found that the single-repository corpus cannot see.
+A measurement run over 41,000 files of real .NET source, timing three tools on identical copies of
+each repository.
 
 ## Method
 
@@ -88,110 +88,12 @@ rewrites 9,191 of them. Kerf's output is still a fixed point there — `dotnet f
 own `max_line_length`, chain breaking, comment alignment. All defensible individually, and
 collectively the opposite of a quiet first run.
 
-efcore's 533 not-fixpt files are explained by defect 4 (multi-line trivia line endings), which
-accounts for most cross-tool conformance failures in the corpus too.
+efcore's 533 not-fixpt files are explained by a known limitation (multi-line trivia line endings),
+which accounts for most cross-tool conformance failures in the corpus too. See
+[known limitations](known-limitations.md).
 
 Anyone working on churn should start here rather than on the corpus, where the number is 742 of 1,196
 and has been stable for so long that it reads as settled.
-
-## Defects found
-
-### 1. Crash on `new { }` — fixed
-
-Both ends of the anonymous-type printer indexed the initializer list without checking it was
-non-empty. `new { }` is valid C# and common in test code. Fixed in `4151fd3` with a regression test.
-
-It crashed **MassTransit, efcore and roslyn — the three largest repositories, and nothing smaller.**
-The corpus contains no empty anonymous object at all.
-
-### 2. One bad file aborts the whole run — not fixed
-
-`FormattingRun` formats in parallel and does not isolate per-file exceptions, so the single `new { }`
-above took down a 17,000-file run with an unhandled exception. This contradicts the standing promise
-that a file which cannot be formatted is reported and left untouched: the blast radius of any printer
-bug is the entire repository rather than one file. The printer bug was a one-line guard; this is a
-design gap.
-
-### 3. `charset` is not implemented
-
-Kerf lists `charset` in its option catalog and hard-codes the readback to `utf-8`, but never writes a
-BOM and never removes one on purpose — it simply always writes without one, and only touches files it
-was already rewriting.
-
-```
-charset = utf-8-bom          # what roslyn asks for
-kerf:            BOM present -> stripped,  BOM absent -> stays absent
-dotnet format:   BOM present -> kept,      BOM absent -> added
-```
-
-roslyn sets `utf-8-bom` on 17,169 files, so Kerf strips a BOM the repository explicitly asks for,
-from every file it touches. This is both a correctness bug and a large share of the roslyn churn.
-
-### 4. Multi-line trivia keeps the source's line endings
-
-The highest-impact conformance defect. Kerf emits multi-line trivia — doc comments, verbatim string
-literals — as a raw source span, so their internal newlines survive unchanged, while the breaks Kerf
-emits itself use the configured ending. The result is a file with mixed endings:
-
-```
-^M$                          <- Kerf's own break, CRLF
-/// <remarks>$               <- inside one doc-comment trivia, source LF
-/// Represents information$
-/// </remarks>^M$
-```
-
-Every such file fails the fixed-point check. This accounts for most of efcore's 3,221 and log4net's
-322, against CSharpier's 128 and 4.
-
-### 5. Expression-body conversions do not compose in one pass
-
-Live in the default configuration, with `csharp_style_expression_bodied_properties = true` and
-`..._accessors = true`:
-
-```csharp
-public int Count { get { throw new NotImplementedException(); } }   // source, expanded
-public int Count { get => throw new NotImplementedException(); }    // run 1
-public int Count => throw new NotImplementedException();            // run 2 — different
-```
-
-The accessor-level conversion fires on run 1. The property-level one only recognises an accessor list
-that *already* has an arrow getter, so it fires on run 2. Two transformations that should compose.
-Hits quartznet (30 files), efcore (96), Humanizer (6), AutoMapper (2).
-
-### 6. Anchor columns feed back into the next run
-
-roslyn's 642 unsettled files are almost all this, and it is the mechanism described in
-[layout-decisions.md](layout-decisions.md) appearing in the *default* configuration rather than
-behind an alignment option:
-
-```csharp
-// run 1
-                        {
-                            Environment.NewLine
-                        },
-// run 2 — one level deeper
-                            {
-                                Environment.NewLine
-                            },
-```
-
-An initializer anchors to the indentation of the line it starts on; Kerf's own output moved that
-line, so the next run anchors somewhere else. The same happens to comment alignment — a comment in
-`DecisionDagBuilder.cs` walks right by tens of columns on the second pass.
-
-This is the one to treat as structural. It is not an option misbehaving, it is the anchor mechanism
-being unstable under its own output on real code.
-
-## A caveat about the metric
-
-FluentValidation's 216 failures are not Kerf's. Reproduced without Kerf in the loop: under that
-repository's `.editorconfig`, `dotnet format` indents members of a **file-scoped namespace** by an
-extra level. CSharpier scores an identical 216. Kerf's rendering is the defensible one; conformance
-counts it against Kerf anyway, because the metric is defined against the tool rather than against
-correctness.
-
-Worth remembering when a conformance number moves: the number can be wrong about which side is right,
-and only a hand check tells you which case you are in.
 
 ## Reproducing
 

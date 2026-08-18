@@ -1,45 +1,17 @@
 ---
 navigation_title: Why Kerf
-description: Existing tools each solve one half of the problem. The measurement that shows it, and what Kerf does instead.
+description: What Kerf does that existing tools do not, in short.
 ---
 
 # Why Kerf
 
-Two kinds of C# formatter exist, and a team that cares about both speed and its own house style cannot
-use either.
+Two kinds of C# formatter exist, and a team that cares about both reflow and its own house style cannot
+use either. `dotnet format` implements IDE0055 faithfully but never wraps a long line. Prettier-style
+formatters reflow but read only a handful of `.editorconfig` keys and decide everything else themselves.
 
-**`dotnet format` implements IDE0055 faithfully.** All 39 `csharp_*` and `dotnet_*` formatting keys,
-exactly as Visual Studio and Rider interpret them. It will never wrap a long line, because IDE0055 has
-no opinion about line width — so the one thing you most want a formatter to do, it does not do.
-
-**Prettier-style formatters reflow beautifully.** They wrap to a width and produce genuinely nice
-output. But they read a handful of `.editorconfig` keys at most; every other layout decision is the
-tool's, not yours.
-
-So the choice on offer is: keep your style and format by hand, or reflow and abandon your style.
-
-## The measurement
-
-This is not a theoretical complaint. On [elastic/docs-builder](https://github.com/elastic/docs-builder)
-— 1,196 files, 193k lines, a repository that is already 100% IDE0055-clean — a Prettier-style formatter
-rewrites **996 of the 1,196 files**.
-
-Not because those files were wrong. Because the tool disagrees with the `.editorconfig` the team had
-already settled on.
-
-{{product}}'s number on that same repository is **669 files** — and every one of them is whitespace
-*within* a line, because without a width {{product}} never changes how long a line is. Most of it is one
-choice: collapsing runs of blank lines to one, which `csharp_keep_blank_lines_in_code` turns off.
-
-Ask for reflow and it is 892 files, because that is what wrapping to a width means. What you do not lose
-by asking is agreement with `dotnet format` — see below.
-
-## What Kerf does
-
-Reflow to a line width, the way Prettier does — while honouring the complete .NET formatting option
-surface. Defaults are Roslyn's defaults, so {{product}} agrees with your IDE out of the box instead of
-fighting it. `max_line_length` is the single opt-in on top, and it decides both the width and who picks the line
-breaks — see [Reflow](concepts/reflow.md).
+{{product}}'s answer: `max_line_length` is the whole decision. Without it, {{product}} is a
+`dotnet format whitespace` equivalent. With it, {{product}} owns the layout — while honouring the
+complete formatting option surface you already configured.
 
 | | `dotnet format whitespace` | `dotnet format style` | **{{product}}** |
 |---|---|---|---|
@@ -49,57 +21,35 @@ breaks — see [Reflow](concepts/reflow.md).
 | Syntax-only code style (braces, expression bodies, file-scoped namespaces) | ❌ | ✅ | ✅ |
 | Semantic code style (`var`, unused usings, naming) | ❌ | ✅ | ❌ *by design* |
 
-The last row is the [scope boundary](concepts/index.md), not a missing feature. {{product}} never loads
-a compilation, and that is what keeps it fast.
+The last row is the scope boundary: {{product}} never loads a compilation, and that is what keeps it fast enough to run inside every build.
 
-## Conformance, as a number
+## What makes it worth adopting
 
-"Compatible with `dotnet format`" is the kind of claim every tool makes. {{product}} states it as a
-measurement, gated in CI on every push against that 1,196-file corpus:
+**Reads your complete `.editorconfig`.** Every key your IDE and `dotnet format` already read,
+{{product}} reads too. Defaults are Roslyn's, so it agrees with Format Document out of the box.
+[Details →](design-principles/existing-tooling.md)
 
-- With reflow off, {{product}}'s output is **byte-identical to `dotnet format whitespace`** — 100%,
-  enforced as a build gate.
-- With reflow on, also **100%** — deterministic layout has no arrangement inherited from the source for
-  `dotnet format` to disagree with, so it is the cleaner of the two.
-- With reflow on *and* `csharp_keep_existing_linebreaks = true`, **99.9%**. One file falls short: a
-  property pattern that reflow breaks, and whose brace `dotnet format` then moves. Measured and held
-  rather than quietly rounded up.
-- **Zero** failed or unparsable files across the corpus, also gated.
+**Reflows to `max_line_length`.** One key opts in. Without it, {{product}} is whitespace-only and
+its output is byte-identical to `dotnet format whitespace`. With it, {{product}} owns the layout —
+idempotently, by construction.
+[Details →](design-principles/reflow.md)
 
-The framing matters: what is measured is that {{product}}'s output is a *fixed point* of `dotnet format`
-— run `dotnet format` over a {{product}}-formatted file and nothing changes. That is the property you
-actually need if the two tools are going to coexist in one repository, and it is what decides whether
-Format Document in your IDE will fight your formatter.
+**Fast enough to run in every build.** ~350 ms CPU on a 1,196-file, 6.5 MB corpus — within
+measurement noise of the Roslyn parse floor. The build integration adds nothing you would notice.
+[Details →](design-principles/performance.md)
 
-The same measurement run over twelve real repositories and 41,000 files, against CSharpier and
-`dotnet format` as well, is written up in
-[the formatter comparison](contribute/formatter-comparison.md) — including the defects it found.
+**Safe by construction.** Every file is verified in memory before being written. A file that fails
+verification is reported and left untouched. Unknown syntax is emitted verbatim rather than guessed at.
+[Details →](design-principles/safety.md)
 
-## Speed, and where it comes from
+**Works with AI coding agents.** Parser-only means it runs before the compiler, inside the build.
+Formatting offences are fixed automatically before the agent sees anything. Nothing goes in `AGENTS.md`.
+[Details →](design-principles/ai-native.md)
 
-Measured on the same 6.5 MB corpus, as CPU time:
+**Two passes, one tool.** The syntax pass (`kerf format`) needs no build and runs before the compiler.
+The semantic pass (`kerf cleanup`) reads the diagnostics your build reported and applies the fixes.
+[Details →](design-principles/syntax-and-semantic.md)
 
-| | |
-|---|---|
-| Roslyn parse + full red tree — the floor for any tool | **~300 ms** |
-| **{{product}}** | **~350 ms** |
-| `dotnet format whitespace` | **~12,000 ms** |
-| CSharpier | **~14,000 ms** |
-
-Parsing is about 2.5% of the budget. Roughly 97% of what a formatter costs is its own work. {{product}}
-adds almost nothing on top of the parse: it is within measurement noise of the floor, which is how it
-can run inside every build without the build ever slowing down. The [formatter comparison](contribute/formatter-comparison.md)
-has wall-clock numbers across twelve real repositories; on roslyn (17,167 files) {{product}} takes **7 s**
-against `dotnet format`'s **36 s**.
-
-It ships as a native-AOT binary per platform, so there is no JIT warm-up to pay on a tool you invoke
-constantly: about 10 ms to start.
-
-## Why this shape matters for AI coding agents
-
-Because the syntax pass needs no build, it can run *inside* your build, before the compiler sees your
-source. Every mechanical offence gets fixed underneath whoever — or whatever — is editing the code, and
-only the semantic remainder surfaces as a diagnostic.
-
-For a coding agent, that is the difference between spending its context window on brace placement and
-spending it on your problem. See [Style enforcement that costs no context](workflow/ai-native.md).
+**A fixed point of `dotnet format`.** Run `dotnet format` over {{product}}-formatted code and nothing
+changes — 100%, gated in CI on every push. Format Document in your IDE will not fight your formatter.
+[Details →](design-principles/conformance.md)

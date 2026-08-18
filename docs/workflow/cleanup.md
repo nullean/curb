@@ -116,7 +116,7 @@ Three layers, and the first is the one that makes consuming a verdict from a pre
 
 Then the next build binds it for real. Three nets, of which the last is free.
 
-**Overlapping fixes drop both, never one.** `docs/contribute/layout-decisions.md` is emphatic that one pass is the
+**Overlapping fixes drop both, never one.** The design principle is that one pass is the
 contract. Dropping both means a second pass sees the same overlap and drops it again, so the output is a
 fixed point; keeping one would make the second pass differ from the first.
 

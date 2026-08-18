@@ -55,7 +55,7 @@ max_line_length = 120
 csharp_keep_existing_linebreaks = true
 ```
 
-`kerf print-config Foo.cs` says which mode you are in and what selected it. [Reflow](../concepts/reflow.md)
+`kerf print-config Foo.cs` says which mode you are in and what selected it. [Reflow](../design-principles/reflow.md)
 has the full picture, including which keys need a width.
 
 ## Configure it
@@ -106,7 +106,7 @@ resolved per file, not per directory, because a section can discriminate on file
 |---|---|---|
 | `--files <list>` | `format`, `check` | Work on the paths listed in a file, one per line, instead of walking a directory. This is what the build integration uses. |
 | `--coverage` | `check` | Report which syntax kinds are still emitted verbatim, and how often. |
-| `--no-verify` | `format`, `check` | Skip re-parsing the output to prove the token stream is unchanged. Not recommended — see [Safety](../concepts/safety.md). |
+| `--no-verify` | `format`, `check` | Skip re-parsing the output to prove the token stream is unchanged. Not recommended — see [Safety](../design-principles/safety.md). |
 
 `obj/` and `bin/` are skipped automatically.
 
@@ -125,6 +125,6 @@ is why the build integration treats them differently.
 ## Where next
 
 - [Why {{product}}](../why.md) — the problem it solves, with the measurements.
-- [The two passes](../concepts/index.md) — what {{product}} will and will not touch.
-- [Style enforcement that costs no context](../workflow/ai-native.md) — the argument for putting this in
+- [The two passes](../design-principles/syntax-and-semantic.md) — what {{product}} will and will not touch.
+- [Integrations](../workflow/integrations.md) — the argument for putting this in
   your build rather than in your agent's instructions.
