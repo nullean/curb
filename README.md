@@ -142,9 +142,8 @@ cd kerf
 | M4 | Parallelism, conformance and corpus CI | ✅ |
 | M5 | Syntax-only code style rules | ✅ — braces, expression bodies, file-scoped namespaces, modifier order, using placement, file headers |
 
-Not done: redundant parentheses (IDE0047/0048), the `wrap_if_long` fill layout, and the option-catalog
-generator that will produce a per-option reference. Several ReSharper option families were built,
-measured and deliberately reverted — see
+Not done: redundant parentheses (IDE0047/0048) and the `wrap_if_long` fill layout. Several ReSharper
+option families were built, measured and deliberately reverted — see
 [docs/contribute/layout-decisions.md](docs/contribute/layout-decisions.md).
 
 ### What CI gates on every push

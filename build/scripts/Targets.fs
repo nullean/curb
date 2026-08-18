@@ -1089,8 +1089,9 @@ let private compare (arguments:ParseResults<Arguments>) =
         Path.GetFullPath(Path.Combine(".artifacts", "publish", "Nullean.Kerf.Cli", sprintf "release_%s" rid, name))
     if not (File.Exists binary) then failwithf "expected a native binary at %s" binary
 
-    // Scratch space under the build output so it never pollutes the corpus.
-    let scratch = Path.Combine(Paths.Output.FullName, "compare")
+    // Scratch space in the system temp dir — NOT under build/output, which is in .gitignore.
+    // CSharpier respects .gitignore, so any path under build/output would produce "Formatted 0 files".
+    let scratch = Path.Combine(Path.GetTempPath(), "kerf-compare")
     if Directory.Exists scratch then Directory.Delete(scratch, true)
     Directory.CreateDirectory scratch |> ignore
 

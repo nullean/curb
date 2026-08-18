@@ -36,16 +36,12 @@ toc:
       - file: dotnet-format.md
       - file: rider-resharper.md
       - file: editorconfig-analyzers.md
-  - folder: reference
-    children:
-      - file: index.md
-      - file: options/index.md
-  - listing: reference/options
+  - listing: reference
     glob: "**/*.md"
     groups: [core, new-lines, indentation, spacing, wrapping, blank-lines, expression-bodies, usings, modifiers-and-braces, trailing-commas, suppression]
     sort: asc
     visual: groups
-    island: true
+    island: false
   - folder: contribute
     children:
       - file: layout-decisions.md

@@ -22,10 +22,10 @@ What you set is what you get. {{product}} invents no formatting keys.
 CSharpier writes a formatting cache to your machine's application data directory:
 
 ```
-$LocalApplicationData/CSharpier/cache/...
+$LocalApplicationData/CSharpier/.formattingCache
 ```
 
-That path is outside your repository, machine-global, and keyed on file path plus content hash. It persists across `git clean`, `git checkout`, and repository deletion. A different developer on a different machine formats with no cached state, which means the two machines can produce different results until the cache warms.
+That file is machine-global and outside your repository. It persists across `git clean`, `git checkout`, and repository deletion. A CI runner or a colleague on a fresh checkout has no cache, so every run pays the full formatting cost.
 
 {{product}} has no such cache. Its only state is an MSBuild stamp file written to `$(IntermediateOutputPath)` — inside your project's `obj/` folder, removed by `dotnet clean`, shared with nothing. There is no cache to warm, invalidate, or debug.
 
@@ -54,11 +54,41 @@ This is what "MSBuild-native incrementality" means in practice. Not a cache that
 
 ## Speed
 
-From the twelve-repository comparison (see [Formatter comparison](../contribute/formatter-comparison.md)):
+From the [twelve-repository comparison](../contribute/formatter-comparison.md), measured cold
+(cache cleared before each run) and warm (cache populated from a prior run):
 
-Numbers are placeholder until the benchmark run completes — see `docs/contribute/formatter-comparison.md` for the full table.
+| repo | Kerf | CSharpier cold | CSharpier warm |
+|---|---|---|---|
+| serilog (216 files) | **0.06 s** | 0.73 s | 0.34 s |
+| FluentValidation (219 files) | **0.06 s** | 0.59 s | 0.21 s |
+| RestSharp (255 files) | **0.07 s** | 0.63 s | 0.30 s |
+| Humanizer (733 files) | **0.37 s** | 3.45 s | 0.51 s |
+| Newtonsoft.Json (945 files) | **0.26 s** | 4.85 s | 0.82 s |
+| ServiceStack (4,718 files) | **1.29 s** | 12.84 s | 1.87 s |
+| MassTransit (5,502 files) | **0.62 s** | 4.75 s | 0.83 s |
+| efcore (5,761 files) | **2.27 s** | 19.78 s | 2.49 s |
+| roslyn (17,167 files) | 6.66 s | 64.71 s | **6.01 s** |
 
-Across the measured corpus, {{product}} consistently runs 5–20× faster than CSharpier on the same files. The reason is not any single trick — it is the architecture. One-and-a-half parses per file (one to format, half to verify where the printer moved a token boundary), no workspace load, no cache to maintain.
+Full numbers for all twelve repositories are in the [comparison table](../contribute/formatter-comparison.md).
+
+Kerf beats CSharpier warm on all repositories through efcore (5,761 files). On roslyn, CSharpier
+warm edges out Kerf's re-check time by about 10%. Both numbers above are re-checks of
+already-formatted files: Kerf's first-ever run on roslyn is 8.5 s; CSharpier's is 65 s. Where Kerf
+wins unconditionally: its MSBuild stamp means an unchanged project starts no process at all, while
+CSharpier still walks 17,000 files every time.
+
+The cache is cold on every CI runner and fresh checkout, so the cold column is what your team
+actually pays unless developers run CSharpier repeatedly on the same unchanged code on the same
+machine.
+
+The reason is architecture. {{product}} builds a document IR in a pooled arena — structs, not
+objects, reusing memory across files. It loads no workspace, resolves no symbols, and conditionally
+re-parses only when the printer moved a token boundary (rarely). CSharpier uses a Prettier-style IR
+with per-file allocation, computes a content hash, and writes it to disk. Both format; the overhead
+of the cache path is non-trivial on a cold machine.
+
+The MSBuild stamp widens the gap further: on an unchanged project Kerf starts no process at all.
+CSharpier walks the directory regardless.
 
 ## When CSharpier makes sense
 
