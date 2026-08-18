@@ -105,6 +105,7 @@ resolved per file, not per directory, because a section can discriminate on file
 | Flag | Applies to | What it does |
 |---|---|---|
 | `--files <list>` | `format`, `check` | Work on the paths listed in a file, one per line, instead of walking a directory. This is what the build integration uses. |
+| `--cache <path>` | `format`, `check` | Skip files a previous run watched format to themselves. The caller names the path — there is no ambient cache — so a pre-commit hook points it at a gitignored folder and the build integration points it at `obj/`. Ignored with `--coverage`. |
 | `--coverage` | `check` | Report which syntax kinds are still emitted verbatim, and how often. |
 | `--no-verify` | `format`, `check` | Skip re-parsing the output to prove the token stream is unchanged. Not recommended — see [Safety](../concepts/safety.md). |
 
@@ -117,7 +118,7 @@ resolved per file, not per directory, because a section can discriminate on file
 | `0` | Success. |
 | `1` | `check` found files that would change. |
 | `2` | Unknown command. |
-| `3` | A file failed verification, or `--files` was given without a list. |
+| `3` | A file failed verification, or `--files` or `--cache` was given without a path. |
 
 Only `1` means "your code needs formatting". Anything else means {{product}} did not do its job, which
 is why the build integration treats them differently.
