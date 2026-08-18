@@ -1,55 +1,58 @@
 ---
 navigation_title: Why Kerf
-description: What Kerf does that existing tools do not, in short.
+description: Why a .NET developer should use Kerf — fast, non-fighting, and runs inside dotnet build.
 ---
 
 # Why Kerf
 
-Two kinds of C# formatter exist, and a team that cares about both reflow and its own house style cannot
-use either. `dotnet format` implements IDE0055 faithfully but never wraps a long line. Prettier-style
-formatters reflow but read only a handful of `.editorconfig` keys and decide everything else themselves.
+Kerf runs inside `dotnet build`. It formats your source before the compiler reads it, so formatting
+offences never become build errors. Neither you nor a coding agent has to spend time on brace
+placement.
 
-{{product}}'s answer: `max_line_length` is the whole decision. Without it, {{product}} is a
-`dotnet format whitespace` equivalent. With it, {{product}} owns the layout — while honouring the
-complete formatting option surface you already configured.
+## It's fast
+
+350 ms CPU on a 1,196-file, 6.5 MB corpus — within measurement noise of the Roslyn parse floor.
+`dotnet format whitespace` on the same files: ~12,000 ms. CSharpier: ~14,000 ms.
+
+Speed is what makes running on every build viable. The [build integration](workflow/msbuild.md)
+skips unchanged projects entirely; on a project where nothing changed, no process starts.
+
+## It doesn't fight what you already run
+
+{{product}}'s defaults are Roslyn's defaults — the same values Visual Studio and Rider use for Format
+Document. Its output is a 100% fixed point of `dotnet format whitespace`, measured and gated in CI on
+every push. Hit Format Document in your IDE after {{product}} ran and nothing moves.
+
+It reads the `.editorconfig` you already have — all 39 IDE0055 formatting options, plus the ReSharper
+wrapping and blank-line keys Rider already reads. It invents no keys of its own.
+
+## Turn on EnforceCodeStyleInBuild without fear
+
+```xml
+<EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+```
+
+Without a formatter in the build, this setting turns every misformatted file into a build error. With
+{{product}}, the syntax-level offences are gone before the compiler runs. The diagnostics that survive
+are the ones that needed a compilation to decide — worth fixing, not noise.
+
+## Capability table
 
 | | `dotnet format whitespace` | `dotnet format style` | **{{product}}** |
 |---|---|---|---|
 | Runs on a bare folder, no restore or build | ✅ | ❌ | ✅ |
 | All 39 IDE0055 formatting options | ✅ | ✅ | ✅ |
-| **Reflow to `max_line_length`** | ❌ | ❌ | ✅ |
-| Syntax-only code style (braces, expression bodies, file-scoped namespaces) | ❌ | ✅ | ✅ |
+| Reflow to `max_line_length` | ❌ | ❌ | ✅ |
+| Syntax-level code style (braces, expression bodies, file-scoped namespaces) | ❌ | ✅ | ✅ |
 | Semantic code style (`var`, unused usings, naming) | ❌ | ✅ | ❌ *by design* |
 
-The last row is the scope boundary: {{product}} never loads a compilation, and that is what keeps it fast enough to run inside every build.
+The last row is the scope boundary. {{product}} never loads a compilation, and that is what keeps it
+fast enough to run inside every build.
 
-## What makes it worth adopting
+## Read more
 
-**Reads your complete `.editorconfig`.** Every key your IDE and `dotnet format` already read,
-{{product}} reads too. Defaults are Roslyn's, so it agrees with Format Document out of the box.
-[Details →](design-principles/existing-tooling.md)
-
-**Reflows to `max_line_length`.** One key opts in. Without it, {{product}} is whitespace-only and
-its output is byte-identical to `dotnet format whitespace`. With it, {{product}} owns the layout —
-idempotently, by construction.
-[Details →](design-principles/reflow.md)
-
-**Fast enough to run in every build.** ~350 ms CPU on a 1,196-file, 6.5 MB corpus — within
-measurement noise of the Roslyn parse floor. The build integration adds nothing you would notice.
-[Details →](design-principles/performance.md)
-
-**Safe by construction.** Every file is verified in memory before being written. A file that fails
-verification is reported and left untouched. Unknown syntax is emitted verbatim rather than guessed at.
-[Details →](design-principles/safety.md)
-
-**Works with AI coding agents.** Parser-only means it runs before the compiler, inside the build.
-Formatting offences are fixed automatically before the agent sees anything. Nothing goes in `AGENTS.md`.
-[Details →](design-principles/ai-native.md)
-
-**Two passes, one tool.** The syntax pass (`kerf format`) needs no build and runs before the compiler.
-The semantic pass (`kerf cleanup`) reads the diagnostics your build reported and applies the fixes.
-[Details →](design-principles/syntax-and-semantic.md)
-
-**A fixed point of `dotnet format`.** Run `dotnet format` over {{product}}-formatted code and nothing
-changes — 100%, gated in CI on every push. Format Document in your IDE will not fight your formatter.
-[Details →](design-principles/conformance.md)
+- [Design principles](design-principles/index.md) — parser-only, arena IR, full reprint, safety
+- [Reflow](design-principles/reflow.md) — what `max_line_length` does and what each mode costs
+- [Performance](design-principles/performance.md) — the numbers and why they hold
+- [Conformance](design-principles/conformance.md) — how the `dotnet format` fixed-point is measured
+- [Benchmarks](benchmarks/index.md) — twelve repositories, three tools, measured

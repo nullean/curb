@@ -36,18 +36,16 @@ clear which half the wait belongs to.
 
 An agent has one habit worth protecting: it runs `dotnet build` and reads the errors. Anything that
 requires it to pass an extra flag, remember a pre-step, or understand a tool's internals gets skipped
-under pressure.
+under pressure. So:
 
-So:
-
-- **`dotnet build` stays exactly as it is.** No flag, no wrapper, no environment variable. The
+- `dotnet build` stays exactly as it is. No flag, no wrapper, no environment variable. The
   `Nullean.Kerf.MSBuild` package makes the compiler write its diagnostics down as a side effect; nothing
   about the command changes.
-- **`kerf cleanup` takes no arguments in the common case.** It finds the logs itself.
-- **The second build is not overhead.** It is the verify step the agent was going to run after any edit,
-  and it is what catches a bad fix — as a compile error, immediately.
-- **Nothing is silenced.** A diagnostic that is still reported after cleanup is one {{product}} genuinely cannot
-  fix, so the agent's attention goes where it is actually needed rather than to a mechanical offence.
+- `kerf cleanup` takes no arguments in the common case. It finds the logs itself.
+- The second build is not overhead. It is the verify step the agent was going to run after any edit,
+  and it is what catches a bad fix as a compile error, immediately.
+- Nothing is silenced. A diagnostic that is still reported after cleanup is one {{product}} cannot
+  fix, so the agent's attention goes where it is actually needed.
 
 ## What the agent will see
 
@@ -67,14 +65,9 @@ Cleaned 1 file(s) from 1 log(s) in 102ms — 2 fix(es) in 1 file(s), 0 refused, 
 
 And the next build is clean.
 
-## The two lines worth understanding
+## Two output fields worth understanding
 
-**`stale`** means a file changed after the build wrote its log, so nothing was applied to it — a
-diagnostic's position refers to the bytes the compiler read, and applying it to different bytes is how a
-tool corrupts source. Build again and it will be picked up. This is normal when the agent edited a file
-between building and cleaning.
-
-**`refused`** means {{product}} understood the diagnostic and declined, with a reason on stderr. The common one
-is a file containing `#if`: the compiler decided for one set of symbols, and a using directive needed
-only under another would be reported as unnecessary and then lost. A refusal is a correct outcome, not a
-failure.
+| Field | Meaning |
+|---|---|
+| `stale` | A file changed after the build wrote its log, so nothing was applied. A diagnostic's position refers to the bytes the compiler read; applying it to different bytes is how a tool corrupts source. Build again and it will be picked up. This is normal when the agent edited a file between building and cleaning. |
+| `refused` | {{product}} understood the diagnostic and declined, with a reason on stderr. The common case is a file containing `#if`: the compiler decided for one set of symbols, and a using directive needed only under another would be reported as unnecessary and then lost. A refusal is a correct outcome. |

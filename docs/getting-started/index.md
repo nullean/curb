@@ -31,32 +31,10 @@ use. On a repository that is already IDE0055-clean, `kerf format` should change 
 
 ## Turn on reflow
 
-Reflow is the one thing {{product}} does that no other .NET formatter does, and it is opt-in.
-
-```ini
-[*.cs]
-max_line_length = 120
-```
-
-Omit the key, or set it to `off`, and {{product}} will never wrap a line for you.
-
-This key does two things, and the second one surprises people: it sets the width, and it hands
-{{product}} the line breaks. With a width, where a line breaks is decided from your tokens and that
-width — not from where the previous author pressed return. That is what makes formatting idempotent by
-construction, and it is what unlocks the ReSharper wrapping keys.
-
-It also means the first run on an existing repository is a large commit: on a 1,196-file corpus, 892
-files against 669 with no width — and about three times the changed lines, since only this mode rewraps
-anything. If you want reflow without that, keep your own arrangement:
-
-```ini
-[*.cs]
-max_line_length = 120
-csharp_keep_existing_linebreaks = true
-```
-
-`kerf print-config Foo.cs` says which mode you are in and what selected it. [Reflow](../design-principles/reflow.md)
-has the full picture, including which keys need a width.
+Reflow is opt-in. Add `max_line_length = 120` to your `.editorconfig` and {{product}} wraps long
+lines; omit it and line lengths are never changed. The first run on an existing repository is a large
+commit. See [Reflow](../design-principles/reflow.md) for what the key does, what each mode costs, and
+which ReSharper wrapping keys need a width.
 
 ## Configure it
 
@@ -124,7 +102,7 @@ is why the build integration treats them differently.
 
 ## Where next
 
-- [Why {{product}}](../why.md) — the problem it solves, with the measurements.
+- [Why {{product}}](../why.md) — why it's fast, why it doesn't fight `dotnet format`, and why running inside the build matters.
 - [The two passes](../design-principles/syntax-and-semantic.md) — what {{product}} will and will not touch.
 - [Integrations](../workflow/integrations.md) — the argument for putting this in
   your build rather than in your agent's instructions.

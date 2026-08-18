@@ -48,8 +48,7 @@ delete declarations or rename symbols — changes that can compile and still alt
 or break a reflection string no compiler check catches. {{product}} reports these diagnostics and says
 why rather than guessing.
 
-That remainder is where judgement is required. It is the work worth spending a human or a coding agent
-on.
+{{product}} reports these diagnostics and says why rather than guessing.
 
 ## The boundary in the build
 

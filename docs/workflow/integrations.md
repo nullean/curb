@@ -7,63 +7,20 @@ description: How to wire Kerf into AI coding agents, CI pipelines, MSBuild, and 
 
 ## AI coding agents
 
-Open almost any `AGENTS.md` or `CLAUDE.md` and you will find a section like this:
+Natural-language style rules in `AGENTS.md` get followed inconsistently, especially in a long session
+where the style section is thousands of tokens back in context. Every formatting correction is a round
+trip: the agent writes a file, the build reports IDE0055 diagnostics, the agent edits, the build
+reruns. Each lap costs tokens and latency, and every edit has exactly one right answer already written
+in your `.editorconfig`.
 
-```markdown
-## Style
-- Use tabs, not spaces
-- Allman braces
-- File-scoped namespaces
-- Always use braces, even for single statements
-- Keep lines under 160 columns
-- `var` where the type is apparent
-```
-
-It is well intentioned and it does not work well. Here is what it actually costs.
-
-### The problem with style as prose
-
-**It is instructions, not enforcement.** Natural-language rules get followed inconsistently, especially
-in a long session where the style section is thousands of tokens back in the context. The failure is
-silent — nothing tells the agent it drifted.
-
-**Every correction is a round trip.** The agent writes a file, the build reports IDE0055 diagnostics,
-the agent reads them, edits the file, and the build runs again. Each lap costs tokens, latency and a
-tool call, and every single one of those edits is mechanical — there was exactly one right answer, and
-it was already written down in your `.editorconfig`.
-
-**It crowds out the instructions that matter.** Context spent on brace placement is context not spent on
-your architecture, your invariants, or the bug being fixed.
-
-**It pollutes the diff.** Formatting churn in an agent's pull request is noise a human reviewer has to
-read past to find the change that matters.
-
-The deeper issue is that the rules already exist in machine-readable form. Your `.editorconfig` is the
-source of truth your IDE and `dotnet format` already use. Restating it as English prose for an agent
-creates a second, weaker copy — one that can drift from the first, and that has to be re-read on every
-turn.
-
-### The inversion
-
-Do not tell the agent about your style. Make the build apply it.
+The fix is to make the build apply style rather than telling the agent about it:
 
 ```xml
 <PackageReference Include="Nullean.Kerf.MSBuild" Version="*" PrivateAssets="all" />
 ```
 
-{{product}} runs before `CoreCompile`. By the time the compiler reads your source, the file has already
-been rewritten to match your `.editorconfig`, so the mechanical offences are simply gone — not reported,
-not queued for a follow-up edit, gone. The agent never sees them, never spends a token on them, and
-never has to be told about them.
-
-What reaches the agent is the part that needed judgement: the diagnostics that require a compilation to
-decide, and therefore could not have been fixed mechanically. That is
-[the semantic remainder](../design-principles/syntax-and-semantic.md), and it is the only thing worth a
-coding agent's attention.
-
-This works because of [the pass split](../design-principles/syntax-and-semantic.md). The syntax pass
-needs no build, so it can run *inside* the build. A tool that needed a compilation could not run before
-the compiler.
+{{product}} runs before `CoreCompile`. By the time the compiler reads your source, the mechanical
+offences are gone — not reported, not queued for a follow-up edit, gone.
 
 ### What to write instead
 
@@ -90,31 +47,17 @@ csharp_style_namespace_declarations = file_scoped
 csharp_preferred_modifier_order = public,private,protected,internal,static,readonly,async
 ```
 
-One source of truth, read by your IDE, by `dotnet format`, and by {{product}}.
-
 ### What is actually guaranteed
 
-Worth being precise, because "the build fixes everything" is not true and the useful claim is narrower.
+| Scope | What happens |
+|---|---|
+| All layout | Indentation, spacing, brace placement, blank lines, reflow — 100% of them. Nothing in this class reaches the context window. |
+| Syntax style (opt-in) | Braces, expression bodies, file-scoped namespaces, modifier order, using placement — for every key you set. |
+| Semantic remainder (after build) | `var`, unused usings, `readonly` and more. `kerf cleanup` reads the build's diagnostics and applies the rewrites. See [Cleanup](cleanup.md). |
+| Not handled, deliberately | Naming, unused members, unread assignments. Their fixes can compile and still change which overload binds. {{product}} reports them and says why. |
 
-**Fully handled — every layout rule.** Indentation, spacing, brace placement, blank lines and reflow are
-all decided from the parse tree, so the build fixes 100% of them with no input from the agent. Nothing
-in this class ever reaches your context window.
-
-**Handled where you opt in — syntax style.** Braces, expression bodies, file-scoped namespaces, modifier
-order, using placement and file headers are also fixed by the build, but only for the keys you set.
-{{product}} defaults to leaving your code as written, so it fixes exactly what you configured and
-nothing else.
-
-**Handled after the build — most of the semantic remainder.** `var`, unused usings, `readonly` and six
-more need a compilation to decide, so the build cannot fix them before the compiler runs. It does not have
-to: the compiler already decided, and `kerf cleanup` reads its answer and applies the rewrite. One command
-after the build, and those diagnostics are gone without {{product}} ever loading a compilation of its own.
-See [Cleanup](cleanup.md).
-
-**Not handled at all — and deliberately.** Naming, unused members and unread assignments are left. Their
-fixes delete declarations or rename symbols, which can compile and still change which overload binds or
-break a reflection string no compiler check sees. {{product}} reports them and says why rather than
-guessing. That remainder is genuinely a judgement call, and it is the work you want the agent doing.
+See [AI coding agents](../design-principles/ai-native.md) for more detail on why the pass split makes
+this possible.
 
 ## MSBuild
 
@@ -138,12 +81,12 @@ A typical GitHub Actions step:
   run: kerf check ./src
 ```
 
-If you use the MSBuild package, the build integration already checks in `Release` configuration — you
+If you use the MSBuild package, the build integration already checks in `Release` configuration. You
 may not need a separate step at all. The MSBuild integration rewrites in `Debug` and checks in
-`Release`, which is the default behaviour without configuring anything.
+`Release` by default.
 
-**The diff stays clean.** Because formatting is applied deterministically by the build, a pull request
-contains its actual change and nothing else. Reviewers stop reading past whitespace.
+Formatting is applied deterministically, so a pull request contains its actual change and nothing else.
+Reviewers stop reading past whitespace.
 
 ## Pre-commit hooks
 
@@ -172,6 +115,5 @@ With [Husky.NET](https://alirezanet.github.io/Husky.Net/):
 
 Add this task to your `.husky/task-runner.json`. Husky handles the hook installation for the whole team.
 
-**Nothing is silently mangled.** {{product}} verifies every file before writing it and leaves anything
-that fails verification untouched. Automatic rewriting is only a good idea if it cannot damage code —
-see [Safety](../design-principles/safety.md).
+{{product}} verifies every file before writing it and leaves anything that fails verification
+untouched. See [Safety](../design-principles/safety.md).

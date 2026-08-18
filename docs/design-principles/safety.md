@@ -6,7 +6,7 @@ description: Kerf verifies every file before writing it. What is checked, and wh
 # Safety
 
 A formatter that rewrites your source automatically — inside your build, without being asked — has to be
-unable to damage it. Not unlikely to. Unable to.
+unable to damage it.
 
 {{product}} verifies every file in memory before anything is written to disk. A file that fails
 verification is reported and **left exactly as it was**. It is never partially written, and the build
@@ -14,55 +14,37 @@ tells you rather than continuing quietly.
 
 ## What is checked
 
-**The token stream is unchanged.** The tokens {{product}} emits must match the tokens it parsed. This is
-the check that makes the layout guarantee real rather than aspirational: a layout rule can move every
-space and newline in the file, and this comparison proves it moved nothing else.
+| Check | What it catches | On failure |
+|---|---|---|
+| Token stream unchanged | Spaces and newlines moved; nothing else | Reported as KERF0002, file left untouched |
+| Output re-parses | A printer bug that welds two tokens together | Same |
+| Formatting is idempotent | `format(format(x))` = `format(x)` | Caught by the test suite and the CI corpus gate |
+| All `#if` branches covered | One file can have several token streams | Each symbol set is verified independently |
 
-For [syntax style](syntax-and-semantic.md) rules, which change tokens deliberately, the verifier is told exactly which
-rewrite was requested — braces added, a namespace unwrapped, an arrow introduced, usings reordered, a
-header inserted. Each is allowed for specifically. Everything else is still a failure, so opting into a
-rewrite widens the check by exactly one thing rather than switching it off.
+For [syntax style](syntax-and-semantic.md) rules, which change tokens deliberately, the verifier is
+told exactly which rewrite was requested. Each is allowed for specifically. Everything else is still a
+failure, so opting into a rewrite widens the check by exactly one thing rather than switching it off.
 
-**The output re-parses.** {{product}} parses its own output and compares the resulting token stream
-against the original, so anything that no longer parses the way the input did is caught before the file
-is written.
-
-This second parse is skipped where it is provably redundant: it can only ever find a *moved token
-boundary*, and the printer knows whether it did anything capable of creating one. Where it did not,
-there is nothing for the check to find. That is a deliberate saving, not a shortcut — it is also why
+The re-parse is conditional: the printer tracks whether it did anything capable of moving a token
+boundary. Where it did not, the check is skipped. That is a deliberate saving — it is also why
 {{product}} does not need the unconditional re-parse that costs other formatters a second parse per
-file.
+file. See [Design principles](index.md) for the full reasoning.
 
-**Formatting is idempotent.** `format(format(x))` must equal `format(x)`. This is checked across the
-test suite and gated in CI on the full corpus. It matters more than it sounds: a formatter that does not
-converge makes `check` fail on files `format` just wrote, which turns a build integration into an
-infinite loop of diffs.
-
-**Every `#if` branch is covered.** Conditional compilation means one file has several token streams
-depending on which symbols are defined. Verification loops over the symbol sets rather than checking
-only the branch that happens to be active.
+Idempotency matters more than it sounds. A formatter that does not converge makes `kerf check` fail
+on files `kerf format` just wrote, which turns a build integration into an infinite loop of diffs.
 
 ## Unknown syntax is not at risk
 
-{{product}} does not have a dedicated printer for every construct in C#, and C# keeps growing. Anything
-it does not recognise is emitted **verbatim** from the original source.
-
-The practical effect is that coverage grows without ever putting code at risk. A construct {{product}}
-has not learned yet is passed through unchanged rather than guessed at. It is incomplete before it is
-ever destructive.
-
-You can see exactly where you stand:
+{{product}} does not have a dedicated printer for every construct in C#. Anything it does not recognise
+is emitted **verbatim** from the original source. Coverage grows without ever putting code at risk.
 
 ```sh
 kerf check ./src --coverage
 ```
 
-which reports which syntax kinds are still being emitted verbatim, and how often.
+This reports which syntax kinds are still being emitted verbatim, and how often.
 
 ## Files that opt out
-
-Some files should not be formatted at all, and {{product}} honours the two native ways of saying so
-rather than inventing a third:
 
 ```ini
 [Generated/*.cs]
@@ -80,14 +62,14 @@ These are enforced on every push, against a 1,196-file, 6.5 MB corpus:
 
 - Zero failed files and zero unparsable files.
 - Two format passes produce identical output.
-- Byte-identical to `dotnet format whitespace` with reflow off, and with reflow on; 99.9% with reflow on
+- Byte-identical to `dotnet format whitespace` with reflow off, and 100% with reflow on; 99.9% with reflow on
   and `csharp_keep_existing_linebreaks = true`.
 - A native-AOT publish on all five supported platforms, each smoke-tested before packing.
 - An allocation-ratio ceiling, measured on the AOT binary rather than the JIT build.
 
 ## When verification fails
 
-It is reported, the file is left untouched, and the process exits non-zero. In a build, that is
+{{product}} reports the file, leaves it untouched, and exits non-zero. In a build, that is
 `KERF0002` — an error regardless of your warning settings, because a formatter that could not verify its
 own work has verified nothing.
 

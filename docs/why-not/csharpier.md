@@ -40,9 +40,9 @@ Inputs="@(Compile);@(EditorConfigFiles);$(MSBuildProjectFullPath)"
 Outputs="$(Kerf_StampFile)"
 ```
 
-MSBuild evaluates the `Inputs` against the stamp before {{product}} starts. On an untouched project — no changed source files, no changed `.editorconfig`, no changed project file — the target is skipped entirely. No process starts. No directory walks. Nothing.
+MSBuild evaluates the `Inputs` against the stamp before {{product}} starts. On an untouched project — no changed source files, no changed `.editorconfig`, no changed project file — the target is skipped entirely and no process starts.
 
-On a project where only one file changed, {{product}} formats that one file. Not the directory.
+On a project where only one file changed, {{product}} formats that one file, not the directory.
 
 CSharpier has no equivalent: it walks the directory every time.
 
@@ -50,11 +50,11 @@ CSharpier has no equivalent: it walks the directory every time.
 
 The consequence of the above: in a large solution with dozens of projects, `dotnet build` with {{product}} costs nothing extra on the projects that did not change. Each project's stamp is evaluated independently.
 
-This is what "MSBuild-native incrementality" means in practice. Not a cache that sometimes hits. Not a file hash database that has to be loaded and queried. MSBuild's own dependency tracking, which has been doing this correctly for decades.
+This is what "MSBuild-native incrementality" means in practice: MSBuild's own dependency tracking, which has been doing this correctly for decades. No cache to warm, no file hash database to query.
 
 ## Speed
 
-From the [twelve-repository comparison](../contribute/formatter-comparison.md), measured cold
+From the [twelve-repository comparison](../benchmarks/index.md), measured cold
 (cache cleared before each run) and warm (cache populated from a prior run):
 
 | repo | Kerf | CSharpier cold | CSharpier warm |
@@ -69,7 +69,7 @@ From the [twelve-repository comparison](../contribute/formatter-comparison.md), 
 | efcore (5,761 files) | **2.27 s** | 19.78 s | 2.49 s |
 | roslyn (17,167 files) | 6.66 s | 64.71 s | **6.01 s** |
 
-Full numbers for all twelve repositories are in the [comparison table](../contribute/formatter-comparison.md).
+Full numbers for all twelve repositories are in the [comparison table](../benchmarks/index.md).
 
 Kerf beats CSharpier warm on all repositories through efcore (5,761 files). On roslyn, CSharpier
 warm edges out Kerf's re-check time by about 10%. Both numbers above are re-checks of
@@ -82,13 +82,10 @@ actually pays unless developers run CSharpier repeatedly on the same unchanged c
 machine.
 
 The reason is architecture. {{product}} builds a document IR in a pooled arena — structs, not
-objects, reusing memory across files. It loads no workspace, resolves no symbols, and conditionally
-re-parses only when the printer moved a token boundary (rarely). CSharpier uses a Prettier-style IR
-with per-file allocation, computes a content hash, and writes it to disk. Both format; the overhead
-of the cache path is non-trivial on a cold machine.
-
-The MSBuild stamp widens the gap further: on an unchanged project Kerf starts no process at all.
-CSharpier walks the directory regardless.
+objects, reusing memory across files. It loads no workspace and resolves no symbols. CSharpier uses
+a Prettier-style IR with per-file allocation, computes a content hash, and writes it to disk. The
+overhead of the cache path is non-trivial on a cold machine. Add the MSBuild stamp, and an unchanged
+project starts no process at all.
 
 ## When CSharpier makes sense
 

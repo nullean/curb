@@ -1050,13 +1050,13 @@ type private RepoResult = {
 }
 
 /// Times Kerf, CSharpier and dotnet-format-whitespace over every sub-directory of a corpus dir
-/// and writes a refreshed results table to docs/contribute/formatter-comparison.md.
+/// and writes a refreshed results table to docs/benchmarks/index.md.
 ///
 /// --corpus must point at a directory whose immediate children are C# repository checkouts. Every
 /// subdirectory that contains at least one .cs file is measured. Each tool runs on a fresh copy so
 /// no tool sees the other's output.
 ///
-/// The result table is written both to stdout and into docs/contribute/formatter-comparison.md
+/// The result table is written both to stdout and into docs/benchmarks/index.md
 /// between the <!-- RESULTS --> ... <!-- /RESULTS --> marker comments, so the doc stays current
 /// without a manual edit.
 let private compare (arguments:ParseResults<Arguments>) =
@@ -1245,7 +1245,7 @@ let private compare (arguments:ParseResults<Arguments>) =
     printfn "%s" table
 
     // Splice into the doc between the marker comments.
-    let docPath = "docs/contribute/formatter-comparison.md"
+    let docPath = "docs/benchmarks/index.md"
     if File.Exists docPath then
         let content = File.ReadAllText docPath
         let startMarker = "<!-- RESULTS -->"

@@ -194,3 +194,21 @@ Tabs, Allman braces, file-scoped namespaces, `var`, 160 columns. All of it is in
 which is enforced at build time (`EnforceCodeStyleInBuild`, warnings as errors in `src/`). If the
 build complains about formatting, run `dotnet format whitespace . --folder` — and once Kerf can
 format itself, `kerf format .`.
+
+## Docs voice
+
+The `docs/` pages follow these rules. Apply them when writing or reviewing doc changes.
+
+- No "**Bold term.** Explanation sentence." format. Where content is a set of parallel items, use a
+  real table or a real list. Bold is fine inside a table cell or as a label (`**Workaround:**`).
+- First paragraph sells or explains the page. Everything after it: one idea per sentence, active voice,
+  short, concrete. No figurative language, no wandering.
+- About one em dash per section. Use commas, parentheses, or a full stop instead.
+- No scene-setting opener ("In today's world…"). No wrap-up closer ("In summary…"). Start and end on
+  substance.
+- Contractions where they read naturally.
+- No banned words: delve, leverage, robust, comprehensive, seamless, transformative, holistic, realm,
+  landscape (figurative), and the rest of the list in the style guide the user supplied.
+- No banned structures: "It's not just X — it's Y", "Not only X but Y", "No X. No Y. Just Z.",
+  "This is where X comes in", "Worth noting that".
+- Technical listings are fine as listings. Don't convert them into prose.

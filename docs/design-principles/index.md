@@ -23,7 +23,7 @@ Many formatters keep the AST and patch the trivia — the whitespace and comment
 
 Between the parse tree and the printer sits a document intermediate representation: a Prettier-style tree of `Text`, `Group`, `Indent`, `IfBreak` and `Line` nodes. The printer uses Wadler-Lindig's algorithm to decide where to break each group.
 
-The IR lives in a pooled struct array rather than a class-per-node graph. Every format run reuses the same arena, reset between files. The reason is not speed alone — it is that a zero-allocation IR allows an O(n) verifier: a validator walks the arena in one pass and catches malformed documents in constant space. That verifier runs in debug builds and is what makes the "format(format(x)) == format(x)" guarantee checkable rather than just asserted.
+The IR lives in a pooled struct array rather than a class-per-node graph. Every format run reuses the same arena, reset between files. A zero-allocation IR allows an O(n) verifier: a validator walks the arena in one pass and catches malformed documents in constant space. That verifier runs in debug builds and is what makes the "format(format(x)) == format(x)" guarantee checkable rather than just asserted.
 
 ## Conditional round-trip reparse
 
@@ -47,6 +47,4 @@ With `max_line_length` set and `csharp_keep_existing_linebreaks = false`, {{prod
 
 ## No invented keys
 
-{{product}} reads configuration from your `.editorconfig` and invents no keys. The formatting options come from Microsoft's IDE0055 surface; the syntax-style and wrapping options come from JetBrains' ReSharper key set, which Rider already reads — so a repository that configured Rider is already configured for {{product}} without touching anything.
-
-Unrecognised keys are reported rather than silently ignored, with a "did you mean" suggestion for likely typos. The distinction between "not implemented" and "not known" is surfaced explicitly, because a formatter that silently drops a key you just added gives you no way to know it is not being honoured.
+{{product}} reads configuration from your `.editorconfig` and invents no keys. See [Working with existing tooling](existing-tooling.md) for the full key surface and how unrecognised keys are handled.

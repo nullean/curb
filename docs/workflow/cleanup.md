@@ -3,25 +3,16 @@ navigation_title: Cleanup
 description: kerf cleanup fixes the semantic code style rules a build already reported, without ever loading a compilation.
 ---
 
-# Fixing what the build already told you
+# Cleanup
 
-{{product}} formats from syntax alone. That is what lets it run on a bare folder with no restore and no build,
-and it is why the semantic half of code style has always been out of scope: whether a using directive is
-unused, or a field is only ever assigned in a constructor, is a question only a compilation answers.
+{{product}} formats from syntax alone — no workspace, no compilation. That is what lets it run inside
+`dotnet build` before the compiler runs. Semantic code style is out of that scope: whether a using
+directive is unused, or a field is only ever assigned in a constructor, is a question only a compilation
+can answer.
 
-`kerf cleanup` closes part of that gap without giving any of it up.
-
-> {{product}} never computes semantics. It consumes a verdict the build already printed, and owns the rewrite.
-
-The expensive half of a semantic fix is deciding *whether* it applies. The compiler decided, and it will
-write the answer down — rule id and exact span — if asked. What is left is a rewrite at a known position,
-which is syntax, and syntax is what {{product}} is fastest at.
-
-So: no `CSharpCompilation`, no `MetadataReference`, no `SemanticModel`, no `Workspaces`, no reflection,
-**no new package reference anywhere**, and cleanup ships inside the same native-AOT binary as the
-formatter.
-
-## Using it
+`kerf cleanup` closes part of that gap. The compiler decides whether a rule applies and writes the
+answer to a SARIF log. `kerf cleanup` reads that log and applies the rewrite. No `CSharpCompilation`,
+no `SemanticModel`, no Workspaces.
 
 ```sh
 dotnet build          # fails, or warns, on the rules you escalated
@@ -29,187 +20,86 @@ kerf cleanup          # fixes the ones Kerf owns
 dotnet build          # clean
 ```
 
+## Running it
+
 `Nullean.Kerf.MSBuild` sets `$(ErrorLog)` to `$(IntermediateOutputPath)kerf.sarif` when the project has
 not set one, so the log exists without anyone asking for it. `kerf cleanup` with no arguments searches
-the current directory for those logs. `--diagnostics <path>` names one explicitly, `--check` reports
-without writing, `--forward` hands the remainder to `dotnet format`, and `kerf rules` lists every rule and
-who fixes it.
+the current directory for those logs.
 
-The third build is not an extra step — it is the verify step you were going to run after any change.
-And it is the real safety net: a bad fix is a compile error you see immediately, which is why cleanup
-never needs to bind anything itself.
+| Flag | What it does |
+|---|---|
+| `--diagnostics <path>` | Name a specific log file. |
+| `--check` | Report what would change without writing. |
+| `--forward` | Hand the remainder to `dotnet format style` after cleanup finishes. |
+| `kerf rules` | List every rule and which tool fixes it. |
 
-## Why it is not part of the build
-
-It would be easy to hang cleanup off `AfterTargets="Build"` and save the user a command. It cannot work,
-and the reason is worth recording so nobody tries it again.
-
-**With a rule at `severity = error`, `CoreCompile` fails and the build stops — a post-build target never
-runs.** The configuration where cleanup is most wanted is exactly the one where a post-build hook is
-unreachable. Making the hook fire would mean downgrading the rule to a warning, which means the build
-reports what {{product}} then fixes: a false positive on every run.
-
-The compiler writes its error log *even when it fails*, which is what makes the out-of-band command
-work where the target could not. The cleanup smoke test asserts this directly.
-
-Running *before* `CoreCompile` is what the formatter does, and it is right for the formatter, because
-IDE0055 is decidable from syntax. Cleanup cannot: it needs a compilation to have happened, and a build
-that has not compiled yet has not produced one.
-
-So a code clean tool does not own building. Someone — or something — runs `dotnet build`, and if style
-diagnostics come back, runs `kerf cleanup`.
-
-## Why nothing needs muting
-
-{{product}} never writes a severity, a `NoWarn`, or a `WarningsAsErrors`. It does not have to, and the reason is
-the single most useful thing measured while building this:
-
-**`EnforceCodeStyleInBuild` on its own does not enable the IDE rules.** The SDK's
-`Microsoft.CodeAnalysis.CSharp.CodeStyle.targets` adds its severity configuration only when
-`AnalysisLevelStyle`/`AnalysisModeStyle` diverge from the core values, or the effective level is ≥ 11.0 —
-none of which hold on `net10.0` with defaults. Rules stay at their descriptor default, and Roslyn skips an
-analyser whose descriptors are all suppressed.
-
-Measured: a project with `EnforceCodeStyleInBuild=true`, `GenerateDocumentationFile=true` and four
-unnecessary using directives reported **no IDE rule at all** — only a `SYSLIB1045` regex suggestion. Add
-`dotnet_diagnostic.IDE0005.severity = error` and both runs are reported.
-
-So the set of rules that reports is exactly the set you escalated by hand. Which means one fact does
-triple duty:
-
-- **No false positives.** {{product}} fixes precisely what the build reported, so there is nothing left to
-  report and nothing to silence.
-- **Zero churn on adoption.** A repository that set no severities gets no fixes, byte-identically.
-- **Fewest diagnostics handed back.** Which is the point, when the thing reading them is an agent.
-
-None of that is implemented. It falls out of the design, and the smoke test's fourth assertion holds it
-there.
+The third build is the verify step you were going to run after any change anyway. A bad fix is a
+compile error you see immediately.
 
 ## Opting out
 
-Nothing new to learn.
-
 | Mechanism | Effect |
 |---|---|
-| `dotnet_diagnostic.IDEnnnn.severity = none`, or simply not setting it | The build never reports it, so cleanup never sees it. Structural, not implemented. |
-| `#pragma warning disable IDEnnnn` | The compiler suppresses it before it reaches the log. Also structural. |
-| `generated_code = true`, `<auto-generated>` | Reused from the formatter, via `FormatOptions.Excluded` and `CSharpSource.HasGeneratedHeader`. |
+| `dotnet_diagnostic.IDEnnnn.severity = none`, or not setting it | The build never reports it, so cleanup never sees it. |
+| `#pragma warning disable IDEnnnn` | The compiler suppresses it before it reaches the log. |
+| `generated_code = true`, `<auto-generated>` | Reused from the formatter via `FormatOptions.Excluded`. |
 | `Kerf_Diagnostics=false` | The MSBuild package stops setting `$(ErrorLog)`. |
-| `Kerf_Bypass=true` | Everything, formatter included. One escape hatch, honoured everywhere. |
+| `Kerf_Bypass=true` | Everything, formatter included. |
 | A `$(ErrorLog)` the project already set | {{product}} stands down and never overwrites it. |
 
 ## Safety
 
-Three layers, and the first is the one that makes consuming a verdict from a previous build safe at all.
+Three layers keep applying a verdict from a previous build safe:
 
-1. **The node-kind gate.** Every fixer declares the syntax it applies to, and the reported position must
+1. The node-kind gate. Every fixer declares the syntax it applies to, and the reported position must
    resolve to it. A diagnostic pointing at a using directive that is no longer there simply does not
-   apply. Self-validating rather than heuristic — and it is what makes a second cleanup pass a no-op.
-2. **The freshness gate.** A file whose last-write time is newer than the log is skipped and counted,
-   with a line saying to build again. A span is an offset into the bytes the compiler read; applying it
-   to different bytes is how a tool corrupts source. The node-kind gate catches most drift, but not a
-   *different* node of the same kind having moved into the position — and for `var` that case compiles.
-3. **The declared-delta verifiers**, unchanged from the formatter and never switched off. A fix says
-   which tokens it removes; `ContentVerifier` and `TokenStreamComparer` hold the rest of the file to a
-   strict compare. Removing more than declared, or anything elsewhere, still fails and the file is left
-   untouched.
+   apply.
+2. The freshness gate. A file whose last-write time is newer than the log is skipped. A span is an
+   offset into the bytes the compiler read; applying it to different bytes is how a tool corrupts source.
+3. The declared-delta verifiers, unchanged from the formatter. A fix says which tokens it removes;
+   `ContentVerifier` and `TokenStreamComparer` hold the rest of the file to a strict compare.
 
-Then the next build binds it for real. Three nets, of which the last is free.
-
-**Overlapping fixes drop both, never one.** The design principle is that one pass is the
-contract. Dropping both means a second pass sees the same overlap and drops it again, so the output is a
-fixed point; keeping one would make the second pass differ from the first.
+Overlapping fixes drop both, never one. Dropping both means a second pass sees the same overlap and
+drops it again, so the output is a fixed point.
 
 ## What is fixed
 
-`kerf rules` is the live answer, driven by `RuleCatalog` so it cannot fall behind. A row claims
-`Cleanup` only once a fixer exists — never because one is planned — and a test holds the two together, so
-a rule cannot claim to be fixed by a fixer nobody wrote. That test earned its place: the first version of
-the catalog claimed five rules when one had a fixer, and the cleaner skipped the other four in silence.
-
-Ten rules today: IDE0005, IDE0007, IDE0034, IDE0040, IDE0044, IDE0071, IDE0090, IDE0240, IDE0250 and
-IDE0251.
+`kerf rules` is the live answer. Ten rules today: IDE0005, IDE0007, IDE0034, IDE0040, IDE0044, IDE0071,
+IDE0090, IDE0240, IDE0250, IDE0251.
 
 ### IDE0005 — unnecessary using directives
 
-The rule with the most to gain, and the one that shaped the design.
-
-**One diagnostic covers a run, not a directive.** Roslyn emits one IDE0005 per maximal contiguous run of
-unnecessary directives. Measured on five directives where the third was needed: two results, spanning
-lines 1–2 and 4–5, correctly skipping the third. The span is a delete instruction.
-
-**Which is why the input is the log and not the console output.** MSBuild reports a diagnostic's start but
-not its end, and from start positions alone a run's extent is not recoverable:
-
-```
-d1 unused, d2 needed, d3 unused   →  starts at d1 and d3
-d1 unused, d2 unused, d3 needed   →  a single start at d1
-```
-
-Same observable, different answer. Assuming either shape deletes a directive something needs. The
-console reader is still there for the rules whose span sits inside one node, but it refuses this one.
-
-**Refused where the file has a `#if`.** The compiler decided for one symbol set; a directive needed only
-under another would be reported here and then lost. A refusal rather than a guess, as with the
-file-scoped namespace conversion.
-
-The line goes, not just the tokens, so no hole is left behind — but widening stops at anything that is
-not whitespace, so a comment above or beside the directive keeps its place.
+Roslyn emits one IDE0005 per maximal contiguous run of unnecessary directives. The span is a delete
+instruction. The rule refuses any file containing `#if`: the compiler decided for one symbol set, and
+a directive needed only under another would be reported as unnecessary and then lost.
 
 ### Not fixed, and why
 
-`kerf rules` prints the reason next to each. The ones worth naming here:
-
 | Rule | Why |
 |---|---|
-| IDE0008 use explicit type | The diagnostic does not carry the type *name*, so the fix is not derivable from the span. |
-| IDE0051 / IDE0052 unused members | The fix deletes a declaration, and "never destroy code" is a non-negotiable. Report only, forever. |
-| IDE1006 / IDE0130 naming | A rename touches every reference site, can compile while changing which overload binds, and breaks reflection and serialisation strings that no compiler check catches. **Never**, not "not yet". |
-| IDE0160 block namespace | {{product}} converts *to* file-scoped and never back; removing braces can change what a name resolves to. |
+| IDE0008 use explicit type | The diagnostic does not carry the type name, so the fix is not derivable from the span. |
+| IDE0051 / IDE0052 unused members | The fix deletes a declaration. {{product}} never destroys code. |
+| IDE1006 / IDE0130 naming | A rename touches every reference site, can compile while changing which overload binds, and breaks reflection and serialisation strings. Never. |
+| IDE0160 block namespace | {{product}} converts to file-scoped and never back; removing braces can change what a name resolves to. |
 
 ### The other nine
 
-Ordered as they were built, by whether a mistake is loud.
-
-| Rule | Fix | Delta | If the verdict were wrong |
-|---|---|---|---|
-| **IDE0040** accessibility | Writes out the accessibility C# already applied — `private` inside a type, `public` on an interface member, `internal` on a top-level type. Reads only the parent node. | `Inserted` | Nothing changes; the keyword is the one that was already in force. |
-| **IDE0044** `readonly` | Inserts `readonly` into a field's modifier list. | `Inserted` | A compile error on the next build — a write through `ref`, `Interlocked` or `Unsafe.AsRef` the analyser missed. |
-| **IDE0090** `new()` | Drops the type name after `new`. | `Dropped` | A compile error: if the target type were not known, `new()` is an error, not a different program. |
-| **IDE0007** `var` | Replaces a local's type with `var`. | `Dropped \| Inserted` | **Quiet.** It compiles and changes the declared type — `IEnumerable<int> x = list` becoming `var x = list` narrows `x`. The only one whose mistake is silent, which is why it was built last and why it leans hardest on the freshness gate. |
-| **IDE0250** readonly struct | Inserts `readonly` on a struct. | `Inserted` | Does not compile if some member mutates. |
-| **IDE0251** readonly member | Inserts `readonly` on a struct member. | `Inserted` | Does not compile if the member mutates. Refused on a class, a static member, or anything already readonly. |
-| **IDE0034** simplify `default` | Drops `(T)` from `default(T)`. | `Dropped` | A bare `default` with no inferable target is an error, not a different program. |
-| **IDE0071** simplify interpolation | Drops a redundant `.ToString()`. | `Dropped` | Refused when the call takes arguments: `{x.ToString("N0")}` becomes `{x:N0}`, which moves the argument into a format clause — two places, not one, and deleting the call alone would silently lose the format. |
-| **IDE0240** redundant `#nullable` | Removes the directive's line. | `Dropped` | **Verified by one net rather than two.** A directive lives in trivia and `DescendantTokens()` does not descend into it, so `TokenStreamComparer` cannot see the change at all. `ContentVerifier` does, because it walks characters. The rule therefore does nothing but remove a whole line it has positively identified. |
-
-**Two rules can each be valid and still conflict.** `bool flag = default(bool)` reports both IDE0007 and
-IDE0034. Apply either alone and the result is fine; apply both from one snapshot and you get
-`var flag = default`, which is CS8716. A real build caught it. IDE0007 now refuses any initialiser `var`
-cannot take a type from — `default`, `default(T)`, `null` — which is a syntactic invariant of `var` rather
-than second-guessing a verdict, and it is the `var` rule that stands down because its mistake is the quiet
-one.
-
-Insertions are declared by their **exact text**, not by a count, so the verifiers permit precisely this
-word, once, here. `DeclaredDeltaTests` asserts that from both sides: an undeclared word, a different
-word, a partial word (`readonlyish` does not satisfy a declared `readonly`), a declared insertion that
-never appears, and a declared insertion used as cover for losing or altering content are all still
-failures.
-
-There is deliberately no `Replaced` delta. Swapping a type name for `var` *is* `Dropped | Inserted`, and
-that is exactly what the verifiers are told, so a third value would be a second way of saying the same
-thing that they would then have to translate.
-
-Each rule refuses the shapes where the rewrite would be ambiguous rather than reasoning about them —
-`readonly` on a multi-field declaration, accessibility on a `partial` member, `new()` where there is no
-argument list (`new { X = 1 }` is an anonymous object, which compiles and is a different program),
-`var` on a `const`, a multi-variable declaration, or a declaration with no initialiser.
+| Rule | Fix | If the verdict were wrong |
+|---|---|---|
+| IDE0040 accessibility | Writes out the accessibility C# already applied | Nothing changes; the keyword was already in force. |
+| IDE0044 `readonly` | Inserts `readonly` into a field's modifier list | A compile error — a write through `ref` or `Interlocked` the analyser missed. |
+| IDE0090 `new()` | Drops the type name after `new` | A compile error: if the target type were not known, `new()` is an error. |
+| IDE0007 `var` | Replaces a local's type with `var` | **Silent.** It compiles and may narrow the declared type. The only rule whose mistake is quiet; built last and leans hardest on the freshness gate. |
+| IDE0250 readonly struct | Inserts `readonly` on a struct | Does not compile if some member mutates. |
+| IDE0251 readonly member | Inserts `readonly` on a struct member | Does not compile if the member mutates. |
+| IDE0034 simplify `default` | Drops `(T)` from `default(T)` | A bare `default` with no inferable target is an error. |
+| IDE0071 simplify interpolation | Drops a redundant `.ToString()` | Refused when the call takes arguments, to avoid silently losing the format. |
+| IDE0240 redundant `#nullable` | Removes the directive's line | Verified by `ContentVerifier` rather than `TokenStreamComparer`, since trivia is not in the token stream. |
 
 ## Forwarding the remainder
 
-{{product}} is not a replacement for `dotnet format style`. What it can be is precise about the remainder: it
-knows every diagnostic the build reported and which of them it dealt with, so `--forward` names the rest
-exactly instead of leaving someone to run the whole command over the whole solution.
+{{product}} is not a replacement for `dotnet format style`. With `--forward`, it names the remaining
+diagnostics exactly and hands them to `dotnet format`:
 
 ```
 Cleaned 1 file(s) from 1 log(s) in 105ms — 2 fix(es) in 1 file(s), 0 refused, 0 stale, 0 skipped, 0 failed
@@ -217,184 +107,5 @@ Cleaned 1 file(s) from 1 log(s) in 105ms — 2 fix(es) in 1 file(s), 0 refused, 
   kerf 105ms · dotnet format 2366ms (22.5x) — the difference is the workspace load, which no amount of scoping avoids
 ```
 
-Both timings are printed because the difference is the point. Nothing else tells someone which half of
-their wait belongs to which tool.
-
-**IDE\* goes to `style`, everything else to `analyzers`**, at most one invocation each, for the whole
-target rather than per project — the workspace load is the cost, and repeating it would multiply the only
-expensive part.
-
-### What the flags are for, and what they are not for
-
-- **`--include` buys blast radius, not speed.** Measured on a 61-file project: 1.97 s narrowed to one
-  file and one rule, against 1.98 s over everything. The cost is the workspace load, not applying fixes.
-  What it does buy is checked: a second file carrying an identical offence was left untouched. Fixing
-  exactly what was reported is the premise of cleanup, so forwarding keeps it.
-- **The paths have to be relative.** An absolute path in `--include` matches nothing and `dotnet format`
-  exits zero having done nothing — a silent no-op, which is the worst shape a bug can take here because
-  it is indistinguishable from success. {{product}} relativises against its working directory, and if a reported
-  file sits outside it, drops `--include` altogether and says so rather than quietly covering less than
-  it claims.
-- **`--severity info`** because a diagnostic only reaches the log at info or above, so this is the
-  matching superset rather than a widening. **`--no-restore`** because the build already restored. There
-  is no `--no-build` to pass: `dotnet format` does not build output, it loads an MSBuild workspace, and
-  that *is* the 2.4 seconds.
-- **`--verify-no-changes`** is added under `--check`, so both halves agree about whether they may write.
-
-### What is not forwarded
-
-- **Diagnostics reported below warning.** The .NET analysers are on by default at note level, invisible at
-  normal build verbosity. Forwarding one would have `dotnet format` fix every occurrence of that rule in
-  the file on the strength of something nobody saw — a wider blast radius than {{product}}'s own span-local
-  fixes, taken for a weaker reason. Counted and reported, not silently dropped.
-- **Compiler diagnostics.** `dotnet format` cannot fix a `CS` warning; passing one asks for a no-op that
-  looks like a failure.
-- **Refusals that reach every tool.** Here the catalog distinguishes two things that are easy to
-  conflate, and getting it wrong made `--forward` worse before a test caught it. "{{product}} will not delete a
-  declaration" is *{{product}}'s* constraint — non-negotiable #4 — and `dotnet format style` is entitled to do
-  it, so IDE0051 is forwarded. "No tool should rename a symbol unattended" is a claim about the fix
-  itself, since a rename compiles while changing which overload binds and breaks reflection and
-  serialisation strings no compiler check sees — so IDE1006 and IDE0130 are withheld, with the reason
-  printed. `kerf rules` marks each refusal `[not Kerf]` or `[no tool, unattended]`.
-
-## What is slow
-
-Not this. Cleanup is a parse and a rewrite, so it runs at formatter speed — 102 ms on a one-file project
-including process start, most of which is start.
-
-What costs time is everything around it:
-
-| | Cost |
-|---|---|
-| `kerf cleanup` itself | A parse and a rewrite per file the log mentions — measured at 233 ms for a one-file project applying six fixes across all five rules, most of which is process start. Files the log does not mention are never opened. |
-| The build that produces the log | Whatever `EnforceCodeStyleInBuild` costs you. If you already run it, cleanup is free; if you do not, this is the bill. |
-| `$(ErrorLog)` | A SARIF is ~220–430 KB per project per target framework even for a trivial project, almost all of it rule metadata. Read with a streaming reader that skips it rather than deserialising. |
-| `dotnet format style` | ~2.4 s for one project and ~3.0 s for a blanket run, measured — it loads an MSBuild workspace, and scoping does not help. Still the answer for everything in the table above, and `--forward` will run it for you and print both numbers. |
-
-## The adversarial gate
-
-`./build.sh cleanupsafety --corpus <path>` is the counterpart to `conformance`, for the half of cleanup
-that conformance cannot reach.
-
-Every other cleanup test hands over a diagnostic the compiler really reported. This one claims every rule
-fires everywhere it could — so it deletes using directives the file needs, writes `var` where the type was
-load-bearing, and drops type names that were not inferable. **Those are wrong verdicts by construction.**
-{{product}}'s premise is that it trusts the compiler's answer and owns only the rewrite; this measures the second
-half on its own, and what it asserts is about the machinery rather than the verdicts:
-
-1. No file ever fails verification — the declared deltas describe exactly what each fix does.
-2. Anything rewritten still parses. A wrong verdict may leave a file that does not *compile*; none may
-   leave one the parser rejects.
-3. Re-running with the same, now stale, diagnostics changes nothing — the node-kind gate, at scale.
-
-Nothing is written; the corpus is read, cleaned in memory and discarded, so it can be pointed at a
-checkout somebody is working in. It also does not need the corpus to *build*, which means a repository
-whose SDK cannot be resolved locally is still a usable corpus — dotnet/roslyn pins an SDK Arcade
-downloads, and is used anyway.
-
-Measured on dotnet/roslyn: **17,169 files, 162,540 fixes applied across 16,098 files, 1,719,585 refusals, in
-36 s.**
-
-### What it found
-
-Four defects on its first run, none of which the unit tests or the smoke test could reach. They are worth
-recording because each is a class, not an instance.
-
-- **An insertion consumed at the first disagreement rather than at its declared offset.** `string version`
-  becoming `var version` puts `var` in front of a token that also starts with `v`, so there is no
-  disagreement to trigger on, the insertion is never consumed, and the walk desynchronises. Insertions now
-  declare their exact output offset. This is the same trap the dropped-brace handling already carried a
-  comment about — the lesson did not transfer until a corpus insisted.
-- **A zero-width token stealing a dropped span.** `new Dictionary<string, byte[]>()` contains an omitted
-  array-size token, which has zero width — and `TextSpan.Contains` is exclusive at the end, so nothing can
-  ever contain it. Under one-span-per-token accounting it consumed the span belonging to the `]` behind it
-  and left that `]` unexcused. Dropped spans are now matched by containment with a non-advancing cursor, so
-  one span may cover several tokens and a zero-width token costs nothing.
-- **A run of using directives removed as one contiguous range.** What sits between two directives is not
-  always whitespace: a comment saying why an import is there, or the `#line` and `#nullable` directives
-  that fill generated files. IDE0005 now emits one edit per directive, so anything between them survives —
-  and a rule may produce several edits, which is why `ICleanupRule` takes a collection.
-- **A diagnostic having some edits applied and others dropped for overlap.** Half a fix is exactly the
-  partial application the one-pass contract exists to prevent. A diagnostic that loses one edit now loses
-  all of them.
-
-Two further refusals came out of it rather than fixes, because the honest answer was to decline. A type
-with a comment inside it — `new Dictionary<string, /*isBanned*/bool>()` is real code — and a using
-directive Razor's code generator split across `#line` directives:
-
-```
-using global::Microsoft.AspNetCore.Components
-#line default
-#line hidden
-    ;
-```
-
-The directive's span runs from `using` to that `;` and contains both `#line`s. Removing it removed them.
-The content verifier caught it, which is the net working — but a rule that has to be caught should have
-declined, since the alternative is deciding which parts of somebody's generated file are load-bearing.
-
-## The conformance gate
-
-`./build.sh cleanupconformance` is the other half, and the only gate that can catch a fix which compiles
-but is wrong: the corpus is built, cleaned, and built again. `cleanupsafety` never compiles anything, so it
-cannot reach this. It clones elastic/docs-builder if `--corpus` is not given — a corpus that builds with the
-SDK in `global.json`, which is why it is not dotnet/roslyn.
-
-Measured: **394 sites across a 1,201-file solution, 398 fixes in 304 files, and the solution still builds.**
-Four sites are left, all IDE0005, all ones {{product}} declined out loud because the file has a `#if`. `dotnet
-format style` has exactly those four left to do — it has a compilation and can reason about symbol sets,
-which is precisely why {{product}} will not.
-
-The assertion is not "nothing is left". It is the exact claim {{product}} can make: **everything not explicitly
-declined was fixed**, and the count fell.
-
-### What it took to make it measure anything
-
-Three separate things made this gate pass while proving nothing. Each is recorded because each would come
-back on the next corpus.
-
-- **`RunAnalyzersDuringBuild`.** docs-builder sets it to `false` unless `CI=true` — sensible for a local
-  build, fatal here. The analysers were in `@(Analyzer)` and never ran, so every rule reported nothing and
-  the run looked clean. The gate's own "all ten must be reported" assertion is what caught it.
-- **`EnforceCodeStyleInBuild` has to be a *global* property.** Set in `Directory.Build.targets` it loaded
-  **zero** IDE analysers: the SDK decides which analysers to add before that file is imported. A global
-  property is set before evaluation, and it also outranks the nested `Directory.Build.props` files a real
-  repository has.
-- **An `.editorconfig` entry for a specific rule outranks a `.globalconfig` one**, whatever `global_level`
-  says — the level only breaks ties between global configs. docs-builder sets
-  `dotnet_diagnostic.IDE0005.severity = none`, so nine rules reported and the tenth did not. Those lines are
-  commented out in the working copy.
-
-Two smaller ones, for anyone writing a similar script: MSBuild reads both `;` **and** `,` in a command-line
-property value as separators between properties, so `-p:NoWarn=A;B` and `-p:NoWarn=A,B` both fail with
-MSB1006 — the escape is `%3B`. And an up-to-date build reports nothing at all, because `CoreCompile` is
-skipped, so anything measuring diagnostics has to force the compile it wants to measure.
-
-### Zero churn, measured
-
-Before the seeded violations, the pristine corpus reports **one** owned rule — IDE0005, which its own
-`.editorconfig` had switched off. Everything else {{product}} fixes, docs-builder already satisfies across 1,201
-files. That is the zero-churn promise as a measurement rather than a claim, and it is why the fixing half
-has to be exercised by a seeded file: there is nothing there to fix.
-
-## Rejected alternatives
-
-Recorded so they are not re-litigated.
-
-- **Host the SDK's code style analysers or `CodeFixProvider`s.** They are on disk on every machine
-  (`Sdks/Microsoft.NET.Sdk/codestyle/cs/`), and `CompilationWithAnalyzers` and `AnalyzerFileReference`
-  need no `Workspaces` reference — both are in `Microsoft.CodeAnalysis.dll`. Rejected anyway: SDK 10.0.400
-  ships Roslyn `5.900.26.38015` while {{product}} pins `[5.6.0]`, and `5.6.0` is the newest version published to
-  nuget. The compiler ships inside the SDK on its own cadence and is always ahead of the packages, so the
-  skew is structural and permanent — pinning "latest" cannot close it. Closing it would mean loading
-  Roslyn from the consumer's SDK at runtime, which means no pin, reflection, no AOT, and {{product}}'s
-  *formatting* output becoming a function of the user's SDK patch level. That is precisely what the pin
-  comment in `Directory.Packages.props` exists to prevent.
-- **Build our own `CSharpCompilation`** from `@(Compile)` and `@(ReferencePath)`, which MSBuild has
-  already resolved. Workable and needs no new package, but it pays a full bind the compiler is about to
-  pay again, and it does not answer any question the compiler's own log does not already answer.
-- **Harvest the console output as the primary input.** Zero setup, and it works for rules whose span sits
-  inside one node — but not for IDE0005, per the run problem above. Kept as a secondary reader.
-- **Lower the severity of rules {{product}} owns**, so a build-time fixer would not double-report. Unnecessary
-  once the mechanism is out of band, and actively harmful: a muted rule and a fixed one are
-  indistinguishable, which would make the smoke test's third assertion unfalsifiable.
+Both timings are printed because the difference is the point. Nothing else tells you which half of
+the wait belongs to which tool.

@@ -34,7 +34,7 @@ Rider's cleanup can apply semantic fixes: unused imports, `var` where the type i
 
 {{product}} does not do any of that. It covers what syntax alone can decide — layout, brace style, modifier order, expression bodies, file-scoped namespaces, using placement. Everything that requires a compilation stays with Rider's cleanup and `dotnet format style`.
 
-The split is not a limitation — it is what makes {{product}} fast enough to run inside every build.
+That scope boundary is what makes {{product}} fast enough to run inside every build.
 
 ## Why both make sense
 

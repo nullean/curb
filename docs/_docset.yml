@@ -46,7 +46,8 @@ toc:
     sort: asc
     visual: groups
     island: false
-  - folder: contribute
+  - file: known-limitations.md
+  - folder: benchmarks
     children:
-      - file: formatter-comparison.md
-      - file: known-limitations.md
+      - file: index.md
+      - file: churn.md

@@ -1,5 +1,5 @@
 ---
-navigation_title: Formatter comparison
+navigation_title: Benchmarks
 description: A measurement run over 41,000 files of real .NET source across twelve repositories.
 ---
 
@@ -16,10 +16,10 @@ was then run over their output and the differences counted — that is the fixed
 that decides whether Format Document in an IDE will fight the formatter. Kerf was also run a second
 time over its own output to check it settles.
 
-CSharpier is timed twice: **cold** (cache cleared before each of three runs; best-of-3 taken) and
-**warm** (one run immediately after, with the cache populated). The warm number is what CSharpier
-reports if you've already formatted the same content once on this machine. The cold number is what
-any developer sees on a fresh checkout, a CI runner, or after `dotnet clean`.
+CSharpier is timed twice: cold (cache cleared before each of three runs; best-of-3 taken) and warm
+(one run immediately after, with the cache populated). The warm number is what CSharpier reports if
+you've already formatted the same content once on this machine. The cold number is what any developer
+sees on a fresh checkout, a CI runner, or after `dotnet clean`.
 
 Two repositories have no `.editorconfig` at all (Newtonsoft.Json, ServiceStack), which is the
 onboarding case for a repository that has never configured anything.
@@ -57,43 +57,22 @@ sees on a fresh checkout or CI runner. `csp(warm)` is one immediate follow-up ru
 populated; it is CSharpier's best case for a file set it has already seen.
 
 Kerf beats CSharpier cold by 5–20× on every repository. Kerf beats CSharpier warm on all
-repositories through efcore (5,761 files), typically by 1.1–6×. The one exception is roslyn (17,167
-files), where CSharpier warm edges out Kerf's best-of-3 re-check time by about 18% (6.1 s vs 7.4 s).
+repositories through efcore (5,761 files), typically by 1.1–6×. On roslyn (17,167 files), CSharpier
+warm edges out Kerf's re-check time by about 18% (6.1 s vs 7.4 s) — both numbers are re-checks of
+already-formatted files. Kerf's first-ever run on roslyn is 8.5 s; CSharpier's is 65 s.
 
-That comparison is not quite apples-to-apples: Kerf's 7.4 s is a re-check of already-formatted
-files (runs 2 and 3 over the same directory); Kerf's first-ever run on roslyn is 8.5 s. CSharpier's
-warm is a re-check of already-formatted files against a populated cache, which is its best case.
 Where Kerf wins unconditionally on any large project: its MSBuild stamp means an unchanged project
 starts no process at all, while CSharpier still walks 17,000 files every time.
 
 `dotnet format` is consistently 5–10× slower than CSharpier and 15–25× slower than Kerf. It loads
 the full Roslyn workspace per project and is not designed to be fast.
 
-
 ### Churn
 
-Against `dotnet format` it is mixed. repos that are already `dotnet format`-clean see Kerf reformatting
-extra ground (expression bodies, trailing commas, using placement, BOM handling):
-
-| repo | Kerf changed | dotnet format changed | Kerf not-fixpt |
-|---|---|---|---|
-| roslyn | 9,191 | **0** | **0** |
-| efcore | 5,288 | 5,340 | 533 |
-| MassTransit | 5,291 | 411 | 62 |
-| Newtonsoft.Json | 897 | 72 | 17 |
-
-roslyn is the sharpest case: its 17,167 files are already exactly `dotnet format`-clean, and Kerf
-rewrites 9,191 of them. Kerf's output is still a fixed point there — `dotnet format` changes 0 of it
-— so this is all *free ground*: BOM handling, using-directive sorting, reflow at the repository's
-own `max_line_length`, chain breaking, comment alignment. All defensible individually, and
-collectively the opposite of a quiet first run.
-
-efcore's 533 not-fixpt files are explained by a known limitation (multi-line trivia line endings),
-which accounts for most cross-tool conformance failures in the corpus too. See
-[known limitations](known-limitations.md).
-
-Anyone working on churn should start here rather than on the corpus, where the number is 742 of 1,196
-and has been stable for so long that it reads as settled.
+See [Churn](churn.md) for what churn means, how much to expect on first adoption, and a worked
+example. The short version: roslyn (17,167 files, already exactly `dotnet format`-clean) is Kerf's
+sharpest case — 9,191 files rewritten, zero not-fixed-point. All of it is ground `dotnet format`
+doesn't cover: BOM handling, using-directive sorting, chain breaking, comment alignment.
 
 ## Reproducing
 

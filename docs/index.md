@@ -11,7 +11,7 @@ A syntax and semantic style enforcer for C#, fast enough to always run as part o
 formatting options behind code style rule
 [IDE0055](https://learn.microsoft.com/dotnet/fundamentals/code-analysis/style-rules/ide0055) — and
 reflows C# to a line width the way Prettier does. Its defaults are Roslyn's defaults, so it agrees with
-Visual Studio and Rider out of the box instead of fighting them.
+Visual Studio and Rider out of the box.
 
 **Your choices, not ours.**
 
@@ -28,20 +28,18 @@ Or, more usefully, let the build do it:
 
 ## Three things worth knowing
 
-**Fast is the feature, not the boast.** Speed here is what makes running unconditionally possible. The
-syntax pass never loads a compilation, starts in about 10 ms as a native binary, and is skipped
-entirely by MSBuild when nothing changed — so nobody has to decide when to run it.
-→ [Why {{product}}](why.md)
+Speed is what makes running unconditionally possible. The syntax pass never loads a compilation,
+starts in about 10 ms as a native binary, and is skipped entirely by MSBuild when nothing changed.
+Nobody has to decide when to run it. → [Why {{product}}](why.md)
 
-**Your `.editorconfig` is the configuration.** Around 90 keys, and no new ones invented: where Rider
-already had an opinion, {{product}} reads Rider's key rather than adding a rival. On a repository that
-is already IDE0055-clean the diff is small, and confined to whitespace within lines until you ask for
-reflow.
+Around 90 `.editorconfig` keys, and no new ones invented. Where Rider already had an opinion,
+{{product}} reads Rider's key rather than adding a rival. On a repository that is already IDE0055-clean,
+the diff is small, and confined to whitespace within lines until you ask for reflow.
 → [The two passes](design-principles/syntax-and-semantic.md)
 
-**It coexists with what you already run.** {{product}}'s output is a fixed point of `dotnet format`,
-measured and gated in CI. Hit Format Document in your IDE and nothing moves;
-`EnforceCodeStyleInBuild` stays green. → [Why {{product}}](why.md)
+{{product}}'s output is a fixed point of `dotnet format`, measured and gated in CI. Hit Format Document
+in your IDE and nothing moves; `EnforceCodeStyleInBuild` stays green.
+→ [Why {{product}}](why.md)
 
 ## Built for a codebase agents also edit
 
