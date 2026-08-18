@@ -5,7 +5,7 @@ using Nullean.Kerf.Options;
 namespace Nullean.Kerf.OptionDocs;
 
 /// <summary>
-/// Generates docs/reference/options/**/*.md from OptionDescriptor.All by running
+/// Generates docs/reference/**/*.md from OptionDescriptor.All by running
 /// Kerf against each option's snippet fixture.
 /// </summary>
 internal static class Program
@@ -59,7 +59,7 @@ internal static class Program
     internal static int Main(string[] args)
     {
         var root = RepoRoot();
-        var outputRoot = Path.Combine(root, "docs", "reference", "options");
+        var outputRoot = Path.Combine(root, "docs", "reference");
 
         Console.WriteLine($"repo root: {root}");
         Console.WriteLine($"output:    {outputRoot}");
@@ -100,9 +100,6 @@ internal static class Program
 
             var sb = new StringBuilder();
             sb.AppendLine(GroupedHeader);
-            sb.AppendLine("---");
-            sb.AppendLine($"title: {title}");
-            sb.AppendLine("---");
             sb.AppendLine();
             sb.AppendLine($"# {title}");
             sb.AppendLine();
@@ -123,9 +120,6 @@ internal static class Program
             Directory.CreateDirectory(outputRoot);
             var sb = new StringBuilder();
             sb.AppendLine(GroupedHeader);
-            sb.AppendLine("---");
-            sb.AppendLine("title: Option Reference");
-            sb.AppendLine("---");
             sb.AppendLine();
             sb.AppendLine("# Option Reference");
             sb.AppendLine();
@@ -160,11 +154,11 @@ internal static class Program
     {
         var slug = GroupSlugs[descriptor.Group];
         var sb = new StringBuilder();
-        sb.AppendLine(GroupedHeader);
         sb.AppendLine("---");
-        sb.AppendLine($"title: {descriptor.Key}");
         sb.AppendLine($"listing: {slug}");
         sb.AppendLine("---");
+        sb.AppendLine();
+        sb.AppendLine(GroupedHeader);
         sb.AppendLine();
         sb.AppendLine($"# `{descriptor.Key}`");
         sb.AppendLine();

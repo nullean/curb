@@ -5,6 +5,7 @@ project.lock.json
 .DS_Store
 *.pyc
 nupkg/
+.claude
 
 # Visual Studio
 .vs/
