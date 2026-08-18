@@ -42,6 +42,38 @@ if breaks are decided from the tokens alone then the second run asks the same qu
 and gets the same answer. In the first mode idempotency is a property {{product}} measures on every
 fixture and on the whole corpus; in the second it is a property of the design.
 
+## Formal properties
+
+Two properties hold, and they are not the same property.
+
+**Idempotency — `f(f(x)) = f(x)`**
+
+Formatting twice gives the same result as formatting once. In the no-width mode, this is measured on
+every fixture and on the full corpus. In the width mode, it follows from the design: tokens do not
+move under formatting, so the second run asks the same question of the same input and gets the same
+answer.
+
+The practical consequence: `kerf check` cannot report a file that `kerf format` just wrote. A build
+integration that checks in CI and rewrites locally will not produce an infinite loop of diffs.
+
+**Input-independence — `f(x) = f(y)` when `tokens(x) = tokens(y)`**
+
+This is the stronger property, and it holds only in the width mode. Two files with different
+whitespace but identical tokens produce identical formatted output. The result depends on what the
+file *says*, not on how it was laid out before formatting.
+
+This property does not have a standard name. In formal-methods terms it is closest to
+*confluence* — all starting points reach the same normal form — or *canonicality*.
+
+Without a width, this does not hold. `csharp_keep_existing_linebreaks` reproduces the breaks the
+author chose, so two identically-tokenized files that were written differently format differently.
+That is deliberate: in the no-width mode, where you broke an argument list is part of the
+information the file carries.
+
+The consequence of input-independence is that a fresh checkout and an in-progress working copy
+format identically. Two developers who formatted the same code separately get the same result. The
+formatted output is a pure function of the source tokens and the configuration.
+
 ## Keeping your own line breaks
 
 If you want reflow but want your arrangement kept where you made one:
@@ -123,4 +155,4 @@ takes out of their hands; both report **KERF1004** with what they still do. An e
 either way.
 
 The full reasoning for which rules are admissible in which mode, with the measurements behind each, is in
-[Layout decisions](../contribute/layout-decisions.md).
+[Layout decisions](../contribute/_layout-decisions.md).
