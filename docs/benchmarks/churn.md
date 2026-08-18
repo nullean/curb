@@ -1,76 +1,81 @@
 ---
 navigation_title: Churn
-description: What churn is, how much to expect on first adoption, and a worked example across configurations.
+description: What churn is, how much to expect on first adoption, and how idempotency means Kerf and dotnet format agree forever after.
 ---
 
 # Churn
 
-Churn is how many files and lines Kerf rewrites on its first run over a repository that already passes
-its existing formatter. The first Kerf commit is a large diff. This page says how large, and what is
-in it.
+Churn is how many files Kerf rewrites on its first run over a repository that already passes its
+existing formatter. The first Kerf commit is a diff. This page says what is in it.
 
 ## How much to expect
 
-Measured on [elastic/docs-builder](https://github.com/elastic/docs-builder) — 1,196 files, 193k
-lines, already 100% IDE0055-clean — and reproducible with `./build.sh churn`:
+Most repositories will see files changed on the first run — even those that are already
+`dotnet format`-clean. The diff is confined to ground `dotnet format` does not cover: blank-line
+normalisation, using-directive sorting, chain breaking, comment alignment. With `max_line_length`
+set, add reflow on top.
 
-| Configuration | Files changed | Changed lines |
-|---|---|---|
-| no width | 669 | 15,214 |
-| `max_line_length = 160` | 892 | 43,451 |
-| `= 160` plus `csharp_keep_existing_linebreaks = true` | 685 | 16,252 |
+How many files depends on the repository. The [benchmark table](index.md) shows the spread across
+twelve real .NET projects.
 
-Two things to read plainly.
+The table below is from one corpus (elastic/docs-builder, 1,196 files, already 100% IDE0055-clean),
+measured across three configurations:
 
-The no-width number is not zero. It is 669 files, and almost all of it is Kerf collapsing runs of two
-or more blank lines to one. `dotnet format` has no opinion on blank lines, so this is a choice Kerf
-makes. `csharp_keep_blank_lines_in_code` and `csharp_keep_blank_lines_in_declarations` turn it off.
+| Configuration | Files changed |
+|---|---|
+| no `max_line_length` | 669 of 1,196 |
+| `max_line_length = 160` | 892 of 1,196 |
+| `max_line_length = 160` + `csharp_keep_existing_linebreaks = true` | 685 of 1,196 |
 
-File count understates what a width does. It is a 33% step by files but 2.9× the changed lines,
-because only the width column rewraps anything. If you're deciding whether to set a width, the line
-count is the honest number.
+File count understates what a width does — the line count in the `max_line_length = 160` case is
+roughly 3× higher, because only that mode rewraps anything. If you're deciding whether to set a
+width, the line count is the honest number.
+
+## After the first commit, Kerf and dotnet format agree
+
+Churn is a one-time cost. Once the initial commit is in, idempotency takes over.
+
+Kerf's output is a fixed point of `dotnet format whitespace`: run `dotnet format` over Kerf-formatted
+code and nothing changes. This is not a claim — it is a CI-gated measurement, checked against
+1,196 files on every push.
+
+The practical consequence: Format Document in your IDE won't undo what Kerf wrote. `dotnet format`
+in CI won't produce a diff. The two tools genuinely agree, and they stay that way. That is what
+"plays nice with existing tooling" means in practice.
+
+The "Kerf not-fixpt" column in [the benchmark table](index.md) is this number per repository. On
+roslyn — 17,167 files, already exactly `dotnet format`-clean — it is zero. On efcore it is 533,
+explained by a known limitation (multi-line trivia line endings). See
+[known limitations](../known-limitations.md).
 
 ## What's in the diff
 
-Kerf's output is a fixed point of `dotnet format` in all three modes above — run `dotnet format` over
-the result and nothing changes. The churn is ground `dotnet format` doesn't cover:
+The first-run churn is ground `dotnet format` doesn't cover:
 
 - Blank-line normalisation
 - Using-directive sorting
 - Chain breaking
 - Comment alignment
-- Reflow to `max_line_length` (width modes only)
+- Reflow to `max_line_length` (only if set — see below)
 - BOM handling (see [known limitations](../known-limitations.md) for the current caveat)
-
-## The roslyn case
-
-The sharpest example from the [twelve-repository comparison](index.md):
-
-| repo | Kerf changed | dotnet format changed | Kerf not-fixpt |
-|---|---|---|---|
-| roslyn | 9,191 | **0** | **0** |
-| efcore | 5,288 | 5,340 | 533 |
-| MassTransit | 5,291 | 411 | 62 |
-| Newtonsoft.Json | 897 | 72 | 17 |
-
-roslyn's 17,167 files are already exactly `dotnet format`-clean. Kerf rewrites 9,191 of them. Its
-output is still a fixed point — `dotnet format` changes 0 of it — so this is all free ground: the
-categories above, at roslyn scale.
-
-efcore's 533 not-fixed-point files are explained by a known limitation (multi-line trivia line
-endings), which accounts for most cross-tool conformance failures in the corpus. See
-[known limitations](../known-limitations.md).
 
 ## Reducing churn on adoption
 
-Nothing forces you to take it all in one commit. A repository can adopt Kerf with no `max_line_length`
-— where it is a `dotnet format whitespace` equivalent and the diff is small — and add a width later,
-as its own commit, when the churn is convenient.
+Nothing forces you to take the full diff in one commit.
+
+Omitting `max_line_length` means no reflow happens. Kerf becomes a whitespace formatter: it fixes
+indentation, spacing, brace placement, and blank lines, and leaves every line exactly as long as it
+was. That makes the first-run diff smaller — confined to whitespace-within-lines and blank-line
+normalisation. See [Reflow](../design-principles/reflow.md) for what the key does and what each mode
+costs.
+
+You can adopt Kerf with no `max_line_length`, and add a width later as its own commit when the churn
+is convenient.
 
 `kerf print-config Foo.cs` prints every resolved option and says which mode you are in. Worth running
 before the reformatting commit rather than after.
 
-To reproduce the numbers above for your own repository:
+To reproduce these numbers for your own repository:
 
 ```sh
 ./build.sh churn --corpus /path/to/repo

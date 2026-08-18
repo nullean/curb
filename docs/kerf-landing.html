@@ -508,9 +508,11 @@
       </div>
     </div>
     <p class="stats-note">
-      Kerf ships as a native-AOT binary per platform — about 10 ms to start, no warm-up cost. MSBuild
-      skips it entirely when the project is untouched: no process start, no directory walk.
-      <a href="why/" style="color:var(--amber);text-decoration:none">Benchmark details →</a>
+      On Newtonsoft.Json (945 files, no <code>.editorconfig</code>): Kerf 0.26 s,
+      <code>dotnet format</code> 3.47 s, CSharpier (cold) 4.85 s.
+      Kerf ships as a native-AOT binary — about 10 ms to start, no warm-up cost. MSBuild
+      skips it entirely when the project is untouched.
+      <a href="benchmarks/" style="color:var(--amber);text-decoration:none">Full benchmark table →</a>
     </p>
   </div>
 </section>

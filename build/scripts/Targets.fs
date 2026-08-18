@@ -1225,21 +1225,17 @@ let private compare (arguments:ParseResults<Arguments>) =
             r.Name r.KerfSeconds r.CspSeconds r.CspWarmSeconds r.DnfSeconds r.KerfChanged r.CspChanged r.DnfChanged
             r.KerfNotFixpt r.CspNotFixpt r.KerfSecond
 
-    // Emit the table.
-    let header =
-        "```\n" +
-        "repo               files  ec |   kerf  csp(cold) csp(warm)    dnf |    kerf    csp    dnf |   kerf   csp |   2nd\n" +
-        "                             |         --- seconds ---            |  -- files changed --  |  not fixpt   |  idem"
+    // Emit the table (markdown format; files-changed and CSharpier columns omitted).
+    let header = "| repo | files | Kerf | dotnet format | Kerf not-fixpt | 2nd idem |\n|---|---|---|---|---|---|"
     let rows =
         results
         |> Seq.map (fun r ->
-            sprintf "%-18s %5d %3d | %6.2f %9.2f %9.2f %6.2f | %7d %6d %6d | %6d %5d | %5d"
-                r.Name r.Files r.Configs
-                r.KerfSeconds r.CspSeconds r.CspWarmSeconds r.DnfSeconds
-                r.KerfChanged r.CspChanged r.DnfChanged
-                r.KerfNotFixpt r.CspNotFixpt r.KerfSecond)
+            sprintf "| %s | %s | %.2f s | %.2f s | %d | %d |"
+                r.Name (r.Files.ToString("N0"))
+                r.KerfSeconds r.DnfSeconds
+                r.KerfNotFixpt r.KerfSecond)
         |> String.concat "\n"
-    let table = sprintf "%s\n%s\n```" header rows
+    let table = sprintf "%s\n%s" header rows
 
     printfn ""
     printfn "%s" table
