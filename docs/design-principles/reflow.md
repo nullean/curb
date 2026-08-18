@@ -154,5 +154,4 @@ Two IDE0055 keys go the other way. `csharp_preserve_single_line_blocks` and
 takes out of their hands; both report **KERF1004** with what they still do. An empty `{ }` stays collapsed
 either way.
 
-The full reasoning for which rules are admissible in which mode, with the measurements behind each, is in
-[Layout decisions](../contribute/_layout-decisions.md).
+The full reasoning for which rules are admissible in which mode, with the measurements behind each, is in the git history under `docs/contribute/layout-decisions.md`.
