@@ -39,7 +39,7 @@ public class Widget
 
 ### `indent_style = space`
 
-```editorconfig
+```ini
 indent_style = space
 ```
 
@@ -47,7 +47,7 @@ indent_style = space
 
 ### `indent_style = tab`
 
-```editorconfig
+```ini
 indent_style = tab
 ```
 

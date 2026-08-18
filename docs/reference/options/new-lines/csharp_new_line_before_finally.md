@@ -48,7 +48,7 @@ public class Widget
 
 ### `csharp_new_line_before_finally = true`
 
-```editorconfig
+```ini
 csharp_new_line_before_finally = true
 ```
 
@@ -56,7 +56,7 @@ csharp_new_line_before_finally = true
 
 ### `csharp_new_line_before_finally = false`
 
-```editorconfig
+```ini
 csharp_new_line_before_finally = false
 ```
 

@@ -39,7 +39,7 @@ public class Widget
 
 ### `generated_code = true`
 
-```editorconfig
+```ini
 generated_code = true
 ```
 
@@ -47,7 +47,7 @@ generated_code = true
 
 ### `generated_code = false`
 
-```editorconfig
+```ini
 generated_code = false
 ```
 

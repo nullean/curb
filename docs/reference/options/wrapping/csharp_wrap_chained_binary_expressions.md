@@ -36,7 +36,7 @@ public class Widget
 
 ### `csharp_wrap_chained_binary_expressions = chop_if_long`
 
-```editorconfig
+```ini
 csharp_wrap_chained_binary_expressions = chop_if_long
 ```
 

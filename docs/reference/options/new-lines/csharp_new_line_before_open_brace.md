@@ -49,7 +49,7 @@ public class Widget : Base, IWidget
 
 ### `csharp_new_line_before_open_brace = all`
 
-```editorconfig
+```ini
 csharp_new_line_before_open_brace = all
 ```
 
@@ -57,7 +57,7 @@ csharp_new_line_before_open_brace = all
 
 ### `csharp_new_line_before_open_brace = none`
 
-```editorconfig
+```ini
 csharp_new_line_before_open_brace = none
 ```
 
@@ -65,7 +65,7 @@ csharp_new_line_before_open_brace = none
 
 ### `csharp_new_line_before_open_brace = types`
 
-```editorconfig
+```ini
 csharp_new_line_before_open_brace = types
 ```
 
@@ -73,7 +73,7 @@ csharp_new_line_before_open_brace = types
 
 ### `csharp_new_line_before_open_brace = methods`
 
-```editorconfig
+```ini
 csharp_new_line_before_open_brace = methods
 ```
 
@@ -81,7 +81,7 @@ csharp_new_line_before_open_brace = methods
 
 ### `csharp_new_line_before_open_brace = accessors`
 
-```editorconfig
+```ini
 csharp_new_line_before_open_brace = accessors
 ```
 
@@ -89,7 +89,7 @@ csharp_new_line_before_open_brace = accessors
 
 ### `csharp_new_line_before_open_brace = anonymous_types`
 
-```editorconfig
+```ini
 csharp_new_line_before_open_brace = anonymous_types
 ```
 
@@ -97,7 +97,7 @@ csharp_new_line_before_open_brace = anonymous_types
 
 ### `csharp_new_line_before_open_brace = anonymous_methods`
 
-```editorconfig
+```ini
 csharp_new_line_before_open_brace = anonymous_methods
 ```
 
@@ -105,7 +105,7 @@ csharp_new_line_before_open_brace = anonymous_methods
 
 ### `csharp_new_line_before_open_brace = lambdas`
 
-```editorconfig
+```ini
 csharp_new_line_before_open_brace = lambdas
 ```
 
@@ -113,7 +113,7 @@ csharp_new_line_before_open_brace = lambdas
 
 ### `csharp_new_line_before_open_brace = control_blocks`
 
-```editorconfig
+```ini
 csharp_new_line_before_open_brace = control_blocks
 ```
 
@@ -121,7 +121,7 @@ csharp_new_line_before_open_brace = control_blocks
 
 ### `csharp_new_line_before_open_brace = object_collection_array_initializers`
 
-```editorconfig
+```ini
 csharp_new_line_before_open_brace = object_collection_array_initializers
 ```
 
@@ -129,7 +129,7 @@ csharp_new_line_before_open_brace = object_collection_array_initializers
 
 ### `csharp_new_line_before_open_brace = properties`
 
-```editorconfig
+```ini
 csharp_new_line_before_open_brace = properties
 ```
 
@@ -137,7 +137,7 @@ csharp_new_line_before_open_brace = properties
 
 ### `csharp_new_line_before_open_brace = events`
 
-```editorconfig
+```ini
 csharp_new_line_before_open_brace = events
 ```
 

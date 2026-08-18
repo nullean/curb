@@ -48,7 +48,7 @@ public class Widget
 
 ### `csharp_new_line_before_catch = true`
 
-```editorconfig
+```ini
 csharp_new_line_before_catch = true
 ```
 
@@ -56,7 +56,7 @@ csharp_new_line_before_catch = true
 
 ### `csharp_new_line_before_catch = false`
 
-```editorconfig
+```ini
 csharp_new_line_before_catch = false
 ```
 

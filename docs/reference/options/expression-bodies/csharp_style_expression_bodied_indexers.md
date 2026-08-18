@@ -39,7 +39,7 @@ public class Widget
 
 ### `csharp_style_expression_bodied_indexers = false`
 
-```editorconfig
+```ini
 csharp_style_expression_bodied_indexers = false
 ```
 
@@ -47,7 +47,7 @@ csharp_style_expression_bodied_indexers = false
 
 ### `csharp_style_expression_bodied_indexers = true`
 
-```editorconfig
+```ini
 csharp_style_expression_bodied_indexers = true
 ```
 
@@ -55,7 +55,7 @@ csharp_style_expression_bodied_indexers = true
 
 ### `csharp_style_expression_bodied_indexers = when_on_single_line`
 
-```editorconfig
+```ini
 csharp_style_expression_bodied_indexers = when_on_single_line
 ```
 

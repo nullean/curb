@@ -20,6 +20,6 @@ Blank lines before and after each property, indexer or event.
 
 *This option accepts a freeform value. No canned example is generated.*
 
-```editorconfig
+```ini
 csharp_blank_lines_around_property = <value>
 ```

@@ -42,7 +42,7 @@ public class Widget
 
 ### `csharp_space_before_semicolon_in_for_statement = true`
 
-```editorconfig
+```ini
 csharp_space_before_semicolon_in_for_statement = true
 ```
 
@@ -65,7 +65,7 @@ public class Widget
 
 ### `csharp_space_before_semicolon_in_for_statement = false`
 
-```editorconfig
+```ini
 csharp_space_before_semicolon_in_for_statement = false
 ```
 

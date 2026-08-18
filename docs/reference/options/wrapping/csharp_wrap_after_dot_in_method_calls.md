@@ -39,7 +39,7 @@ public class Widget
 
 ### `csharp_wrap_after_dot_in_method_calls = true`
 
-```editorconfig
+```ini
 csharp_wrap_after_dot_in_method_calls = true
 ```
 
@@ -47,7 +47,7 @@ csharp_wrap_after_dot_in_method_calls = true
 
 ### `csharp_wrap_after_dot_in_method_calls = false`
 
-```editorconfig
+```ini
 csharp_wrap_after_dot_in_method_calls = false
 ```
 

@@ -38,7 +38,7 @@ public class Widget
 
 ### `csharp_place_simple_accessorholder_on_single_line = true`
 
-```editorconfig
+```ini
 csharp_place_simple_accessorholder_on_single_line = true
 ```
 
@@ -46,7 +46,7 @@ csharp_place_simple_accessorholder_on_single_line = true
 
 ### `csharp_place_simple_accessorholder_on_single_line = false`
 
-```editorconfig
+```ini
 csharp_place_simple_accessorholder_on_single_line = false
 ```
 

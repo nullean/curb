@@ -39,7 +39,7 @@ public class Widget
 
 ### `csharp_wrap_before_first_method_call = true`
 
-```editorconfig
+```ini
 csharp_wrap_before_first_method_call = true
 ```
 
@@ -47,7 +47,7 @@ csharp_wrap_before_first_method_call = true
 
 ### `csharp_wrap_before_first_method_call = false`
 
-```editorconfig
+```ini
 csharp_wrap_before_first_method_call = false
 ```
 

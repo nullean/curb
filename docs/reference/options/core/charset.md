@@ -40,7 +40,7 @@ public class Widget
 
 ### `charset = utf-8`
 
-```editorconfig
+```ini
 charset = utf-8
 ```
 
@@ -48,7 +48,7 @@ charset = utf-8
 
 ### `charset = utf-8-bom`
 
-```editorconfig
+```ini
 charset = utf-8-bom
 ```
 
@@ -56,7 +56,7 @@ charset = utf-8-bom
 
 ### `charset = preserve`
 
-```editorconfig
+```ini
 charset = preserve
 ```
 

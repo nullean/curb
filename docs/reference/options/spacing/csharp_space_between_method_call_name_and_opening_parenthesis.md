@@ -41,7 +41,7 @@ public class Widget
 
 ### `csharp_space_between_method_call_name_and_opening_parenthesis = true`
 
-```editorconfig
+```ini
 csharp_space_between_method_call_name_and_opening_parenthesis = true
 ```
 
@@ -63,7 +63,7 @@ public class Widget
 
 ### `csharp_space_between_method_call_name_and_opening_parenthesis = false`
 
-```editorconfig
+```ini
 csharp_space_between_method_call_name_and_opening_parenthesis = false
 ```
 

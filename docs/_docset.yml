@@ -40,39 +40,12 @@ toc:
     children:
       - file: index.md
       - file: options/index.md
-      - folder: options/core
-        children:
-          - file: index.md
-      - folder: options/new-lines
-        children:
-          - file: index.md
-      - folder: options/indentation
-        children:
-          - file: index.md
-      - folder: options/spacing
-        children:
-          - file: index.md
-      - folder: options/wrapping
-        children:
-          - file: index.md
-      - folder: options/blank-lines
-        children:
-          - file: index.md
-      - folder: options/expression-bodies
-        children:
-          - file: index.md
-      - folder: options/usings
-        children:
-          - file: index.md
-      - folder: options/modifiers-and-braces
-        children:
-          - file: index.md
-      - folder: options/trailing-commas
-        children:
-          - file: index.md
-      - folder: options/suppression
-        children:
-          - file: index.md
+  - listing: reference/options
+    glob: "**/*.md"
+    groups: [core, new-lines, indentation, spacing, wrapping, blank-lines, expression-bodies, usings, modifiers-and-braces, trailing-commas, suppression]
+    sort: asc
+    visual: groups
+    island: true
   - folder: contribute
     children:
       - file: layout-decisions.md

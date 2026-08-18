@@ -48,7 +48,7 @@ public class Widget
 
 ### `csharp_space_after_keywords_in_control_flow_statements = true`
 
-```editorconfig
+```ini
 csharp_space_after_keywords_in_control_flow_statements = true
 ```
 
@@ -56,7 +56,7 @@ csharp_space_after_keywords_in_control_flow_statements = true
 
 ### `csharp_space_after_keywords_in_control_flow_statements = false`
 
-```editorconfig
+```ini
 csharp_space_after_keywords_in_control_flow_statements = false
 ```
 

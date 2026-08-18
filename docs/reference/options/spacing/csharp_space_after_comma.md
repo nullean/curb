@@ -41,7 +41,7 @@ public class Widget
 
 ### `csharp_space_after_comma = true`
 
-```editorconfig
+```ini
 csharp_space_after_comma = true
 ```
 
@@ -49,7 +49,7 @@ csharp_space_after_comma = true
 
 ### `csharp_space_after_comma = false`
 
-```editorconfig
+```ini
 csharp_space_after_comma = false
 ```
 

@@ -37,7 +37,7 @@ public class Widget
 
 ### `csharp_trailing_comma_in_multiline_lists = true`
 
-```editorconfig
+```ini
 csharp_trailing_comma_in_multiline_lists = true
 ```
 
@@ -45,7 +45,7 @@ csharp_trailing_comma_in_multiline_lists = true
 
 ### `csharp_trailing_comma_in_multiline_lists = false`
 
-```editorconfig
+```ini
 csharp_trailing_comma_in_multiline_lists = false
 ```
 

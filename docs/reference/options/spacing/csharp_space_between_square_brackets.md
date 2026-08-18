@@ -38,7 +38,7 @@ public class Widget
 
 ### `csharp_space_between_square_brackets = true`
 
-```editorconfig
+```ini
 csharp_space_between_square_brackets = true
 ```
 
@@ -57,7 +57,7 @@ public class Widget
 
 ### `csharp_space_between_square_brackets = false`
 
-```editorconfig
+```ini
 csharp_space_between_square_brackets = false
 ```
 

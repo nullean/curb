@@ -20,6 +20,6 @@ Maximum consecutive blank lines between statements.
 
 *This option accepts a freeform value. No canned example is generated.*
 
-```editorconfig
+```ini
 csharp_keep_blank_lines_in_code = <value>
 ```

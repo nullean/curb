@@ -20,6 +20,6 @@ Columns per indent level.
 
 *This option accepts a freeform value. No canned example is generated.*
 
-```editorconfig
+```ini
 indent_size = <value>
 ```

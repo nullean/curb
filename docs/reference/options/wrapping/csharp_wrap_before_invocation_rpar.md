@@ -41,7 +41,7 @@ public class Widget
 
 ### `csharp_wrap_before_invocation_rpar = true`
 
-```editorconfig
+```ini
 csharp_wrap_before_invocation_rpar = true
 ```
 
@@ -49,7 +49,7 @@ csharp_wrap_before_invocation_rpar = true
 
 ### `csharp_wrap_before_invocation_rpar = false`
 
-```editorconfig
+```ini
 csharp_wrap_before_invocation_rpar = false
 ```
 

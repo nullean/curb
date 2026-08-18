@@ -39,7 +39,7 @@ public class Widget
 
 ### `csharp_space_around_declaration_statements = false`
 
-```editorconfig
+```ini
 csharp_space_around_declaration_statements = false
 ```
 
@@ -47,7 +47,7 @@ csharp_space_around_declaration_statements = false
 
 ### `csharp_space_around_declaration_statements = ignore`
 
-```editorconfig
+```ini
 csharp_space_around_declaration_statements = ignore
 ```
 

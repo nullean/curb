@@ -40,7 +40,7 @@ public class Widget
 
 ### `end_of_line = lf`
 
-```editorconfig
+```ini
 end_of_line = lf
 ```
 
@@ -48,7 +48,7 @@ end_of_line = lf
 
 ### `end_of_line = crlf`
 
-```editorconfig
+```ini
 end_of_line = crlf
 ```
 
@@ -68,7 +68,7 @@ public class Widget
 
 ### `end_of_line = auto`
 
-```editorconfig
+```ini
 end_of_line = auto
 ```
 

@@ -20,6 +20,6 @@ Chop an argument list carrying more than this many arguments.
 
 *This option accepts a freeform value. No canned example is generated.*
 
-```editorconfig
+```ini
 csharp_max_invocation_arguments_on_line = <value>
 ```

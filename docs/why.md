@@ -82,12 +82,15 @@ Measured on the same 6.5 MB corpus, as CPU time:
 | | |
 |---|---|
 | Roslyn parse + full red tree — the floor for any tool | **~300 ms** |
-| **{{product}}** | milliseconds on top of that floor |
+| **{{product}}** | **~350 ms** |
 | `dotnet format whitespace` | **~12,000 ms** |
 | CSharpier | **~14,000 ms** |
 
-Parsing is about 2.5% of the budget. Roughly 97% of what a formatter costs is its own work, which is why
-{{product}} treats the printer as the thing to optimise and holds an allocation-ratio gate in CI.
+Parsing is about 2.5% of the budget. Roughly 97% of what a formatter costs is its own work. {{product}}
+adds almost nothing on top of the parse: it is within measurement noise of the floor, which is how it
+can run inside every build without the build ever slowing down. The [formatter comparison](contribute/formatter-comparison.md)
+has wall-clock numbers across twelve real repositories; on roslyn (17,167 files) {{product}} takes **7 s**
+against `dotnet format`'s **36 s**.
 
 It ships as a native-AOT binary per platform, so there is no JIT warm-up to pay on a tool you invoke
 constantly: about 10 ms to start.

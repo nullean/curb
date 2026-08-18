@@ -48,7 +48,7 @@ public class Widget
 
 ### `csharp_preserve_single_line_statements = true`
 
-```editorconfig
+```ini
 csharp_preserve_single_line_statements = true
 ```
 
@@ -56,7 +56,7 @@ csharp_preserve_single_line_statements = true
 
 ### `csharp_preserve_single_line_statements = false`
 
-```editorconfig
+```ini
 csharp_preserve_single_line_statements = false
 ```
 

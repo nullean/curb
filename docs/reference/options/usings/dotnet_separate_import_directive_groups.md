@@ -35,7 +35,7 @@ public class Widget { }
 
 ### `dotnet_separate_import_directive_groups = true`
 
-```editorconfig
+```ini
 dotnet_separate_import_directive_groups = true
 ```
 
@@ -43,7 +43,7 @@ dotnet_separate_import_directive_groups = true
 
 ### `dotnet_separate_import_directive_groups = false`
 
-```editorconfig
+```ini
 dotnet_separate_import_directive_groups = false
 ```
 

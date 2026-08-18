@@ -37,7 +37,7 @@ public class Widget
 
 ### `csharp_wrap_before_first_type_parameter_constraint = true`
 
-```editorconfig
+```ini
 csharp_wrap_before_first_type_parameter_constraint = true
 ```
 
@@ -56,7 +56,7 @@ public class Widget
 
 ### `csharp_wrap_before_first_type_parameter_constraint = false`
 
-```editorconfig
+```ini
 csharp_wrap_before_first_type_parameter_constraint = false
 ```
 

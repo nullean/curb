@@ -20,6 +20,6 @@ Chop a parameter list carrying more than this many parameters, regardless of wid
 
 *This option accepts a freeform value. No canned example is generated.*
 
-```editorconfig
+```ini
 csharp_max_formal_parameters_on_line = <value>
 ```

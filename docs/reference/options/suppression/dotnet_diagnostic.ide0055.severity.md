@@ -42,7 +42,7 @@ public class Widget
 
 ### `dotnet_diagnostic.ide0055.severity = none`
 
-```editorconfig
+```ini
 dotnet_diagnostic.ide0055.severity = none
 ```
 
@@ -50,7 +50,7 @@ dotnet_diagnostic.ide0055.severity = none
 
 ### `dotnet_diagnostic.ide0055.severity = silent`
 
-```editorconfig
+```ini
 dotnet_diagnostic.ide0055.severity = silent
 ```
 
@@ -58,7 +58,7 @@ dotnet_diagnostic.ide0055.severity = silent
 
 ### `dotnet_diagnostic.ide0055.severity = suggestion`
 
-```editorconfig
+```ini
 dotnet_diagnostic.ide0055.severity = suggestion
 ```
 
@@ -66,7 +66,7 @@ dotnet_diagnostic.ide0055.severity = suggestion
 
 ### `dotnet_diagnostic.ide0055.severity = warning`
 
-```editorconfig
+```ini
 dotnet_diagnostic.ide0055.severity = warning
 ```
 
@@ -74,7 +74,7 @@ dotnet_diagnostic.ide0055.severity = warning
 
 ### `dotnet_diagnostic.ide0055.severity = error`
 
-```editorconfig
+```ini
 dotnet_diagnostic.ide0055.severity = error
 ```
 

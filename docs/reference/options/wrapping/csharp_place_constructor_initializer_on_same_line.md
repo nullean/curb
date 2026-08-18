@@ -44,7 +44,7 @@ public class Widget : Base
 
 ### `csharp_place_constructor_initializer_on_same_line = true`
 
-```editorconfig
+```ini
 csharp_place_constructor_initializer_on_same_line = true
 ```
 
@@ -52,7 +52,7 @@ csharp_place_constructor_initializer_on_same_line = true
 
 ### `csharp_place_constructor_initializer_on_same_line = false`
 
-```editorconfig
+```ini
 csharp_place_constructor_initializer_on_same_line = false
 ```
 

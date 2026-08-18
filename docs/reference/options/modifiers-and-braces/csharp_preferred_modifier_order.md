@@ -20,6 +20,6 @@ Reorder modifiers to the specified preference. IDE0036. Applied without a compil
 
 *This option accepts a freeform value. No canned example is generated.*
 
-```editorconfig
+```ini
 csharp_preferred_modifier_order = <value>
 ```

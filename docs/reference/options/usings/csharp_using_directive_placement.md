@@ -35,7 +35,7 @@ public class Widget { }
 
 ### `csharp_using_directive_placement = inside_namespace`
 
-```editorconfig
+```ini
 csharp_using_directive_placement = inside_namespace
 ```
 
@@ -51,7 +51,7 @@ public class Widget { }
 
 ### `csharp_using_directive_placement = outside_namespace`
 
-```editorconfig
+```ini
 csharp_using_directive_placement = outside_namespace
 ```
 

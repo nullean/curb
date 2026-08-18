@@ -42,7 +42,7 @@ public class Widget
 
 ### `csharp_indent_labels = one_less_than_current`
 
-```editorconfig
+```ini
 csharp_indent_labels = one_less_than_current
 ```
 
@@ -50,7 +50,7 @@ csharp_indent_labels = one_less_than_current
 
 ### `csharp_indent_labels = flush_left`
 
-```editorconfig
+```ini
 csharp_indent_labels = flush_left
 ```
 
@@ -72,7 +72,7 @@ end:
 
 ### `csharp_indent_labels = no_change`
 
-```editorconfig
+```ini
 csharp_indent_labels = no_change
 ```
 

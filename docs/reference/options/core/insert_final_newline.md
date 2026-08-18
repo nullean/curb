@@ -39,7 +39,7 @@ public class Widget
 
 ### `insert_final_newline = true`
 
-```editorconfig
+```ini
 insert_final_newline = true
 ```
 
@@ -47,7 +47,7 @@ insert_final_newline = true
 
 ### `insert_final_newline = false`
 
-```editorconfig
+```ini
 insert_final_newline = false
 ```
 

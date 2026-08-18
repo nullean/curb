@@ -20,6 +20,6 @@ Blank lines below the last using directive.
 
 *This option accepts a freeform value. No canned example is generated.*
 
-```editorconfig
+```ini
 csharp_blank_lines_after_using_list = <value>
 ```

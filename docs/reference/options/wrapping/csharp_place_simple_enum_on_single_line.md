@@ -31,7 +31,7 @@ public enum Status { Active, Inactive, Pending }
 
 ### `csharp_place_simple_enum_on_single_line = true`
 
-```editorconfig
+```ini
 csharp_place_simple_enum_on_single_line = true
 ```
 
@@ -39,7 +39,7 @@ csharp_place_simple_enum_on_single_line = true
 
 ### `csharp_place_simple_enum_on_single_line = false`
 
-```editorconfig
+```ini
 csharp_place_simple_enum_on_single_line = false
 ```
 

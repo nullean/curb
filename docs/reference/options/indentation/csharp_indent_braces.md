@@ -39,7 +39,7 @@ public class Widget
 
 ### `csharp_indent_braces = true`
 
-```editorconfig
+```ini
 csharp_indent_braces = true
 ```
 
@@ -59,7 +59,7 @@ public class Widget
 
 ### `csharp_indent_braces = false`
 
-```editorconfig
+```ini
 csharp_indent_braces = false
 ```
 

@@ -20,6 +20,6 @@ Blank lines below the opening brace and above the closing brace of a type.
 
 *This option accepts a freeform value. No canned example is generated.*
 
-```editorconfig
+```ini
 csharp_blank_lines_inside_type = <value>
 ```

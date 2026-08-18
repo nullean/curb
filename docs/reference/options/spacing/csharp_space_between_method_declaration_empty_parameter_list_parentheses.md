@@ -37,7 +37,7 @@ public class Widget
 
 ### `csharp_space_between_method_declaration_empty_parameter_list_parentheses = true`
 
-```editorconfig
+```ini
 csharp_space_between_method_declaration_empty_parameter_list_parentheses = true
 ```
 
@@ -45,7 +45,7 @@ csharp_space_between_method_declaration_empty_parameter_list_parentheses = true
 
 ### `csharp_space_between_method_declaration_empty_parameter_list_parentheses = false`
 
-```editorconfig
+```ini
 csharp_space_between_method_declaration_empty_parameter_list_parentheses = false
 ```
 

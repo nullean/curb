@@ -37,7 +37,7 @@ namespace N
 
 ### `csharp_style_namespace_declarations = block_scoped`
 
-```editorconfig
+```ini
 csharp_style_namespace_declarations = block_scoped
 ```
 
@@ -45,7 +45,7 @@ csharp_style_namespace_declarations = block_scoped
 
 ### `csharp_style_namespace_declarations = file_scoped`
 
-```editorconfig
+```ini
 csharp_style_namespace_declarations = file_scoped
 ```
 

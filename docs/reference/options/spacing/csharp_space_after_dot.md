@@ -39,7 +39,7 @@ public class Widget
 
 ### `csharp_space_after_dot = true`
 
-```editorconfig
+```ini
 csharp_space_after_dot = true
 ```
 
@@ -47,7 +47,7 @@ csharp_space_after_dot = true
 
 ### `csharp_space_after_dot = false`
 
-```editorconfig
+```ini
 csharp_space_after_dot = false
 ```
 

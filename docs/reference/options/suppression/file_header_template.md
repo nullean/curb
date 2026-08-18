@@ -39,7 +39,7 @@ public class Widget
 
 ### `file_header_template = unset`
 
-```editorconfig
+```ini
 file_header_template = unset
 ```
 

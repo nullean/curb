@@ -44,7 +44,7 @@ public class Widget
 
 ### `csharp_wrap_before_arrow_with_expressions = true`
 
-```editorconfig
+```ini
 csharp_wrap_before_arrow_with_expressions = true
 ```
 
@@ -52,7 +52,7 @@ csharp_wrap_before_arrow_with_expressions = true
 
 ### `csharp_wrap_before_arrow_with_expressions = false`
 
-```editorconfig
+```ini
 csharp_wrap_before_arrow_with_expressions = false
 ```
 

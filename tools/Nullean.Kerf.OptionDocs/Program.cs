@@ -202,7 +202,7 @@ internal static class Program
         {
             sb.AppendLine("*This option accepts a freeform value. No canned example is generated.*");
             sb.AppendLine();
-            sb.AppendLine("```editorconfig");
+            sb.AppendLine("```ini");
             sb.AppendLine($"{descriptor.Key} = <value>");
             sb.AppendLine("```");
         }
@@ -222,7 +222,7 @@ internal static class Program
             {
                 sb.AppendLine($"### `{descriptor.Key} = {value}`");
                 sb.AppendLine();
-                sb.AppendLine("```editorconfig");
+                sb.AppendLine("```ini");
                 sb.AppendLine($"{descriptor.Key} = {value}");
                 sb.AppendLine("```");
                 sb.AppendLine();

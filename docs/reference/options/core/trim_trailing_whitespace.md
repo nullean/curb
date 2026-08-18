@@ -39,7 +39,7 @@ public class Widget
 
 ### `trim_trailing_whitespace = true`
 
-```editorconfig
+```ini
 trim_trailing_whitespace = true
 ```
 
@@ -47,7 +47,7 @@ trim_trailing_whitespace = true
 
 ### `trim_trailing_whitespace = false`
 
-```editorconfig
+```ini
 trim_trailing_whitespace = false
 ```
 

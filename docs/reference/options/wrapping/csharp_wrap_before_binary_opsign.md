@@ -37,7 +37,7 @@ public class Widget
 
 ### `csharp_wrap_before_binary_opsign = true`
 
-```editorconfig
+```ini
 csharp_wrap_before_binary_opsign = true
 ```
 
@@ -45,7 +45,7 @@ csharp_wrap_before_binary_opsign = true
 
 ### `csharp_wrap_before_binary_opsign = false`
 
-```editorconfig
+```ini
 csharp_wrap_before_binary_opsign = false
 ```
 

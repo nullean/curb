@@ -41,7 +41,7 @@ public class Widget
 
 ### `csharp_trailing_comma_in_singleline_lists = true`
 
-```editorconfig
+```ini
 csharp_trailing_comma_in_singleline_lists = true
 ```
 
@@ -49,7 +49,7 @@ csharp_trailing_comma_in_singleline_lists = true
 
 ### `csharp_trailing_comma_in_singleline_lists = false`
 
-```editorconfig
+```ini
 csharp_trailing_comma_in_singleline_lists = false
 ```
 

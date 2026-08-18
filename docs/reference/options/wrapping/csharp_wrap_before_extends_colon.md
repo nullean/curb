@@ -39,7 +39,7 @@ public class Widget : Base, IWidget
 
 ### `csharp_wrap_before_extends_colon = true`
 
-```editorconfig
+```ini
 csharp_wrap_before_extends_colon = true
 ```
 
@@ -60,7 +60,7 @@ public class Widget
 
 ### `csharp_wrap_before_extends_colon = false`
 
-```editorconfig
+```ini
 csharp_wrap_before_extends_colon = false
 ```
 

@@ -38,7 +38,7 @@ public class Widget
 
 ### `csharp_place_field_attribute_on_same_line = own_line`
 
-```editorconfig
+```ini
 csharp_place_field_attribute_on_same_line = own_line
 ```
 
@@ -46,7 +46,7 @@ csharp_place_field_attribute_on_same_line = own_line
 
 ### `csharp_place_field_attribute_on_same_line = if_owner_is_single_line`
 
-```editorconfig
+```ini
 csharp_place_field_attribute_on_same_line = if_owner_is_single_line
 ```
 

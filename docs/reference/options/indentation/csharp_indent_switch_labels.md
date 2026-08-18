@@ -48,7 +48,7 @@ public class Widget
 
 ### `csharp_indent_switch_labels = true`
 
-```editorconfig
+```ini
 csharp_indent_switch_labels = true
 ```
 
@@ -56,7 +56,7 @@ csharp_indent_switch_labels = true
 
 ### `csharp_indent_switch_labels = false`
 
-```editorconfig
+```ini
 csharp_indent_switch_labels = false
 ```
 

@@ -48,7 +48,7 @@ public class Widget
 
 ### `csharp_indent_case_contents_when_block = true`
 
-```editorconfig
+```ini
 csharp_indent_case_contents_when_block = true
 ```
 
@@ -56,7 +56,7 @@ csharp_indent_case_contents_when_block = true
 
 ### `csharp_indent_case_contents_when_block = false`
 
-```editorconfig
+```ini
 csharp_indent_case_contents_when_block = false
 ```
 

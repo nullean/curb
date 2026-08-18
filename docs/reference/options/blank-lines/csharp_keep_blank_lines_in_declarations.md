@@ -20,6 +20,6 @@ Maximum consecutive blank lines between members.
 
 *This option accepts a freeform value. No canned example is generated.*
 
-```editorconfig
+```ini
 csharp_keep_blank_lines_in_declarations = <value>
 ```

@@ -40,7 +40,7 @@ public class Widget
 
 ### `csharp_new_line_between_query_expression_clauses = true`
 
-```editorconfig
+```ini
 csharp_new_line_between_query_expression_clauses = true
 ```
 
@@ -64,7 +64,7 @@ public class Widget
 
 ### `csharp_new_line_between_query_expression_clauses = false`
 
-```editorconfig
+```ini
 csharp_new_line_between_query_expression_clauses = false
 ```
 

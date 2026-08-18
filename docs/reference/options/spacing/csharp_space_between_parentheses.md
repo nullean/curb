@@ -50,7 +50,7 @@ public class Widget
 
 ### `csharp_space_between_parentheses = false`
 
-```editorconfig
+```ini
 csharp_space_between_parentheses = false
 ```
 
@@ -58,7 +58,7 @@ csharp_space_between_parentheses = false
 
 ### `csharp_space_between_parentheses = control_flow_statements`
 
-```editorconfig
+```ini
 csharp_space_between_parentheses = control_flow_statements
 ```
 
@@ -87,7 +87,7 @@ public class Widget
 
 ### `csharp_space_between_parentheses = type_casts`
 
-```editorconfig
+```ini
 csharp_space_between_parentheses = type_casts
 ```
 
@@ -95,7 +95,7 @@ csharp_space_between_parentheses = type_casts
 
 ### `csharp_space_between_parentheses = expressions`
 
-```editorconfig
+```ini
 csharp_space_between_parentheses = expressions
 ```
 

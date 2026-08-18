@@ -39,7 +39,7 @@ public class Widget
 
 ### `csharp_style_expression_bodied_accessors = false`
 
-```editorconfig
+```ini
 csharp_style_expression_bodied_accessors = false
 ```
 
@@ -47,7 +47,7 @@ csharp_style_expression_bodied_accessors = false
 
 ### `csharp_style_expression_bodied_accessors = true`
 
-```editorconfig
+```ini
 csharp_style_expression_bodied_accessors = true
 ```
 
@@ -66,7 +66,7 @@ public class Widget
 
 ### `csharp_style_expression_bodied_accessors = when_on_single_line`
 
-```editorconfig
+```ini
 csharp_style_expression_bodied_accessors = when_on_single_line
 ```
 

@@ -20,6 +20,6 @@ Columns a tab occupies when measuring line width.
 
 *This option accepts a freeform value. No canned example is generated.*
 
-```editorconfig
+```ini
 tab_width = <value>
 ```

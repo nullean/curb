@@ -35,7 +35,7 @@ public class Widget { }
 
 ### `dotnet_sort_system_directives_first = true`
 
-```editorconfig
+```ini
 dotnet_sort_system_directives_first = true
 ```
 
@@ -51,7 +51,7 @@ public class Widget { }
 
 ### `dotnet_sort_system_directives_first = false`
 
-```editorconfig
+```ini
 dotnet_sort_system_directives_first = false
 ```
 

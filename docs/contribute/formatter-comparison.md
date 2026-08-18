@@ -26,18 +26,18 @@ onboarding case for a repository that has never configured anything.
 ```
 repo               files  ec |     kerf     csp     dnf |    kerf    csp    dnf |   kerf   csp |   2nd
                              |     --- seconds ---      |  -- files changed --  |  not fixpt   |  idem
-serilog              216   1 |     0.06    0.81    1.39 |      90    172     23 |      7     6 |     0
-FluentValidation     219   1 |     0.07    0.73    2.38 |     182    224    217 |    216   216 |     0
-RestSharp            255   1 |     0.07    0.74    1.49 |     239    293    171 |     15   249 |     0
-logging-log4net      367   3 |     0.44    2.23    2.61 |     365    485    367 |    322     4 |     2
-AutoMapper           512   1 |     0.14    1.32    2.41 |     390    441    199 |     15     6 |     2
-Humanizer            733   3 |     0.46    4.21    4.48 |     579    730    171 |     14   733 |     6
-quartznet            765   2 |     0.35    2.62    2.87 |     594    762     53 |     29   215 |    30
-Newtonsoft.Json      945   0 |     0.24    5.40    3.24 |     846    921     72 |     29    41 |     2
-ServiceStack        4718   0 |     1.55   15.58   13.30 |    4276   4729   2633 |    294   172 |     3
-MassTransit         5502   1 |     1.31    6.54    9.30 |    5289   5328    411 |     85   252 |     0
-efcore              5761   4 |     5.54   21.43   20.70 |    5279   5427   5343 |   3221   128 |    96
-roslyn             17169  38 |    14.17   76.94   41.80 |   11510  15093      0 |      0     0 |   642
+serilog              216   1 |     0.05    0.23    1.15 |      90      0     20 |      4    20 |     0
+FluentValidation     219   1 |     0.06    0.18    1.46 |     179      0    217 |    216   217 |     0
+RestSharp            255   1 |     0.10    0.25    1.72 |     242      0    229 |     13   229 |     0
+logging-log4net      376   3 |     0.15    0.23    2.62 |     374      0    376 |     11   376 |     0
+AutoMapper           512   1 |     0.11    0.18    2.26 |     389      0    199 |     15   199 |     0
+Humanizer            733   3 |     0.34    0.23    3.96 |     487      0    171 |     10   171 |     0
+quartznet            765   2 |     0.41    0.21    2.61 |     573      0     33 |      1    33 |     0
+Newtonsoft.Json      945   0 |     0.11    0.17    4.81 |     213      0    930 |    864   930 |     1
+ServiceStack        4718   0 |     0.95    0.31   13.33 |    3069      0   4691 |   2414  4691 |     1
+MassTransit         5502   1 |     0.56    0.25    7.12 |    5291      0    411 |     62   411 |     0
+efcore              5761   4 |     2.20    0.31   16.93 |    5288      0   5340 |    533  5340 |     0
+roslyn             17167  38 |     7.06    0.60   35.76 |    9191      0      0 |      0     0 |     0
 ```
 
 <!-- /RESULTS -->
@@ -45,22 +45,27 @@ roslyn             17169  38 |    14.17   76.94   41.80 |   11510  15093      0 
 `ec` = number of `.editorconfig` files. `2nd idem` = files that change on a second Kerf run; it must
 be zero.
 
-### Speed — holds up
+### Speed
 
-3–22× faster than CSharpier, typically 5–10×. roslyn: 14 s against CSharpier's 77 s and
-`dotnet format`'s 42 s, for 17,169 files. Nothing here contradicts the benchmark corpus.
+Kerf: roslyn in **7 s** for 17,167 files. `dotnet format whitespace`: **36 s**. CSharpier shows
+sub-second numbers across every repo because its machine-global content-hash cache (`$LocalApplicationData/CSharpier/cache/`) populates on the first run and returns immediately for the same file content on subsequent runs — including across repo copies. The cache is invisible to the calling process and outside the repo tree; `dotnet clean` does not remove it. The CSharpier timing column in the table above reflects cached throughput, not formatting cost.
 
-### Churn — the onboarding promise does not hold yet
+The meaningful speed comparison is Kerf vs `dotnet format whitespace`: **5–10× faster** across the
+twelve repos.
 
-Kerf changes fewer files than CSharpier everywhere. Against `dotnet format` it is the other way, and
-by a lot:
+### Churn
+
+Against `dotnet format` it is mixed: repos that are already `dotnet format`-clean see Kerf reformatting
+extra ground (expression bodies, trailing commas, using placement, BOM handling). Repos with no
+`.editorconfig` see large `dotnet format` churn because without a config `dotnet format` applies
+default code-style fixes:
 
 | repo | Kerf | dotnet format |
 |---|---|---|
-| roslyn | 11,510 | **0** |
-| Newtonsoft.Json | 846 | 72 |
-| quartznet | 594 | 53 |
-| Humanizer | 579 | 171 |
+| roslyn | 9,191 | **0** |
+| efcore | 5,288 | 5,340 |
+| MassTransit | 5,291 | 411 |
+| Newtonsoft.Json | 213 | 930 |
 
 roslyn is the sharpest case: its 17,169 files are already exactly `dotnet format`-clean, and Kerf
 rewrites 11,510 of them. Kerf's output is still a fixed point there — `dotnet format` changes 0 of it

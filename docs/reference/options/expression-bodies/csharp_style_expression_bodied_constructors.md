@@ -40,7 +40,7 @@ public class Widget
 
 ### `csharp_style_expression_bodied_constructors = false`
 
-```editorconfig
+```ini
 csharp_style_expression_bodied_constructors = false
 ```
 
@@ -48,7 +48,7 @@ csharp_style_expression_bodied_constructors = false
 
 ### `csharp_style_expression_bodied_constructors = true`
 
-```editorconfig
+```ini
 csharp_style_expression_bodied_constructors = true
 ```
 
@@ -65,7 +65,7 @@ public class Widget
 
 ### `csharp_style_expression_bodied_constructors = when_on_single_line`
 
-```editorconfig
+```ini
 csharp_style_expression_bodied_constructors = when_on_single_line
 ```
 

@@ -37,7 +37,7 @@ public class Widget
 
 ### `csharp_wrap_parameters_style = chop_always`
 
-```editorconfig
+```ini
 csharp_wrap_parameters_style = chop_always
 ```
 
@@ -60,7 +60,7 @@ public class Widget
 
 ### `csharp_wrap_parameters_style = chop_if_long`
 
-```editorconfig
+```ini
 csharp_wrap_parameters_style = chop_if_long
 ```
 

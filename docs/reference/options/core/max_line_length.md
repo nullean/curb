@@ -39,7 +39,7 @@ public class Widget
 
 ### `max_line_length = off`
 
-```editorconfig
+```ini
 max_line_length = off
 ```
 

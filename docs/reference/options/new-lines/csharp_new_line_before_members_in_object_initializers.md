@@ -37,7 +37,7 @@ public class Widget
 
 ### `csharp_new_line_before_members_in_object_initializers = true`
 
-```editorconfig
+```ini
 csharp_new_line_before_members_in_object_initializers = true
 ```
 
@@ -45,7 +45,7 @@ csharp_new_line_before_members_in_object_initializers = true
 
 ### `csharp_new_line_before_members_in_object_initializers = false`
 
-```editorconfig
+```ini
 csharp_new_line_before_members_in_object_initializers = false
 ```
 

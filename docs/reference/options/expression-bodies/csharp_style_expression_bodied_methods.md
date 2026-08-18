@@ -45,7 +45,7 @@ public class Widget
 
 ### `csharp_style_expression_bodied_methods = false`
 
-```editorconfig
+```ini
 csharp_style_expression_bodied_methods = false
 ```
 
@@ -53,7 +53,7 @@ csharp_style_expression_bodied_methods = false
 
 ### `csharp_style_expression_bodied_methods = true`
 
-```editorconfig
+```ini
 csharp_style_expression_bodied_methods = true
 ```
 
@@ -72,7 +72,7 @@ public class Widget
 
 ### `csharp_style_expression_bodied_methods = when_on_single_line`
 
-```editorconfig
+```ini
 csharp_style_expression_bodied_methods = when_on_single_line
 ```
 

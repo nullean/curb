@@ -38,7 +38,7 @@ public class Widget
 
 ### `csharp_space_around_binary_operators = before_and_after`
 
-```editorconfig
+```ini
 csharp_space_around_binary_operators = before_and_after
 ```
 
@@ -46,7 +46,7 @@ csharp_space_around_binary_operators = before_and_after
 
 ### `csharp_space_around_binary_operators = none`
 
-```editorconfig
+```ini
 csharp_space_around_binary_operators = none
 ```
 
@@ -64,7 +64,7 @@ public class Widget
 
 ### `csharp_space_around_binary_operators = ignore`
 
-```editorconfig
+```ini
 csharp_space_around_binary_operators = ignore
 ```
 

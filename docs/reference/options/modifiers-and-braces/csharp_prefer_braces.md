@@ -49,7 +49,7 @@ public class Widget
 
 ### `csharp_prefer_braces = false`
 
-```editorconfig
+```ini
 csharp_prefer_braces = false
 ```
 
@@ -57,7 +57,7 @@ csharp_prefer_braces = false
 
 ### `csharp_prefer_braces = true`
 
-```editorconfig
+```ini
 csharp_prefer_braces = true
 ```
 
@@ -65,7 +65,7 @@ csharp_prefer_braces = true
 
 ### `csharp_prefer_braces = when_multiline`
 
-```editorconfig
+```ini
 csharp_prefer_braces = when_multiline
 ```
 

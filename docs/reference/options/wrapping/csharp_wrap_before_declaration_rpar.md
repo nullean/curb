@@ -37,7 +37,7 @@ public class Widget
 
 ### `csharp_wrap_before_declaration_rpar = true`
 
-```editorconfig
+```ini
 csharp_wrap_before_declaration_rpar = true
 ```
 
@@ -45,7 +45,7 @@ csharp_wrap_before_declaration_rpar = true
 
 ### `csharp_wrap_before_declaration_rpar = false`
 
-```editorconfig
+```ini
 csharp_wrap_before_declaration_rpar = false
 ```
 

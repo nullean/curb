@@ -37,7 +37,7 @@ public class Widget
 
 ### `csharp_new_line_before_members_in_anonymous_types = true`
 
-```editorconfig
+```ini
 csharp_new_line_before_members_in_anonymous_types = true
 ```
 
@@ -45,7 +45,7 @@ csharp_new_line_before_members_in_anonymous_types = true
 
 ### `csharp_new_line_before_members_in_anonymous_types = false`
 
-```editorconfig
+```ini
 csharp_new_line_before_members_in_anonymous_types = false
 ```
 

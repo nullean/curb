@@ -39,7 +39,7 @@ public class Widget
 
 ### `csharp_keep_existing_linebreaks = true`
 
-```editorconfig
+```ini
 csharp_keep_existing_linebreaks = true
 ```
 
@@ -47,7 +47,7 @@ csharp_keep_existing_linebreaks = true
 
 ### `csharp_keep_existing_linebreaks = false`
 
-```editorconfig
+```ini
 csharp_keep_existing_linebreaks = false
 ```
 

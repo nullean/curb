@@ -39,7 +39,7 @@ public class Widget
 
 ### `csharp_style_expression_bodied_properties = false`
 
-```editorconfig
+```ini
 csharp_style_expression_bodied_properties = false
 ```
 
@@ -47,7 +47,7 @@ csharp_style_expression_bodied_properties = false
 
 ### `csharp_style_expression_bodied_properties = true`
 
-```editorconfig
+```ini
 csharp_style_expression_bodied_properties = true
 ```
 
@@ -66,7 +66,7 @@ public class Widget
 
 ### `csharp_style_expression_bodied_properties = when_on_single_line`
 
-```editorconfig
+```ini
 csharp_style_expression_bodied_properties = when_on_single_line
 ```
 

@@ -39,7 +39,7 @@ public class Widget : Base, IWidget
 
 ### `csharp_space_before_colon_in_inheritance_clause = true`
 
-```editorconfig
+```ini
 csharp_space_before_colon_in_inheritance_clause = true
 ```
 
@@ -47,7 +47,7 @@ csharp_space_before_colon_in_inheritance_clause = true
 
 ### `csharp_space_before_colon_in_inheritance_clause = false`
 
-```editorconfig
+```ini
 csharp_space_before_colon_in_inheritance_clause = false
 ```
 

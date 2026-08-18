@@ -20,6 +20,6 @@ Chop an array initializer carrying more than this many elements.
 
 *This option accepts a freeform value. No canned example is generated.*
 
-```editorconfig
+```ini
 csharp_max_array_initializer_elements_on_line = <value>
 ```

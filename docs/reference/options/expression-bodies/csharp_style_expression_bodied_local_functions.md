@@ -45,7 +45,7 @@ public class Widget
 
 ### `csharp_style_expression_bodied_local_functions = false`
 
-```editorconfig
+```ini
 csharp_style_expression_bodied_local_functions = false
 ```
 
@@ -53,7 +53,7 @@ csharp_style_expression_bodied_local_functions = false
 
 ### `csharp_style_expression_bodied_local_functions = true`
 
-```editorconfig
+```ini
 csharp_style_expression_bodied_local_functions = true
 ```
 
@@ -61,7 +61,7 @@ csharp_style_expression_bodied_local_functions = true
 
 ### `csharp_style_expression_bodied_local_functions = when_on_single_line`
 
-```editorconfig
+```ini
 csharp_style_expression_bodied_local_functions = when_on_single_line
 ```
 

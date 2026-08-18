@@ -20,6 +20,6 @@ Blank lines before and after each method or constructor. 0 means leave the autho
 
 *This option accepts a freeform value. No canned example is generated.*
 
-```editorconfig
+```ini
 csharp_blank_lines_around_invocable = <value>
 ```
