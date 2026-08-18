@@ -1039,6 +1039,7 @@ type private RepoResult = {
     Configs: int
     KerfSeconds: float
     CspSeconds: float
+    CspWarmSeconds: float
     DnfSeconds: float
     KerfChanged: int
     CspChanged: int
@@ -1148,18 +1149,33 @@ let private compare (arguments:ParseResults<Arguments>) =
                 sw.Elapsed.TotalSeconds ]
             |> List.min
 
-        // CSharpier — best of 3 (re-copy each time so the second run is not a no-op over formatted output)
+        // CSharpier cache path — machine-global, content-hash keyed, outside the repo tree.
+        // Clearing it before each cold run is the only way to get accurate formatting times.
+        let csharpierCache =
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "CSharpier", ".formattingCache")
+
+        // CSharpier cold — best of 3. Cache cleared before each run; repo re-copied so each run
+        // formats the original source, not an already-formatted copy.
         let cspSec =
             [ for i in 1..3 ->
                 if i > 1 then
                     if Directory.Exists cspDir then Directory.Delete(cspDir, true)
                     copyTree repo.FullName cspDir
                     configureCorpus arguments cspDir
+                if File.Exists csharpierCache then File.Delete csharpierCache
                 let sw = Diagnostics.Stopwatch.StartNew()
                 execResult "csharpier" ["format"; cspDir] |> ignore
                 sw.Stop()
                 sw.Elapsed.TotalSeconds ]
             |> List.min
+
+        // CSharpier warm — one run with the cache already populated (no re-copy, no cache clear).
+        // cspDir is now CSharpier-formatted; running again exercises the cache path only.
+        let cspWarmSec =
+            let sw = Diagnostics.Stopwatch.StartNew()
+            execResult "csharpier" ["format"; cspDir] |> ignore
+            sw.Stop()
+            sw.Elapsed.TotalSeconds
 
         // dotnet format whitespace — best of 3
         let dnfSec =
@@ -1199,26 +1215,26 @@ let private compare (arguments:ParseResults<Arguments>) =
 
         let r = {
             Name = repo.Name; Files = files; Configs = configs
-            KerfSeconds = kerfSec; CspSeconds = cspSec; DnfSeconds = dnfSec
+            KerfSeconds = kerfSec; CspSeconds = cspSec; CspWarmSeconds = cspWarmSec; DnfSeconds = dnfSec
             KerfChanged = kerfChanged; CspChanged = cspChanged; DnfChanged = dnfChanged
             KerfNotFixpt = kerfNotFixpt; CspNotFixpt = cspNotFixpt; KerfSecond = kerfSecond
         }
         results.Add(r)
-        printfn "%s: kerf %.2f s, csp %.2f s, dnf %.2f s; changed %d/%d/%d; not-fixpt %d/%d; 2nd %d"
-            r.Name r.KerfSeconds r.CspSeconds r.DnfSeconds r.KerfChanged r.CspChanged r.DnfChanged
+        printfn "%s: kerf %.2f s, csp cold %.2f s, csp warm %.2f s, dnf %.2f s; changed %d/%d/%d; not-fixpt %d/%d; 2nd %d"
+            r.Name r.KerfSeconds r.CspSeconds r.CspWarmSeconds r.DnfSeconds r.KerfChanged r.CspChanged r.DnfChanged
             r.KerfNotFixpt r.CspNotFixpt r.KerfSecond
 
     // Emit the table.
     let header =
         "```\n" +
-        "repo               files  ec |     kerf     csp     dnf |    kerf    csp    dnf |   kerf   csp |   2nd\n" +
-        "                             |     --- seconds ---      |  -- files changed --  |  not fixpt   |  idem"
+        "repo               files  ec |   kerf  csp(cold) csp(warm)    dnf |    kerf    csp    dnf |   kerf   csp |   2nd\n" +
+        "                             |         --- seconds ---            |  -- files changed --  |  not fixpt   |  idem"
     let rows =
         results
         |> Seq.map (fun r ->
-            sprintf "%-18s %5d %3d | %8.2f %7.2f %7.2f | %7d %6d %6d | %6d %5d | %5d"
+            sprintf "%-18s %5d %3d | %6.2f %9.2f %9.2f %6.2f | %7d %6d %6d | %6d %5d | %5d"
                 r.Name r.Files r.Configs
-                r.KerfSeconds r.CspSeconds r.DnfSeconds
+                r.KerfSeconds r.CspSeconds r.CspWarmSeconds r.DnfSeconds
                 r.KerfChanged r.CspChanged r.DnfChanged
                 r.KerfNotFixpt r.CspNotFixpt r.KerfSecond)
         |> String.concat "\n"

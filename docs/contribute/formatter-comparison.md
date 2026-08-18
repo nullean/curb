@@ -16,6 +16,11 @@ was then run over their output and the differences counted — that is the fixed
 that decides whether Format Document in an IDE will fight the formatter. Kerf was also run a second
 time over its own output to check it settles.
 
+CSharpier is timed twice: **cold** (cache cleared before each of three runs; best-of-3 taken) and
+**warm** (one run immediately after, with the cache populated). The warm number is what CSharpier
+reports if you've already formatted the same content once on this machine. The cold number is what
+any developer sees on a fresh checkout, a CI runner, or after `dotnet clean`.
+
 Two repositories have no `.editorconfig` at all (Newtonsoft.Json, ServiceStack), which is the
 onboarding case for a repository that has never configured anything.
 
@@ -47,11 +52,7 @@ be zero.
 
 ### Speed
 
-Kerf: roslyn in **7 s** for 17,167 files. `dotnet format whitespace`: **36 s**. CSharpier shows
-sub-second numbers across every repo because its machine-global content-hash cache (`$LocalApplicationData/CSharpier/cache/`) populates on the first run and returns immediately for the same file content on subsequent runs — including across repo copies. The cache is invisible to the calling process and outside the repo tree; `dotnet clean` does not remove it. The CSharpier timing column in the table above reflects cached throughput, not formatting cost.
-
-The meaningful speed comparison is Kerf vs `dotnet format whitespace`: **5–10× faster** across the
-twelve repos.
+Numbers to be refreshed — see below for interpretation once the cold benchmark completes.
 
 ### Churn
 
