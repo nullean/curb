@@ -15,10 +15,10 @@ tells you rather than continuing quietly.
 ## What is checked
 
 **The token stream is unchanged.** The tokens {{product}} emits must match the tokens it parsed. This is
-the check that makes [the layout guarantee](index.md) real rather than aspirational: a layout rule can
-move every space and newline in the file, and this comparison proves it moved nothing else.
+the check that makes the layout guarantee real rather than aspirational: a layout rule can move every
+space and newline in the file, and this comparison proves it moved nothing else.
 
-For [syntax style](index.md) rules, which change tokens deliberately, the verifier is told exactly which
+For [syntax style](syntax-and-semantic.md) rules, which change tokens deliberately, the verifier is told exactly which
 rewrite was requested — braces added, a namespace unwrapped, an arrow introduced, usings reordered, a
 header inserted. Each is allowed for specifically. Everything else is still a failure, so opting into a
 rewrite widens the check by exactly one thing rather than switching it off.

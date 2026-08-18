@@ -29,7 +29,7 @@ The IR lives in a pooled struct array rather than a class-per-node graph. Every 
 
 After printing, {{product}} re-parses its own output and compares the token streams. This catches the one class of printer bug that a content check misses: closing the gap between two tokens and accidentally welding them into something new.
 
-The reparse is conditional: the printer tracks whether it did anything capable of moving a token boundary — closing a gap, or emitting content after a line comment on the same line — and only triggers the reparse when it did. For code that never closes a gap, the check is provably redundant and is skipped. See [Safety](concepts/safety.md) for what is always checked and what the reparse covers.
+The reparse is conditional: the printer tracks whether it did anything capable of moving a token boundary — closing a gap, or emitting content after a line comment on the same line — and only triggers the reparse when it did. For code that never closes a gap, the check is provably redundant and is skipped. See [Safety](safety.md) for what is always checked and what the reparse covers.
 
 ## Unknown syntax is emitted verbatim
 
