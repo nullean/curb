@@ -488,30 +488,26 @@
     <p class="section-label">// where the time goes</p>
     <h2 class="section-title">Fast enough that<br/>skipping it makes no sense.</h2>
     <p class="section-sub">
-      CPU time, 1,196-file corpus. Parsing is the floor every tool pays; everything above it is the
-      tool's own doing — about 97% of the total. A tool at twelve seconds becomes something you run
-      occasionally. That is the difference this buys.
+      Newtonsoft.Json — 945 files, no <code>.editorconfig</code>. Wall-clock time, best of three runs.
     </p>
 
     <div class="stats">
       <div class="stat">
-        <div class="stat-num fast">~300 ms</div>
-        <div class="stat-label">Roslyn parse + full red tree — the floor any tool pays</div>
+        <div class="stat-num fast">0.26 s</div>
+        <div class="stat-label">Kerf</div>
       </div>
       <div class="stat">
-        <div class="stat-num fast">~350 ms</div>
-        <div class="stat-label">Kerf — barely above the parse floor</div>
-      </div>
-      <div class="stat">
-        <div class="stat-num slow">~12,000 ms</div>
+        <div class="stat-num slow">3.47 s</div>
         <div class="stat-label"><code>dotnet format whitespace</code></div>
+      </div>
+      <div class="stat">
+        <div class="stat-num slow">4.85 s</div>
+        <div class="stat-label">CSharpier (cold — no prior cache)</div>
       </div>
     </div>
     <p class="stats-note">
-      On Newtonsoft.Json (945 files, no <code>.editorconfig</code>): Kerf 0.26 s,
-      <code>dotnet format</code> 3.47 s, CSharpier (cold) 4.85 s.
       Kerf ships as a native-AOT binary — about 10 ms to start, no warm-up cost. MSBuild
-      skips it entirely when the project is untouched.
+      skips it entirely when the project is untouched: no process start, no directory walk.
       <a href="benchmarks/" style="color:var(--amber);text-decoration:none">Full benchmark table →</a>
     </p>
   </div>
