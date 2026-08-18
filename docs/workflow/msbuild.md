@@ -72,43 +72,45 @@ dotnet build -p:Kerf_Check=true               # check without rewriting
 | `KERF0001` | error, or warning with `Kerf_UnformattedAsWarnings` | Some files are not formatted. Only `check` can produce this. |
 | `KERF0002` | error, always | {{product}} itself failed. This is an error whatever the warnings setting says — a formatter that could not run has verified nothing, and saying so quietly would be worse than not running at all. |
 
-## What it costs on an untouched build
+## How incrementality works
 
-Nothing at all. The target declares `Inputs="@(Compile);@(EditorConfigFiles);$(MSBuildProjectFullPath)"`
-against an output stamp, so MSBuild skips it entirely when none of those changed — no process start, no
+There are two layers, and the first one matters more.
+
+### Defence 1 — MSBuild stamp
+
+The target declares `Inputs="@(Compile);@(EditorConfigFiles);$(MSBuildProjectFullPath)"` against an
+output stamp. When none of those changed, MSBuild skips the target entirely — no process start, no
 directory walk, no file reads.
 
-The project file is an input because changing it can change which files are compiled. The
-`.editorconfig` files are inputs because changing one changes the answer for every file they govern.
+The project file is an input because changing it can change which files are compiled. `.editorconfig`
+files are inputs because changing one changes the answer for every file they govern.
 
-## What it costs on a build that does run
+This is the common case on every build after the first.
 
-Only the files the project actually compiles are passed, written to a list file and handed over with
-`--files`. Passing the folder would reach sources belonging to another project, or to none.
+### Defence 2 — formatting cache
 
-There is a formatting cache, and it is deliberately the second line of defence rather than the first.
-Inputs and Outputs decide whether {{product}} runs at all; the cache decides how much work it does once
-it has to. Those are different questions, and the first one matters more — a project where one file out
-of eight hundred changed still has to run, and without a cache it re-parses the other seven hundred and
-ninety-nine only to conclude they were already formatted.
+Once the target does run — because one file changed — the cache decides how much work {{product}} does.
+Without it, a project where one file out of eight hundred changed re-parses the other seven hundred and
+ninety-nine only to conclude they were already formatted. With it, those files cost a hash comparison
+rather than a parse.
 
-The cache is `$(IntermediateOutputPath)kerf.cache`, passed to the CLI as `--cache`. It records, per file,
-that {{product}} ran the formatter over exactly those bytes under exactly those resolved options and got
-them back unchanged. A file whose bytes moved, or whose `.editorconfig` answer moved, is not in it and
-gets formatted. It is in `FileWrites`, so `dotnet clean` removes it along with the stamp.
+The cache lives at `$(IntermediateOutputPath)kerf.cache` and is passed to the CLI as `--cache`. It
+records, per file, that {{product}} ran the formatter over exactly those bytes under exactly those
+resolved options and got them back unchanged. A file whose bytes moved, or whose `.editorconfig` answer
+moved, is not in it and gets formatted normally.
 
 It earns the most with `Kerf_Check=true`. A failing check never stamps, so the target re-runs on every
-build until someone formats the file — and with the cache those re-runs cost one file rather than the
-whole project.
+build until someone formats the file. With the cache, those re-runs cost one file rather than the whole
+project.
 
-Two things it does not do. It never records a file {{product}} just rewrote, only one the formatter was
-watched to leave alone, so a formatter that stopped being idempotent still shows up as a file that keeps
-changing rather than disappearing into a cache hit. And it does not avoid reading your source: the key is
-the file's content, so every file is still read, just not parsed.
+The cache is in `FileWrites`, so `dotnet clean` removes it along with the stamp.
 
-{{product}} has no ambient cache under a user profile directory, and will not grow one. The caller names
-the path or there is no cache: one that nobody named is one nobody can find, clear or reason about, and it
-outlives every repository that fed it.
+Two things it does not do. It never records a file {{product}} just rewrote — only one it was watched to
+leave alone — so an idempotency bug still shows up as a file that keeps changing. And it does not skip
+reading source: the key is the file's content, so every file is still read, just not parsed.
+
+{{product}} has no ambient cache under a user profile directory. The caller names the path or there is no
+cache — one nobody named is one nobody can find, clear, or reason about.
 
 ## Making it faster
 

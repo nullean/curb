@@ -1240,15 +1240,14 @@ let private compare (arguments:ParseResults<Arguments>) =
             r.Name r.KerfSeconds r.CspSeconds r.CspWarmSeconds r.DnfSeconds r.KerfChanged r.CspChanged r.DnfChanged
             r.KerfNotFixpt r.CspNotFixpt r.KerfSecond
 
-    // Emit the table (markdown format; files-changed and CSharpier columns omitted).
-    let header = "| repo | files | Kerf | dotnet format | Kerf not-fixpt | 2nd idem |\n|---|---|---|---|---|---|"
+    // Emit the table (markdown format; not-fixpt and 2nd-idem columns are in churn.md).
+    let header = "| repo | files | Kerf | dotnet format | CSharpier |\n|---|---|---|---|---|"
     let rows =
         results
         |> Seq.map (fun r ->
-            sprintf "| %s | %s | %.2f s | %.2f s | %d | %d |"
+            sprintf "| %s | %s | %.2f s | %.2f s | %.2f s |"
                 r.Name (r.Files.ToString("N0"))
-                r.KerfSeconds r.DnfSeconds
-                r.KerfNotFixpt r.KerfSecond)
+                r.KerfSeconds r.DnfSeconds r.CspSeconds)
         |> String.concat "\n"
     let table = sprintf "%s\n%s" header rows
 

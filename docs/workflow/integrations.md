@@ -62,8 +62,10 @@ this possible.
 ## MSBuild
 
 The MSBuild package runs {{product}} as part of every `dotnet build` — formatting before `CoreCompile`
-in debug, checking in release. See [MSBuild integration](msbuild.md) for full configuration options,
-stamp file details, and how to scope formatting to specific projects.
+in debug, checking in release. When nothing changed, MSBuild skips the target entirely via stamp file.
+When one file did change, a formatting cache skips every file that is still formatted. See
+[MSBuild integration](msbuild.md) for full configuration options and how to scope formatting to
+specific projects.
 
 ## CI/CD
 
@@ -91,12 +93,15 @@ Reviewers stop reading past whitespace.
 ## Pre-commit hooks
 
 `kerf check` can be used as a git pre-commit hook to catch formatting issues before they are committed.
+Point `--cache` at `.git/kerf.cache` and most runs cost a hash comparison per file rather than a full
+parse — `.git/` is never committed, and entries expire after seven days, so nothing has to clean up
+behind it.
 
 ### Plain git hook
 
 ```sh
 #!/bin/sh
-kerf check ./src
+kerf check --cache .git/kerf.cache ./src
 ```
 
 Save to `.git/hooks/pre-commit` and make it executable (`chmod +x .git/hooks/pre-commit`).
@@ -108,7 +113,7 @@ With [Husky.NET](https://alirezanet.github.io/Husky.Net/):
 ```json
 {
   "command": "kerf",
-  "args": ["check", "./src"],
+  "args": ["check", "--cache", ".git/kerf.cache", "./src"],
   "pathMode": "absolute"
 }
 ```

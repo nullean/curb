@@ -303,6 +303,13 @@
 </style>
 </head>
 <body>
+<!--
+  hx-boost="false" on the wrapper: if this page is loaded via HTMX navigation from the docs site
+  (clicking "Home" in the docs sidebar), the docs-builder body tag retains hx-boost="true" and
+  would intercept every link click here. That breaks subsequent navigation — links fetch partial
+  fragments instead of full pages. Disabling boost here forces full-page loads for all landing links.
+-->
+<div hx-boost="false">
 
 <!-- ══════════════  NAV  ══════════════ -->
 <nav>
@@ -638,5 +645,6 @@ formatting you see in a diff.
     els.forEach(function (el) { io.observe(el); });
   }
 </script>
+</div><!-- /hx-boost="false" -->
 </body>
 </html>

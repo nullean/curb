@@ -43,10 +43,51 @@ The practical consequence: Format Document in your IDE won't undo what Kerf wrot
 in CI won't produce a diff. The two tools genuinely agree, and they stay that way. That is what
 "plays nice with existing tooling" means in practice.
 
-The "Kerf not-fixpt" column in [the benchmark table](index.md) is this number per repository. On
-roslyn — 17,167 files, already exactly `dotnet format`-clean — it is zero. On efcore it is 533,
-explained by a known limitation (multi-line trivia line endings). See
-[known limitations](../known-limitations.md).
+### Not-fixed-point count per repository
+
+This is the number of files where `dotnet format whitespace` disagrees with Kerf's output — ideally
+zero. A non-zero count means Format Document in the IDE can partially undo Kerf's work on those files.
+
+| repo | not-fixpt files |
+|---|---|
+| serilog | 4 |
+| FluentValidation | 216 |
+| RestSharp | 15 |
+| logging-log4net | 11 |
+| AutoMapper | 15 |
+| Humanizer | 10 |
+| quartznet | 1 |
+| Newtonsoft.Json | 17 |
+| ServiceStack | 290 |
+| MassTransit | 62 |
+| efcore | 533 |
+| roslyn | 0 |
+
+The roslyn case — 17,167 files, already exactly `dotnet format`-clean — shows zero. Most of the
+non-zero numbers come from a known limitation with multi-line trivia line endings. See
+[known limitations](../known-limitations.md). The efcore number (533) is the most affected because
+efcore uses XML doc comments heavily.
+
+### Idempotency: files changed on second run
+
+This is how many files change when Kerf is run a second time over its own output. The number must
+always be zero — a non-zero count means the formatter has not reached a fixed point. Across all twelve
+repositories the count is zero.
+
+| repo | 2nd-run changes |
+|---|---|
+| serilog | 0 |
+| FluentValidation | 0 |
+| RestSharp | 0 |
+| logging-log4net | 0 |
+| AutoMapper | 0 |
+| Humanizer | 0 |
+| quartznet | 0 |
+| Newtonsoft.Json | 0 |
+| ServiceStack | 0 |
+| MassTransit | 0 |
+| efcore | 0 |
+| roslyn | 0 |
 
 ## What's in the diff
 

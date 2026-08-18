@@ -11,11 +11,13 @@ placement.
 
 ## It's fast
 
-350 ms CPU on a 1,196-file, 6.5 MB corpus — within measurement noise of the Roslyn parse floor.
-`dotnet format whitespace` on the same files: ~12,000 ms.
+0.26 s on 945 files (Newtonsoft.Json), cold. `dotnet format whitespace` on the same files: 3.47 s.
+Across twelve real repositories, Kerf is 5–25× faster. See [Benchmarks](benchmarks/index.md) for
+the full table.
 
 Speed is what makes running on every build viable. The [build integration](workflow/msbuild.md)
-skips unchanged projects entirely; on a project where nothing changed, no process starts.
+skips unchanged projects entirely via MSBuild's stamp mechanism; on a project where nothing changed,
+no process starts.
 
 ## It doesn't fight what you already run
 

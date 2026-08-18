@@ -83,7 +83,7 @@ resolved per file, not per directory, because a section can discriminate on file
 | Flag | Applies to | What it does |
 |---|---|---|
 | `--files <list>` | `format`, `check` | Work on the paths listed in a file, one per line, instead of walking a directory. This is what the build integration uses. |
-| `--cache <path>` | `format`, `check` | Skip files a previous run watched format to themselves. The caller names the path — there is no ambient cache — so a pre-commit hook points it at a gitignored folder and the build integration points it at `obj/`. Ignored with `--coverage`. |
+| `--cache <path>` | `format`, `check` | Skip files a previous run watched format to themselves. The caller names the path — there is no ambient cache. The build integration uses `obj/kerf.cache`; a pre-commit hook uses `.git/kerf.cache`. Ignored with `--coverage`. |
 | `--coverage` | `check` | Report which syntax kinds are still emitted verbatim, and how often. |
 | `--no-verify` | `format`, `check` | Skip re-parsing the output to prove the token stream is unchanged. Not recommended — see [Safety](../design-principles/safety.md). |
 
