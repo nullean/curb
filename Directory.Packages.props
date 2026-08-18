@@ -24,6 +24,18 @@
     <PackageVersion Include="editorconfig" Version="0.17.0" />
     <PackageVersion Include="System.IO.Abstractions" Version="22.2.0" />
     <PackageVersion Include="Nullean.Argh" Version="0.17.1" />
+
+    <!-- Fingerprints the file content and the resolved options behind the `cache` flag. XxHash128 rather
+         than SHA-256 out of System.Security.Cryptography, and the reason is native AOT rather than speed:
+         on Linux the crypto stack goes through the OpenSSL shim, so hashing would hand a binary that has
+         no native dependency today a libssl/libcrypto one, and throw per file on a host without it. This
+         package is pure managed and ships no native assets; measured on osx-arm64, it costs the AOT
+         binary 65 KB, 13,581,712 bytes to 13,648,288. The speed difference decided nothing — about 3 ms
+         across the 6.5 MB corpus, against a ~300 ms parse floor.
+
+         Collision resistance is not a requirement here. Anyone able to write the cache file can write the
+         .cs file next to it, so there is no adversary a cryptographic digest would keep out. -->
+    <PackageVersion Include="System.IO.Hashing" Version="10.0.11" />
   </ItemGroup>
 
   <ItemGroup>

@@ -13,6 +13,7 @@ if (args.Length == 0 || args[0] is "-h" or "--help")
 	Console.WriteLine("  kerf format <path>         format files in place");
 	Console.WriteLine("  kerf check <path>          exit non-zero if anything would change");
 	Console.WriteLine("  --files <list>             work on the paths listed in a file, one per line");
+	Console.WriteLine("  --cache <path>             skip files a previous run watched format to themselves");
 	Console.WriteLine("  kerf print-config <file>   show the resolved options and any diagnostics");
 	Console.WriteLine("  kerf doc-tree <file>       dump the document IR for a file");
 	Console.WriteLine("  kerf --version");
@@ -58,19 +59,55 @@ if (filesFlag >= 0)
 		.Where(line => line.Length > 0)];
 }
 
+// Where to remember which files a run left alone. There is no default and no ambient location: a cache
+// nobody named is one nobody can find, clear or reason about, and it outlives every repository that fed
+// it. The MSBuild integration points this at $(IntermediateOutputPath), so `dotnet clean` takes it away.
+string? cachePath = null;
+var cacheFlag = Array.IndexOf(args, "--cache");
+if (cacheFlag >= 0)
+{
+	if (cacheFlag + 1 >= args.Length)
+	{
+		Console.Error.WriteLine("--cache needs the path of the file to keep the cache in");
+		return 3;
+	}
+
+	cachePath = args[cacheFlag + 1];
+}
+
+// The path to work on is the first argument after the command that is neither a flag nor a flag's
+// operand. This used to be args[1] outright, which reads `kerf format --cache obj/kerf.cache ./src` as a
+// request to format a file called "--cache" and then throws trying to read it.
+string[] valueFlags = ["--files", "--cache", "--diagnostics"];
+string? formattingTarget = null;
+for (var i = 1; i < args.Length; i++)
+{
+	if (args[i].StartsWith('-'))
+	{
+		if (valueFlags.Contains(args[i]))
+			i++;
+		continue;
+	}
+
+	formattingTarget = args[i];
+	break;
+}
+
 switch (args[0])
 {
-	case "format" when args.Length > 1 || explicitFiles is not null:
-		return FormattingRun.Execute(fileSystem, explicitFiles is null ? args[1] : ".", write: true,
+	case "format" when formattingTarget is not null || explicitFiles is not null:
+		return FormattingRun.Execute(fileSystem, formattingTarget ?? ".", write: true,
 			verify: !args.Contains("--no-verify"),
-			explicitFiles: explicitFiles);
+			explicitFiles: explicitFiles,
+			cachePath: cachePath).ExitCode;
 
-	case "check" when args.Length > 1 || explicitFiles is not null:
-		return FormattingRun.Execute(fileSystem, explicitFiles is null ? args[1] : ".", write: false,
+	case "check" when formattingTarget is not null || explicitFiles is not null:
+		return FormattingRun.Execute(fileSystem, formattingTarget ?? ".", write: false,
 			expandUnhandled: args.Contains("--expand-unhandled"),
 			verify: !args.Contains("--no-verify"),
 			coverageReport: args.Contains("--coverage"),
-			explicitFiles: explicitFiles);
+			explicitFiles: explicitFiles,
+			cachePath: cachePath).ExitCode;
 
 	case "cleanup":
 		{

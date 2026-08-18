@@ -342,6 +342,9 @@ let private perf (arguments:ParseResults<Arguments>) =
 /// IDE0055 is escalated to an error and the source is deliberately misformatted; building it with
 /// Kerf bypassed must fail with those same errors. Only the pair proves anything — the first alone
 /// would pass just as well if the analysers were never running.
+///
+/// A third build covers the cache, which is the other half of the incrementality story and the half
+/// nothing else would catch.
 let private msbuildSmoketest (arguments:ParseResults<Arguments>) =
     let rid =
         let os =
@@ -383,6 +386,18 @@ let private msbuildSmoketest (arguments:ParseResults<Arguments>) =
     if not (File.ReadAllText(source).Contains("public static int Run(int x)")) then
         failwithf "Kerf did not reformat the sample before the compiler read it"
 
+    // The cache only shows up when the target actually runs a second time, and simply building again
+    // would not do that: the stamp is fresh, so MSBuild skips the target outright — the first layer of
+    // incrementality doing its job. Restoring Program.cs and touching it is what forces the run, and it
+    // also guarantees that file misses, so a hit can only be Stable.cs. Hence "exactly one", not "some":
+    // a cache that served Program.cs too would be serving a file whose bytes had changed.
+    printfn "building the sample again, to prove the cache serves the file that did not change"
+    let cachedCode, cachedOutput = build [sprintf "-p:Kerf_Exe=%s" binary; "-p:Kerf_LogLevel=high"]
+    if cachedCode <> 0 then
+        failwithf "the sample must build a second time, but it failed:\n%s" cachedOutput
+    if not (cachedOutput.Contains "(1 from cache)") then
+        failwithf "expected Kerf to serve exactly one file from the cache on the second build, got:\n%s" cachedOutput
+
     printfn "building the sample with Kerf bypassed"
     let bypassedCode, bypassedOutput = build ["-p:Kerf_Bypass=true"]
     if bypassedCode = 0 then
@@ -393,7 +408,7 @@ let private msbuildSmoketest (arguments:ParseResults<Arguments>) =
     // Leave the sample misformatted, which is how it is checked in.
     File.Copy(pristine, source, true)
     printfn ""
-    printfn "MSBuild integration verified: formatted before CoreCompile, and IDE0055 fails without it"
+    printfn "MSBuild integration verified: formatted before CoreCompile, cached on the way back, and IDE0055 fails without it"
 
 /// Cleans a corpus that really builds, then requires that it still builds and that dotnet format style has
 /// nothing left to say about the rules Kerf owns.

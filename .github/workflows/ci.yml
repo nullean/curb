@@ -122,6 +122,18 @@ jobs:
           grep -qE '0 failed, 0 unparsable' result.txt \
             || (echo "::error::corpus reported failures" && exit 1)
 
+      # The cache is only ever allowed to skip work that was provably unnecessary, and the way that goes
+      # wrong is silently: an over-eager cache reports a clean corpus it never looked at, and a cache that
+      # never hits looks exactly like one that is working. Both runs are asserted for that reason.
+      - name: Verify the cache skips only unchanged files
+        run: |
+          dotnet run --project src/Nullean.Kerf.Cli -c Release -- check /tmp/corpus --cache /tmp/kerf.cache | tee cold.txt
+          ! grep -q 'from cache' cold.txt \
+            || (echo "::error::the first run cannot have served anything from an empty cache" && exit 1)
+          dotnet run --project src/Nullean.Kerf.Cli -c Release -- check /tmp/corpus --cache /tmp/kerf.cache | tee warm.txt
+          grep -qE '\([0-9]+ from cache\)' warm.txt \
+            || (echo "::error::the cache served nothing on a second run over an unchanged corpus" && exit 1)
+
       - name: Verify formatting is idempotent
         run: |
           cp -R /tmp/corpus /tmp/pass1

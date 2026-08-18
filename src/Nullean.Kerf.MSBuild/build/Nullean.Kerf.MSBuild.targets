@@ -27,6 +27,12 @@
          fail the build is a check nobody notices. -->
     <Kerf_UnformattedAsWarnings Condition="'$(Kerf_UnformattedAsWarnings)' == ''">false</Kerf_UnformattedAsWarnings>
 
+    <!-- Reuse the previous run's verdict for files that have not changed. On, because the cost of being
+         wrong is one cold run and the cost of being right is most of a build step. A boolean rather than
+         emptying Kerf_CacheFile, because a property set to nothing is indistinguishable from one nobody
+         set, so the condition that defaults the path would simply put it back. -->
+    <Kerf_Cache Condition="'$(Kerf_Cache)' == ''">true</Kerf_Cache>
+
     <!-- MSBuild message importance for Kerf's own output: high, normal or low. Low by default, so
          a successful format is invisible at normal verbosity and the one-line summary is there when
          someone asks for it. Errors and warnings are raised as diagnostics regardless. -->
@@ -86,6 +92,12 @@
       <Kerf_StampFile Condition="'$(Kerf_StampFile)' == ''">$(IntermediateOutputPath)kerf.stamp</Kerf_StampFile>
       <Kerf_FileList Condition="'$(Kerf_FileList)' == ''">$(IntermediateOutputPath)kerf.files</Kerf_FileList>
 
+      <!-- Per file rather than per project; see the note in the Kerf target for what that buys. Here for
+           the same reason as the other two, and per target framework for the same reason as the error
+           log, so two inner builds of a multi-targeting project cannot write over each other. Set
+           Kerf_Cache to false to build without one. -->
+      <Kerf_CacheFile Condition="'$(Kerf_CacheFile)' == ''">$(IntermediateOutputPath)kerf.cache</Kerf_CacheFile>
+
       <!-- The framework-dependent build that ships in this package, run on the SDK doing the build.
            See the package project for why this is not a per-RID native binary. Kerf_Exe overrides it
            with a native one, which starts in about a hundredth of the time. -->
@@ -104,10 +116,25 @@
                      and '@(Compile)' != ''">
 
     <!--
-      Incrementality is by Inputs/Outputs against the compile set and the .editorconfig files that
-      govern it, so an untouched project pays nothing at all — no process start, no directory walk.
-      A formatter that re-scans every file on every build gets a formatting cache bolted on to hide
-      the cost; not needing one is better than having a fast one.
+      Two layers of incrementality, and the order between them is the point.
+
+      First, this target's Inputs and Outputs against the compile set and the .editorconfig files that
+      govern it. An untouched project pays nothing at all: no process start, no directory walk, no file
+      reads. That is still the layer that matters most, because the cheapest run is the one that does
+      not happen, and no cache can beat not being consulted.
+
+      Second, Kerf_CacheFile, for the runs that do happen. Incrementality here is per project, so one
+      edited file out of eight hundred re-runs the target over all eight hundred, and without a cache it
+      re-parses the seven hundred and ninety-nine only to conclude they were already formatted. The
+      cache records, per file, that Kerf ran the formatter over exactly those bytes under exactly those
+      resolved options and got them back unchanged, so the re-run costs the file that moved. It earns
+      the most under Kerf_Check=true: a failing check never stamps, so the target repeats on every
+      build until someone formats the file.
+
+      It is a build artefact and is named as one. It sits in $(IntermediateOutputPath) beside the stamp
+      and the file list, and it is in FileWrites, so `dotnet clean` takes it away. Kerf has no ambient
+      cache under a user profile directory — one nobody named is one nobody can find, clear or reason
+      about, and it outlives every repository that fed it.
 
       The project file is an input because changing it can change which files are compiled.
     -->
@@ -127,9 +154,10 @@
     <PropertyGroup>
       <_KerfInvocation Condition="'$(Kerf_Exe)' != ''">&quot;$(Kerf_Exe)&quot;</_KerfInvocation>
       <_KerfInvocation Condition="'$(Kerf_Exe)' == ''">&quot;$(DOTNET_HOST_PATH)&quot; &quot;$(Kerf_Dll)&quot;</_KerfInvocation>
+      <_KerfCacheArg Condition="'$(Kerf_Cache)' != 'false' and '$(Kerf_CacheFile)' != ''">--cache &quot;$(Kerf_CacheFile)&quot;</_KerfCacheArg>
     </PropertyGroup>
 
-    <Exec Command="$(_KerfInvocation) $(_KerfCommand) --files &quot;$(Kerf_FileList)&quot;"
+    <Exec Command="$(_KerfInvocation) $(_KerfCommand) --files &quot;$(Kerf_FileList)&quot; $(_KerfCacheArg)"
           StandardOutputImportance="$(Kerf_LogLevel)"
           ContinueOnError="true"
           IgnoreExitCode="true">
@@ -157,7 +185,7 @@
     <Touch Condition="'$(_KerfExitCode)' == '0'" Files="$(Kerf_StampFile)" AlwaysCreate="true" />
 
     <ItemGroup>
-      <FileWrites Include="$(Kerf_StampFile);$(Kerf_FileList)" />
+      <FileWrites Include="$(Kerf_StampFile);$(Kerf_FileList);$(Kerf_CacheFile)" />
     </ItemGroup>
   </Target>
 

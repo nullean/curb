@@ -26,6 +26,14 @@ internal static class FormattingRun
 	private static string SkippedText(int skipped) =>
 		skipped == 0 ? "" : string.Create(CultureInfo.InvariantCulture, $"{skipped} skipped, ");
 
+	/// <summary>
+	/// Renders the cache hits beside the file count rather than among the verdicts, because every figure
+	/// after it — coverage, megabytes of source, the allocation ratio — covers only the files that were
+	/// actually printed. Absent when nothing was served from cache, so the usual line is unchanged.
+	/// </summary>
+	private static string CachedText(int cached) =>
+		cached == 0 ? "" : string.Create(CultureInfo.InvariantCulture, $" ({cached} from cache)");
+
 	/// <param name="fileSystem">Abstracted so a run can be driven entirely in memory by a test.</param>
 	/// <param name="target">A file or directory to walk. Ignored when <paramref name="explicitFiles"/> is given.</param>
 	/// <param name="write">Format in place, rather than only reporting what would change.</param>
@@ -38,18 +46,37 @@ internal static class FormattingRun
 	/// folder — it can exclude some, and link others in from outside — so formatting the directory
 	/// would reach files belonging to another project, or to none.
 	/// </param>
-	public static int Execute(
+	/// <param name="cachePath">
+	/// Where to remember which files were already formatted, so a run triggered by one changed file does
+	/// not re-parse the rest. Absent means no cache: the caller names the path or there is not one.
+	/// </param>
+	public static FormattingRunSummary Execute(
 		IFileSystem fileSystem,
 		string target,
 		bool write,
 		bool expandUnhandled = false,
 		bool? verify = null,
 		bool coverageReport = false,
-		string[]? explicitFiles = null)
+		string[]? explicitFiles = null,
+		string? cachePath = null)
 	{
 		// On by default for both commands: the printer tracks whether it actually put a token
 		// boundary at risk, so on code that does not, the second parse never happens.
 		var verifyRoundTrip = verify ?? true;
+
+		// Both of these are diagnostic modes that would make a cache lie. --expand-unhandled changes what
+		// the printer emits, so its verdicts are not the ones a real run would reach; --coverage counts
+		// syntax kinds as they are printed, and a run that skipped nine hundred files would report a
+		// histogram of the ninety that missed as though it were the repository's.
+		if (cachePath is not null && (coverageReport || expandUnhandled))
+		{
+			Console.Error.WriteLine("--cache is ignored together with --coverage or --expand-unhandled");
+			cachePath = null;
+		}
+
+		var cache = cachePath is null
+			? null
+			: FormattingCache.Load(fileSystem, fileSystem.Path.GetFullPath(cachePath), DateTimeOffset.UtcNow);
 
 		string[] files;
 		if (explicitFiles is not null)
@@ -71,11 +98,24 @@ internal static class FormattingRun
 		// what is left is a glob match per file, about 1 ms across the whole corpus.
 		//
 		// It is not thread-safe against the shared parser, so it happens up front on one thread.
-		var work = new (string Path, FormatOptions Options)[files.Length];
+		//
+		// The options fingerprint has to be taken here for the same reason, and it is only taken at all
+		// when there is a cache to key. The path is absolutised for the cache alone, so the messages and
+		// the writes below still say whatever the caller asked for.
+		var work = new (string Path, FormatOptions Options, string CacheKey, UInt128 OptionsHash)[files.Length];
+		var fingerprinter = cache is null ? null : new OptionsFingerprinter();
 		for (var i = 0; i < files.Length; i++)
-			work[i] = (files[i], EditorConfigOptionsBinder.Bind(editorConfig.For(files[i])));
+		{
+			var configuration = editorConfig.For(files[i]);
+			work[i] = (
+				files[i],
+				EditorConfigOptionsBinder.Bind(configuration),
+				cache is null ? "" : fileSystem.Path.GetFullPath(files[i]),
+				fingerprinter?.Of(configuration) ?? default);
+		}
 
 		var changed = 0;
+		var cached = 0;
 		var skipped = 0;
 		var failed = 0;
 		var unparsable = 0;
@@ -91,7 +131,10 @@ internal static class FormattingRun
 		// A bounded channel lets 4 reader tasks overlap I/O with CPU: formatter workers pull
 		// (path, options, bytes) tuples that are already in memory, so they never block on the
 		// file system. Capacity 32 keeps formatters fed without holding the whole corpus at once.
-		var channel = Channel.CreateBounded<(string Path, FormatOptions Options, byte[] Bytes)>(
+		//
+		// The two hashes ride along because the reader has already computed the content one to ask the
+		// cache; recomputing it in the worker to record the answer would hash every file twice.
+		var channel = Channel.CreateBounded<(string Path, FormatOptions Options, byte[] Bytes, string CacheKey, UInt128 ContentHash, UInt128 OptionsHash)>(
 			new BoundedChannelOptions(32) { SingleWriter = false, SingleReader = false });
 
 		// 4 reader tasks mirror the old gate width. Each races for the next index via an atomic
@@ -107,9 +150,20 @@ internal static class FormattingRun
 				// WriteAllText silently writes none, so `charset` was unobservable at both ends and
 				// every file Kerf touched lost its mark.
 				var bytes = fileSystem.File.ReadAllBytes(item.Path);
+
+				// Asked here rather than in the formatter worker, so a hit costs the read and the hash
+				// and then stops: the file never enters the channel and is never decoded. The decode is
+				// the larger half of what a file needing no work would otherwise cost.
+				var contentHash = cache is null ? default : Fingerprint.OfContent(bytes);
+				if (cache is not null && cache.IsFixedPoint(item.CacheKey, contentHash, item.OptionsHash))
+				{
+					Interlocked.Increment(ref cached);
+					continue;
+				}
+
 				// await WriteAsync so the thread is released (rather than blocked) when the channel
 				// is full; the reader backs off without pinning a thread-pool thread.
-				await channel.Writer.WriteAsync((item.Path, item.Options, bytes));
+				await channel.Writer.WriteAsync((item.Path, item.Options, bytes, item.CacheKey, contentHash, item.OptionsHash));
 			}
 		})).ToArray();
 
@@ -183,6 +237,15 @@ internal static class FormattingRun
 									result.Text ?? source,
 									wantsBom ? Utf8WithBom : Utf8);
 						}
+						else
+						{
+							// The only place anything is recorded, and deliberately not the branch above:
+							// what is remembered is that the formatter was run over these bytes and handed
+							// them back, which is something this run watched happen. A file that was just
+							// rewritten would have to be taken on trust instead, and a formatter that
+							// trusts its own output cannot notice when it stops being idempotent.
+							cache?.Record(item.CacheKey, item.ContentHash, item.OptionsHash);
+						}
 						break;
 				}
 
@@ -215,6 +278,12 @@ internal static class FormattingRun
 		var allocated = GC.GetTotalAllocatedBytes(precise: true) - allocatedBefore;
 		var sourceBytes = work.Sum(w => fileSystem.FileInfo.New(w.Path).Length);
 
+		// After the measurements, so neither the timing nor the allocation ratio counts bookkeeping the
+		// formatter did not do. Before the exit code, because the runs worth caching hardest are the ones
+		// that fail: a check that finds an unformatted file never stamps, so the build repeats it until
+		// somebody formats the file, and the cache is what makes those repeats cost one file.
+		cache?.Save();
+
 		// Sorted, because a ConcurrentBag hands them back in whatever order the threads finished, so
 		// two runs over the same tree reported a different arbitrary twenty. Diagnosing a large
 		// repository against a moving sample is worse than useless.
@@ -228,7 +297,7 @@ internal static class FormattingRun
 		var coverage = totalTokens == 0 ? 1 : printedTokens / (double)totalTokens / 1000;
 
 		Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
-			$"{(write ? "Formatted" : "Checked")} {files.Length} file(s) in {stopwatch.ElapsedMilliseconds}ms — "
+			$"{(write ? "Formatted" : "Checked")} {files.Length} file(s){CachedText(cached)} in {stopwatch.ElapsedMilliseconds}ms — "
 			+ $"{changed} {(write ? "changed" : "would change")}, {SkippedText(skipped)}{failed} failed, {unparsable} unparsable, "
 			+ $"printer coverage {coverage:P1}"));
 
@@ -251,17 +320,36 @@ internal static class FormattingRun
 
 		if (verifyRoundTrip)
 		{
+			// Out of the files that were printed, not out of every file named. A cache hit never reaches
+			// the printer, so counting it in the denominator would report a proportion of a population
+			// that was never at risk.
+			var printed = files.Length - cached;
 			Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
-				$"  round-trip verified {reparsed} of {files.Length} file(s) "
-				+ $"({reparsed / (double)Math.Max(1, files.Length):P1} needed a second parse)"));
+				$"  round-trip verified {reparsed} of {printed} file(s) "
+				+ $"({reparsed / (double)Math.Max(1, printed):P1} needed a second parse)"));
 		}
 
-		if (failed > 0)
-			return 3;
-		return !write && changed > 0 ? 1 : 0;
+		var exitCode = failed > 0 ? 3 : !write && changed > 0 ? 1 : 0;
+		return new FormattingRunSummary(files.Length, changed, cached, skipped, failed, unparsable, reparsed, coverage, exitCode);
 	}
 
 	private static bool IsFormattable(string path) =>
 		!path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal)
 		&& !path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.Ordinal);
 }
+
+/// <summary>What a formatting run did, for a caller that needs more than an exit code.</summary>
+/// <remarks>
+/// The run prints its own summary; this exists so tests can assert on the counts without capturing
+/// console output, which TUnit's parallelism makes unreliable.
+/// </remarks>
+internal readonly record struct FormattingRunSummary(
+	int Files,
+	int Changed,
+	int Cached,
+	int Skipped,
+	int Failed,
+	int Unparsable,
+	int Reparsed,
+	double Coverage,
+	int ExitCode);

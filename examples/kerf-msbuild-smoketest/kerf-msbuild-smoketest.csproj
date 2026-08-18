@@ -8,6 +8,10 @@
 
     Excluded from the solution build; driven by ./build.sh msbuild-smoketest, which points Kerf_Exe
     at the freshly published binary.
+
+    Stable.cs is the second half of that: it is already formatted and stays so, which is what lets the
+    harness assert that the second build served exactly one file from the cache while Program.cs, which
+    it restores to its misformatted state each time, still misses.
   -->
 
   <PropertyGroup>
