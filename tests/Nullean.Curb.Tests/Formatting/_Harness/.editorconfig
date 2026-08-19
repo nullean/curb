@@ -1,0 +1,3 @@
+[*.cs]
+# Namespace intentionally matches the parent Formatting namespace, not the _Harness organisational folder.
+dotnet_diagnostic.IDE0130.severity = none

@@ -39,7 +39,7 @@ public class DeclaredDeltaTests
 	/// A word the output does not contain gets an offset nothing can match, so "declared but never appeared"
 	/// stays a failure rather than becoming an exception.
 	/// </remarks>
-	private static IReadOnlyList<InsertedToken>? Locate(string output, IReadOnlyList<string>? inserted)
+	private static List<InsertedToken>? Locate(string output, IReadOnlyList<string>? inserted)
 	{
 		if (inserted is null)
 			return null;

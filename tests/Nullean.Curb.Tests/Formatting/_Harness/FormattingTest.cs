@@ -187,7 +187,7 @@ public abstract class FormattingTest
 internal static class ExpectationDump
 {
 	private static readonly string? Root = Environment.GetEnvironmentVariable("CURB_EXPECTATION_DUMP");
-	private static int _next;
+	private static int Next;
 
 	public static void Record(string expected, string? editorConfig)
 	{
@@ -197,7 +197,7 @@ internal static class ExpectationDump
 		// A directory each, because the expectations do not share a configuration: one asserts tab
 		// indentation, the next a width of 40. Pooling them under one .editorconfig would judge most
 		// of them against settings they were never written for.
-		var directory = Path.Combine(Root, Interlocked.Increment(ref _next).ToString("D5", CultureInfo.InvariantCulture));
+		var directory = Path.Combine(Root, Interlocked.Increment(ref Next).ToString("D5", CultureInfo.InvariantCulture));
 		Directory.CreateDirectory(directory);
 
 		File.WriteAllText(

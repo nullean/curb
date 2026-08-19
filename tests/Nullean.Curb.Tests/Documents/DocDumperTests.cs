@@ -22,13 +22,11 @@ public class DocDumperTests
 				arena.SoftLine();
 				arena.SourceText(4, 1);       // "a"
 			}
-			using (var ifBreak = arena.IfBreak(groupId))
-			{
-				using (ifBreak.Branch())
-					arena.Synthetic(SyntheticText.Empty);
-				using (ifBreak.Branch())
-					arena.Synthetic(SyntheticText.Comma);
-			}
+			using var ifBreak = arena.IfBreak(groupId);
+			using (ifBreak.Branch())
+				arena.Synthetic(SyntheticText.Empty);
+			using (ifBreak.Branch())
+				arena.Synthetic(SyntheticText.Comma);
 		}
 
 		var dump = DocDumper.Dump(arena, Source);

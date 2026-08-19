@@ -151,6 +151,8 @@ dotnet_diagnostic.CA1707.severity = none
 # The document IR switches over DocKind exhaustively via `default:`; listing every member at every
 # site is noise, and a new kind should fall through to the default rather than break the build.
 dotnet_diagnostic.IDE0010.severity = none
+# Same reasoning for switch expressions: wildcard arms handle future enum values without breaking.
+dotnet_diagnostic.IDE0072.severity = none
 # Several types rent pooled buffers in their constructor, which a primary constructor cannot express.
 dotnet_diagnostic.IDE0290.severity = suggestion
 # Hot-path counters stay as fields; `Count => _count` reads better than an auto property here.
