@@ -12,20 +12,16 @@ and the build integration guide.
 
 ## Why
 
-Existing tools each solve one half of the problem:
+**Fast enough to run on every build.** Curb is a native-AOT binary with no warm-up cost. On
+Newtonsoft.Json (945 files), cold: **0.26 s**. `dotnet format whitespace` on the same files:
+**3.47 s**. Across twelve real repositories, Curb is 5–25× faster — fast enough to wire into
+`dotnet build` and forget about it.
 
-- **`dotnet format`** implements IDE0055 faithfully but never wraps a long line.
-- **Prettier-style formatters** reflow beautifully but ignore most `.editorconfig` keys; every other
-  layout decision is fixed by the tool.
-
-Curb's answer is that **`max_line_length` is the whole decision**:
-
-- **No `max_line_length`** — Curb is an IDE0055 whitespace formatter. Its output is byte-identical
-  to `dotnet format whitespace`.
-- **`max_line_length` set** — line breaks are a function of your tokens and your width. Formatting
-  is idempotent, and the ReSharper wrap keys tune the result.
-
-One switch, two coherent modes.
+**Plays well with your IDE and `dotnet format`.** Curb supports the full set of `.editorconfig`
+formatting properties that Visual Studio, Rider and `dotnet format` read — all 39 `csharp_*` and
+`dotnet_*` keys of [IDE0055](https://learn.microsoft.com/dotnet/fundamentals/code-analysis/style-rules/ide0055),
+plus the ReSharper wrapping and blank-line keys. Running `dotnet format whitespace` over Curb's
+output never disagrees — measured across 41,000 files, gated on every push.
 
 ## Install
 
