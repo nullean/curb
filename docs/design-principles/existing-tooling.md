@@ -1,6 +1,6 @@
 ---
 navigation_title: Working with existing tooling
-description: Kerf reads the .editorconfig you already have. Defaults are Roslyn's, so it agrees with your IDE out of the box.
+description: Curb reads the .editorconfig you already have. Defaults are Roslyn's, so it agrees with your IDE out of the box.
 ---
 
 # Working with existing tooling
@@ -37,5 +37,5 @@ Unrecognised keys are reported rather than silently ignored, with a "did you mea
 typos. The distinction between "not implemented" and "not known" is surfaced explicitly — a formatter
 that silently drops a key you just added gives you no way to know it is not being honoured.
 
-`kerf print-config Foo.cs` prints every resolved option and its source. Worth running on a repository
+`curb print-config Foo.cs` prints every resolved option and its source. Worth running on a repository
 you are about to reformat.

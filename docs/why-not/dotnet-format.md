@@ -1,6 +1,6 @@
 ---
 navigation_title: dotnet format
-description: What Kerf adds on top of dotnet format, and where the two deliberately agree.
+description: What Curb adds on top of dotnet format, and where the two deliberately agree.
 ---
 
 # Why not just dotnet format?
@@ -21,7 +21,7 @@ none either.
 detection. It loads a compilation to do this, which costs roughly 40 seconds per project in a large
 solution.
 
-## What Kerf adds
+## What Curb adds
 
 - Reflow. Add `max_line_length = 120` to your `.editorconfig` and {{product}} wraps long lines. `dotnet format` never will.
 - Syntax-level code style without a compilation. Several IDE analysers — IDE0011 (braces), IDE0022–0027 (expression bodies), IDE0036 (modifier order), IDE0065 (using placement), IDE0161 (file-scoped namespaces) — need a compilation in `dotnet format style` but are decidable from syntax alone. {{product}} applies them in the same pass as layout.

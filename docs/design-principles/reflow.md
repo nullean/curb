@@ -1,6 +1,6 @@
 ---
 navigation_title: Reflow
-description: What max_line_length does — it sets a width and it selects how Kerf decides line breaks — and what each mode costs.
+description: What max_line_length does — it sets a width and it selects how Curb decides line breaks — and what each mode costs.
 ---
 
 # Reflow
@@ -40,8 +40,8 @@ Two properties hold, and they are different properties.
 *Idempotency* — `f(f(x)) = f(x)`. Formatting twice gives the same result as formatting once. In the
 no-width mode this is measured on every fixture and on the full corpus. In the width mode it follows
 from the design: tokens do not move under formatting, so the second run asks the same question of the
-same input and gets the same answer. The practical consequence is that `kerf check` cannot report a
-file that `kerf format` just wrote.
+same input and gets the same answer. The practical consequence is that `curb check` cannot report a
+file that `curb format` just wrote.
 
 *Input-independence* — `f(x) = f(y)` when `tokens(x) = tokens(y)`. This is the stronger property,
 and it only holds in the width mode. Two files with different whitespace but identical tokens produce
@@ -72,12 +72,12 @@ The trade is that this reintroduces the one class of bug the deterministic mode 
 whose answer depends on layout that {{product}} itself produced. Several ReSharper keys are therefore
 unavailable here and say so when you set them; see [what needs a width](#keys-that-need-a-width).
 
-`csharp_keep_existing_linebreaks = false` without a `max_line_length` is refused (**KERF1007**). With no
+`csharp_keep_existing_linebreaks = false` without a `max_line_length` is refused (**CURB1007**). With no
 width nothing is ever too long, so it would join every construct in the file onto one line.
 
 ## Adopting a width
 
-Setting a width on an existing repository is one large commit. `kerf check` will report most of your
+Setting a width on an existing repository is one large commit. `curb check` will report most of your
 files on the first run, and [the build integration](../workflow/msbuild.md) will rewrite them on the
 first compile.
 
@@ -85,13 +85,13 @@ Nothing forces you to take it in one step. A repository can adopt {{product}} wi
 — where it is a `dotnet format whitespace` equivalent — and add a width later, as its own commit, when
 the churn is convenient.
 
-`kerf print-config Foo.cs` prints every resolved option and says which mode you are in and what selected
+`curb print-config Foo.cs` prints every resolved option and says which mode you are in and what selected
 it. Worth running before the reformatting commit rather than after.
 
 ## Keys that need a width
 
 Some ReSharper wrapping keys are only honoured under deterministic layout, and setting one without a
-width reports **KERF1005** rather than going quiet:
+width reports **CURB1005** rather than going quiet:
 
 | Key | What it does |
 |---|---|
@@ -106,5 +106,5 @@ so the keys become admissible there and nowhere else.
 
 Two IDE0055 keys go the other way. `csharp_preserve_single_line_blocks` and
 `csharp_preserve_single_line_statements` ask {{product}} to keep what *you* put on one line, which a
-width takes out of their hands; both report **KERF1004** with what they still do. An empty `{ }` stays
+width takes out of their hands; both report **CURB1004** with what they still do. An empty `{ }` stays
 collapsed either way.

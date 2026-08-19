@@ -1,6 +1,6 @@
 ---
 navigation_title: Installation
-description: Install Kerf as a global dotnet tool, an MSBuild package, or a native binary.
+description: Install Curb as a global dotnet tool, an MSBuild package, or a native binary.
 ---
 
 # Installation
@@ -8,10 +8,10 @@ description: Install Kerf as a global dotnet tool, an MSBuild package, or a nati
 ## Global tool
 
 ```sh
-dotnet tool install -g Nullean.Kerf
+dotnet tool install -g Nullean.Curb
 ```
 
-Installs the `kerf` command globally. Requires the .NET 10 SDK. After this, `kerf format ./src` and `kerf check ./src` work from any directory.
+Installs the `curb` command globally. Requires the .NET 10 SDK. After this, `curb format ./src` and `curb check ./src` work from any directory.
 
 The tool ships as a native-AOT binary per platform — about 11 MB, about 10 ms to start — with a portable managed fallback for platforms not in the list.
 
@@ -28,13 +28,13 @@ The tool ships as a native-AOT binary per platform — about 11 MB, about 10 ms 
 To update:
 
 ```sh
-dotnet tool update -g Nullean.Kerf
+dotnet tool update -g Nullean.Curb
 ```
 
 ## MSBuild package
 
 ```xml
-<PackageReference Include="Nullean.Kerf.MSBuild" Version="*" PrivateAssets="all" />
+<PackageReference Include="curb" Version="*" PrivateAssets="all" />
 ```
 
 Add this to your `Directory.Build.props` (or directly to a project file) and `dotnet build` will format your source before compiling it. The package is build-only — nothing lands in your output assemblies.
@@ -43,7 +43,7 @@ The package bundles a framework-dependent build of the CLI. To use the native bi
 
 ```xml
 <PropertyGroup>
-  <Kerf_Exe>$(HOME)/.dotnet/tools/kerf</Kerf_Exe>
+  <Curb_Exe>$(HOME)/.dotnet/tools/curb</Curb_Exe>
 </PropertyGroup>
 ```
 
@@ -56,11 +56,11 @@ Download the binary for your platform from the GitHub releases page and put it o
 ## Verifying the install
 
 ```sh
-kerf --version
+curb --version
 ```
 
 ```sh
-kerf check ./src
+curb check ./src
 ```
 
 On a repository already formatted by the IDE, the check should report no changes.

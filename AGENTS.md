@@ -1,13 +1,13 @@
-# Kerf — contributor and agent conventions
+# Curb — contributor and agent conventions
 
-Kerf formats C# from a `.editorconfig`, honouring the full IDE0055 option surface while adding
+Curb formats C# from a `.editorconfig`, honouring the full IDE0055 option surface while adding
 width-aware reflow. It ships as a native-AOT `dotnet tool`.
 
 ## Build and test
 
 ```sh
 ./build.sh build          # dotnet build -c Release
-./build.sh test           # runs tests/Nullean.Kerf.Tests via `dotnet run`
+./build.sh test           # runs tests/Nullean.Curb.Tests via `dotnet run`
 ./build.sh benchmark      # BenchmarkDotNet suite
 ./build.sh docs           # builds docs/ and serves it at http://localhost:8080/formatter/
 ./build.sh generatepackages
@@ -27,16 +27,16 @@ Microsoft.Testing.Platform, so they are launched with `dotnet run`, not `dotnet 
 
 | Path | What |
 |---|---|
-| `src/Nullean.Kerf.Core` | The engine: document IR, layout printer, syntax printers, verifier. **No IO, no config source.** |
-| `src/Nullean.Kerf.Cleanup` | Applies code style fixes from diagnostics a build reported. **No IO, no compilation.** |
-| `src/Nullean.Kerf.EditorConfig` | Binds `.editorconfig` to formatting options. Owns the `IFileSystem` dependency. |
-| `src/Nullean.Kerf.Cli` | The `kerf` tool. Native-AOT, packed per RID. |
-| `tests/Nullean.Kerf.Tests` | Golden files, option matrix, document-IR units, `MockFileSystem` tests. |
-| `tests/Nullean.Kerf.Benchmarks` | BenchmarkDotNet, `[MemoryDiagnoser]`. |
-| `src/Nullean.Kerf.MSBuild` | Props and targets only, nothing compiled. Runs the formatter before `CoreCompile`, and asks the compiler for an error log. |
-| `examples/kerf-aot-smoketest` | Publishes AOT and runs; the CI gate on every RID. Never packed. |
-| `examples/kerf-msbuild-smoketest` | Proves the formatter runs before `CoreCompile`. Not in the solution. |
-| `examples/kerf-cleanup-smoketest` | Proves cleanup fixes what a build reported, and only that. Not in the solution. |
+| `src/Nullean.Curb.Core` | The engine: document IR, layout printer, syntax printers, verifier. **No IO, no config source.** |
+| `src/Nullean.Curb.Cleanup` | Applies code style fixes from diagnostics a build reported. **No IO, no compilation.** |
+| `src/Nullean.Curb.EditorConfig` | Binds `.editorconfig` to formatting options. Owns the `IFileSystem` dependency. |
+| `src/Nullean.Curb.Cli` | The `curb` tool. Native-AOT, packed per RID. |
+| `tests/Nullean.Curb.Tests` | Golden files, option matrix, document-IR units, `MockFileSystem` tests. |
+| `tests/Nullean.Curb.Benchmarks` | BenchmarkDotNet, `[MemoryDiagnoser]`. |
+| `src/curb` | Props and targets only, nothing compiled. Runs the formatter before `CoreCompile`, and asks the compiler for an error log. |
+| `examples/curb-aot-smoketest` | Publishes AOT and runs; the CI gate on every RID. Never packed. |
+| `examples/curb-msbuild-smoketest` | Proves the formatter runs before `CoreCompile`. Not in the solution. |
+| `examples/curb-cleanup-smoketest` | Proves cleanup fixes what a build reported, and only that. Not in the solution. |
 | `build/scripts` | F# Bullseye build runner. |
 
 ## Non-negotiables
@@ -70,14 +70,14 @@ These are the difference between fast and slow. Enforce them in review:
 One option should be a small, isolated change. The generated completeness test fails if you skip
 the fixtures.
 
-1. `src/Nullean.Kerf.Core/Options/OptionCatalog.cs` — one declaration (key, allowed values, default,
+1. `src/Nullean.Curb.Core/Options/OptionCatalog.cs` — one declaration (key, allowed values, default,
    bit slot, doc summary, `Implemented = true`).
 2. The generator regenerates the accessor, parser, validator, diagnostics, `print-config` row and
    `docs/options.md`. **Do not hand-edit generated output.**
 3. Add a helper in `Printing/CSharp/Spacing.cs` (or `BraceLines.cs` / `Indentation.cs`) that turns
    the option into a `Doc`.
 4. Swap the hard-coded `" "` / `Doc.Line` / `Doc.Indent(…)` in 1–3 printers for the helper.
-5. Add `tests/Nullean.Kerf.Tests/Fixtures/options/<key>/<value>.test`, one per allowed value.
+5. Add `tests/Nullean.Curb.Tests/Fixtures/options/<key>/<value>.test`, one per allowed value.
    Generate expectations from `dotnet format` where possible — it is the reference implementation.
 
 Printers must never read options directly; they call a helper. That is what keeps an option's
@@ -92,7 +92,7 @@ the diagnostic does not carry, it is not a cleanup rule — record why and stop.
    build with `-p:ErrorLog=x.sarif,version=2.1`, and read the actual span. **Where the position lands is
    not obvious**: IDE0044 and IDE0040 report the field *identifier*, IDE0007 the *type*, IDE0090 the `new`
    keyword, IDE0005 the first `using` of a whole run. The fixer walks up from there.
-2. Add the fixer under `src/Nullean.Kerf.Cleanup/Rules/`, implementing `ICleanupRule`. It must declare
+2. Add the fixer under `src/Nullean.Curb.Cleanup/Rules/`, implementing `ICleanupRule`. It must declare
    `NeedsSpan`, and it must gate on node kind — the reported position has to resolve to the syntax the
    rule owns, or it refuses. **That gate is what makes a stale log harmless**, so it is not optional.
 3. Add it to `CSharpCleaner.Rules`, and flip its `RuleCatalog` row to `RuleOwner.Cleanup` with its
@@ -100,7 +100,7 @@ the diagnostic does not carry, it is not a cleanup rule — record why and stop.
 4. If the delta is new, teach `ContentVerifier` and `TokenStreamComparer` about it — and add negative
    tests to `CleanupDeltaTests` from **both** sides. A widening that is too generous is invisible: every
    test still passes and the net quietly stops catching what it exists for.
-5. Add cases to `tests/Nullean.Kerf.Tests/Cleanup/`, with the diagnostic supplied by hand. One per thing
+5. Add cases to `tests/Nullean.Curb.Tests/Cleanup/`, with the diagnostic supplied by hand. One per thing
    it fixes, and **one per thing it refuses** — a rule that fixes the right thing and also the wrong thing
    passes half a suite.
 6. Run **both** corpus gates before claiming it is done, and record the numbers in
@@ -112,18 +112,18 @@ the diagnostic does not carry, it is not a cleanup rule — record why and stop.
    green-lights a rule that changes tokens — the same discipline as
    [docs/contribute/layout-decisions.md](docs/contribute/layout-decisions.md), for the same reason.
 
-A refusal is a first-class outcome, not an error. Report it with its reason so "Kerf declined" is
-distinguishable from "Kerf is broken."
+A refusal is a first-class outcome, not an error. Report it with its reason so "Curb declined" is
+distinguishable from "Curb is broken."
 
 ## Scope boundary
 
-**Kerf never computes semantics.** It never loads a compilation, never resolves a reference and never
-uses the semantic model. That is what lets `kerf format` run on a bare folder with no restore and no
+**Curb never computes semantics.** It never loads a compilation, never resolves a reference and never
+uses the semantic model. That is what lets `curb format` run on a bare folder with no restore and no
 build, and it is why Core's only package reference is the exact-pinned parser.
 
-- **`kerf format`, in scope:** IDE0055 formatting, plus syntax-only code style (braces, expression
+- **`curb format`, in scope:** IDE0055 formatting, plus syntax-only code style (braces, expression
   bodies, file-scoped namespaces, modifier order, redundant parentheses).
-- **`kerf cleanup`, in scope:** semantic code style rules — but only ones a build has already reported,
+- **`curb cleanup`, in scope:** semantic code style rules — but only ones a build has already reported,
   and only where the fix is derivable from the diagnostic's position plus syntax. It *consumes a verdict*
   rather than deriving one. `--forward` hands the remainder to `dotnet format` and prints both timings.
   See [docs/cleanup.md](docs/cleanup.md).
@@ -145,7 +145,7 @@ rule cannot claim to be fixed by a fixer nobody wrote.
   idempotency assertions free.
 - Every fixture also asserts: the token-coverage verifier passes, the re-parse token comparer passes,
   `format(format(x)) == format(x)`, and the `#if` symbol-set loop passes.
-- The conformance gate: with `max_line_length = off`, Kerf output must be **byte-identical to
+- The conformance gate: with `max_line_length = off`, Curb output must be **byte-identical to
   `dotnet format whitespace`**. That number is the product claim; keep it at 100%.
 - `./build.sh churn --corpus <path>` reports the other half: how many of a repository's files adoption
   rewrites. Not a gate, but it must be published for any change that moves it.
@@ -156,14 +156,14 @@ rule cannot claim to be fixed by a fixer nobody wrote.
 is not a preference among others.
 
 - **No width — preservation.** A construct the author opened out stays opened out at their breaks; only one
-  they left on a single line is handed to width. Kerf never changes a line's length; output is byte-identical
+  they left on a single line is handed to width. Curb never changes a line's length; output is byte-identical
   to `dotnet format whitespace`. 742/1,196 corpus files of churn, almost all blank-line collapsing.
 - **A width — deterministic.** `layout = f(tokens, width)`, so idempotency holds by construction rather than
   by measurement, and it is the *better* fixed point of `dotnet format` (1196/1196 against preservation's
   1195/1196 with reflow). 892 files of churn but ~2.7× the changed lines, which is the number that decided
   the gating — file count hides it almost entirely.
 - **`csharp_keep_existing_linebreaks`** overrides the resolution in either direction. `= false` with no width
-  is refused (KERF1007): with an infinite width every group that fits would be joined.
+  is refused (CURB1007): with an infinite width every group that fits would be joined.
 
 Practical consequences when adding an option:
 
@@ -171,9 +171,9 @@ Practical consequences when adding an option:
   and `AuthorJoined`. Both answer false in deterministic mode, so each call site falls through to the
   width-driven branch it already has. **A bare `OnSameLine` in a break decision is a review failure** —
   it is for questions that are not break decisions.
-- An option may be admissible in one mode only. Say so through a diagnostic — `KERF1004` for a key
-  deterministic layout makes inert, `KERF1005` for one only it can honour, `KERF1006` for a value
-  `dotnet format` would undo, `KERF1007` for deterministic layout without a width — rather than letting it
+- An option may be admissible in one mode only. Say so through a diagnostic — `CURB1004` for a key
+  deterministic layout makes inert, `CURB1005` for one only it can honour, `CURB1006` for a value
+  `dotnet format` would undo, `CURB1007` for deterministic layout without a width — rather than letting it
   half-work. Say what it degrades *to*, and per construct rather than per key: "no effect" was wrong for
   `preserve_single_line_blocks`, which accessor lists still honour.
 - The mode resolves from `MaxLineLength`, so `csharp_keep_existing_linebreaks` must be bound immediately
@@ -184,7 +184,7 @@ Practical consequences when adding an option:
 
 **Before adding any option that moves a line break, read
 [docs/contribute/layout-decisions.md](docs/contribute/layout-decisions.md).** In preservation mode a layout rule may read the
-tokens and layout the author owns, and never layout Kerf itself decides. That one mistake has killed more
+tokens and layout the author owns, and never layout Curb itself decides. That one mistake has killed more
 features than every other cause combined; the note carries the measurements so they are not re-derived,
 and records which of them deterministic mode has since brought back.
 
@@ -192,8 +192,8 @@ and records which of them deterministic mode has since brought back.
 
 Tabs, Allman braces, file-scoped namespaces, `var`, 160 columns. All of it is in `.editorconfig`,
 which is enforced at build time (`EnforceCodeStyleInBuild`, warnings as errors in `src/`). If the
-build complains about formatting, run `dotnet format whitespace . --folder` — and once Kerf can
-format itself, `kerf format .`.
+build complains about formatting, run `dotnet format whitespace . --folder` — and once Curb can
+format itself, `curb format .`.
 
 ## Docs voice
 

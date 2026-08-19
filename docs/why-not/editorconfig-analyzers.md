@@ -1,17 +1,17 @@
 ---
 navigation_title: EditorConfig analyzers
-description: How Kerf works with EnforceCodeStyleInBuild and the IDE0055 analyzers, rather than around them.
+description: How Curb works with EnforceCodeStyleInBuild and the IDE0055 analyzers, rather than around them.
 ---
 
 # Why not just EnforceCodeStyleInBuild?
 
 `EnforceCodeStyleInBuild = true` in your project tells the .NET SDK to run the Roslyn style analyzers inside `CoreCompile` and report IDE0055 and the code style rules as build diagnostics. It is the right thing to set. {{product}} is designed to work with it, not instead of it.
 
-## What happens without Kerf
+## What happens without Curb
 
 With `EnforceCodeStyleInBuild = true` and no formatter in the build, every mechanically unformatted file reports IDE0055. A developer who forgot to run `dotnet format` sees build errors — and to fix them, they have to run the command, check the output, commit again, and wait for CI to rerun. For a CI pipeline that runs tests after the build, the whole suite gets blocked on a missing semicolon.
 
-## What happens with Kerf
+## What happens with Curb
 
 {{product}} runs at `BeforeTargets="CoreCompile"`. By the time `CoreCompile` evaluates the analyzers, {{product}} has already rewritten every file it can format. The only IDE0055 diagnostics that survive are things {{product}} has not implemented — which are reported explicitly rather than silently skipped.
 
@@ -27,15 +27,15 @@ With both `EnforceCodeStyleInBuild` and {{product}} in place, the analyzer outpu
 
 If a file should not be formatted by {{product}}, use `generated_code = true` or `dotnet_diagnostic.IDE0055.severity = none` in your `.editorconfig`. {{product}} honours both and skips the file. The analyzers still run unless you configure their severity separately.
 
-## Diagnostics Kerf emits
+## Diagnostics Curb emits
 
 {{product}} itself can produce build diagnostics through the MSBuild integration:
 
 | Code | Meaning |
 |---|---|
-| `KERF0001` | Check mode: files would change. |
-| `KERF0002` | {{product}} failed on a file — the file was left untouched. |
+| `CURB0001` | Check mode: files would change. |
+| `CURB0002` | {{product}} failed on a file — the file was left untouched. |
 
-`KERF0002` is always an error. A formatter that could not verify its own work has verified nothing, and a quiet warning would hide that.
+`CURB0002` is always an error. A formatter that could not verify its own work has verified nothing, and a quiet warning would hide that.
 
-The `.editorconfig` diagnostics (KERF1001–KERF1007) appear in `kerf print-config` output and in the build log, not as MSBuild diagnostics.
+The `.editorconfig` diagnostics (CURB1001–CURB1007) appear in `curb print-config` output and in the build log, not as MSBuild diagnostics.

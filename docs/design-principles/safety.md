@@ -1,6 +1,6 @@
 ---
 navigation_title: Safety
-description: Kerf verifies every file before writing it. What is checked, and why unknown syntax is never at risk.
+description: Curb verifies every file before writing it. What is checked, and why unknown syntax is never at risk.
 ---
 
 # Safety
@@ -16,7 +16,7 @@ tells you rather than continuing quietly.
 
 | Check | What it catches | On failure |
 |---|---|---|
-| Token stream unchanged | Spaces and newlines moved; nothing else | Reported as KERF0002, file left untouched |
+| Token stream unchanged | Spaces and newlines moved; nothing else | Reported as CURB0002, file left untouched |
 | Output re-parses | A printer bug that welds two tokens together | Same |
 | Formatting is idempotent | `format(format(x))` = `format(x)` | Caught by the test suite and the CI corpus gate |
 | All `#if` branches covered | One file can have several token streams | Each symbol set is verified independently |
@@ -30,8 +30,8 @@ boundary. Where it did not, the check is skipped. That is a deliberate saving �
 {{product}} does not need the unconditional re-parse that costs other formatters a second parse per
 file. See [Design principles](index.md) for the full reasoning.
 
-Idempotency matters more than it sounds. A formatter that does not converge makes `kerf check` fail
-on files `kerf format` just wrote, which turns a build integration into an infinite loop of diffs.
+Idempotency matters more than it sounds. A formatter that does not converge makes `curb check` fail
+on files `curb format` just wrote, which turns a build integration into an infinite loop of diffs.
 
 ## Unknown syntax is not at risk
 
@@ -39,7 +39,7 @@ on files `kerf format` just wrote, which turns a build integration into an infin
 is emitted **verbatim** from the original source. Coverage grows without ever putting code at risk.
 
 ```sh
-kerf check ./src --coverage
+curb check ./src --coverage
 ```
 
 This reports which syntax kinds are still being emitted verbatim, and how often.
@@ -70,7 +70,7 @@ These are enforced on every push, against a 1,196-file, 6.5 MB corpus:
 ## When verification fails
 
 {{product}} reports the file, leaves it untouched, and exits non-zero. In a build, that is
-`KERF0002` — an error regardless of your warning settings, because a formatter that could not verify its
+`CURB0002` — an error regardless of your warning settings, because a formatter that could not verify its
 own work has verified nothing.
 
 If you hit one, it is a bug worth reporting: it means {{product}} found a construct it would have

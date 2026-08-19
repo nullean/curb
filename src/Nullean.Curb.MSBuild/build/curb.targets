@@ -1,0 +1,192 @@
+<Project>
+
+  <!--
+    Curb runs before the compiler, not after it.
+
+    The point of this ordering is EnforceCodeStyleInBuild. With that property set, the IDE analysers
+    run inside CoreCompile and report IDE0055 and the code style rules as build diagnostics. A target
+    at BeforeTargets="CoreCompile" has already rewritten the files by then, so the compiler reads
+    formatted source and the only style diagnostics left are the ones that genuinely need a
+    compilation to decide. Someone — or something — building the project gets the mechanical
+    offences fixed underneath them and only has to think about the semantic remainder.
+
+    Running after the build, or as a separate command someone has to remember, would not do that.
+  -->
+
+  <PropertyGroup>
+    <!-- Check rather than rewrite. Defaults to rewriting in Debug and checking in Release: a
+         developer wants their file fixed, and a release or CI build wants to be told, not edited. -->
+    <Curb_Check Condition="'$(Curb_Check)' == '' and '$(Configuration)' == 'Release'">true</Curb_Check>
+    <Curb_Check Condition="'$(Curb_Check)' == ''">false</Curb_Check>
+
+    <!-- The escape hatch. One property, honoured everywhere, so a build that must not be touched
+         has a single thing to set. -->
+    <Curb_Bypass Condition="'$(Curb_Bypass)' == ''">false</Curb_Bypass>
+
+    <!-- Report unformatted files as warnings rather than errors. Off, because a check that does not
+         fail the build is a check nobody notices. -->
+    <Curb_UnformattedAsWarnings Condition="'$(Curb_UnformattedAsWarnings)' == ''">false</Curb_UnformattedAsWarnings>
+
+    <!-- Reuse the previous run's verdict for files that have not changed. On, because the cost of being
+         wrong is one cold run and the cost of being right is most of a build step. A boolean rather than
+         emptying Curb_CacheFile, because a property set to nothing is indistinguishable from one nobody
+         set, so the condition that defaults the path would simply put it back. -->
+    <Curb_Cache Condition="'$(Curb_Cache)' == ''">true</Curb_Cache>
+
+    <!-- MSBuild message importance for Curb's own output: high, normal or low. Low by default, so
+         a successful format is invisible at normal verbosity and the one-line summary is there when
+         someone asks for it. Errors and warnings are raised as diagnostics regardless. -->
+    <Curb_LogLevel Condition="'$(Curb_LogLevel)' == ''">low</Curb_LogLevel>
+
+  </PropertyGroup>
+
+  <Target Name="CurbDiagnostics" BeforeTargets="CoreCompile" Condition="'$(Curb_Diagnostics)' != 'false'">
+    <!--
+      Ask the compiler to write down what it reported, so `curb cleanup` can fix the semantic rules Curb
+      cannot decide from syntax. This is the whole of cleanup's involvement in a build: no target that
+      rewrites anything, no Exec, nothing that runs after the compiler. A code clean tool does not own
+      building — someone runs `dotnet build`, and if style diagnostics come back they run `curb cleanup`.
+
+      Why the log and not the console output: MSBuild reports a diagnostic's start but not its end, and
+      IDE0005 is one diagnostic per contiguous run of unnecessary using directives. Measured, on five
+      directives where the third was needed: the log gave two results spanning lines 1-2 and 4-5. From
+      start positions alone the run's extent is not recoverable — one unused directive, then a needed
+      one, then an unused one reports two starts, while two unused then a needed one reports a single
+      start — so a console-driven fix would delete a directive something needs.
+
+      Set here rather than in the PropertyGroup at the top of this file, because $(ErrorLog) and
+      $(IntermediateOutputPath) are not set until the SDK's own targets have been imported.
+    -->
+    <PropertyGroup Condition="'$(ErrorLog)' == '' and '$(TargetFramework)' != '' and '$(Curb_Bypass)' != 'true'">
+      <!--
+        Only when the project has not set one. A consumer's own error log feeds their own tooling, and
+        fighting over a single-valued property would break it.
+
+        $(TargetFramework) has to be non-empty so the outer build of a multi-targeting project does not
+        set a path both inner builds then write to. Measured: they do not coordinate, and the result is
+        two SARIF documents concatenated into one file that no JSON reader will accept.
+        $(IntermediateOutputPath) is already per target framework, which is why it is the right place.
+      -->
+      <ErrorLog>$(IntermediateOutputPath)curb.sarif,version=2.1</ErrorLog>
+      <Curb_WroteDiagnostics>true</Curb_WroteDiagnostics>
+    </PropertyGroup>
+
+    <!-- So `dotnet clean` takes it away again. Only the log this target asked for, never a consumer's. -->
+    <ItemGroup Condition="'$(Curb_WroteDiagnostics)' == 'true'">
+      <FileWrites Include="$(IntermediateOutputPath)curb.sarif" />
+    </ItemGroup>
+  </Target>
+
+  <Target Name="CurbPrepare">
+    <!--
+      Both of these are resolved here rather than in the PropertyGroup above, because that is
+      evaluated when this file is imported and $(IntermediateOutputPath) is not set until the SDK's
+      own targets have been. Setting the stamp path up there left `curb.stamp` and `curb.files` in
+      the project directory next to somebody's source — which a build tool has no business doing, and
+      which was invisible until one of them was committed.
+
+      A target's Inputs and Outputs are evaluated after its DependsOnTargets have run, so setting the
+      stamp path here is early enough for incrementality to use it.
+    -->
+    <PropertyGroup>
+      <Curb_StampFile Condition="'$(Curb_StampFile)' == ''">$(IntermediateOutputPath)curb.stamp</Curb_StampFile>
+      <Curb_FileList Condition="'$(Curb_FileList)' == ''">$(IntermediateOutputPath)curb.files</Curb_FileList>
+
+      <!-- Per file rather than per project; see the note in the Curb target for what that buys. Here for
+           the same reason as the other two, and per target framework for the same reason as the error
+           log, so two inner builds of a multi-targeting project cannot write over each other. Set
+           Curb_Cache to false to build without one. -->
+      <Curb_CacheFile Condition="'$(Curb_CacheFile)' == ''">$(IntermediateOutputPath)curb.cache</Curb_CacheFile>
+
+      <!-- The framework-dependent build that ships in this package, run on the SDK doing the build.
+           See the package project for why this is not a per-RID native binary. Curb_Exe overrides it
+           with a native one, which starts in about a hundredth of the time. -->
+      <Curb_Dll Condition="'$(Curb_Dll)' == ''">$(MSBuildThisFileDirectory)../tools/net10.0/curb.dll</Curb_Dll>
+    </PropertyGroup>
+  </Target>
+
+  <Target Name="Curb"
+          BeforeTargets="CoreCompile"
+          DependsOnTargets="CurbPrepare"
+          Inputs="@(Compile);@(EditorConfigFiles);$(MSBuildProjectFullPath)"
+          Outputs="$(Curb_StampFile)"
+          Condition="'$(Curb_Bypass)' != 'true'
+                     and '$(DesignTimeBuild)' != 'true'
+                     and '$(BuildingProject)' == 'true'
+                     and '@(Compile)' != ''">
+
+    <!--
+      Two layers of incrementality, and the order between them is the point.
+
+      First, this target's Inputs and Outputs against the compile set and the .editorconfig files that
+      govern it. An untouched project pays nothing at all: no process start, no directory walk, no file
+      reads. That is still the layer that matters most, because the cheapest run is the one that does
+      not happen, and no cache can beat not being consulted.
+
+      Second, Curb_CacheFile, for the runs that do happen. Incrementality here is per project, so one
+      edited file out of eight hundred re-runs the target over all eight hundred, and without a cache it
+      re-parses the seven hundred and ninety-nine only to conclude they were already formatted. The
+      cache records, per file, that Curb ran the formatter over exactly those bytes under exactly those
+      resolved options and got them back unchanged, so the re-run costs the file that moved. It earns
+      the most under Curb_Check=true: a failing check never stamps, so the target repeats on every
+      build until someone formats the file.
+
+      It is a build artefact and is named as one. It sits in $(IntermediateOutputPath) beside the stamp
+      and the file list, and it is in FileWrites, so `dotnet clean` takes it away. Curb has no ambient
+      cache under a user profile directory — one nobody named is one nobody can find, clear or reason
+      about, and it outlives every repository that fed it.
+
+      The project file is an input because changing it can change which files are compiled.
+    -->
+
+    <PropertyGroup>
+      <_CurbCommand>format</_CurbCommand>
+      <_CurbCommand Condition="'$(Curb_Check)' == 'true'">check</_CurbCommand>
+    </PropertyGroup>
+
+    <!-- Only the files this project actually compiles. Passing the folder would reach sources that
+         belong to another project, or to none. -->
+    <WriteLinesToFile File="$(Curb_FileList)"
+                      Lines="@(Compile->'%(FullPath)')"
+                      Overwrite="true"
+                      WriteOnlyWhenDifferent="true" />
+
+    <PropertyGroup>
+      <_CurbInvocation Condition="'$(Curb_Exe)' != ''">&quot;$(Curb_Exe)&quot;</_CurbInvocation>
+      <_CurbInvocation Condition="'$(Curb_Exe)' == ''">&quot;$(DOTNET_HOST_PATH)&quot; &quot;$(Curb_Dll)&quot;</_CurbInvocation>
+      <_CurbCacheArg Condition="'$(Curb_Cache)' != 'false' and '$(Curb_CacheFile)' != ''">--cache &quot;$(Curb_CacheFile)&quot;</_CurbCacheArg>
+    </PropertyGroup>
+
+    <Exec Command="$(_CurbInvocation) $(_CurbCommand) --msbuild-list-file &quot;$(Curb_FileList)&quot; $(_CurbCacheArg)"
+          StandardOutputImportance="$(Curb_LogLevel)"
+          ContinueOnError="true"
+          IgnoreExitCode="true">
+      <Output TaskParameter="ExitCode" PropertyName="_CurbExitCode" />
+    </Exec>
+
+    <!-- Exit 1 is "some files are not formatted", which only `check` can produce. Anything else
+         non-zero is Curb failing, and that is an error whatever the warnings setting says: a
+         formatter that could not run has verified nothing, and saying so quietly would be worse
+         than not running at all. -->
+    <Warning Condition="'$(_CurbExitCode)' == '1' and '$(Curb_UnformattedAsWarnings)' == 'true'"
+             Code="CURB0001"
+             Text="Some files are not formatted. Run 'curb format', or build without Curb_Check=true." />
+
+    <Error Condition="'$(_CurbExitCode)' == '1' and '$(Curb_UnformattedAsWarnings)' != 'true'"
+           Code="CURB0001"
+           Text="Some files are not formatted. Run 'curb format', or build without Curb_Check=true." />
+
+    <Error Condition="'$(_CurbExitCode)' != '0' and '$(_CurbExitCode)' != '1'"
+           Code="CURB0002"
+           Text="Curb failed with exit code $(_CurbExitCode)." />
+
+    <!-- Only stamp a clean run. Stamping after a failure would make the next build skip the target
+         and look like it passed. -->
+    <Touch Condition="'$(_CurbExitCode)' == '0'" Files="$(Curb_StampFile)" AlwaysCreate="true" />
+
+    <ItemGroup>
+      <FileWrites Include="$(Curb_StampFile);$(Curb_FileList);$(Curb_CacheFile)" />
+    </ItemGroup>
+  </Target>
+
+</Project>

@@ -97,8 +97,8 @@ csharp_prefer_braces = when_multiline:suggestion
 csharp_using_directive_placement = outside_namespace:error
 
 # --- Formatting (IDE0055) -------------------------------------------------
-# Kerf's own source is formatted to these. Once Kerf can format itself, this
-# section is also the dogfooding fixture: `kerf check .` must be clean.
+# Curb's own source is formatted to these. Once Curb can format itself, this
+# section is also the dogfooding fixture: `curb check .` must be clean.
 
 csharp_new_line_before_open_brace = all
 csharp_new_line_before_else = true

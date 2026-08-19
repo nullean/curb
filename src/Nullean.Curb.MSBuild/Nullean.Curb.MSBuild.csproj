@@ -1,0 +1,69 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    A build-only package: no library, no lib/ folder, nothing that ends up in a consumer's output.
+    All it carries is the props and targets, plus a runtime.json so NuGet resolves the one native
+    binary matching the machine doing the build rather than all five.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+    <DevelopmentDependency>true</DevelopmentDependency>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+
+    <!-- Nothing here is compiled, so the AOT analyser has nothing to analyse. -->
+    <IsAotCompatible>false</IsAotCompatible>
+    <EnableAotAnalyzer>false</EnableAotAnalyzer>
+
+    <PackageId>curb</PackageId>
+    <Title>curb for MSBuild: format before the compiler runs</Title>
+    <Description>Runs curb before CoreCompile, so EnforceCodeStyleInBuild only reports what a formatter cannot fix.</Description>
+    <PackageTags>csharp;formatter;editorconfig;msbuild;ide0055</PackageTags>
+    <NoWarn>$(NoWarn);NU5128</NoWarn>
+  </PropertyGroup>
+
+  <!--
+    The payload is a framework-dependent build of the CLI, run on the SDK the consumer already has.
+
+    Not the RID graph the plan called for. A runtime.json only resolves its RID-specific package when
+    a RuntimeIdentifier is selected, and a plain library build never selects one — measured, with a
+    local feed: zero mentions in project.assets.json without a RID, three with. So that mechanism
+    would have delivered nothing to almost every consumer. Bundling all five native binaries instead
+    is ~60 MB of which any machine needs a fifth.
+
+    What it costs is process start: about 100 ms against the native binary's nothing, on a step
+    Inputs/Outputs skip entirely unless the project's sources actually changed. Curb_Exe still takes
+    a native binary for anyone who wants to supply one.
+  -->
+  <PropertyGroup>
+    <TargetsForTfmSpecificContentInPackage>
+      $(TargetsForTfmSpecificContentInPackage);PackCliPayload
+    </TargetsForTfmSpecificContentInPackage>
+  </PropertyGroup>
+
+  <Target Name="PackCliPayload">
+    <!-- Built here rather than declared as a wildcard, because a wildcard is expanded when the
+         project is evaluated and these files do not exist until this runs. -->
+    <MSBuild Projects="../Nullean.Curb.Cli/Nullean.Curb.Cli.csproj"
+             Targets="Publish"
+             Properties="Configuration=$(Configuration);TargetFramework=net10.0;PublishDir=$(BaseIntermediateOutputPath)cli/;RuntimeIdentifier=;PublishAot=false;SelfContained=false;PublishSelfContained=false" />
+
+    <ItemGroup>
+      <TfmSpecificPackageFile Include="$(BaseIntermediateOutputPath)cli/**/*" Exclude="$(BaseIntermediateOutputPath)cli/**/*.pdb">
+        <PackagePath>tools/net10.0/</PackagePath>
+      </TfmSpecificPackageFile>
+    </ItemGroup>
+
+    <Error Condition="'@(TfmSpecificPackageFile)' == ''"
+           Text="The CLI payload is missing, so the package would install a formatter it cannot run." />
+  </Target>
+
+  <ItemGroup>
+    <None Include="build/**" Pack="true" PackagePath="build/" />
+    <None Include="../../README.md" Pack="true" PackagePath="README.md" />
+    <None Include="../../nuget-icon.png" Pack="true" PackagePath="nuget-icon.png" />
+  </ItemGroup>
+
+</Project>

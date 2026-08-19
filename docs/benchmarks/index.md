@@ -10,10 +10,10 @@ each repository.
 
 ## Method
 
-Twelve repositories, cloned shallow, each formatted from a pristine copy. Kerf is the published
+Twelve repositories, cloned shallow, each formatted from a pristine copy. Curb is the published
 native-AOT binary, not the JIT build. All three tools are timed cold — repository and formatter cache
-cleared before each run. After formatting, `dotnet format whitespace` was run over Kerf's output to
-measure agreement; Kerf was also run a second time over its own output to verify idempotency. Those
+cleared before each run. After formatting, `dotnet format whitespace` was run over Curb's output to
+measure agreement; Curb was also run a second time over its own output to verify idempotency. Those
 per-repository counts are in [Churn](churn.md).
 
 Two repositories have no `.editorconfig` at all (Newtonsoft.Json, ServiceStack), which is the
@@ -23,7 +23,7 @@ onboarding case for a repository that has never configured anything.
 
 <!-- RESULTS -->
 
-| repo | files | Kerf | dotnet format | CSharpier |
+| repo | files | Curb | dotnet format | CSharpier |
 |---|---|---|---|---|
 | serilog | 216 | 0.06 s | 1.23 s | 0.73 s |
 | FluentValidation | 219 | 0.06 s | 1.48 s | 0.59 s |
@@ -42,7 +42,7 @@ onboarding case for a repository that has never configured anything.
 
 ### Speed
 
-Kerf is 5–25× faster than `dotnet format` across the corpus, on every repository. `dotnet format`
+Curb is 5–25× faster than `dotnet format` across the corpus, on every repository. `dotnet format`
 loads the full Roslyn workspace per project and is not designed to be fast.
 
 On unchanged projects the MSBuild stamp means no process starts at all.
@@ -50,7 +50,7 @@ On unchanged projects the MSBuild stamp means no process starts at all.
 ### Churn
 
 See [Churn](churn.md) for what churn means, how much to expect on first adoption, and a worked
-example. The short version: roslyn (17,167 files, already exactly `dotnet format`-clean) is Kerf's
+example. The short version: roslyn (17,167 files, already exactly `dotnet format`-clean) is Curb's
 sharpest case — 9,191 files rewritten, zero not-fixed-point. All of it is ground `dotnet format`
 doesn't cover: BOM handling, using-directive sorting, chain breaking, comment alignment.
 

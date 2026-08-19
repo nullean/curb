@@ -1,14 +1,14 @@
-project: 'Kerf'
+project: 'Curb'
 max_toc_depth: 2
 dev_docs: true
 
 branding:
-  icon: assets/kerf-logo.svg
+  icon: assets/curb-logo.svg
 
-# Kerf is a codename. Prose refers to the product as {{product}}, so a rename is an edit here plus a
+# Curb was formerly known as Curb. Prose uses {{product}} for the name.
 # sweep of the code samples, the CLI examples and the landing page — substitutions reach none of those.
 subs:
-  product: "Kerf"
+  product: "Curb"
 
 toc:
   - file: index.md

@@ -25,7 +25,7 @@
     <PackageVersion Include="System.IO.Abstractions" Version="22.2.0" />
     <!-- 0.18.0 fixes handler exit codes (nullean/argh#65), an illink crash under TreatWarningsAsErrors
          (nullean/argh#67), and drops a ~1 MB System.Text.Json dependency (nullean/argh#66). Reference
-         Nullean.Argh, not Nullean.Argh.Hosting — see Nullean.Kerf.Cli.csproj. -->
+         Nullean.Argh, not Nullean.Argh.Hosting — see Nullean.Curb.Cli.csproj. -->
     <PackageVersion Include="Nullean.Argh" Version="0.18.0" />
 
     <!-- Fingerprints the file content and the resolved options behind the `cache` flag. XxHash128 rather

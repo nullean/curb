@@ -1,12 +1,12 @@
 ---
 navigation_title: The build integration
-description: Nullean.Kerf.MSBuild rewrites your source before the compiler reads it. How it works and every property it exposes.
+description: curb rewrites your source before the compiler reads it. How it works and every property it exposes.
 ---
 
 # The build integration
 
 ```xml
-<PackageReference Include="Nullean.Kerf.MSBuild" Version="*" PrivateAssets="all" />
+<PackageReference Include="curb" Version="*" PrivateAssets="all" />
 ```
 
 That is the whole setup. From then on `dotnet build` formats the project's source before compiling it.
@@ -43,34 +43,34 @@ wants their file fixed, and a release or CI build wants to be told, not edited.
 | `Debug` (and anything not `Release`) | rewrite the file |
 | `Release` | check only; fail the build if anything would change |
 
-Override with `Kerf_Check` when you want the other one.
+Override with `Curb_Check` when you want the other one.
 
 ```sh
-dotnet build -c Release -p:Kerf_Check=false   # rewrite even in Release
-dotnet build -p:Kerf_Check=true               # check without rewriting
+dotnet build -c Release -p:Curb_Check=false   # rewrite even in Release
+dotnet build -p:Curb_Check=true               # check without rewriting
 ```
 
 ## Properties
 
 | Property | Default | What it does |
 |---|---|---|
-| `Kerf_Check` | `true` in `Release`, else `false` | Check instead of rewriting. A check that finds unformatted files raises KERF0001. |
-| `Kerf_Bypass` | `false` | Skip {{product}} entirely — no process start, no stamp file, nothing. The single escape hatch for a build that must not be touched. |
-| `Kerf_UnformattedAsWarnings` | `false` | Report KERF0001 as a warning instead of an error. Off by default, because a check that does not fail the build is a check nobody notices. |
-| `Kerf_LogLevel` | `low` | MSBuild message importance for {{product}}'s own output: `high`, `normal` or `low`. Errors and warnings are raised as diagnostics regardless. |
-| `Kerf_Exe` | *unset* | Path to a native {{product}} binary. Roughly a hundred times faster to start than the framework-dependent build the package carries. |
-| `Kerf_Dll` | the bundled CLI | The framework-dependent build shipped in the package, run on the SDK doing the build. |
-| `Kerf_StampFile` | `$(IntermediateOutputPath)kerf.stamp` | Incrementality stamp. |
-| `Kerf_Cache` | `true` | Reuse the previous run's verdict for files that have not changed. Set `false` to build without a cache. |
-| `Kerf_CacheFile` | `$(IntermediateOutputPath)kerf.cache` | Where that cache lives. |
-| `Kerf_FileList` | `$(IntermediateOutputPath)kerf.files` | The compile set handed to the CLI. |
+| `Curb_Check` | `true` in `Release`, else `false` | Check instead of rewriting. A check that finds unformatted files raises CURB0001. |
+| `Curb_Bypass` | `false` | Skip {{product}} entirely — no process start, no stamp file, nothing. The single escape hatch for a build that must not be touched. |
+| `Curb_UnformattedAsWarnings` | `false` | Report CURB0001 as a warning instead of an error. Off by default, because a check that does not fail the build is a check nobody notices. |
+| `Curb_LogLevel` | `low` | MSBuild message importance for {{product}}'s own output: `high`, `normal` or `low`. Errors and warnings are raised as diagnostics regardless. |
+| `Curb_Exe` | *unset* | Path to a native {{product}} binary. Roughly a hundred times faster to start than the framework-dependent build the package carries. |
+| `Curb_Dll` | the bundled CLI | The framework-dependent build shipped in the package, run on the SDK doing the build. |
+| `Curb_StampFile` | `$(IntermediateOutputPath)curb.stamp` | Incrementality stamp. |
+| `Curb_Cache` | `true` | Reuse the previous run's verdict for files that have not changed. Set `false` to build without a cache. |
+| `Curb_CacheFile` | `$(IntermediateOutputPath)curb.cache` | Where that cache lives. |
+| `Curb_FileList` | `$(IntermediateOutputPath)curb.files` | The compile set handed to the CLI. |
 
 ## Diagnostics
 
 | Code | Severity | Meaning |
 |---|---|---|
-| `KERF0001` | error, or warning with `Kerf_UnformattedAsWarnings` | Some files are not formatted. Only `check` can produce this. |
-| `KERF0002` | error, always | {{product}} itself failed. This is an error whatever the warnings setting says — a formatter that could not run has verified nothing, and saying so quietly would be worse than not running at all. |
+| `CURB0001` | error, or warning with `Curb_UnformattedAsWarnings` | Some files are not formatted. Only `check` can produce this. |
+| `CURB0002` | error, always | {{product}} itself failed. This is an error whatever the warnings setting says — a formatter that could not run has verified nothing, and saying so quietly would be worse than not running at all. |
 
 ## How incrementality works
 
@@ -94,12 +94,12 @@ Without it, a project where one file out of eight hundred changed re-parses the 
 ninety-nine only to conclude they were already formatted. With it, those files cost a hash comparison
 rather than a parse.
 
-The cache lives at `$(IntermediateOutputPath)kerf.cache` and is passed to the CLI as `--cache`. It
+The cache lives at `$(IntermediateOutputPath)curb.cache` and is passed to the CLI as `--cache`. It
 records, per file, that {{product}} ran the formatter over exactly those bytes under exactly those
 resolved options and got them back unchanged. A file whose bytes moved, or whose `.editorconfig` answer
 moved, is not in it and gets formatted normally.
 
-It earns the most with `Kerf_Check=true`. A failing check never stamps, so the target re-runs on every
+It earns the most with `Curb_Check=true`. A failing check never stamps, so the target re-runs on every
 build until someone formats the file. With the cache, those re-runs cost one file rather than the whole
 project.
 
@@ -122,14 +122,14 @@ point at it:
 
 ```xml
 <PropertyGroup>
-  <Kerf_Exe>$(HOME)/.dotnet/tools/kerf</Kerf_Exe>
+  <Curb_Exe>$(HOME)/.dotnet/tools/curb</Curb_Exe>
 </PropertyGroup>
 ```
 
 ## Turning it off
 
 ```sh
-dotnet build -p:Kerf_Bypass=true
+dotnet build -p:Curb_Bypass=true
 ```
 
 One property, honoured everywhere, so a build that must not be touched has a single thing to set.

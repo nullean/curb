@@ -1,6 +1,6 @@
 ---
 navigation_title: Known limitations
-description: Current limitations in Kerf's formatting output and what to expect on first adoption.
+description: Current limitations in Curb's formatting output and what to expect on first adoption.
 ---
 
 # Known limitations

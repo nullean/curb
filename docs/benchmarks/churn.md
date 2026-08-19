@@ -1,12 +1,12 @@
 ---
 navigation_title: Churn
-description: What churn is, how much to expect on first adoption, and how idempotency means Kerf and dotnet format agree forever after.
+description: What churn is, how much to expect on first adoption, and how idempotency means Curb and dotnet format agree forever after.
 ---
 
 # Churn
 
-Churn is how many files Kerf rewrites on its first run over a repository that already passes its
-existing formatter. The first Kerf commit is a diff. This page says what is in it.
+Churn is how many files Curb rewrites on its first run over a repository that already passes its
+existing formatter. The first Curb commit is a diff. This page says what is in it.
 
 ## How much to expect
 
@@ -31,22 +31,22 @@ File count understates what a width does — the line count in the `max_line_len
 roughly 3× higher, because only that mode rewraps anything. If you're deciding whether to set a
 width, the line count is the honest number.
 
-## After the first commit, Kerf and dotnet format agree
+## After the first commit, Curb and dotnet format agree
 
 Churn is a one-time cost. Once the initial commit is in, idempotency takes over.
 
-Kerf's output is a fixed point of `dotnet format whitespace`: run `dotnet format` over Kerf-formatted
+Curb's output is a fixed point of `dotnet format whitespace`: run `dotnet format` over Curb-formatted
 code and nothing changes. This is not a claim — it is a CI-gated measurement, checked against
 1,196 files on every push.
 
-The practical consequence: Format Document in your IDE won't undo what Kerf wrote. `dotnet format`
+The practical consequence: Format Document in your IDE won't undo what Curb wrote. `dotnet format`
 in CI won't produce a diff. The two tools genuinely agree, and they stay that way. That is what
 "plays nice with existing tooling" means in practice.
 
 ### Not-fixed-point count per repository
 
-This is the number of files where `dotnet format whitespace` disagrees with Kerf's output — ideally
-zero. A non-zero count means Format Document in the IDE can partially undo Kerf's work on those files.
+This is the number of files where `dotnet format whitespace` disagrees with Curb's output — ideally
+zero. A non-zero count means Format Document in the IDE can partially undo Curb's work on those files.
 
 | repo | not-fixpt files |
 |---|---|
@@ -70,7 +70,7 @@ efcore uses XML doc comments heavily.
 
 ### Idempotency: files changed on second run
 
-This is how many files change when Kerf is run a second time over its own output. The number must
+This is how many files change when Curb is run a second time over its own output. The number must
 always be zero — a non-zero count means the formatter has not reached a fixed point. Across all twelve
 repositories the count is zero.
 
@@ -104,16 +104,16 @@ The first-run churn is ground `dotnet format` doesn't cover:
 
 Nothing forces you to take the full diff in one commit.
 
-Omitting `max_line_length` means no reflow happens. Kerf becomes a whitespace formatter: it fixes
+Omitting `max_line_length` means no reflow happens. Curb becomes a whitespace formatter: it fixes
 indentation, spacing, brace placement, and blank lines, and leaves every line exactly as long as it
 was. That makes the first-run diff smaller — confined to whitespace-within-lines and blank-line
 normalisation. See [Reflow](../design-principles/reflow.md) for what the key does and what each mode
 costs.
 
-You can adopt Kerf with no `max_line_length`, and add a width later as its own commit when the churn
+You can adopt Curb with no `max_line_length`, and add a width later as its own commit when the churn
 is convenient.
 
-`kerf print-config Foo.cs` prints every resolved option and says which mode you are in. Worth running
+`curb print-config Foo.cs` prints every resolved option and says which mode you are in. Worth running
 before the reformatting commit rather than after.
 
 To reproduce these numbers for your own repository:

@@ -26,8 +26,8 @@
     <Authors>Nullean and contributors</Authors>
     <Copyright>Nullean</Copyright>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageProjectUrl>https://github.com/nullean/kerf</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/nullean/kerf</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/nullean/curb</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/nullean/curb</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageIcon>nuget-icon.png</PackageIcon>
     <PackageReadmeFile>README.md</PackageReadmeFile>

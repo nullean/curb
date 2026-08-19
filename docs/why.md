@@ -1,18 +1,18 @@
 ---
-navigation_title: Why Kerf
-description: Why a .NET developer should use Kerf — fast, non-fighting, and runs inside dotnet build.
+navigation_title: Why Curb
+description: Why a .NET developer should use Curb — fast, non-fighting, and runs inside dotnet build.
 ---
 
-# Why Kerf
+# Why Curb
 
-Kerf runs inside `dotnet build`. It formats your source before the compiler reads it, so formatting
+Curb runs inside `dotnet build`. It formats your source before the compiler reads it, so formatting
 offences never become build errors. Neither you nor a coding agent has to spend time on brace
 placement.
 
 ## It's fast
 
 0.26 s on 945 files (Newtonsoft.Json), cold. `dotnet format whitespace` on the same files: 3.47 s.
-Across twelve real repositories, Kerf is 5–25× faster. See [Benchmarks](benchmarks/index.md) for
+Across twelve real repositories, Curb is 5–25× faster. See [Benchmarks](benchmarks/index.md) for
 the full table.
 
 Speed is what makes running on every build viable. The [build integration](workflow/msbuild.md)

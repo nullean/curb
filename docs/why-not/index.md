@@ -1,6 +1,6 @@
 ---
 navigation_title: Why not X?
-description: How Kerf relates to the formatters and tools you probably already use.
+description: How Curb relates to the formatters and tools you probably already use.
 ---
 
 # Why not X?

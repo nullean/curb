@@ -17,16 +17,16 @@ Formatting is fixed automatically before the compiler runs, so `dotnet build` ne
 
 If a build reports code style diagnostics (the `IDEnnnn` series), run:
 
-    kerf cleanup
+    curb cleanup
 
-then build again. It fixes the rules it owns — `kerf rules` lists them — using the diagnostics the build
+then build again. It fixes the rules it owns — `curb rules` lists them — using the diagnostics the build
 already produced. It never builds anything itself, so it must be run after a build, not before.
 
-What is left after that needs `dotnet format style`, or a human. `kerf cleanup` reports what it declined
+What is left after that needs `dotnet format style`, or a human. `curb cleanup` reports what it declined
 and why rather than failing quietly.
 
 To have it hand the remainder on automatically, add `--forward`. That is much slower — it loads an MSBuild
-workspace, seconds per solution against Kerf's milliseconds — and the run prints both timings so it is
+workspace, seconds per solution against Curb's milliseconds — and the run prints both timings so it is
 clear which half the wait belongs to.
 ```
 
@@ -39,9 +39,9 @@ requires it to pass an extra flag, remember a pre-step, or understand a tool's i
 under pressure. So:
 
 - `dotnet build` stays exactly as it is. No flag, no wrapper, no environment variable. The
-  `Nullean.Kerf.MSBuild` package makes the compiler write its diagnostics down as a side effect; nothing
+  `curb` package makes the compiler write its diagnostics down as a side effect; nothing
   about the command changes.
-- `kerf cleanup` takes no arguments in the common case. It finds the logs itself.
+- `curb cleanup` takes no arguments in the common case. It finds the logs itself.
 - The second build is not overhead. It is the verify step the agent was going to run after any edit,
   and it is what catches a bad fix as a compile error, immediately.
 - Nothing is silenced. A diagnostic that is still reported after cleanup is one {{product}} cannot
@@ -57,7 +57,7 @@ Widget.cs(4,1): error IDE0005: Using directive is unnecessary.
 Build FAILED.
 ```
 
-After `kerf cleanup`:
+After `curb cleanup`:
 
 ```
 Cleaned 1 file(s) from 1 log(s) in 102ms — 2 fix(es) in 1 file(s), 0 refused, 0 stale, 0 skipped, 0 failed

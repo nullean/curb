@@ -1,6 +1,6 @@
 ---
 navigation_title: Rider / ReSharper
-description: Kerf reads the same .editorconfig keys Rider does, so a team using both needs no extra configuration.
+description: Curb reads the same .editorconfig keys Rider does, so a team using both needs no extra configuration.
 ---
 
 # Why not just Rider / ReSharper cleanup?

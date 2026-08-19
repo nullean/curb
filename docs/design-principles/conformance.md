@@ -1,6 +1,6 @@
 ---
 navigation_title: Conformance
-description: How Kerf's output is measured as a fixed point of dotnet format — and what that means in practice.
+description: How Curb's output is measured as a fixed point of dotnet format — and what that means in practice.
 ---
 
 # Conformance

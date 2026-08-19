@@ -1,6 +1,6 @@
 ---
 navigation_title: Getting started
-description: Install Kerf, format a folder, and configure it with the .editorconfig you already have.
+description: Install Curb, format a folder, and configure it with the .editorconfig you already have.
 ---
 
 # Getting started
@@ -10,7 +10,7 @@ description: Install Kerf, format a folder, and configure it with the .editorcon
 As a global tool:
 
 ```sh
-dotnet tool install -g Nullean.Kerf
+dotnet tool install -g Nullean.Curb
 ```
 
 Ships as a native-AOT binary for `linux-x64`, `linux-arm64`, `win-x64`, `win-arm64` and `osx-arm64`,
@@ -22,12 +22,12 @@ To have your build do the formatting instead — which is usually what you want 
 ## Format something
 
 ```sh
-kerf format ./src     # rewrite files in place
-kerf check ./src      # exit non-zero if anything would change
+curb format ./src     # rewrite files in place
+curb check ./src      # exit non-zero if anything would change
 ```
 
 Out of the box {{product}} uses Roslyn's defaults, which are the same defaults Visual Studio and Rider
-use. On a repository that is already IDE0055-clean, `kerf format` should change nothing.
+use. On a repository that is already IDE0055-clean, `curb format` should change nothing.
 
 ## Turn on reflow
 
@@ -63,7 +63,7 @@ to a tool that loads a compilation.
 When output surprises you, this is the first thing to run:
 
 ```sh
-kerf print-config Program.cs
+curb print-config Program.cs
 ```
 
 It prints every resolved option for that specific file, the value in force, and any diagnostics — so you
@@ -74,17 +74,17 @@ resolved per file, not per directory, because a section can discriminate on file
 
 | Command | What it does |
 |---|---|
-| `kerf format <path>` | Format files in place. |
-| `kerf check <path>` | Exit non-zero if anything would change. Writes nothing. |
-| `kerf print-config <file>` | Show every resolved option for a file, and any diagnostics. |
-| `kerf doc-tree <file>` | Dump the internal document IR. A debugging aid. |
-| `kerf --version` | |
+| `curb format <path>` | Format files in place. |
+| `curb check <path>` | Exit non-zero if anything would change. Writes nothing. |
+| `curb print-config <file>` | Show every resolved option for a file, and any diagnostics. |
+| `curb doc-tree <file>` | Dump the internal document IR. A debugging aid. |
+| `curb --version` | |
 
 | Flag | Applies to | What it does |
 |---|---|---|
 | `-f`, `--files <path>` | `format`, `check` | Work on only these files, instead of walking a directory. Repeatable. |
 | `--msbuild-list-file <path>` | `format`, `check` | Work on the paths listed in this file, one per line, instead of walking a directory. What the build integration passes, since a compile set can be too long for a command line. |
-| `-c`, `--cache <path>` | `format`, `check` | Skip files a previous run watched format to themselves. The caller names the path — there is no ambient cache. The build integration uses `obj/kerf.cache`; a pre-commit hook uses `.git/kerf.cache`. Ignored with `--coverage`. |
+| `-c`, `--cache <path>` | `format`, `check` | Skip files a previous run watched format to themselves. The caller names the path — there is no ambient cache. The build integration uses `obj/curb.cache`; a pre-commit hook uses `.git/curb.cache`. Ignored with `--coverage`. |
 | `--coverage` | `check` | Report which syntax kinds are still emitted verbatim, and how often. |
 | `--no-verify` | `format`, `check` | Skip re-parsing the output to prove the token stream is unchanged. Not recommended — see [Safety](../design-principles/safety.md). |
 

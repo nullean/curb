@@ -30,7 +30,7 @@ jobs:
       # docs-builder emits root-absolute URLs and GitHub Pages serves this repo from a sub-path, so
       # the generated site has to be told about it.
       #
-      # This value must stay in step with the <base href> in docs/kerf-landing.html, which the build
+      # This value must stay in step with the <base href> in docs/curb-landing.html, which the build
       # never touches, and with Documentation.PathPrefix in the build scripts. `./build.sh docs`
       # fails when the three drift apart.
       - name: Build documentation
@@ -41,7 +41,7 @@ jobs:
       # docs-builder has no landing-page feature. The branded page is a standalone document that
       # replaces the generated index.html here — docs/index.md survives as the "Home" nav entry.
       - name: Swap in the landing page
-        run: cp docs/kerf-landing.html .artifacts/docs/html/index.html
+        run: cp docs/curb-landing.html .artifacts/docs/html/index.html
 
       - name: Copy robots.txt
         run: cp docs/robots.txt .artifacts/docs/html/robots.txt

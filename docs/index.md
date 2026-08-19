@@ -3,7 +3,7 @@ navigation_title: Home
 description: A syntax and semantic style enforcer for C#, fast enough to always run as part of dotnet build. Your choices, not ours.
 ---
 
-# Kerf
+# Curb
 
 A syntax and semantic style enforcer for C#, fast enough to always run as part of `dotnet build`.
 
@@ -16,14 +16,14 @@ Visual Studio and Rider out of the box.
 **Your choices, not ours.**
 
 ```sh
-dotnet tool install -g Nullean.Kerf
-kerf format ./src
+dotnet tool install -g Nullean.Curb
+curb format ./src
 ```
 
 Or, more usefully, let the build do it:
 
 ```xml
-<PackageReference Include="Nullean.Kerf.MSBuild" Version="*" PrivateAssets="all" />
+<PackageReference Include="curb" Version="*" PrivateAssets="all" />
 ```
 
 ## Three things worth knowing

@@ -22,10 +22,10 @@ let private exec binary args = Proc.Exec(binary, List.toArray args) |> ignore
 /// `.github/workflows/docs.yml` (the `prefix:` input) and the `<base href>` in the landing page.
 /// `checkPrefixesAgree` below turns drift between them into a local failure rather than a 404 in
 /// production, because nothing else would catch it — docs-builder never reads the landing page.
-let PathPrefix = "formatter"
+let PathPrefix = "curb"
 
 let private docsSource = "docs"
-let private landingPage = Path.Combine(docsSource, "kerf-landing.html")
+let private landingPage = Path.Combine(docsSource, "curb-landing.html")
 let private robotsTxt = Path.Combine(docsSource, "robots.txt")
 let private workflow = Path.Combine(".github", "workflows", "docs.yml")
 

@@ -1,6 +1,6 @@
 ---
 navigation_title: Design principles
-description: The decisions that shaped Kerf's architecture and where each came from.
+description: The decisions that shaped Curb's architecture and where each came from.
 ---
 
 # Design principles
@@ -35,7 +35,7 @@ The reparse is conditional: the printer tracks whether it did anything capable o
 
 {{product}} does not have a dedicated printer for every construct in C#. Anything it has not learned yet is passed through exactly as it was in the source. The printer's coverage grows without ever putting code at risk — a file that exercises an unrecognised construct is formatted everywhere else and left alone there.
 
-You can see current coverage with `kerf check ./src --coverage`.
+You can see current coverage with `curb check ./src --coverage`.
 
 ## Deliberately non-canonicalising
 

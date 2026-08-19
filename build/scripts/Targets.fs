@@ -55,10 +55,10 @@ let private pristineCheck (arguments:ParseResults<Arguments>) =
 
 let private test (arguments:ParseResults<Arguments>) =
     // TUnit runs on Microsoft.Testing.Platform; `dotnet run` avoids the deprecated VSTest path.
-    exec "dotnet" ["run"; "--project"; "tests/Nullean.Kerf.Tests"; "-c"; "Release"] |> ignore
+    exec "dotnet" ["run"; "--project"; "tests/Nullean.Curb.Tests"; "-c"; "Release"] |> ignore
 
 let private benchmark (arguments:ParseResults<Arguments>) =
-    exec "dotnet" ["run"; "--project"; "tests/Nullean.Kerf.Benchmarks"; "-c"; "Release"] |> ignore
+    exec "dotnet" ["run"; "--project"; "tests/Nullean.Curb.Benchmarks"; "-c"; "Release"] |> ignore
 
 /// Builds docs/ the way the workflow does — including the landing page override, which is the whole
 /// reason `docs-builder serve` is not enough on its own — and serves the result.
@@ -141,39 +141,39 @@ let private modeLabel (arguments:ParseResults<Arguments>) =
        | [] -> ""
        | parts -> sprintf " (%s)" (String.Join(", ", parts))
 
-/// Measures how far Kerf's output is from dotnet format's, which is the product claim made
+/// Measures how far Curb's output is from dotnet format's, which is the product claim made
 /// checkable. Reflow is forced off so that every difference is an option disagreement rather than a
-/// deliberate wrap: with max_line_length off, Kerf should be a fixed point of dotnet format.
+/// deliberate wrap: with max_line_length off, Curb should be a fixed point of dotnet format.
 let private conformance (arguments:ParseResults<Arguments>) =
     let corpus = corpusFrom arguments "conformance"
 
     let root = Path.Combine(Paths.Output.FullName, "conformance")
     if Directory.Exists root then Directory.Delete(root, true)
-    let work = Path.Combine(root, "kerf")
+    let work = Path.Combine(root, "curb")
     let reference = Path.Combine(root, "reference")
 
     printfn "copying corpus from %s" corpus.FullName
     copyTree corpus.FullName work
 
-    // What this measures is dotnet_format(kerf(x)) = kerf(x) — that Kerf's output is a *fixed point*
+    // What this measures is dotnet_format(curb(x)) = curb(x) — that Curb's output is a *fixed point*
     // of dotnet format, not that the two agree on the same input. That is the stronger property and
-    // the one that matters: a repository formatted by Kerf stays put when anyone runs dotnet format,
+    // the one that matters: a repository formatted by Curb stays put when anyone runs dotnet format,
     // hits Format Document, or builds with EnforceCodeStyleInBuild.
     //
     // It is also what makes opinionated mode admissible. dotnet format declines to decide almost
-    // everything about layout, and anything it declines to decide Kerf may decide while staying a
+    // everything about layout, and anything it declines to decide Curb may decide while staying a
     // fixed point. So --opinionated is gated by this same number: it may change many files, it may
     // not change this.
     //
     // It is also why deterministic layout is measurable at all. --deterministic changes which breaks
-    // Kerf picks, not whether dotnet format tolerates them, so this number has to hold in both modes
+    // Curb picks, not whether dotnet format tolerates them, so this number has to hold in both modes
     // — and if it does not, deterministic mode is inadmissible however good its churn looks.
     //
     // Reflow is forced off by default so a difference is an option disagreement rather than a wrap
-    // Kerf chose; --reflow keeps the corpus's own widths, which is the configuration people run.
+    // Curb chose; --reflow keeps the corpus's own widths, which is the configuration people run.
     configureCorpus arguments work
 
-    exec "dotnet" ["run"; "--project"; "src/Nullean.Kerf.Cli"; "-c"; "Release"; "--"; "format"; work] |> ignore
+    exec "dotnet" ["run"; "--project"; "src/Nullean.Curb.Cli"; "-c"; "Release"; "--"; "format"; work] |> ignore
     copyTree work reference
     exec "dotnet" ["format"; "whitespace"; reference; "--folder"] |> ignore
 
@@ -196,16 +196,16 @@ let private conformance (arguments:ParseResults<Arguments>) =
         printfn ""
         printfn "compare with: diff -ru %s %s" reference work
 
-    // A regression here means Kerf drifted away from the reference implementation, which is the one
+    // A regression here means Curb drifted away from the reference implementation, which is the one
     // number the product claim rests on. Fail rather than merely report it.
     match arguments.TryGetResult Minimum with
     | Some floor when percentage < floor ->
         failwithf "conformance %.2f%% is below the required %.2f%%" percentage floor
     | _ -> ()
 
-/// Measures what adopting Kerf costs a repository: how many of its files the first run rewrites.
+/// Measures what adopting Curb costs a repository: how many of its files the first run rewrites.
 ///
-/// The other side of conformance, and a different question. Conformance asks whether Kerf's output
+/// The other side of conformance, and a different question. Conformance asks whether Curb's output
 /// survives dotnet format — a property about the output alone. Churn asks how far that output is from
 /// what the repository already has, which is the number that decides whether anybody installs it. A
 /// formatter can be a perfect fixed point of dotnet format and still rewrite every file it touches.
@@ -222,7 +222,7 @@ let private churn (arguments:ParseResults<Arguments>) =
 
     let root = Path.Combine(Paths.Output.FullName, "churn")
     if Directory.Exists root then Directory.Delete(root, true)
-    let work = Path.Combine(root, "kerf")
+    let work = Path.Combine(root, "curb")
 
     printfn "copying corpus from %s" corpus.FullName
     copyTree corpus.FullName work
@@ -234,7 +234,7 @@ let private churn (arguments:ParseResults<Arguments>) =
         |> Array.map (fun file -> file, File.ReadAllText file)
         |> Map.ofArray
 
-    exec "dotnet" ["run"; "--project"; "src/Nullean.Kerf.Cli"; "-c"; "Release"; "--"; "format"; work] |> ignore
+    exec "dotnet" ["run"; "--project"; "src/Nullean.Curb.Cli"; "-c"; "Release"; "--"; "format"; work] |> ignore
 
     let lineCount (text:string) = text.Split('\n').Length
     let changed =
@@ -299,11 +299,11 @@ let private perf (arguments:ParseResults<Arguments>) =
         sprintf "%s-%s" os arch
 
     printfn "publishing native AOT for %s" rid
-    exec "dotnet" ["publish"; "src/Nullean.Kerf.Cli"; "-c"; "Release"; "-r"; rid] |> ignore
+    exec "dotnet" ["publish"; "src/Nullean.Curb.Cli"; "-c"; "Release"; "-r"; rid] |> ignore
 
     let binary =
-        let name = if OperatingSystem.IsWindows() then "kerf.exe" else "kerf"
-        Path.Combine(".artifacts", "publish", "Nullean.Kerf.Cli", sprintf "release_%s" rid, name)
+        let name = if OperatingSystem.IsWindows() then "curb.exe" else "curb"
+        Path.Combine(".artifacts", "publish", "Nullean.Curb.Cli", sprintf "release_%s" rid, name)
     if not (File.Exists binary) then failwithf "expected a native binary at %s" binary
 
     // The first run pays for a cold file cache, so take the best of several rather than the mean.
@@ -338,9 +338,9 @@ let private perf (arguments:ParseResults<Arguments>) =
 
 /// Proves the MSBuild integration does the one thing it exists for: format before the compiler.
 ///
-/// The assertion is deliberately two-sided. Building the sample with Kerf must succeed even though
+/// The assertion is deliberately two-sided. Building the sample with Curb must succeed even though
 /// IDE0055 is escalated to an error and the source is deliberately misformatted; building it with
-/// Kerf bypassed must fail with those same errors. Only the pair proves anything — the first alone
+/// Curb bypassed must fail with those same errors. Only the pair proves anything — the first alone
 /// would pass just as well if the analysers were never running.
 ///
 /// A third build covers the cache, which is the other half of the incrementality story and the half
@@ -358,13 +358,13 @@ let private msbuildSmoketest (arguments:ParseResults<Arguments>) =
             | other -> failwithf "no RID mapping for %O" other
         sprintf "%s-%s" os arch
 
-    exec "dotnet" ["publish"; "src/Nullean.Kerf.Cli"; "-c"; "Release"; "-r"; rid] |> ignore
+    exec "dotnet" ["publish"; "src/Nullean.Curb.Cli"; "-c"; "Release"; "-r"; rid] |> ignore
 
     let binary =
-        let name = if OperatingSystem.IsWindows() then "kerf.exe" else "kerf"
-        Path.GetFullPath(Path.Combine(".artifacts", "publish", "Nullean.Kerf.Cli", sprintf "release_%s" rid, name))
+        let name = if OperatingSystem.IsWindows() then "curb.exe" else "curb"
+        Path.GetFullPath(Path.Combine(".artifacts", "publish", "Nullean.Curb.Cli", sprintf "release_%s" rid, name))
 
-    let sample = Path.Combine("examples", "kerf-msbuild-smoketest")
+    let sample = Path.Combine("examples", "curb-msbuild-smoketest")
     let source = Path.Combine(sample, "Program.cs")
     let pristine = Path.Combine(sample, "Program.unformatted")
 
@@ -379,12 +379,12 @@ let private msbuildSmoketest (arguments:ParseResults<Arguments>) =
         let output = result.ConsoleOut |> Seq.map (fun l -> l.Line) |> String.concat "\n"
         result.ExitCode, output
 
-    printfn "building the sample with Kerf"
-    let withKerfCode, withKerfOutput = build [sprintf "-p:Kerf_Exe=%s" binary]
-    if withKerfCode <> 0 then
-        failwithf "the sample must build with Kerf in the way, but it failed:\n%s" withKerfOutput
+    printfn "building the sample with Curb"
+    let withCurbCode, withCurbOutput = build [sprintf "-p:Curb_Exe=%s" binary]
+    if withCurbCode <> 0 then
+        failwithf "the sample must build with Curb in the way, but it failed:\n%s" withCurbOutput
     if not (File.ReadAllText(source).Contains("public static int Run(int x)")) then
-        failwithf "Kerf did not reformat the sample before the compiler read it"
+        failwithf "Curb did not reformat the sample before the compiler read it"
 
     // The cache only shows up when the target actually runs a second time, and simply building again
     // would not do that: the stamp is fresh, so MSBuild skips the target outright — the first layer of
@@ -392,18 +392,18 @@ let private msbuildSmoketest (arguments:ParseResults<Arguments>) =
     // also guarantees that file misses, so a hit can only be Stable.cs. Hence "exactly one", not "some":
     // a cache that served Program.cs too would be serving a file whose bytes had changed.
     printfn "building the sample again, to prove the cache serves the file that did not change"
-    let cachedCode, cachedOutput = build [sprintf "-p:Kerf_Exe=%s" binary; "-p:Kerf_LogLevel=high"]
+    let cachedCode, cachedOutput = build [sprintf "-p:Curb_Exe=%s" binary; "-p:Curb_LogLevel=high"]
     if cachedCode <> 0 then
         failwithf "the sample must build a second time, but it failed:\n%s" cachedOutput
     if not (cachedOutput.Contains "(1 from cache)") then
-        failwithf "expected Kerf to serve exactly one file from the cache on the second build, got:\n%s" cachedOutput
+        failwithf "expected Curb to serve exactly one file from the cache on the second build, got:\n%s" cachedOutput
 
-    printfn "building the sample with Kerf bypassed"
-    let bypassedCode, bypassedOutput = build ["-p:Kerf_Bypass=true"]
+    printfn "building the sample with Curb bypassed"
+    let bypassedCode, bypassedOutput = build ["-p:Curb_Bypass=true"]
     if bypassedCode = 0 then
-        failwith "the sample built clean without Kerf, so the check proves nothing — is EnforceCodeStyleInBuild still on?"
+        failwith "the sample built clean without Curb, so the check proves nothing — is EnforceCodeStyleInBuild still on?"
     if not (bypassedOutput.Contains "IDE0055") then
-        failwithf "expected IDE0055 errors without Kerf, got:\n%s" bypassedOutput
+        failwithf "expected IDE0055 errors without Curb, got:\n%s" bypassedOutput
 
     // Leave the sample misformatted, which is how it is checked in.
     File.Copy(pristine, source, true)
@@ -411,7 +411,7 @@ let private msbuildSmoketest (arguments:ParseResults<Arguments>) =
     printfn "MSBuild integration verified: formatted before CoreCompile, cached on the way back, and IDE0055 fails without it"
 
 /// Cleans a corpus that really builds, then requires that it still builds and that dotnet format style has
-/// nothing left to say about the rules Kerf owns.
+/// nothing left to say about the rules Curb owns.
 ///
 /// The end-to-end claim, and the only gate that can catch a fix which compiles but is wrong. `cleanupsafety`
 /// proves a wrong verdict cannot damage a file; it cannot prove a *right* verdict was applied correctly,
@@ -450,15 +450,15 @@ let private cleanupConformance (arguments:ParseResults<Arguments>) =
     printfn "copying corpus from %s" corpus.FullName
     copyTree corpus.FullName work.FullName
 
-    // The rules Kerf owns, asked for rather than restated. A second copy of the list here would drift from
+    // The rules Curb owns, asked for rather than restated. A second copy of the list here would drift from
     // the catalog, and the drift would look like a passing gate.
     let ownedIds =
-        let result = Proc.Start("dotnet", [| "run"; "--project"; "src/Nullean.Kerf.Cli"; "-c"; "Release"; "--"; "rules"; "--cleanup-ids" |])
+        let result = Proc.Start("dotnet", [| "run"; "--project"; "src/Nullean.Curb.Cli"; "-c"; "Release"; "--"; "rules"; "--cleanup-ids" |])
         result.ConsoleOut
         |> Seq.map (fun l -> l.Line.Trim())
         |> Seq.filter (fun l -> l.StartsWith("IDE", StringComparison.Ordinal))
         |> Seq.tryHead
-        |> Option.defaultWith (fun () -> failwith "could not read the cleanup rule ids from `kerf rules --cleanup-ids`")
+        |> Option.defaultWith (fun () -> failwith "could not read the cleanup rule ids from `curb rules --cleanup-ids`")
         |> fun line -> line.Split(' ') |> Array.filter (fun s -> s.Length > 0)
 
     printfn "rules: %s" (String.concat " " ownedIds)
@@ -475,14 +475,14 @@ let private cleanupConformance (arguments:ParseResults<Arguments>) =
                 File.WriteAllText(file, "")
 
     // Escalate the owned rules, and set the preference keys they read so the analyser reports the direction
-    // Kerf fixes.
+    // Curb fixes.
     //
     // A .globalconfig rather than an append to the corpus's .editorconfig. Appending was tried and reported
     // nothing: a corpus carries its own sections, its own `root=true`, and — because the work tree sits inside
-    // this repository — Kerf's own .editorconfig turns up as an ancestor too. A global config has no globs, no
+    // this repository — Curb's own .editorconfig turns up as an ancestor too. A global config has no globs, no
     // sections and no walk, so there is nothing left to reason about. It is also what the SDK itself uses to
     // set these severities, and `global_level` settles ties out loud rather than by file position.
-    let globalConfig = Path.Combine(work.FullName, "kerf-conformance.globalconfig")
+    let globalConfig = Path.Combine(work.FullName, "curb-conformance.globalconfig")
     let severities =
         ownedIds |> Array.map (sprintf "dotnet_diagnostic.%s.severity = warning") |> String.concat "\n"
 
@@ -533,10 +533,10 @@ let private cleanupConformance (arguments:ParseResults<Arguments>) =
     let targetsXml =
         [ "<Project>"
           "  <PropertyGroup Condition=\"'$(TargetFramework)' != ''\">"
-          "    <ErrorLog>$(IntermediateOutputPath)kerf.sarif,version=2.1</ErrorLog>"
+          "    <ErrorLog>$(IntermediateOutputPath)curb.sarif,version=2.1</ErrorLog>"
           "  </PropertyGroup>"
           "  <ItemGroup>"
-          "    <EditorConfigFiles Include=\"$(MSBuildThisFileDirectory)kerf-conformance.globalconfig\" />"
+          "    <EditorConfigFiles Include=\"$(MSBuildThisFileDirectory)curb-conformance.globalconfig\" />"
           "  </ItemGroup>"
           "</Project>" ]
         |> String.concat "\n"
@@ -589,7 +589,7 @@ let private cleanupConformance (arguments:ParseResults<Arguments>) =
           "using System.Text;"                                // IDE0005, and the next line joins its run
           "using System.Globalization;"
           ""
-          "namespace Kerf.ConformanceSeed;"
+          "namespace Curb.ConformanceSeed;"
           ""
           "internal struct SeedPoint"                         // IDE0250
           "{"
@@ -621,7 +621,7 @@ let private cleanupConformance (arguments:ParseResults<Arguments>) =
           "" ]
         |> String.concat "\n"
 
-    let seedFile = Path.Combine(seedProject, "KerfConformanceSeed.cs")
+    let seedFile = Path.Combine(seedProject, "CurbConformanceSeed.cs")
     File.WriteAllText(seedFile, seed)
 
     printfn "building with one violation seeded per rule"
@@ -633,7 +633,7 @@ let private cleanupConformance (arguments:ParseResults<Arguments>) =
 
     // Distinct sites, not lines: MSBuild prints each diagnostic twice, once in the stream and once in the
     // summary, and once per target framework on top of that.
-    // Only the rules Kerf owns. Matching every IDE id counted the corpus's own escalations — IDE0058 alone
+    // Only the rules Curb owns. Matching every IDE id counted the corpus's own escalations — IDE0058 alone
     // contributes 233 sites — and made the assertion below meaningless.
     let ownedPattern =
         sprintf @"([^\s(]+\.cs)\((\d+),(\d+)\): warning (%s)" (String.concat "|" ownedIds)
@@ -657,10 +657,10 @@ let private cleanupConformance (arguments:ParseResults<Arguments>) =
     printfn "  before: %s" (tally before)
 
     printfn "cleaning"
-    let cleanup = Proc.Start("dotnet", [| "run"; "--project"; "src/Nullean.Kerf.Cli"; "-c"; "Release"; "--"; "cleanup"; work.FullName |])
+    let cleanup = Proc.Start("dotnet", [| "run"; "--project"; "src/Nullean.Curb.Cli"; "-c"; "Release"; "--"; "cleanup"; work.FullName |])
     let cleanupOutput = cleanup.ConsoleOut |> Seq.map (fun l -> l.Line) |> String.concat "\n"
     printfn "%s" cleanupOutput
-    if cleanup.ExitCode <> 0 then failwith "kerf cleanup failed on the corpus"
+    if cleanup.ExitCode <> 0 then failwith "curb cleanup failed on the corpus"
 
     // Churn, published rather than asserted, the way layout-decisions requires of anything that rewrites
     // files. Taken from cleanup's own summary rather than from git, so the copy does not need to carry the
@@ -678,7 +678,7 @@ let private cleanupConformance (arguments:ParseResults<Arguments>) =
     let after = build "after cleanup"
     let sitesAfter = sites after
 
-    // Not "nothing is left": Kerf declines some sites on purpose — a file with a `#if` keeps its using
+    // Not "nothing is left": Curb declines some sites on purpose — a file with a `#if` keeps its using
     // directives, because the compiler decided for one symbol set. So the claim is the exact one it can
     // make: everything that was not explicitly declined was fixed.
     printfn "after cleanup: %d site(s) left, %d declined" sitesAfter.Count refused
@@ -694,7 +694,7 @@ let private cleanupConformance (arguments:ParseResults<Arguments>) =
             summary.Groups[1].Value sitesBefore.Count sitesAfter.Count
 
     // And what the reference implementation makes of the result. Reported rather than gated, because it will
-    // also want to fix the sites Kerf declined — it has a compilation and can reason about symbol sets.
+    // also want to fix the sites Curb declined — it has a compilation and can reason about symbol sets.
     printfn "asking dotnet format style what it would still do"
     let verify =
         Proc.Start("dotnet",
@@ -718,7 +718,7 @@ let private cleanupConformance (arguments:ParseResults<Arguments>) =
     printfn "cleanup conformance verified: %d site(s) fixed across a solution that still builds, %d declined and said so"
         (sitesBefore.Count - sitesAfter.Count) sitesAfter.Count
 
-/// Feeds a corpus verdicts Kerf has no business trusting, and requires that none of them damages a file.
+/// Feeds a corpus verdicts Curb has no business trusting, and requires that none of them damages a file.
 ///
 /// The counterpart to `conformance`, for the half of cleanup that conformance cannot reach. Every other
 /// cleanup test hands over a diagnostic the compiler really reported; this one claims every rule fires
@@ -738,14 +738,14 @@ let private cleanupSafety (arguments:ParseResults<Arguments>) =
     if not corpus.Exists then failwithf "corpus not found: %s" corpus.FullName
 
     printfn "sweeping %s" corpus.FullName
-    let summaryFile = Path.Combine(Path.GetTempPath(), "kerf-cleanup-summary.txt")
+    let summaryFile = Path.Combine(Path.GetTempPath(), "curb-cleanup-summary.txt")
     if File.Exists summaryFile then File.Delete summaryFile
-    Environment.SetEnvironmentVariable("KERF_CLEANUP_CORPUS", corpus.FullName)
-    Environment.SetEnvironmentVariable("KERF_CLEANUP_SUMMARY", summaryFile)
+    Environment.SetEnvironmentVariable("CURB_CLEANUP_CORPUS", corpus.FullName)
+    Environment.SetEnvironmentVariable("CURB_CLEANUP_SUMMARY", summaryFile)
 
     let result =
         Proc.Start("dotnet",
-            [| "run"; "--project"; "tests/Nullean.Kerf.Tests"; "-c"; "Release"; "--"
+            [| "run"; "--project"; "tests/Nullean.Curb.Tests"; "-c"; "Release"; "--"
                "--treenode-filter"; "/*/*/CleanupCorpusTests/*" |])
 
     let output = result.ConsoleOut |> Seq.map (fun l -> l.Line) |> String.concat "\n"
@@ -755,7 +755,7 @@ let private cleanupSafety (arguments:ParseResults<Arguments>) =
 
     if File.Exists summaryFile then printfn "%s" (File.ReadAllText(summaryFile).Trim())
 
-/// Proves `kerf cleanup` fixes what a build reported, and nothing else.
+/// Proves `curb cleanup` fixes what a build reported, and nothing else.
 ///
 /// Four assertions, where the MSBuild formatting smoke test needs two. Two of them are the same idea —
 /// it works, and it would have failed without us, because an assertion that passes when the analysers
@@ -763,12 +763,12 @@ let private cleanupSafety (arguments:ParseResults<Arguments>) =
 /// formatter cannot: it could silence a rule instead of fixing it, and it could rewrite a repository
 /// that never asked for anything.
 let private cleanupSmoketest (arguments:ParseResults<Arguments>) =
-    exec "dotnet" ["publish"; "src/Nullean.Kerf.Cli"; "-c"; "Release"; "-o"; ".artifacts/cleanup-smoketest/kerf"
+    exec "dotnet" ["publish"; "src/Nullean.Curb.Cli"; "-c"; "Release"; "-o"; ".artifacts/cleanup-smoketest/curb"
                    "-p:PublishAot=false"; "-p:SelfContained=false"] |> ignore
 
-    let kerfDll = Path.GetFullPath(Path.Combine(".artifacts", "cleanup-smoketest", "kerf", "kerf.dll"))
+    let curbDll = Path.GetFullPath(Path.Combine(".artifacts", "cleanup-smoketest", "curb", "curb.dll"))
 
-    let sample = Path.Combine("examples", "kerf-cleanup-smoketest")
+    let sample = Path.Combine("examples", "curb-cleanup-smoketest")
     let source = Path.Combine(sample, "Widget.cs")
     let pristine = Path.Combine(sample, "Widget.unclean")
     let editorConfig = Path.Combine(sample, ".editorconfig")
@@ -782,24 +782,24 @@ let private cleanupSmoketest (arguments:ParseResults<Arguments>) =
         File.SetLastWriteTimeUtc(source, DateTime.UtcNow)
 
     let build () =
-        let args = ["build"; sample; "-c"; "Debug"; "--nologo"; "-tl:off"; sprintf "-p:Kerf_Dll=%s" kerfDll]
+        let args = ["build"; sample; "-c"; "Debug"; "--nologo"; "-tl:off"; sprintf "-p:Curb_Dll=%s" curbDll]
         let result = Proc.Start("dotnet", List.toArray args)
         let output = result.ConsoleOut |> Seq.map (fun l -> l.Line) |> String.concat "\n"
         result.ExitCode, output
 
     // The repository sets UseArtifactsOutput, so the sample's $(IntermediateOutputPath) is under
     // .artifacts rather than beside its project file. Found rather than assumed, because which of the two
-    // layouts a consumer uses is not this test's business — and `kerf cleanup` run from a repository root
+    // layouts a consumer uses is not this test's business — and `curb cleanup` run from a repository root
     // finds the log either way.
     let findLogs () =
-        Directory.GetFiles(".", "kerf.sarif", SearchOption.AllDirectories)
-        |> Array.filter (fun p -> p.Contains "kerf-cleanup-smoketest")
+        Directory.GetFiles(".", "curb.sarif", SearchOption.AllDirectories)
+        |> Array.filter (fun p -> p.Contains "curb-cleanup-smoketest")
 
     let clearLogs () = findLogs () |> Array.iter File.Delete
 
     let cleanup (extra: string list) =
         let logs = findLogs () |> Array.toList |> List.collect (fun l -> ["--sarif-log"; l])
-        let args = ["exec"; kerfDll; "cleanup"; sample] @ logs @ extra
+        let args = ["exec"; curbDll; "cleanup"; sample] @ logs @ extra
         let result = Proc.Start("dotnet", List.toArray args)
         let output = result.ConsoleOut |> Seq.map (fun l -> l.Line) |> String.concat "\n"
         result.ExitCode, output
@@ -822,28 +822,28 @@ let private cleanupSmoketest (arguments:ParseResults<Arguments>) =
         // The compiler writes its error log even when it fails. That is the fact a post-build MSBuild
         // target could not have used, because it would never have run.
         if Array.isEmpty (findLogs ()) then
-            failwith "the failing build wrote no kerf.sarif, so cleanup has nothing to read"
+            failwith "the failing build wrote no curb.sarif, so cleanup has nothing to read"
 
         // 2. Cleanup reads that log and the source changes.
-        printfn "running kerf cleanup"
+        printfn "running curb cleanup"
         let cleanCode, cleanOutput = cleanup []
-        if cleanCode <> 0 then failwithf "kerf cleanup failed:\n%s" cleanOutput
+        if cleanCode <> 0 then failwithf "curb cleanup failed:\n%s" cleanOutput
         let cleaned = File.ReadAllText(source)
         if cleaned = File.ReadAllText(pristine) then
-            failwithf "kerf cleanup changed nothing:\n%s" cleanOutput
+            failwithf "curb cleanup changed nothing:\n%s" cleanOutput
         if cleaned.Contains "System.Globalization" || cleaned.Contains "System.Numerics" then
-            failwithf "kerf cleanup left part of a run behind — it read the start of the span and not its end:\n%s" cleaned
+            failwithf "curb cleanup left part of a run behind — it read the start of the span and not its end:\n%s" cleaned
         if not (cleaned.Contains "System.Text.RegularExpressions") then
-            failwith "kerf cleanup removed a directive the file needs; the run's extent was read wrong"
+            failwith "curb cleanup removed a directive the file needs; the run's extent was read wrong"
 
         // The other four rules, asserted on the output rather than only on the exit code. Each is a
         // different delta — a modifier inserted, a type name dropped, a type name swapped for a keyword —
         // and a rule that silently stopped firing would otherwise look like a clean run.
         for expected in [ "private readonly string _name"; "private int _count"; "var text = "; "=> new()" ] do
             if not (cleaned.Contains expected) then
-                failwithf "kerf cleanup did not produce %s:\n%s" expected cleaned
+                failwithf "curb cleanup did not produce %s:\n%s" expected cleaned
 
-        // 3. The next build is clean, and IDE0005 is absent rather than downgraded. Kerf never writes a
+        // 3. The next build is clean, and IDE0005 is absent rather than downgraded. Curb never writes a
         //    severity; a muted rule and a fixed one look the same from the exit code alone, so the
         //    output is checked too.
         printfn "building the sample again"
@@ -873,7 +873,7 @@ let private cleanupSmoketest (arguments:ParseResults<Arguments>) =
             failwith "cleanup rewrote a file nobody asked it to; the fixed set must be the reported set"
 
         printfn ""
-        printfn "kerf cleanup verified: fixes what the build reported, whole runs, nothing else, and nothing unasked"
+        printfn "curb cleanup verified: fixes what the build reported, whole runs, nothing else, and nothing unasked"
     finally
         // Leave the sample unclean and escalated, which is how it is checked in.
         File.WriteAllText(editorConfig, pristineConfig)
@@ -882,7 +882,7 @@ let private cleanupSmoketest (arguments:ParseResults<Arguments>) =
 /// Proves that every expectation the test suite asserts is a fixed point of dotnet format.
 ///
 /// Until this existed only the corpus proved that. The hand-written expectations proved only that
-/// Kerf agrees with itself, so one written from a wrong belief about dotnet format would sit there
+/// Curb agrees with itself, so one written from a wrong belief about dotnet format would sit there
 /// passing forever — which is exactly how the note about arrow clauses survived several readings.
 ///
 /// Slow, and it needs the SDK, so it is its own target rather than part of `test`.
@@ -891,9 +891,9 @@ let private verifyExpectations (arguments:ParseResults<Arguments>) =
     if Directory.Exists dump then Directory.Delete(dump, true)
     Directory.CreateDirectory dump |> ignore
 
-    Environment.SetEnvironmentVariable("KERF_EXPECTATION_DUMP", dump)
-    exec "dotnet" ["run"; "--project"; "tests/Nullean.Kerf.Tests"; "-c"; "Release"] |> ignore
-    Environment.SetEnvironmentVariable("KERF_EXPECTATION_DUMP", null)
+    Environment.SetEnvironmentVariable("CURB_EXPECTATION_DUMP", dump)
+    exec "dotnet" ["run"; "--project"; "tests/Nullean.Curb.Tests"; "-c"; "Release"] |> ignore
+    Environment.SetEnvironmentVariable("CURB_EXPECTATION_DUMP", null)
 
     let cases = Directory.GetDirectories dump
     printfn "checking %d expectations against dotnet format" cases.Length
@@ -928,7 +928,7 @@ let private verifyExpectations (arguments:ParseResults<Arguments>) =
 
     // A floor rather than zero, the same shape as the conformance gate. Seven expectations disagree
     // today and each needs deciding on its own merits: some are tests that deliberately feed an
-    // invalid option value and assert the fallback, where Kerf's fallback and Roslyn's differ; others
+    // invalid option value and assert the fallback, where Curb's fallback and Roslyn's differ; others
     // are real questions about which brace-style flag governs indexers and events. The gate stops the
     // number growing while they are worked through, which is worth more than blocking on them.
     let percentage = 100.0 * float (cases.Length - changed.Length) / float cases.Length
@@ -953,9 +953,9 @@ let private generatePackages (arguments:ParseResults<Arguments>) =
     // CI matrix, where each is compiled on a matching runner.
     let staging = DirectoryInfo(Path.Combine(Paths.Output.FullName, "..", "cli-staging")).FullName
     if Directory.Exists staging then Directory.Delete(staging, true)
-    exec "dotnet" ["pack"; "src/Nullean.Kerf.Cli/Nullean.Kerf.Cli.csproj"; "-c"; "Release"; "-o"; Paths.RootRelative staging] |> ignore
+    exec "dotnet" ["pack"; "src/Nullean.Curb.Cli/Nullean.Curb.Cli.csproj"; "-c"; "Release"; "-o"; Paths.RootRelative staging] |> ignore
 
-    let ridSuffixes = Paths.AotRuntimeIdentifiers |> List.map (sprintf "Nullean.Kerf.%s.")
+    let ridSuffixes = Paths.AotRuntimeIdentifiers |> List.map (sprintf "curb-cli.%s.")
     DirectoryInfo(staging).GetFiles("*.nupkg")
     |> Seq.filter (fun f -> not (ridSuffixes |> List.exists f.Name.StartsWith))
     |> Seq.iter (fun f ->
@@ -968,7 +968,7 @@ let private generatePackages (arguments:ParseResults<Arguments>) =
 let private validatePackages (arguments:ParseResults<Arguments>) =
     let output = Paths.RootRelative <| Paths.Output.FullName
     // Only managed library packages carry signed assemblies. The root tool package holds just
-    // DotnetToolSettings.xml, the per-RID packages hold native binaries, and Nullean.Kerf.MSBuild is
+    // DotnetToolSettings.xml, the per-RID packages hold native binaries, and Nullean.Curb.MSBuild is
     // build-only — props, targets and a CLI payload, with no assembly of its own. All three fail a
     // signing check for the same reason: there is nothing signed in them to check.
     let nugetPackages =
@@ -1052,19 +1052,19 @@ type private RepoResult = {
     Name: string
     Files: int
     Configs: int
-    KerfSeconds: float
+    CurbSeconds: float
     CspSeconds: float
     CspWarmSeconds: float
     DnfSeconds: float
-    KerfChanged: int
+    CurbChanged: int
     CspChanged: int
     DnfChanged: int
-    KerfNotFixpt: int
+    CurbNotFixpt: int
     CspNotFixpt: int
-    KerfSecond: int
+    CurbSecond: int
 }
 
-/// Times Kerf, CSharpier and dotnet-format-whitespace over every sub-directory of a corpus dir
+/// Times Curb, CSharpier and dotnet-format-whitespace over every sub-directory of a corpus dir
 /// and writes a refreshed results table to docs/benchmarks/index.md.
 ///
 /// --corpus must point at a directory whose immediate children are C# repository checkouts. Every
@@ -1097,16 +1097,16 @@ let private compare (arguments:ParseResults<Arguments>) =
         sprintf "%s-%s" os arch
 
     printfn "publishing native AOT for %s" rid
-    exec "dotnet" ["publish"; "src/Nullean.Kerf.Cli"; "-c"; "Release"; "-r"; rid] |> ignore
+    exec "dotnet" ["publish"; "src/Nullean.Curb.Cli"; "-c"; "Release"; "-r"; rid] |> ignore
 
     let binary =
-        let name = if OperatingSystem.IsWindows() then "kerf.exe" else "kerf"
-        Path.GetFullPath(Path.Combine(".artifacts", "publish", "Nullean.Kerf.Cli", sprintf "release_%s" rid, name))
+        let name = if OperatingSystem.IsWindows() then "curb.exe" else "curb"
+        Path.GetFullPath(Path.Combine(".artifacts", "publish", "Nullean.Curb.Cli", sprintf "release_%s" rid, name))
     if not (File.Exists binary) then failwithf "expected a native binary at %s" binary
 
     // Scratch space in the system temp dir — NOT under build/output, which is in .gitignore.
     // CSharpier respects .gitignore, so any path under build/output would produce "Formatted 0 files".
-    let scratch = Path.Combine(Path.GetTempPath(), "kerf-compare")
+    let scratch = Path.Combine(Path.GetTempPath(), "curb-compare")
     if Directory.Exists scratch then Directory.Delete(scratch, true)
     Directory.CreateDirectory scratch |> ignore
 
@@ -1143,24 +1143,24 @@ let private compare (arguments:ParseResults<Arguments>) =
         let configs = Directory.GetFiles(repo.FullName, ".editorconfig", SearchOption.AllDirectories).Length
 
         // Fresh copies — one per tool so no tool sees the other's output.
-        let kerfDir = Path.Combine(scratch, repo.Name + "_kerf")
+        let curbDir = Path.Combine(scratch, repo.Name + "_curb")
         let cspDir  = Path.Combine(scratch, repo.Name + "_csp")
         let dnfDir  = Path.Combine(scratch, repo.Name + "_dnf")
-        copyTree repo.FullName kerfDir
+        copyTree repo.FullName curbDir
         copyTree repo.FullName cspDir
         copyTree repo.FullName dnfDir
-        configureCorpus arguments kerfDir
+        configureCorpus arguments curbDir
         configureCorpus arguments cspDir
         configureCorpus arguments dnfDir
 
-        // Kerf — best of 3.
+        // Curb — best of 3.
         // Uses execResult (not exec) so a verification failure on one file does not abort the run.
         // Exit code 3 means a file could not be verified and was left untouched — expected on repos
         // with raw string literals or BOM handling; the changed-file count still reflects what happened.
-        let kerfSec =
+        let curbSec =
             [ for _ in 1..3 ->
                 let sw = Diagnostics.Stopwatch.StartNew()
-                execResult binary ["format"; kerfDir] |> ignore
+                execResult binary ["format"; curbDir] |> ignore
                 sw.Stop()
                 sw.Elapsed.TotalSeconds ]
             |> List.min
@@ -1207,47 +1207,47 @@ let private compare (arguments:ParseResults<Arguments>) =
             |> List.min
 
         // Files changed vs pristine
-        let kerfChanged = countChanged repo.FullName kerfDir
+        let curbChanged = countChanged repo.FullName curbDir
         let cspChanged  = countChanged repo.FullName cspDir
         let dnfChanged  = countChanged repo.FullName dnfDir
 
         // Not-fixed-point: how many of each tool's outputs are changed by dotnet format whitespace
-        printfn "checking fixed-point for kerf..."
-        let kerfNotFixpt = countNotFixpt kerfDir
+        printfn "checking fixed-point for curb..."
+        let curbNotFixpt = countNotFixpt curbDir
         printfn "checking fixed-point for csharpier..."
         let cspNotFixpt = countNotFixpt cspDir
 
-        // Kerf idempotency: second pass over own output
-        printfn "checking kerf idempotency..."
-        let kerfDir2 = Path.Combine(scratch, repo.Name + "_kerf2")
-        copyTree kerfDir kerfDir2
-        execResult binary ["format"; kerfDir2] |> ignore
-        let kerfSecond = countChanged kerfDir kerfDir2
-        if Directory.Exists kerfDir2 then Directory.Delete(kerfDir2, true)
+        // Curb idempotency: second pass over own output
+        printfn "checking curb idempotency..."
+        let curbDir2 = Path.Combine(scratch, repo.Name + "_curb2")
+        copyTree curbDir curbDir2
+        execResult binary ["format"; curbDir2] |> ignore
+        let curbSecond = countChanged curbDir curbDir2
+        if Directory.Exists curbDir2 then Directory.Delete(curbDir2, true)
 
         // Clean up work dirs to keep disk usage bounded.
-        for d in [kerfDir; cspDir; dnfDir] do
+        for d in [curbDir; cspDir; dnfDir] do
             if Directory.Exists d then Directory.Delete(d, true)
 
         let r = {
             Name = repo.Name; Files = files; Configs = configs
-            KerfSeconds = kerfSec; CspSeconds = cspSec; CspWarmSeconds = cspWarmSec; DnfSeconds = dnfSec
-            KerfChanged = kerfChanged; CspChanged = cspChanged; DnfChanged = dnfChanged
-            KerfNotFixpt = kerfNotFixpt; CspNotFixpt = cspNotFixpt; KerfSecond = kerfSecond
+            CurbSeconds = curbSec; CspSeconds = cspSec; CspWarmSeconds = cspWarmSec; DnfSeconds = dnfSec
+            CurbChanged = curbChanged; CspChanged = cspChanged; DnfChanged = dnfChanged
+            CurbNotFixpt = curbNotFixpt; CspNotFixpt = cspNotFixpt; CurbSecond = curbSecond
         }
         results.Add(r)
-        printfn "%s: kerf %.2f s, csp cold %.2f s, csp warm %.2f s, dnf %.2f s; changed %d/%d/%d; not-fixpt %d/%d; 2nd %d"
-            r.Name r.KerfSeconds r.CspSeconds r.CspWarmSeconds r.DnfSeconds r.KerfChanged r.CspChanged r.DnfChanged
-            r.KerfNotFixpt r.CspNotFixpt r.KerfSecond
+        printfn "%s: curb %.2f s, csp cold %.2f s, csp warm %.2f s, dnf %.2f s; changed %d/%d/%d; not-fixpt %d/%d; 2nd %d"
+            r.Name r.CurbSeconds r.CspSeconds r.CspWarmSeconds r.DnfSeconds r.CurbChanged r.CspChanged r.DnfChanged
+            r.CurbNotFixpt r.CspNotFixpt r.CurbSecond
 
     // Emit the table (markdown format; not-fixpt and 2nd-idem columns are in churn.md).
-    let header = "| repo | files | Kerf | dotnet format | CSharpier |\n|---|---|---|---|---|"
+    let header = "| repo | files | Curb | dotnet format | CSharpier |\n|---|---|---|---|---|"
     let rows =
         results
         |> Seq.map (fun r ->
             sprintf "| %s | %s | %.2f s | %.2f s | %.2f s |"
                 r.Name (r.Files.ToString("N0"))
-                r.KerfSeconds r.DnfSeconds r.CspSeconds)
+                r.CurbSeconds r.DnfSeconds r.CspSeconds)
         |> String.concat "\n"
     let table = sprintf "%s\n%s" header rows
 
@@ -1275,7 +1275,7 @@ let private compare (arguments:ParseResults<Arguments>) =
         printfn "warning: %s not found; table not written" docPath
 
 let private options (_:ParseResults<Arguments>) =
-    exec "dotnet" ["run"; "--project"; "tools/Nullean.Kerf.OptionDocs"; "-c"; "Release"] |> ignore
+    exec "dotnet" ["run"; "--project"; "tools/Nullean.Curb.OptionDocs"; "-c"; "Release"] |> ignore
 
 let private release (arguments:ParseResults<Arguments>) = printfn "release"
 

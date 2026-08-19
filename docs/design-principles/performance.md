@@ -1,6 +1,6 @@
 ---
 navigation_title: Performance
-description: How Kerf achieves parse-floor performance, and why that matters for running inside every build.
+description: How Curb achieves parse-floor performance, and why that matters for running inside every build.
 ---
 
 # Performance

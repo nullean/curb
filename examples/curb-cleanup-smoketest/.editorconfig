@@ -1,0 +1,23 @@
+root = true
+
+[*.cs]
+indent_style = tab
+insert_final_newline = true
+
+# Escalated on purpose. Nothing is reported without these — measured: with EnforceCodeStyleInBuild on and
+# no severity set, the compiler reported no IDE rule at all on this file. That is the whole opt-in
+# mechanism, and it is why Curb never has to touch a severity itself.
+dotnet_diagnostic.IDE0005.severity = error
+dotnet_diagnostic.IDE0007.severity = error
+dotnet_diagnostic.IDE0040.severity = error
+dotnet_diagnostic.IDE0044.severity = error
+dotnet_diagnostic.IDE0090.severity = error
+
+# Which direction each rule wants. The analyser reads these to decide whether to report at all, so Curb
+# inherits the preference for free and cannot disagree with it.
+csharp_style_var_for_built_in_types = true
+csharp_style_var_when_type_is_apparent = true
+csharp_style_var_elsewhere = true
+dotnet_style_readonly_field = true
+dotnet_style_require_accessibility_modifiers = for_non_interface_members
+csharp_style_implicit_object_creation_when_type_is_apparent = true

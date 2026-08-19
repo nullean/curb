@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Curb.AotSmokeTest</RootNamespace>
+    <PublishAot>true</PublishAot>
+    <PublishSelfContained>true</PublishSelfContained>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <EventSourceSupport>false</EventSourceSupport>
+    <MetadataUpdaterSupport>false</MetadataUpdaterSupport>
+    <StripSymbols>true</StripSymbols>
+    <!-- Surface every trim/AOT warning individually rather than a single rolled-up one: this
+         project exists precisely to catch them. -->
+    <TrimmerSingleWarn>false</TrimmerSingleWarn>
+    <!-- The one known-benign warning: Roslyn's CommonCompiler.GetAssemblyLocation reads
+         Assembly.Location, which is empty under AOT. That is the command-line compiler path, which
+         Curb never invokes — we only call CSharpSyntaxTree.ParseText. Suppressed narrowly so that a
+         genuinely NEW trim warning still fails review here. -->
+    <NoWarn>$(NoWarn);IL3000</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Nullean.Curb.Core\Nullean.Curb.Core.csproj" />
+  </ItemGroup>
+
+</Project>

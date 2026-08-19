@@ -1,6 +1,6 @@
 ---
 navigation_title: AI coding agents
-description: How Kerf's parser-only design lets it run inside the build, removing formatting from the work a coding agent has to do.
+description: How Curb's parser-only design lets it run inside the build, removing formatting from the work a coding agent has to do.
 ---
 
 # AI coding agents
@@ -50,7 +50,7 @@ One source of truth, read by your IDE, by `dotnet format`, and by {{product}}.
 |---|---|
 | All layout | Indentation, spacing, brace placement, blank lines, reflow — decided from the parse tree. Nothing in this class reaches the agent's context. |
 | Syntax style (opt-in) | Braces, expression bodies, file-scoped namespaces, modifier order, using placement — for every key you set in `.editorconfig`. |
-| Semantic remainder (after build) | `var`, unused usings, `readonly` and more. `kerf cleanup` reads the diagnostics your build already reported and applies the rewrites. See [Cleanup](../workflow/cleanup.md). |
+| Semantic remainder (after build) | `var`, unused usings, `readonly` and more. `curb cleanup` reads the diagnostics your build already reported and applies the rewrites. See [Cleanup](../workflow/cleanup.md). |
 | Not handled, deliberately | Naming, unused members, unread assignments. Their fixes can change which overload binds or break a reflection string. {{product}} reports them; the agent decides. |
 
 See [Integrations](../workflow/integrations.md) for how to wire this into MSBuild, CI, and pre-commit hooks.

@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Nullean.Curb.Tests</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="TUnit" />
+    <PackageReference Include="AwesomeAssertions" />
+    <PackageReference Include="DiffPlex" />
+    <PackageReference Include="JetBrains.Annotations" />
+    <PackageReference Include="System.IO.Abstractions.TestingHelpers" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/Nullean.Curb.Core/Nullean.Curb.Core.csproj" />
+    <ProjectReference Include="../../src/Nullean.Curb.Cleanup/Nullean.Curb.Cleanup.csproj" />
+    <ProjectReference Include="../../src/Nullean.Curb.EditorConfig/Nullean.Curb.EditorConfig.csproj" />
+    <ProjectReference Include="../../src/Nullean.Curb.Cli/Nullean.Curb.Cli.csproj" />
+  </ItemGroup>
+
+</Project>

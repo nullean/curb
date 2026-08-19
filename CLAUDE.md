@@ -1,13 +1,13 @@
-# Kerf
+# Curb
 
 See [AGENTS.md](AGENTS.md) for project conventions, layout, hot-path rules and the option-onboarding
 playbook. It is the source of truth; this file only adds orientation.
 
 ## The one-paragraph version
 
-Kerf parses C# with Roslyn (parser only — never `Workspaces`, never a compilation), builds a
+Curb parses C# with Roslyn (parser only — never `Workspaces`, never a compilation), builds a
 Prettier-style document IR in a pooled arena, and prints it back out. Every layout decision is driven
-by a `FormatOptions` struct resolved from `.editorconfig`. Defaults match Roslyn's own, so Kerf agrees
+by a `FormatOptions` struct resolved from `.editorconfig`. Defaults match Roslyn's own, so Curb agrees
 with the IDE out of the box; `max_line_length` opts into reflow on top.
 
 ## Where the time goes
@@ -23,12 +23,12 @@ So ~97% of a formatter's cost is its own work, not parsing. Optimise the printer
 
 - **Full re-print, not a trivia rewriter.** A rewriter cannot reflow, and reflow is the product.
 - **Arena document IR** (struct in a pooled array, text leaves referencing source spans) rather than
-  a class-per-node graph. It buys an O(n) zero-allocation verifier, which in turn lets Kerf make the
+  a class-per-node graph. It buys an O(n) zero-allocation verifier, which in turn lets Curb make the
   round-trip re-parse conditional: it only runs when the printer detected a moved token boundary, not
   on every file.
 - **The `preserve_single_line_*` options are supported**, which makes output depend on input layout.
-  Kerf is idempotent but deliberately not canonicalising — that is correct IDE0055 behaviour.
-- **`UnhandledNode` prints unknown syntax verbatim.** Kerf is safe but incomplete from day one;
+  Curb is idempotent but deliberately not canonicalising — that is correct IDE0055 behaviour.
+- **`UnhandledNode` prints unknown syntax verbatim.** Curb is safe but incomplete from day one;
   printer coverage grows without ever risking code.
 
 ## Current state
@@ -63,7 +63,7 @@ pages on demand and so never applies the landing page override.
 
 Two things about the site are easy to get wrong:
 
-- **`docs/kerf-landing.html` is not generated.** It is a standalone page CI copies over the generated
+- **`docs/curb-landing.html` is not generated.** It is a standalone page CI copies over the generated
   `index.html`, so the build's `prefix` never reaches it. Its links are relative and resolve against a
   `<base href="/formatter/">` that must stay in step with the workflow's `prefix: formatter` and with
   `Documentation.PathPrefix`. `./build.sh docs` fails if the three drift apart — nothing else would

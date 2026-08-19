@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>Nullean.Curb.EditorConfig</RootNamespace>
+    <Description>Binds .editorconfig files to Curb formatting options, including the full IDE0055 csharp_* and dotnet_* surface.</Description>
+    <PackageTags>csharp;formatter;editorconfig;ide0055;code-style</PackageTags>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Nullean.Curb.Core/Nullean.Curb.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="editorconfig" />
+    <PackageReference Include="System.IO.Abstractions" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="README.md" />
+    <None Include="..\..\nuget-icon.png" Pack="true" PackagePath="nuget-icon.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Nullean.Curb.Tests" PublicKey="002400000480000014010000060200000024000052534131000800000100010065a1711028007da1779e8f246c6ec533ea3f7d99d2ca4391649c74738898b0db38935179e773ccb53249af1a0ce3a0e9f721c6fa933794a7b818fc42e0029bea1b3b4b565f774c43a2c887bc48147f997c80a182c3b655a9b14e79c911b3bffcf4b618757bb15cbc964705bf9cdda0760f2bdc4c44f2eec3b32dacec03e5e9d87266441c269ac44d3b9b503a011833fc2cd024b412250f48c9750f0b6146ec96518a5235a9b6734b89fe4f9c59923f8ddc9557f8133fbd90c9188fd8520f21a6ebfe3b9b37b3c5c8517526862d832b5506c281d0cc8e2b70ef978220f2ff35523e187c79c14528e1bec901950bacd1dee81aae2b615ec58da571bd83868885c2" />
+  </ItemGroup>
+
+</Project>

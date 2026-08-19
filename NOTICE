@@ -1,4 +1,4 @@
-Kerf
+Curb
 Copyright (c) Nullean and contributors
 
 This product includes software design derived from the following projects.
@@ -7,8 +7,8 @@ This product includes software design derived from the following projects.
 CSharpier — https://github.com/belav/csharpier
 Licensed under the MIT License.
 
-Kerf is an independent implementation, not a fork: no CSharpier source is copied
-into this repository. However, several algorithms and models in Kerf are
+Curb is an independent implementation, not a fork: no CSharpier source is copied
+into this repository. However, several algorithms and models in Curb are
 recognisably derived from CSharpier's approach, and that debt is acknowledged here:
 
   - The document-layout algorithm (group break propagation, the flat/break fits

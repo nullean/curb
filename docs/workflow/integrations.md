@@ -1,6 +1,6 @@
 ---
 navigation_title: Integrations
-description: How to wire Kerf into AI coding agents, CI pipelines, MSBuild, and pre-commit hooks.
+description: How to wire Curb into AI coding agents, CI pipelines, MSBuild, and pre-commit hooks.
 ---
 
 # Integrations
@@ -16,7 +16,7 @@ in your `.editorconfig`.
 The fix is to make the build apply style rather than telling the agent about it:
 
 ```xml
-<PackageReference Include="Nullean.Kerf.MSBuild" Version="*" PrivateAssets="all" />
+<PackageReference Include="curb" Version="*" PrivateAssets="all" />
 ```
 
 {{product}} runs before `CoreCompile`. By the time the compiler reads your source, the mechanical
@@ -53,7 +53,7 @@ csharp_preferred_modifier_order = public,private,protected,internal,static,reado
 |---|---|
 | All layout | Indentation, spacing, brace placement, blank lines, reflow — 100% of them. Nothing in this class reaches the context window. |
 | Syntax style (opt-in) | Braces, expression bodies, file-scoped namespaces, modifier order, using placement — for every key you set. |
-| Semantic remainder (after build) | `var`, unused usings, `readonly` and more. `kerf cleanup` reads the build's diagnostics and applies the rewrites. See [Cleanup](cleanup.md). |
+| Semantic remainder (after build) | `var`, unused usings, `readonly` and more. `curb cleanup` reads the build's diagnostics and applies the rewrites. See [Cleanup](cleanup.md). |
 | Not handled, deliberately | Naming, unused members, unread assignments. Their fixes can compile and still change which overload binds. {{product}} reports them and says why. |
 
 See [AI coding agents](../design-principles/ai-native.md) for more detail on why the pass split makes
@@ -69,18 +69,18 @@ specific projects.
 
 ## CI/CD
 
-In CI, use `kerf check` rather than `kerf format`. It exits non-zero if any file would change, and
+In CI, use `curb check` rather than `curb format`. It exits non-zero if any file would change, and
 changes nothing.
 
 ```sh
-kerf check ./src
+curb check ./src
 ```
 
 A typical GitHub Actions step:
 
 ```yaml
 - name: Check formatting
-  run: kerf check ./src
+  run: curb check ./src
 ```
 
 If you use the MSBuild package, the build integration already checks in `Release` configuration. You
@@ -92,8 +92,8 @@ Reviewers stop reading past whitespace.
 
 ## Pre-commit hooks
 
-`kerf check` can be used as a git pre-commit hook to catch formatting issues before they are committed.
-Point `--cache` at `.git/kerf.cache` and most runs cost a hash comparison per file rather than a full
+`curb check` can be used as a git pre-commit hook to catch formatting issues before they are committed.
+Point `--cache` at `.git/curb.cache` and most runs cost a hash comparison per file rather than a full
 parse — `.git/` is never committed, and entries expire after seven days, so nothing has to clean up
 behind it.
 
@@ -101,7 +101,7 @@ behind it.
 
 ```sh
 #!/bin/sh
-kerf check --cache .git/kerf.cache ./src
+curb check --cache .git/curb.cache ./src
 ```
 
 Save to `.git/hooks/pre-commit` and make it executable (`chmod +x .git/hooks/pre-commit`).
@@ -112,8 +112,8 @@ With [Husky.NET](https://alirezanet.github.io/Husky.Net/):
 
 ```json
 {
-  "command": "kerf",
-  "args": ["check", "--cache", ".git/kerf.cache", "./src"],
+  "command": "curb",
+  "args": ["check", "--cache", ".git/curb.cache", "./src"],
   "pathMode": "absolute"
 }
 ```

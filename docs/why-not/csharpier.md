@@ -1,6 +1,6 @@
 ---
 navigation_title: CSharpier
-description: How Kerf differs from CSharpier, and why the two are not direct replacements for each other.
+description: How Curb differs from CSharpier, and why the two are not direct replacements for each other.
 ---
 
 # Why not CSharpier?
@@ -37,7 +37,7 @@ CSharpier does not integrate with MSBuild as a first-class build step. You run i
 
 ```xml
 Inputs="@(Compile);@(EditorConfigFiles);$(MSBuildProjectFullPath)"
-Outputs="$(Kerf_StampFile)"
+Outputs="$(Curb_StampFile)"
 ```
 
 MSBuild evaluates the `Inputs` against the stamp before {{product}} starts. On an untouched project — no changed source files, no changed `.editorconfig`, no changed project file — the target is skipped entirely and no process starts.
@@ -57,7 +57,7 @@ This is what "MSBuild-native incrementality" means in practice: MSBuild's own de
 From the [twelve-repository comparison](../benchmarks/index.md), measured cold
 (cache cleared before each run) and warm (cache populated from a prior run):
 
-| repo | Kerf | CSharpier cold | CSharpier warm |
+| repo | Curb | CSharpier cold | CSharpier warm |
 |---|---|---|---|
 | serilog (216 files) | **0.06 s** | 0.73 s | 0.34 s |
 | FluentValidation (219 files) | **0.06 s** | 0.59 s | 0.21 s |
@@ -71,9 +71,9 @@ From the [twelve-repository comparison](../benchmarks/index.md), measured cold
 
 Full numbers for all twelve repositories are in the [comparison table](../benchmarks/index.md).
 
-Kerf beats CSharpier warm on all repositories through efcore (5,761 files). On roslyn, CSharpier
-warm edges out Kerf's re-check time by about 10%. Both numbers above are re-checks of
-already-formatted files: Kerf's first-ever run on roslyn is 8.5 s; CSharpier's is 65 s. Where Kerf
+Curb beats CSharpier warm on all repositories through efcore (5,761 files). On roslyn, CSharpier
+warm edges out Curb's re-check time by about 10%. Both numbers above are re-checks of
+already-formatted files: Curb's first-ever run on roslyn is 8.5 s; CSharpier's is 65 s. Where Curb
 wins unconditionally: its MSBuild stamp means an unchanged project starts no process at all, while
 CSharpier still walks 17,000 files every time.
 

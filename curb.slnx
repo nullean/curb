@@ -1,0 +1,33 @@
+<Solution>
+  <Folder Name="/build/">
+    <File Path=".editorconfig" />
+    <File Path=".gitattributes" />
+    <File Path=".gitignore" />
+    <File Path=".github/workflows/ci.yml" />
+    <File Path=".config/dotnet-tools.json" />
+    <File Path="build.bat" />
+    <File Path="build.sh" />
+    <File Path="Directory.Build.props" />
+    <File Path="Directory.Packages.props" />
+    <File Path="global.json" />
+    <File Path="nuget.config" />
+    <File Path="NOTICE" />
+    <File Path="README.md" />
+    <Project Path="build/scripts/scripts.fsproj" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/Nullean.Curb.Core/Nullean.Curb.Core.csproj" />
+    <Project Path="src/Nullean.Curb.Cleanup/Nullean.Curb.Cleanup.csproj" />
+    <Project Path="src/Nullean.Curb.EditorConfig/Nullean.Curb.EditorConfig.csproj" />
+    <Project Path="src/Nullean.Curb.Cli/Nullean.Curb.Cli.csproj" />
+    <Project Path="src/Nullean.Curb.MSBuild/Nullean.Curb.MSBuild.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <File Path="tests/Directory.Build.props" />
+    <Project Path="tests/Nullean.Curb.Tests/Nullean.Curb.Tests.csproj" />
+    <Project Path="tests/Nullean.Curb.Benchmarks/Nullean.Curb.Benchmarks.csproj" />
+  </Folder>
+  <Folder Name="/examples/">
+    <Project Path="examples/curb-aot-smoketest/curb-aot-smoketest.csproj" />
+  </Folder>
+</Solution>
