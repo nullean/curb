@@ -15,7 +15,7 @@ Measured on a 6.5 MB corpus (1,196 files), as CPU time:
 
 Parsing is about 2.5% of the budget. Roughly 97% of what a formatter costs is its own work. {{product}} adds almost nothing on top of the parse: it is within measurement noise of the floor.
 
-The [twelve-repository comparison](../benchmarks/index.md) has wall-clock numbers across real repositories; on roslyn (17,167 files) {{product}} takes **7 s** against `dotnet format`'s **34 s**.
+The [twelve-repository comparison](../benchmarks/index.md) has wall-clock numbers across real repositories; on roslyn (17,167 files) {{product}} takes **7 s** against `dotnet format whitespace`'s **34 s**.
 
 ## Why it is fast
 

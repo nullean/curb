@@ -17,15 +17,22 @@ and the build integration guide.
 
 ## Why
 
-**Fast enough to run on every build.** Curb is a native-AOT binary with no warm-up cost. Measured
+**Fast enough to run on every build.** curb is a native-AOT binary with no warm-up cost. Measured
 cold on Newtonsoft.Json (945 files):
 
-| | Curb | dotnet format | CSharpier |
+| | curb | dnf whitespace | CSharpier |
 |---|---|---|---|
 | Newtonsoft.Json (945 files) | **0.26 s** | 3.47 s | 4.85 s |
 
-Across twelve real repositories Curb is 5–25× faster than `dotnet format` — fast enough to wire
-into `dotnet build` and forget about it. Full numbers: [Benchmarks](https://curb.nullean.net/benchmarks/).
+`dnf whitespace` is `dotnet format whitespace` — the whitespace-only pass, curb's closest equivalent.
+Across twelve real repositories curb is 5–25× faster than `dotnet format whitespace`, while doing
+more: it reflows long lines, sorts using directives, and applies syntax-level code style on top.
+Fast enough to wire into `dotnet build` and forget about it. Full numbers:
+[Benchmarks](https://curb.nullean.net/benchmarks/).
+
+On subsequent builds the MSBuild integration skips unchanged projects entirely — no process starts.
+For projects with changes, only the files that changed since the last build are reformatted. curb is
+FAST cold, FASTER warm.
 
 **Plays well with your IDE and `dotnet format`.** Curb supports the full set of `.editorconfig`
 formatting properties that Visual Studio, Rider and `dotnet format` read — all 39 `csharp_*` and
