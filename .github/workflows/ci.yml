@@ -124,7 +124,7 @@ jobs:
         run: |
           EXT=""
           [[ "$RUNNER_OS" == "Windows" ]] && EXT=".exe"
-          BINARY=$(find .artifacts -name "Nullean.Kerf.Cli${EXT}" -type f | head -1)
+          BINARY=$(find .artifacts -name "kerf${EXT}" -type f | head -1)
           [[ -n "$BINARY" ]] && ls -la "$BINARY" || echo "(no native binary found)"
 
       - name: Upload per-RID package

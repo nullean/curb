@@ -28,8 +28,8 @@ internal static class CleanupRun
 	/// <param name="fileSystem">Abstracted so a run can be driven entirely in memory by a test.</param>
 	/// <param name="target">Where to look for logs when <paramref name="logs"/> is empty.</param>
 	/// <param name="write">Apply the fixes, rather than only reporting what would change.</param>
-	/// <param name="logs">Explicit log paths, from <c>--diagnostics</c>.</param>
-	/// <param name="explicitFiles">Restrict to these files, from <c>--files</c>. Empty means every file the logs mention.</param>
+	/// <param name="logs">Explicit log paths, from <c>--sarif-log</c>.</param>
+	/// <param name="explicitFiles">Restrict to these files, from <c>--files</c>/<c>--msbuild-list-file</c>. Empty means every file the logs mention.</param>
 	/// <param name="forward">Hand what Kerf did not fix to <c>dotnet format</c>, from <c>--forward</c>.</param>
 	public static int Execute(
 		IFileSystem fileSystem,
@@ -45,7 +45,7 @@ internal static class CleanupRun
 		{
 			Console.Error.WriteLine(
 				$"No diagnostics log found. Build first — the {LogName} files the compiler writes are what "
-				+ "cleanup reads — or point at one with --diagnostics <path>.");
+				+ "cleanup reads — or point at one with --sarif-log <path>.");
 			return 3;
 		}
 

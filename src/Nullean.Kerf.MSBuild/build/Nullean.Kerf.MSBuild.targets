@@ -101,7 +101,7 @@
       <!-- The framework-dependent build that ships in this package, run on the SDK doing the build.
            See the package project for why this is not a per-RID native binary. Kerf_Exe overrides it
            with a native one, which starts in about a hundredth of the time. -->
-      <Kerf_Dll Condition="'$(Kerf_Dll)' == ''">$(MSBuildThisFileDirectory)../tools/net10.0/Nullean.Kerf.Cli.dll</Kerf_Dll>
+      <Kerf_Dll Condition="'$(Kerf_Dll)' == ''">$(MSBuildThisFileDirectory)../tools/net10.0/kerf.dll</Kerf_Dll>
     </PropertyGroup>
   </Target>
 
@@ -157,7 +157,7 @@
       <_KerfCacheArg Condition="'$(Kerf_Cache)' != 'false' and '$(Kerf_CacheFile)' != ''">--cache &quot;$(Kerf_CacheFile)&quot;</_KerfCacheArg>
     </PropertyGroup>
 
-    <Exec Command="$(_KerfInvocation) $(_KerfCommand) --files &quot;$(Kerf_FileList)&quot; $(_KerfCacheArg)"
+    <Exec Command="$(_KerfInvocation) $(_KerfCommand) --msbuild-list-file &quot;$(Kerf_FileList)&quot; $(_KerfCacheArg)"
           StandardOutputImportance="$(Kerf_LogLevel)"
           ContinueOnError="true"
           IgnoreExitCode="true">

@@ -82,8 +82,9 @@ resolved per file, not per directory, because a section can discriminate on file
 
 | Flag | Applies to | What it does |
 |---|---|---|
-| `--files <list>` | `format`, `check` | Work on the paths listed in a file, one per line, instead of walking a directory. This is what the build integration uses. |
-| `--cache <path>` | `format`, `check` | Skip files a previous run watched format to themselves. The caller names the path — there is no ambient cache. The build integration uses `obj/kerf.cache`; a pre-commit hook uses `.git/kerf.cache`. Ignored with `--coverage`. |
+| `-f`, `--files <path>` | `format`, `check` | Work on only these files, instead of walking a directory. Repeatable. |
+| `--msbuild-list-file <path>` | `format`, `check` | Work on the paths listed in this file, one per line, instead of walking a directory. What the build integration passes, since a compile set can be too long for a command line. |
+| `-c`, `--cache <path>` | `format`, `check` | Skip files a previous run watched format to themselves. The caller names the path — there is no ambient cache. The build integration uses `obj/kerf.cache`; a pre-commit hook uses `.git/kerf.cache`. Ignored with `--coverage`. |
 | `--coverage` | `check` | Report which syntax kinds are still emitted verbatim, and how often. |
 | `--no-verify` | `format`, `check` | Skip re-parsing the output to prove the token stream is unchanged. Not recommended — see [Safety](../design-principles/safety.md). |
 
@@ -96,7 +97,7 @@ resolved per file, not per directory, because a section can discriminate on file
 | `0` | Success. |
 | `1` | `check` found files that would change. |
 | `2` | Unknown command. |
-| `3` | A file failed verification, or `--files` or `--cache` was given without a path. |
+| `3` | A file failed verification, or a named path did not exist. |
 
 Only `1` means "your code needs formatting". Anything else means {{product}} did not do its job, which
 is why the build integration treats them differently.

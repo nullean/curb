@@ -3,7 +3,9 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <RootNamespace>Nullean.Kerf.Cli</RootNamespace>
-    <AssemblyName>Nullean.Kerf.Cli</AssemblyName>
+    <!-- Not Nullean.Kerf.Cli: Argh's help/usage text reads the assembly's own identity name, with no
+         override, so this has to be the name people actually type. -->
+    <AssemblyName>kerf</AssemblyName>
 
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>kerf</ToolCommandName>
@@ -28,10 +30,12 @@
     <PublishAot>true</PublishAot>
     <PublishSelfContained>true</PublishSelfContained>
     <StripSymbols>true</StripSymbols>
+    <!-- Behaviour-neutral: FormattingRun/CleanupRun already force CultureInfo.InvariantCulture. -167 KB. -->
     <InvariantGlobalization>true</InvariantGlobalization>
     <EventSourceSupport>false</EventSourceSupport>
     <MetadataUpdaterSupport>false</MetadataUpdaterSupport>
     <TrimmerSingleWarn>false</TrimmerSingleWarn>
+    <!-- Not StackTraceSupport=false: -166 KB, but it drops symbolicated stack traces on a crash. -->
     <!-- See Nullean.Kerf.Core.csproj: Roslyn's command-line-compiler path reads Assembly.Location.
          Kerf only ever parses, so this is unreachable. Narrow suppression, not a blanket one. -->
     <NoWarn>$(NoWarn);IL3000</NoWarn>
@@ -40,6 +44,9 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
     <PackageReference Include="System.IO.Hashing" />
+    <!-- Not Nullean.Argh.Hosting: +0.37 MB AOT vs. +7.67 MB for Hosting's DI/Generic Host, which this
+         one-shot CLI has no use for. -->
+    <PackageReference Include="Nullean.Argh" />
     <ProjectReference Include="../Nullean.Kerf.Core/Nullean.Kerf.Core.csproj" />
     <ProjectReference Include="../Nullean.Kerf.Cleanup/Nullean.Kerf.Cleanup.csproj" />
     <ProjectReference Include="../Nullean.Kerf.EditorConfig/Nullean.Kerf.EditorConfig.csproj" />

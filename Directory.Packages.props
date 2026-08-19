@@ -23,7 +23,10 @@
     <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="[5.6.0]" />
     <PackageVersion Include="editorconfig" Version="0.17.0" />
     <PackageVersion Include="System.IO.Abstractions" Version="22.2.0" />
-    <PackageVersion Include="Nullean.Argh" Version="0.17.1" />
+    <!-- 0.18.0 fixes handler exit codes (nullean/argh#65), an illink crash under TreatWarningsAsErrors
+         (nullean/argh#67), and drops a ~1 MB System.Text.Json dependency (nullean/argh#66). Reference
+         Nullean.Argh, not Nullean.Argh.Hosting — see Nullean.Kerf.Cli.csproj. -->
+    <PackageVersion Include="Nullean.Argh" Version="0.18.0" />
 
     <!-- Fingerprints the file content and the resolved options behind the `cache` flag. XxHash128 rather
          than SHA-256 out of System.Security.Cryptography, and the reason is native AOT rather than speed:

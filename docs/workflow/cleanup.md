@@ -28,7 +28,8 @@ the current directory for those logs.
 
 | Flag | What it does |
 |---|---|
-| `--diagnostics <path>` | Name a specific log file. |
+| `-s`, `--sarif-log <path>` | Name a specific log file, instead of searching for one. Repeatable. |
+| `-f`, `--files <path>` | Restrict cleanup to these files. Repeatable. |
 | `--check` | Report what would change without writing. |
 | `--forward` | Hand the remainder to `dotnet format style` after cleanup finishes. |
 | `kerf rules` | List every rule and which tool fixes it. |

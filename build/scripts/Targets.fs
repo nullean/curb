@@ -302,7 +302,7 @@ let private perf (arguments:ParseResults<Arguments>) =
     exec "dotnet" ["publish"; "src/Nullean.Kerf.Cli"; "-c"; "Release"; "-r"; rid] |> ignore
 
     let binary =
-        let name = if OperatingSystem.IsWindows() then "Nullean.Kerf.Cli.exe" else "Nullean.Kerf.Cli"
+        let name = if OperatingSystem.IsWindows() then "kerf.exe" else "kerf"
         Path.Combine(".artifacts", "publish", "Nullean.Kerf.Cli", sprintf "release_%s" rid, name)
     if not (File.Exists binary) then failwithf "expected a native binary at %s" binary
 
@@ -361,7 +361,7 @@ let private msbuildSmoketest (arguments:ParseResults<Arguments>) =
     exec "dotnet" ["publish"; "src/Nullean.Kerf.Cli"; "-c"; "Release"; "-r"; rid] |> ignore
 
     let binary =
-        let name = if OperatingSystem.IsWindows() then "Nullean.Kerf.Cli.exe" else "Nullean.Kerf.Cli"
+        let name = if OperatingSystem.IsWindows() then "kerf.exe" else "kerf"
         Path.GetFullPath(Path.Combine(".artifacts", "publish", "Nullean.Kerf.Cli", sprintf "release_%s" rid, name))
 
     let sample = Path.Combine("examples", "kerf-msbuild-smoketest")
@@ -766,7 +766,7 @@ let private cleanupSmoketest (arguments:ParseResults<Arguments>) =
     exec "dotnet" ["publish"; "src/Nullean.Kerf.Cli"; "-c"; "Release"; "-o"; ".artifacts/cleanup-smoketest/kerf"
                    "-p:PublishAot=false"; "-p:SelfContained=false"] |> ignore
 
-    let kerfDll = Path.GetFullPath(Path.Combine(".artifacts", "cleanup-smoketest", "kerf", "Nullean.Kerf.Cli.dll"))
+    let kerfDll = Path.GetFullPath(Path.Combine(".artifacts", "cleanup-smoketest", "kerf", "kerf.dll"))
 
     let sample = Path.Combine("examples", "kerf-cleanup-smoketest")
     let source = Path.Combine(sample, "Widget.cs")
@@ -798,7 +798,7 @@ let private cleanupSmoketest (arguments:ParseResults<Arguments>) =
     let clearLogs () = findLogs () |> Array.iter File.Delete
 
     let cleanup (extra: string list) =
-        let logs = findLogs () |> Array.toList |> List.collect (fun l -> ["--diagnostics"; l])
+        let logs = findLogs () |> Array.toList |> List.collect (fun l -> ["--sarif-log"; l])
         let args = ["exec"; kerfDll; "cleanup"; sample] @ logs @ extra
         let result = Proc.Start("dotnet", List.toArray args)
         let output = result.ConsoleOut |> Seq.map (fun l -> l.Line) |> String.concat "\n"
@@ -1100,7 +1100,7 @@ let private compare (arguments:ParseResults<Arguments>) =
     exec "dotnet" ["publish"; "src/Nullean.Kerf.Cli"; "-c"; "Release"; "-r"; rid] |> ignore
 
     let binary =
-        let name = if OperatingSystem.IsWindows() then "Nullean.Kerf.Cli.exe" else "Nullean.Kerf.Cli"
+        let name = if OperatingSystem.IsWindows() then "kerf.exe" else "kerf"
         Path.GetFullPath(Path.Combine(".artifacts", "publish", "Nullean.Kerf.Cli", sprintf "release_%s" rid, name))
     if not (File.Exists binary) then failwithf "expected a native binary at %s" binary
 
