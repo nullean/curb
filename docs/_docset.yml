@@ -3,10 +3,13 @@ max_toc_depth: 2
 dev_docs: true
 
 branding:
-  icon: assets/curb-logo.svg
+  icon: images/curb-mark.svg
+  favicon: images/png/curb-mark-32.png
+  og-image: images/png/curb-lockup-704x384.png
+  apple-touch-icon: images/png/curb-mark-180.png
 
-# Curb was formerly known as Curb. Prose uses {{product}} for the name.
-# sweep of the code samples, the CLI examples and the landing page — substitutions reach none of those.
+# Prose uses {{product}} for the name so the codename can be changed in one place.
+# Substitutions do not reach code samples, CLI examples, or the landing page.
 subs:
   product: "Curb"
 
