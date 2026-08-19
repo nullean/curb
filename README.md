@@ -30,7 +30,21 @@ output never disagrees — measured across 41,000 files, gated on every push.
 
 ## Install
 
-As a global dotnet tool:
+### MSBuild — runs on every `dotnet build`
+
+```xml
+<PackageReference Include="curb" Version="*" PrivateAssets="all" />
+```
+
+Curb runs before `CoreCompile`, rewriting source in `Debug` and checking in `Release`. With
+`EnforceCodeStyleInBuild` set, the only style diagnostics left are the ones that genuinely require a
+compilation — everything mechanical is already fixed before the compiler reads the file.
+
+This is the recommended integration for most projects. It is particularly effective in agentic
+workflows: any code an agent writes or edits is formatted automatically on the next build, without
+the agent having to think about it. See [the build integration docs](https://nullean.github.io/curb/workflow/msbuild/).
+
+### CLI — pre-commit hooks, CI, scripting
 
 ```sh
 dotnet tool install -g curb-cli
@@ -39,22 +53,10 @@ dotnet tool install -g curb-cli
 Ships as a native-AOT binary per platform (`linux-x64`, `linux-arm64`, `win-x64`, `win-arm64`,
 `osx-arm64`), with a portable fallback. About 10 ms startup.
 
-## Use
-
 ```sh
 curb format ./src          # format in place
 curb check ./src           # exit 1 if anything would change
 curb print-config Foo.cs   # show every resolved option and its source
-```
-
-Configuration is your `.editorconfig` — no second config file.
-
-```ini
-[*.cs]
-indent_style = tab
-max_line_length = 120                  # omit for no reflow and preserved line breaks
-csharp_new_line_before_open_brace = all
-csharp_preserve_single_line_blocks = true
 ```
 
 For code style rules that need a compilation (unused usings, `var`, naming), run a build first and
@@ -65,16 +67,6 @@ dotnet build && curb cleanup
 ```
 
 `curb rules` lists what Curb fixes and what it leaves to `dotnet format style`.
-
-## MSBuild integration
-
-```xml
-<PackageReference Include="curb" Version="*" PrivateAssets="all" />
-```
-
-Curb then runs before `CoreCompile` on every `dotnet build`, rewriting in `Debug` and checking in
-`Release`. With `EnforceCodeStyleInBuild` set, the only style diagnostics left are the ones that
-genuinely require a compilation. See [the build integration docs](https://nullean.github.io/curb/workflow/msbuild/).
 
 ## Building from source
 
