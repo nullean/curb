@@ -28,119 +28,44 @@ Which constructs put their opening brace on a new line.
 
 **Default:** `all`
 
-## Examples
+## Example
 
-The snippet below is formatted with default options and then again with the option applied.
+::::{tab-set}
 
-**Snippet (formatted with defaults):**
-
+:::{tab-item} Before
 ```csharp
 namespace N;
 
-public class Widget : Base, IWidget
+public class Widget {
+    public int X { get; set; }
+
+    public void Run() {
+        if (X > 0) {
+            X--;
+        }
+    }
+}
+```
+:::
+
+:::{tab-item} After
+```csharp
+namespace N;
+
+public class Widget
 {
     public int X { get; set; }
 
     public void Run()
     {
-        X = X + 1;
+        if (X > 0)
+        {
+            X--;
+        }
     }
 }
 ```
+:::
 
-### `csharp_new_line_before_open_brace = all`
-
-```ini
-csharp_new_line_before_open_brace = all
-```
-
-*No visible change on this snippet — the option affects other constructs.*
-
-### `csharp_new_line_before_open_brace = none`
-
-```ini
-csharp_new_line_before_open_brace = none
-```
-
-*No visible change on this snippet — the option affects other constructs.*
-
-### `csharp_new_line_before_open_brace = types`
-
-```ini
-csharp_new_line_before_open_brace = types
-```
-
-*No visible change on this snippet — the option affects other constructs.*
-
-### `csharp_new_line_before_open_brace = methods`
-
-```ini
-csharp_new_line_before_open_brace = methods
-```
-
-*No visible change on this snippet — the option affects other constructs.*
-
-### `csharp_new_line_before_open_brace = accessors`
-
-```ini
-csharp_new_line_before_open_brace = accessors
-```
-
-*No visible change on this snippet — the option affects other constructs.*
-
-### `csharp_new_line_before_open_brace = anonymous_types`
-
-```ini
-csharp_new_line_before_open_brace = anonymous_types
-```
-
-*No visible change on this snippet — the option affects other constructs.*
-
-### `csharp_new_line_before_open_brace = anonymous_methods`
-
-```ini
-csharp_new_line_before_open_brace = anonymous_methods
-```
-
-*No visible change on this snippet — the option affects other constructs.*
-
-### `csharp_new_line_before_open_brace = lambdas`
-
-```ini
-csharp_new_line_before_open_brace = lambdas
-```
-
-*No visible change on this snippet — the option affects other constructs.*
-
-### `csharp_new_line_before_open_brace = control_blocks`
-
-```ini
-csharp_new_line_before_open_brace = control_blocks
-```
-
-*No visible change on this snippet — the option affects other constructs.*
-
-### `csharp_new_line_before_open_brace = object_collection_array_initializers`
-
-```ini
-csharp_new_line_before_open_brace = object_collection_array_initializers
-```
-
-*No visible change on this snippet — the option affects other constructs.*
-
-### `csharp_new_line_before_open_brace = properties`
-
-```ini
-csharp_new_line_before_open_brace = properties
-```
-
-*No visible change on this snippet — the option affects other constructs.*
-
-### `csharp_new_line_before_open_brace = events`
-
-```ini
-csharp_new_line_before_open_brace = events
-```
-
-*No visible change on this snippet — the option affects other constructs.*
+::::
 

@@ -18,37 +18,37 @@ Put each member of an object initializer on its own line.
 
 **Default:** `false`
 
-## Examples
+## Example
 
-The snippet below is formatted with default options and then again with the option applied.
+::::{tab-set}
 
-**Snippet (formatted with defaults):**
-
+:::{tab-item} Before
 ```csharp
 namespace N;
 
+public class Point { public int X; public int Y; public int Z; }
+
 public class Widget
 {
-    public object Make()
-    {
-        return new Point { X = 1, Y = 2, Z = 3 };
-    }
+    public Point Make() => new Point { X = 1, Y = 2, Z = 3 };
 }
 ```
+:::
 
-### `csharp_new_line_before_members_in_object_initializers = true`
+:::{tab-item} After
+```csharp
+namespace N;
 
-```ini
-csharp_new_line_before_members_in_object_initializers = true
+public class Point { public int X; public int Y; public int Z; }
+
+public class Widget
+{
+    public Point Make() => new Point { X = 1, Y = 2, Z = 3 };
+}
 ```
+:::
 
-*No visible change on this snippet — the option affects other constructs.*
+::::
 
-### `csharp_new_line_before_members_in_object_initializers = false`
-
-```ini
-csharp_new_line_before_members_in_object_initializers = false
-```
-
-*No visible change on this snippet — the option affects other constructs.*
+*Curb recognises this key but does not yet reformat this construct — Before and After are identical.*
 

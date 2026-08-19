@@ -18,31 +18,51 @@ Add a trailing comma after the last element of a list that breaks across lines.
 
 **Default:** `false`
 
-## Examples
+## Example
 
-The snippet below is formatted with default options and then again with the option applied.
+::::{tab-set}
 
-**Snippet (formatted with defaults):**
-
+:::{tab-item} Before
 ```csharp
 namespace N;
 
 public class Widget
 {
-    public object Make()
+    public int[] Make()
     {
-        return new Point { X = 1, Y = 2, Z = 3 };
+        return new int[]
+        {
+            1,
+            2,
+            3
+        };
     }
 }
 ```
+:::
 
-### `csharp_trailing_comma_in_multiline_lists = true`
+:::{tab-item} After
+```csharp
+namespace N;
 
-```ini
-csharp_trailing_comma_in_multiline_lists = true
+public class Widget
+{
+    public int[] Make()
+    {
+        return new int[]
+        {
+            1,
+            2,
+            3,
+        };
+    }
+}
 ```
+:::
 
-*No visible change on this snippet — the option affects other constructs.*
+::::
+
+*Setting shown: `csharp_trailing_comma_in_multiline_lists = true`*
 
 ### `csharp_trailing_comma_in_multiline_lists = false`
 
@@ -50,5 +70,20 @@ csharp_trailing_comma_in_multiline_lists = true
 csharp_trailing_comma_in_multiline_lists = false
 ```
 
-*No visible change on this snippet — the option affects other constructs.*
+```csharp
+namespace N;
+
+public class Widget
+{
+    public int[] Make()
+    {
+        return new int[]
+        {
+            1,
+            2,
+            3
+        };
+    }
+}
+```
 

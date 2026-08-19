@@ -17,7 +17,7 @@ Chop an argument list carrying more than this many arguments.
 
 **Default:** `(not set)`
 
-## Examples
+## Example
 
 *This option accepts a freeform value. No canned example is generated.*
 

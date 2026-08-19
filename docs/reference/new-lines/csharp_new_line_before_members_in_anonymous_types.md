@@ -18,12 +18,11 @@ Put each member of an anonymous type on its own line.
 
 **Default:** `false`
 
-## Examples
+## Example
 
-The snippet below is formatted with default options and then again with the option applied.
+::::{tab-set}
 
-**Snippet (formatted with defaults):**
-
+:::{tab-item} Before
 ```csharp
 namespace N;
 
@@ -35,20 +34,23 @@ public class Widget
     }
 }
 ```
+:::
 
-### `csharp_new_line_before_members_in_anonymous_types = true`
+:::{tab-item} After
+```csharp
+namespace N;
 
-```ini
-csharp_new_line_before_members_in_anonymous_types = true
+public class Widget
+{
+    public object Describe()
+    {
+        return new { Name = "curb", Version = 1, Active = true };
+    }
+}
 ```
+:::
 
-*No visible change on this snippet — the option affects other constructs.*
+::::
 
-### `csharp_new_line_before_members_in_anonymous_types = false`
-
-```ini
-csharp_new_line_before_members_in_anonymous_types = false
-```
-
-*No visible change on this snippet — the option affects other constructs.*
+*Curb recognises this key but does not yet reformat this construct — Before and After are identical.*
 

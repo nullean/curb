@@ -18,32 +18,45 @@ Allow { get; set; } to stay on the property's line.
 
 **Default:** `true`
 
-## Examples
+## Example
 
-The snippet below is formatted with default options and then again with the option applied.
+::::{tab-set}
 
-**Snippet (formatted with defaults):**
-
+:::{tab-item} Before
 ```csharp
 namespace N;
 
 public class Widget
 {
-    private int _value;
+    public int X
+    {
+        get;
+        set;
+    }
 
-    public int Value { get { return _value; } set { _value = value; } }
-
-    public string Name { get { return "widget"; } }
+    public string Name
+    {
+        get;
+        set;
+    }
 }
 ```
+:::
 
-### `csharp_place_simple_accessorholder_on_single_line = true`
+:::{tab-item} After
+```csharp
+namespace N;
 
-```ini
-csharp_place_simple_accessorholder_on_single_line = true
+public class Widget
+{
+    public int X { get; set; }
+
+    public string Name { get; set; }
+}
 ```
+:::
 
-*No visible change on this snippet — the option affects other constructs.*
+::::
 
 ### `csharp_place_simple_accessorholder_on_single_line = false`
 
@@ -56,17 +69,16 @@ namespace N;
 
 public class Widget
 {
-    private int _value;
-
-    public int Value
+    public int X
     {
-        get { return _value; }
-        set { _value = value; }
+        get;
+        set;
     }
 
     public string Name
     {
-        get { return "widget"; }
+        get;
+        set;
     }
 }
 ```

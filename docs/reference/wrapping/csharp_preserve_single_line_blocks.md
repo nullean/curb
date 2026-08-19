@@ -18,12 +18,11 @@ Allow a block the author wrote on one line to stay on one line.
 
 **Default:** `true`
 
-## Examples
+## Example
 
-The snippet below is formatted with default options and then again with the option applied.
+::::{tab-set}
 
-**Snippet (formatted with defaults):**
-
+:::{tab-item} Before
 ```csharp
 namespace N;
 
@@ -34,21 +33,9 @@ public class Widget
     public void Empty() { }
 }
 ```
+:::
 
-### `csharp_preserve_single_line_blocks = true`
-
-```ini
-csharp_preserve_single_line_blocks = true
-```
-
-*No visible change on this snippet — the option affects other constructs.*
-
-### `csharp_preserve_single_line_blocks = false`
-
-```ini
-csharp_preserve_single_line_blocks = false
-```
-
+:::{tab-item} After
 ```csharp
 namespace N;
 
@@ -65,6 +52,28 @@ public class Widget
     public void Empty()
     {
     }
+}
+```
+:::
+
+::::
+
+*Setting shown: `csharp_preserve_single_line_blocks = false`*
+
+### `csharp_preserve_single_line_blocks = true`
+
+```ini
+csharp_preserve_single_line_blocks = true
+```
+
+```csharp
+namespace N;
+
+public class Widget
+{
+    public int X { get; set; }
+    public string Name { get; set; } = "";
+    public void Empty() { }
 }
 ```
 

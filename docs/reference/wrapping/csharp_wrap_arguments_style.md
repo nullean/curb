@@ -18,7 +18,7 @@ chop_always gives every argument its own line. Only honoured in deterministic mo
 
 **Default:** `chop_if_long`
 
-## Examples
+## Example
 
 The snippet below is formatted with default options and then again with the option applied.
 

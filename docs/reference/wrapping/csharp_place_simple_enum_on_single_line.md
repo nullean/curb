@@ -18,32 +18,11 @@ Allow a short enum body to stay on one line.
 
 **Default:** `true`
 
-## Examples
+## Example
 
-The snippet below is formatted with default options and then again with the option applied.
+::::{tab-set}
 
-**Snippet (formatted with defaults):**
-
-```csharp
-namespace N;
-
-public enum Status { Active, Inactive, Pending }
-```
-
-### `csharp_place_simple_enum_on_single_line = true`
-
-```ini
-csharp_place_simple_enum_on_single_line = true
-```
-
-*No visible change on this snippet — the option affects other constructs.*
-
-### `csharp_place_simple_enum_on_single_line = false`
-
-```ini
-csharp_place_simple_enum_on_single_line = false
-```
-
+:::{tab-item} Before
 ```csharp
 namespace N;
 
@@ -51,7 +30,25 @@ public enum Status
 {
     Active,
     Inactive,
-    Pending
+    Pending,
 }
 ```
+:::
+
+:::{tab-item} After
+```csharp
+namespace N;
+
+public enum Status
+{
+    Active,
+    Inactive,
+    Pending,
+}
+```
+:::
+
+::::
+
+*Curb recognises this key but does not yet reformat this construct — Before and After are identical.*
 

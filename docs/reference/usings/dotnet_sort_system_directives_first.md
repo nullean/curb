@@ -18,37 +18,39 @@ Put System.* usings before all others.
 
 **Default:** `false`
 
-## Examples
+## Example
 
-The snippet below is formatted with default options and then again with the option applied.
+::::{tab-set}
 
-**Snippet (formatted with defaults):**
-
+:::{tab-item} Before
 ```csharp
-using System;
 using Foo.Bar;
+using System;
+using Baz.Qux;
 using System.Collections.Generic;
 
 namespace N;
 
 public class Widget { }
 ```
+:::
 
-### `dotnet_sort_system_directives_first = true`
-
-```ini
-dotnet_sort_system_directives_first = true
-```
-
+:::{tab-item} After
 ```csharp
 using System;
 using System.Collections.Generic;
+using Baz.Qux;
 using Foo.Bar;
 
 namespace N;
 
 public class Widget { }
 ```
+:::
+
+::::
+
+*Setting shown: `dotnet_sort_system_directives_first = true`*
 
 ### `dotnet_sort_system_directives_first = false`
 
@@ -56,5 +58,14 @@ public class Widget { }
 dotnet_sort_system_directives_first = false
 ```
 
-*No visible change on this snippet — the option affects other constructs.*
+```csharp
+using Foo.Bar;
+using System;
+using Baz.Qux;
+using System.Collections.Generic;
+
+namespace N;
+
+public class Widget { }
+```
 

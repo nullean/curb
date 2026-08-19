@@ -18,7 +18,7 @@ Insert a // comment header at the top of files missing one. IDE0073.
 
 **Default:** `(not set)`
 
-## Examples
+## Example
 
 The snippet below is formatted with default options and then again with the option applied.
 

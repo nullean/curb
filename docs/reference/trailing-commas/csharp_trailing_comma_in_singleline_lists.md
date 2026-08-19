@@ -18,35 +18,47 @@ Add a trailing comma after the last element even when the list is on one line.
 
 **Default:** `false`
 
-## Examples
+## Example
 
-The snippet below is formatted with default options and then again with the option applied.
+::::{tab-set}
 
-**Snippet (formatted with defaults):**
-
+:::{tab-item} Before
 ```csharp
 namespace N;
 
 public class Widget
 {
-    public void Register(string name, int value, bool active, string tag)
-    {
-    }
-
     public void Run()
     {
+        var list = new List<int> { 1, 2, 3 };
         Register("curb", 42, true, "formatter");
     }
+
+    private void Register(string a, int b, bool c, string d) { }
 }
 ```
+:::
 
-### `csharp_trailing_comma_in_singleline_lists = true`
+:::{tab-item} After
+```csharp
+namespace N;
 
-```ini
-csharp_trailing_comma_in_singleline_lists = true
+public class Widget
+{
+    public void Run()
+    {
+        var list = new List<int> { 1, 2, 3, };
+        Register("curb", 42, true, "formatter");
+    }
+
+    private void Register(string a, int b, bool c, string d) { }
+}
 ```
+:::
 
-*No visible change on this snippet — the option affects other constructs.*
+::::
+
+*Setting shown: `csharp_trailing_comma_in_singleline_lists = true`*
 
 ### `csharp_trailing_comma_in_singleline_lists = false`
 
@@ -54,5 +66,18 @@ csharp_trailing_comma_in_singleline_lists = true
 csharp_trailing_comma_in_singleline_lists = false
 ```
 
-*No visible change on this snippet — the option affects other constructs.*
+```csharp
+namespace N;
+
+public class Widget
+{
+    public void Run()
+    {
+        var list = new List<int> { 1, 2, 3 };
+        Register("curb", 42, true, "formatter");
+    }
+
+    private void Register(string a, int b, bool c, string d) { }
+}
+```
 

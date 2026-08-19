@@ -18,7 +18,7 @@ Put a where clause on its own line.
 
 **Default:** `false`
 
-## Examples
+## Example
 
 The snippet below is formatted with default options and then again with the option applied.
 

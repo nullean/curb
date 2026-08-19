@@ -18,33 +18,37 @@ Space after the colon in a base list.
 
 **Default:** `true`
 
-## Examples
+## Example
 
-The snippet below is formatted with default options and then again with the option applied.
+::::{tab-set}
 
-**Snippet (formatted with defaults):**
-
+:::{tab-item} Before
 ```csharp
 namespace N;
 
-public class Widget : Base, IWidget
-{
-    public int X { get; set; }
+public interface IWidget { }
 
-    public void Run()
-    {
-        X = X + 1;
-    }
+public class Widget :IWidget
+{
+    public void Run() { }
 }
 ```
+:::
 
-### `csharp_space_after_colon_in_inheritance_clause = true`
+:::{tab-item} After
+```csharp
+namespace N;
 
-```ini
-csharp_space_after_colon_in_inheritance_clause = true
+public interface IWidget { }
+
+public class Widget : IWidget
+{
+    public void Run() { }
+}
 ```
+:::
 
-*No visible change on this snippet — the option affects other constructs.*
+::::
 
 ### `csharp_space_after_colon_in_inheritance_clause = false`
 
@@ -55,14 +59,11 @@ csharp_space_after_colon_in_inheritance_clause = false
 ```csharp
 namespace N;
 
-public class Widget :Base, IWidget
-{
-    public int X { get; set; }
+public interface IWidget { }
 
-    public void Run()
-    {
-        X = X + 1;
-    }
+public class Widget :IWidget
+{
+    public void Run() { }
 }
 ```
 

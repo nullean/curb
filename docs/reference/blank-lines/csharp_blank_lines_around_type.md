@@ -17,10 +17,39 @@ Blank lines before and after each type declaration.
 
 **Default:** `0`
 
-## Examples
+## Example
 
-*This option accepts a freeform value. No canned example is generated.*
+::::{tab-set}
 
-```ini
-csharp_blank_lines_around_type = <value>
+:::{tab-item} Before
+```csharp
+namespace N;
+
+public class Outer
+{
+    public class Inner1 { }
+    public class Inner2 { }
+    public class Inner3 { }
+}
 ```
+:::
+
+:::{tab-item} After
+```csharp
+namespace N;
+
+public class Outer
+{
+    public class Inner1 { }
+
+    public class Inner2 { }
+
+    public class Inner3 { }
+}
+```
+:::
+
+::::
+
+*Setting shown: `csharp_blank_lines_around_type = 1`*
+

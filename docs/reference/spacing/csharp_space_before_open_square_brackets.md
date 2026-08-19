@@ -18,24 +18,43 @@ Space before an opening square bracket.
 
 **Default:** `false`
 
-## Examples
+## Example
 
-The snippet below is formatted with default options and then again with the option applied.
+::::{tab-set}
 
-**Snippet (formatted with defaults):**
-
+:::{tab-item} Before
 ```csharp
 namespace N;
 
 public class Widget
 {
-    private int[] _data = new int[10];
-
-    public int this[int index] { get { return _data[index]; } set { _data[index] = value; } }
-
-    public int First => _data[0];
+    public int Get()
+    {
+        int [] arr = new int [10];
+        arr [0] = 1;
+        return arr [0];
+    }
 }
 ```
+:::
+
+:::{tab-item} After
+```csharp
+namespace N;
+
+public class Widget
+{
+    public int Get()
+    {
+        int[] arr = new int[10];
+        arr[0] = 1;
+        return arr[0];
+    }
+}
+```
+:::
+
+::::
 
 ### `csharp_space_before_open_square_brackets = true`
 
@@ -48,19 +67,12 @@ namespace N;
 
 public class Widget
 {
-    private int [] _data = new int [10];
-
-    public int this [int index] { get { return _data [index]; } set { _data [index] = value; } }
-
-    public int First => _data [0];
+    public int Get()
+    {
+        int [] arr = new int [10];
+        arr [0] = 1;
+        return arr [0];
+    }
 }
 ```
-
-### `csharp_space_before_open_square_brackets = false`
-
-```ini
-csharp_space_before_open_square_brackets = false
-```
-
-*No visible change on this snippet — the option affects other constructs.*
 

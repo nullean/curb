@@ -18,7 +18,7 @@ When a chain breaks, leave the dot at the end of the preceding line.
 
 **Default:** `false`
 
-## Examples
+## Example
 
 The snippet below is formatted with default options and then again with the option applied.
 

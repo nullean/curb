@@ -18,7 +18,7 @@ Put a base list on its own line, colon first.
 
 **Default:** `false`
 
-## Examples
+## Example
 
 The snippet below is formatted with default options and then again with the option applied.
 

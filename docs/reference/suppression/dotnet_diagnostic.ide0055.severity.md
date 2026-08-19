@@ -21,7 +21,7 @@ Set this to none to opt a file out of formatting.
 
 **Default:** `warning`
 
-## Examples
+## Example
 
 The snippet below is formatted with default options and then again with the option applied.
 

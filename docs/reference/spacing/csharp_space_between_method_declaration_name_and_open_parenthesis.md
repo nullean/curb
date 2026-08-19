@@ -18,41 +18,41 @@ Space between the method name and its opening parenthesis.
 
 **Default:** `false`
 
-## Examples
+## Example
 
-The snippet below is formatted with default options and then again with the option applied.
+::::{tab-set}
 
-**Snippet (formatted with defaults):**
-
+:::{tab-item} Before
 ```csharp
 namespace N;
 
 public class Widget
 {
-    public void Register(string name, int value, bool active, string tag)
+    public void Register (string name, int value)
     {
-        Console.WriteLine(name);
+        Console.WriteLine (name);
     }
 }
 ```
+:::
 
-### `csharp_space_between_method_declaration_name_and_open_parenthesis = true`
-
-```ini
-csharp_space_between_method_declaration_name_and_open_parenthesis = true
-```
-
+:::{tab-item} After
 ```csharp
 namespace N;
 
 public class Widget
 {
-    public void Register (string name, int value, bool active, string tag)
+    public void Register (string name, int value)
     {
         Console.WriteLine(name);
     }
 }
 ```
+:::
+
+::::
+
+*Setting shown: `csharp_space_between_method_declaration_name_and_open_parenthesis = true`*
 
 ### `csharp_space_between_method_declaration_name_and_open_parenthesis = false`
 
@@ -60,5 +60,15 @@ public class Widget
 csharp_space_between_method_declaration_name_and_open_parenthesis = false
 ```
 
-*No visible change on this snippet — the option affects other constructs.*
+```csharp
+namespace N;
+
+public class Widget
+{
+    public void Register(string name, int value)
+    {
+        Console.WriteLine(name);
+    }
+}
+```
 

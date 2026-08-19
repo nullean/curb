@@ -18,12 +18,36 @@ Indent statements inside a case label.
 
 **Default:** `true`
 
-## Examples
+## Example
 
-The snippet below is formatted with default options and then again with the option applied.
+::::{tab-set}
 
-**Snippet (formatted with defaults):**
+:::{tab-item} Before
+```csharp
+namespace N;
 
+public class Widget
+{
+    public string Name(int code)
+    {
+        switch (code)
+        {
+            case 1:
+            return "one";
+            case 2:
+            {
+            var msg = "two";
+            return msg;
+            }
+            default:
+            return "other";
+        }
+    }
+}
+```
+:::
+
+:::{tab-item} After
 ```csharp
 namespace N;
 
@@ -46,14 +70,9 @@ public class Widget
     }
 }
 ```
+:::
 
-### `csharp_indent_case_contents = true`
-
-```ini
-csharp_indent_case_contents = true
-```
-
-*No visible change on this snippet — the option affects other constructs.*
+::::
 
 ### `csharp_indent_case_contents = false`
 

@@ -17,10 +17,55 @@ Maximum consecutive blank lines between statements.
 
 **Default:** `1`
 
-## Examples
+## Example
 
-*This option accepts a freeform value. No canned example is generated.*
+::::{tab-set}
 
-```ini
-csharp_keep_blank_lines_in_code = <value>
+:::{tab-item} Before
+```csharp
+namespace N;
+
+public class Widget
+{
+    public void Run()
+    {
+        int a = 1;
+
+
+
+        int b = 2;
+
+
+
+        Console.WriteLine(a + b);
+    }
+}
 ```
+:::
+
+:::{tab-item} After
+```csharp
+namespace N;
+
+public class Widget
+{
+    public void Run()
+    {
+        int a = 1;
+
+
+
+        int b = 2;
+
+
+
+        Console.WriteLine(a + b);
+    }
+}
+```
+:::
+
+::::
+
+*Curb recognises this key but does not yet reformat this construct — Before and After are identical.*
+

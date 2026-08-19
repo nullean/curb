@@ -18,49 +18,41 @@ Space before a comma.
 
 **Default:** `false`
 
-## Examples
+## Example
 
-The snippet below is formatted with default options and then again with the option applied.
+::::{tab-set}
 
-**Snippet (formatted with defaults):**
-
+:::{tab-item} Before
 ```csharp
 namespace N;
 
 public class Widget
 {
-    public void Register(string name, int value, bool active, string tag)
+    public void Register(string name ,int value ,bool active)
     {
-    }
-
-    public void Run()
-    {
-        Register("curb", 42, true, "formatter");
+        Console.WriteLine(name ,value ,active);
     }
 }
 ```
+:::
 
-### `csharp_space_before_comma = true`
-
-```ini
-csharp_space_before_comma = true
-```
-
+:::{tab-item} After
 ```csharp
 namespace N;
 
 public class Widget
 {
-    public void Register(string name , int value , bool active , string tag)
+    public void Register(string name , int value , bool active)
     {
-    }
-
-    public void Run()
-    {
-        Register("curb" , 42 , true , "formatter");
+        Console.WriteLine(name , value , active);
     }
 }
 ```
+:::
+
+::::
+
+*Setting shown: `csharp_space_before_comma = true`*
 
 ### `csharp_space_before_comma = false`
 
@@ -68,5 +60,15 @@ public class Widget
 csharp_space_before_comma = false
 ```
 
-*No visible change on this snippet — the option affects other constructs.*
+```csharp
+namespace N;
+
+public class Widget
+{
+    public void Register(string name, int value, bool active)
+    {
+        Console.WriteLine(name, value, active);
+    }
+}
+```
 

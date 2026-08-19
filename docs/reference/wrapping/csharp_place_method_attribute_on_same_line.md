@@ -18,7 +18,7 @@ Where a method's attribute section goes. if_owner_is_single_line joins it when t
 
 **Default:** `own_line`
 
-## Examples
+## Example
 
 The snippet below is formatted with default options and then again with the option applied.
 

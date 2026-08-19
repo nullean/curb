@@ -18,12 +18,31 @@ Put else on its own line rather than joining it to the preceding brace.
 
 **Default:** `true`
 
-## Examples
+## Example
 
-The snippet below is formatted with default options and then again with the option applied.
+::::{tab-set}
 
-**Snippet (formatted with defaults):**
+:::{tab-item} Before
+```csharp
+namespace N;
 
+public class Widget
+{
+    public string Classify(int n)
+    {
+        if (n > 0) {
+            return "positive";
+        } else if (n < 0) {
+            return "negative";
+        } else {
+            return "zero";
+        }
+    }
+}
+```
+:::
+
+:::{tab-item} After
 ```csharp
 namespace N;
 
@@ -46,14 +65,9 @@ public class Widget
     }
 }
 ```
+:::
 
-### `csharp_new_line_before_else = true`
-
-```ini
-csharp_new_line_before_else = true
-```
-
-*No visible change on this snippet — the option affects other constructs.*
+::::
 
 ### `csharp_new_line_before_else = false`
 

@@ -17,10 +17,57 @@ Blank lines before and after each method or constructor. 0 means leave the autho
 
 **Default:** `0`
 
-## Examples
+## Example
 
-*This option accepts a freeform value. No canned example is generated.*
+::::{tab-set}
 
-```ini
-csharp_blank_lines_around_invocable = <value>
+:::{tab-item} Before
+```csharp
+namespace N;
+
+public class Widget
+{
+    public void Run()
+    {
+        Console.WriteLine("run");
+    }
+    public void Stop()
+    {
+        Console.WriteLine("stop");
+    }
+    public void Reset()
+    {
+        Console.WriteLine("reset");
+    }
+}
 ```
+:::
+
+:::{tab-item} After
+```csharp
+namespace N;
+
+public class Widget
+{
+    public void Run()
+    {
+        Console.WriteLine("run");
+    }
+
+    public void Stop()
+    {
+        Console.WriteLine("stop");
+    }
+
+    public void Reset()
+    {
+        Console.WriteLine("reset");
+    }
+}
+```
+:::
+
+::::
+
+*Setting shown: `csharp_blank_lines_around_invocable = 1`*
+

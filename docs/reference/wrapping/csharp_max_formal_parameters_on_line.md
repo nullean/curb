@@ -17,7 +17,7 @@ Chop a parameter list carrying more than this many parameters, regardless of wid
 
 **Default:** `(not set)`
 
-## Examples
+## Example
 
 *This option accepts a freeform value. No canned example is generated.*
 

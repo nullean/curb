@@ -19,7 +19,7 @@ Line ending to write. auto matches whatever the source uses.
 
 **Default:** `auto`
 
-## Examples
+## Example
 
 The snippet below is formatted with default options and then again with the option applied.
 

@@ -17,10 +17,31 @@ Blank lines before and after a namespace declaration.
 
 **Default:** `0`
 
-## Examples
+## Example
 
-*This option accepts a freeform value. No canned example is generated.*
+::::{tab-set}
 
-```ini
-csharp_blank_lines_around_namespace = <value>
+:::{tab-item} Before
+```csharp
+using System;
+
+namespace N;
+
+public class Widget { }
 ```
+:::
+
+:::{tab-item} After
+```csharp
+using System;
+
+namespace N;
+
+public class Widget { }
+```
+:::
+
+::::
+
+*Curb recognises this key but does not yet reformat this construct — Before and After are identical.*
+

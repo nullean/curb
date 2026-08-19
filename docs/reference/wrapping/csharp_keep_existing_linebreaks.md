@@ -18,7 +18,7 @@ Preservation mode. Defaults to true when max_line_length is off.
 
 **Default:** `(derived from max_line_length)`
 
-## Examples
+## Example
 
 The snippet below is formatted with default options and then again with the option applied.
 

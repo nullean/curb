@@ -17,10 +17,49 @@ Maximum consecutive blank lines between members.
 
 **Default:** `1`
 
-## Examples
+## Example
 
-*This option accepts a freeform value. No canned example is generated.*
+::::{tab-set}
 
-```ini
-csharp_keep_blank_lines_in_declarations = <value>
+:::{tab-item} Before
+```csharp
+namespace N;
+
+public class Widget
+{
+    private int _x;
+
+
+
+    private string _name = "";
+
+
+
+    public int X { get; set; }
+}
 ```
+:::
+
+:::{tab-item} After
+```csharp
+namespace N;
+
+public class Widget
+{
+    private int _x;
+
+
+
+    private string _name = "";
+
+
+
+    public int X { get; set; }
+}
+```
+:::
+
+::::
+
+*Curb recognises this key but does not yet reformat this construct — Before and After are identical.*
+

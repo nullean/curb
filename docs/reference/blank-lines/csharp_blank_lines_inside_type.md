@@ -17,10 +17,36 @@ Blank lines below the opening brace and above the closing brace of a type.
 
 **Default:** `0`
 
-## Examples
+## Example
 
-*This option accepts a freeform value. No canned example is generated.*
+::::{tab-set}
 
-```ini
-csharp_blank_lines_inside_type = <value>
+:::{tab-item} Before
+```csharp
+namespace N;
+
+public class Widget
+{
+    public int X { get; set; }
+    public void Run() { }
+}
 ```
+:::
+
+:::{tab-item} After
+```csharp
+namespace N;
+
+public class Widget
+{
+
+    public int X { get; set; }
+    public void Run() { }
+}
+```
+:::
+
+::::
+
+*Setting shown: `csharp_blank_lines_inside_type = 1`*
+

@@ -18,12 +18,27 @@ Extra spaces in declaration statements. false normalises; ignore leaves them alo
 
 **Default:** `false`
 
-## Examples
+## Example
 
-The snippet below is formatted with default options and then again with the option applied.
+::::{tab-set}
 
-**Snippet (formatted with defaults):**
+:::{tab-item} Before
+```csharp
+namespace N;
 
+public class Widget
+{
+    public void Run()
+    {
+        int  x=1;
+        string  name="curb";
+        bool  active=true;
+    }
+}
+```
+:::
+
+:::{tab-item} After
 ```csharp
 namespace N;
 
@@ -37,14 +52,9 @@ public class Widget
     }
 }
 ```
+:::
 
-### `csharp_space_around_declaration_statements = false`
-
-```ini
-csharp_space_around_declaration_statements = false
-```
-
-*No visible change on this snippet — the option affects other constructs.*
+::::
 
 ### `csharp_space_around_declaration_statements = ignore`
 
@@ -52,5 +62,17 @@ csharp_space_around_declaration_statements = false
 csharp_space_around_declaration_statements = ignore
 ```
 
-*No visible change on this snippet — the option affects other constructs.*
+```csharp
+namespace N;
+
+public class Widget
+{
+    public void Run()
+    {
+        int  x=1;
+        string  name="curb";
+        bool  active=true;
+    }
+}
+```
 

@@ -18,7 +18,7 @@ When a chain breaks, break before the first call too, leaving the receiver on it
 
 **Default:** `(not set)`
 
-## Examples
+## Example
 
 The snippet below is formatted with default options and then again with the option applied.
 

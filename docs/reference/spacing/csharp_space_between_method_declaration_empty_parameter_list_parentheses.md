@@ -18,23 +18,39 @@ Space inside an empty parameter list ().
 
 **Default:** `false`
 
-## Examples
+## Example
 
-The snippet below is formatted with default options and then again with the option applied.
+::::{tab-set}
 
-**Snippet (formatted with defaults):**
-
+:::{tab-item} Before
 ```csharp
 namespace N;
 
 public class Widget
 {
-    public void Register(string name, int value, bool active, string tag)
+    public void Reset( )
     {
-        Console.WriteLine(name);
+        Console.WriteLine("reset");
     }
 }
 ```
+:::
+
+:::{tab-item} After
+```csharp
+namespace N;
+
+public class Widget
+{
+    public void Reset()
+    {
+        Console.WriteLine("reset");
+    }
+}
+```
+:::
+
+::::
 
 ### `csharp_space_between_method_declaration_empty_parameter_list_parentheses = true`
 
@@ -42,13 +58,15 @@ public class Widget
 csharp_space_between_method_declaration_empty_parameter_list_parentheses = true
 ```
 
-*No visible change on this snippet — the option affects other constructs.*
+```csharp
+namespace N;
 
-### `csharp_space_between_method_declaration_empty_parameter_list_parentheses = false`
-
-```ini
-csharp_space_between_method_declaration_empty_parameter_list_parentheses = false
+public class Widget
+{
+    public void Reset( )
+    {
+        Console.WriteLine("reset");
+    }
+}
 ```
-
-*No visible change on this snippet — the option affects other constructs.*
 

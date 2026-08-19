@@ -20,12 +20,29 @@ Space just inside parentheses for specific constructs.
 
 **Default:** `false`
 
-## Examples
+## Example
 
-The snippet below is formatted with default options and then again with the option applied.
+::::{tab-set}
 
-**Snippet (formatted with defaults):**
+:::{tab-item} Before
+```csharp
+namespace N;
 
+public class Widget
+{
+    public string Classify(int n)
+    {
+        if ( n > 0 )
+            return "positive";
+        else if ( n < 0 )
+            return "negative";
+        return "zero";
+    }
+}
+```
+:::
+
+:::{tab-item} After
 ```csharp
 namespace N;
 
@@ -34,28 +51,16 @@ public class Widget
     public string Classify(int n)
     {
         if (n > 0)
-        {
             return "positive";
-        }
         else if (n < 0)
-        {
             return "negative";
-        }
-        else
-        {
-            return "zero";
-        }
+        return "zero";
     }
 }
 ```
+:::
 
-### `csharp_space_between_parentheses = false`
-
-```ini
-csharp_space_between_parentheses = false
-```
-
-*No visible change on this snippet — the option affects other constructs.*
+::::
 
 ### `csharp_space_between_parentheses = control_flow_statements`
 
@@ -71,34 +76,11 @@ public class Widget
     public string Classify(int n)
     {
         if ( n > 0 )
-        {
             return "positive";
-        }
         else if ( n < 0 )
-        {
             return "negative";
-        }
-        else
-        {
-            return "zero";
-        }
+        return "zero";
     }
 }
 ```
-
-### `csharp_space_between_parentheses = type_casts`
-
-```ini
-csharp_space_between_parentheses = type_casts
-```
-
-*No visible change on this snippet — the option affects other constructs.*
-
-### `csharp_space_between_parentheses = expressions`
-
-```ini
-csharp_space_between_parentheses = expressions
-```
-
-*No visible change on this snippet — the option affects other constructs.*
 

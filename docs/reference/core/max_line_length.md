@@ -18,7 +18,7 @@ Column target for reflow. off disables reflow entirely and selects preservation 
 
 **Default:** `off`
 
-## Examples
+## Example
 
 The snippet below is formatted with default options and then again with the option applied.
 

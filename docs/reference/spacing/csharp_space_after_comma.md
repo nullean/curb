@@ -18,35 +18,39 @@ Space after a comma.
 
 **Default:** `true`
 
-## Examples
+## Example
 
-The snippet below is formatted with default options and then again with the option applied.
+::::{tab-set}
 
-**Snippet (formatted with defaults):**
-
+:::{tab-item} Before
 ```csharp
 namespace N;
 
 public class Widget
 {
-    public void Register(string name, int value, bool active, string tag)
+    public void Register(string name,int value,bool active)
     {
-    }
-
-    public void Run()
-    {
-        Register("curb", 42, true, "formatter");
+        Console.WriteLine(name,value,active);
     }
 }
 ```
+:::
 
-### `csharp_space_after_comma = true`
+:::{tab-item} After
+```csharp
+namespace N;
 
-```ini
-csharp_space_after_comma = true
+public class Widget
+{
+    public void Register(string name, int value, bool active)
+    {
+        Console.WriteLine(name, value, active);
+    }
+}
 ```
+:::
 
-*No visible change on this snippet — the option affects other constructs.*
+::::
 
 ### `csharp_space_after_comma = false`
 
@@ -59,13 +63,9 @@ namespace N;
 
 public class Widget
 {
-    public void Register(string name,int value,bool active,string tag)
+    public void Register(string name,int value,bool active)
     {
-    }
-
-    public void Run()
-    {
-        Register("curb",42,true,"formatter");
+        Console.WriteLine(name,value,active);
     }
 }
 ```

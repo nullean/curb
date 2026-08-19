@@ -18,35 +18,37 @@ Separate groups of usings by first namespace segment with a blank line.
 
 **Default:** `false`
 
-## Examples
+## Example
 
-The snippet below is formatted with default options and then again with the option applied.
+::::{tab-set}
 
-**Snippet (formatted with defaults):**
-
+:::{tab-item} Before
 ```csharp
 using System;
-using Foo.Bar;
 using System.Collections.Generic;
+using Foo.Bar;
+using Baz.Qux;
 
 namespace N;
 
 public class Widget { }
 ```
+:::
 
-### `dotnet_separate_import_directive_groups = true`
+:::{tab-item} After
+```csharp
+using System;
+using System.Collections.Generic;
+using Foo.Bar;
+using Baz.Qux;
 
-```ini
-dotnet_separate_import_directive_groups = true
+namespace N;
+
+public class Widget { }
 ```
+:::
 
-*No visible change on this snippet — the option affects other constructs.*
+::::
 
-### `dotnet_separate_import_directive_groups = false`
-
-```ini
-dotnet_separate_import_directive_groups = false
-```
-
-*No visible change on this snippet — the option affects other constructs.*
+*Curb recognises this key but does not yet reformat this construct — Before and After are identical.*
 

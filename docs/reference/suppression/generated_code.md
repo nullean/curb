@@ -18,7 +18,7 @@ Skip this file entirely. Curb never formats files marked as generated.
 
 **Default:** `false`
 
-## Examples
+## Example
 
 The snippet below is formatted with default options and then again with the option applied.
 

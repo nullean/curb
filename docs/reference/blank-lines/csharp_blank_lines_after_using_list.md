@@ -17,10 +17,29 @@ Blank lines below the last using directive.
 
 **Default:** `0`
 
-## Examples
+## Example
 
-*This option accepts a freeform value. No canned example is generated.*
+::::{tab-set}
 
-```ini
-csharp_blank_lines_after_using_list = <value>
+:::{tab-item} Before
+```csharp
+using System;
+namespace N;
+
+public class Widget { }
 ```
+:::
+
+:::{tab-item} After
+```csharp
+using System;
+namespace N;
+
+public class Widget { }
+```
+:::
+
+::::
+
+*Curb recognises this key but does not yet reformat this construct — Before and After are identical.*
+

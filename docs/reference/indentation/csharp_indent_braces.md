@@ -18,45 +18,41 @@ Indent the brace tokens themselves an extra level.
 
 **Default:** `false`
 
-## Examples
+## Example
 
-The snippet below is formatted with default options and then again with the option applied.
+::::{tab-set}
 
-**Snippet (formatted with defaults):**
-
+:::{tab-item} Before
 ```csharp
 namespace N;
 
 public class Widget
 {
-    public int Value { get; set; }
-
-    public int Double()
+    public void Run()
     {
-        return Value * 2;
+        Console.WriteLine("hello");
     }
 }
 ```
+:::
 
-### `csharp_indent_braces = true`
-
-```ini
-csharp_indent_braces = true
-```
-
+:::{tab-item} After
 ```csharp
 namespace N;
 
 public class Widget
     {
-    public int Value { get; set; }
-
-    public int Double()
+    public void Run()
         {
-        return Value * 2;
+        Console.WriteLine("hello");
         }
     }
 ```
+:::
+
+::::
+
+*Setting shown: `csharp_indent_braces = true`*
 
 ### `csharp_indent_braces = false`
 
@@ -64,5 +60,15 @@ public class Widget
 csharp_indent_braces = false
 ```
 
-*No visible change on this snippet — the option affects other constructs.*
+```csharp
+namespace N;
+
+public class Widget
+{
+    public void Run()
+    {
+        Console.WriteLine("hello");
+    }
+}
+```
 

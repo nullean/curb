@@ -18,12 +18,11 @@ Space before a dot.
 
 **Default:** `false`
 
-## Examples
+## Example
 
-The snippet below is formatted with default options and then again with the option applied.
+::::{tab-set}
 
-**Snippet (formatted with defaults):**
-
+:::{tab-item} Before
 ```csharp
 using System.Text;
 
@@ -33,24 +32,29 @@ public class Widget
 {
     public string Build()
     {
-        return new StringBuilder().Append("Hello").Append(", ").Append("World").Append("!").ToString();
+        return new StringBuilder() .Append("Hello") .Append(", ") .ToString();
     }
 }
 ```
+:::
 
-### `csharp_space_before_dot = true`
+:::{tab-item} After
+```csharp
+using System.Text;
 
-```ini
-csharp_space_before_dot = true
+namespace N;
+
+public class Widget
+{
+    public string Build()
+    {
+        return new StringBuilder().Append("Hello").Append(", ").ToString();
+    }
+}
 ```
+:::
 
-*No visible change on this snippet — the option affects other constructs.*
+::::
 
-### `csharp_space_before_dot = false`
-
-```ini
-csharp_space_before_dot = false
-```
-
-*No visible change on this snippet — the option affects other constructs.*
+*Setting shown: `csharp_space_before_dot = true`*
 

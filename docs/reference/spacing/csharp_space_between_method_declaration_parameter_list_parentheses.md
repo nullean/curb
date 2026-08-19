@@ -18,23 +18,39 @@ Space just inside the parentheses of a parameter list.
 
 **Default:** `false`
 
-## Examples
+## Example
 
-The snippet below is formatted with default options and then again with the option applied.
+::::{tab-set}
 
-**Snippet (formatted with defaults):**
-
+:::{tab-item} Before
 ```csharp
 namespace N;
 
 public class Widget
 {
-    public void Register(string name, int value, bool active, string tag)
+    public void Register( string name, int value, bool active )
     {
         Console.WriteLine(name);
     }
 }
 ```
+:::
+
+:::{tab-item} After
+```csharp
+namespace N;
+
+public class Widget
+{
+    public void Register(string name, int value, bool active)
+    {
+        Console.WriteLine(name);
+    }
+}
+```
+:::
+
+::::
 
 ### `csharp_space_between_method_declaration_parameter_list_parentheses = true`
 
@@ -47,18 +63,10 @@ namespace N;
 
 public class Widget
 {
-    public void Register( string name, int value, bool active, string tag )
+    public void Register( string name, int value, bool active )
     {
         Console.WriteLine(name);
     }
 }
 ```
-
-### `csharp_space_between_method_declaration_parameter_list_parentheses = false`
-
-```ini
-csharp_space_between_method_declaration_parameter_list_parentheses = false
-```
-
-*No visible change on this snippet — the option affects other constructs.*
 

@@ -18,12 +18,27 @@ Indent with spaces or tabs.
 
 **Default:** `space`
 
-## Examples
+## Example
 
-The snippet below is formatted with default options and then again with the option applied.
+::::{tab-set}
 
-**Snippet (formatted with defaults):**
+:::{tab-item} Before
+```csharp
+namespace N;
 
+public class Widget
+{
+	public int Value { get; set; }
+
+	public int Double()
+	{
+		return Value * 2;
+	}
+}
+```
+:::
+
+:::{tab-item} After
 ```csharp
 namespace N;
 
@@ -37,14 +52,9 @@ public class Widget
     }
 }
 ```
+:::
 
-### `indent_style = space`
-
-```ini
-indent_style = space
-```
-
-*No visible change on this snippet — the option affects other constructs.*
+::::
 
 ### `indent_style = tab`
 

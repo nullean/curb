@@ -17,10 +17,39 @@ Blank lines before and after each field.
 
 **Default:** `0`
 
-## Examples
+## Example
 
-*This option accepts a freeform value. No canned example is generated.*
+::::{tab-set}
 
-```ini
-csharp_blank_lines_around_field = <value>
+:::{tab-item} Before
+```csharp
+namespace N;
+
+public class Widget
+{
+    private int _x;
+    private int _y;
+    private int _z;
+}
 ```
+:::
+
+:::{tab-item} After
+```csharp
+namespace N;
+
+public class Widget
+{
+    private int _x;
+
+    private int _y;
+
+    private int _z;
+}
+```
+:::
+
+::::
+
+*Setting shown: `csharp_blank_lines_around_field = 1`*
+

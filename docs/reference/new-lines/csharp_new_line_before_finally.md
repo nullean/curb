@@ -18,12 +18,31 @@ Put finally on its own line.
 
 **Default:** `true`
 
-## Examples
+## Example
 
-The snippet below is formatted with default options and then again with the option applied.
+::::{tab-set}
 
-**Snippet (formatted with defaults):**
+:::{tab-item} Before
+```csharp
+namespace N;
 
+public class Widget
+{
+    public int Parse(string s)
+    {
+        try {
+            return int.Parse(s);
+        } catch (FormatException) {
+            return 0;
+        } finally {
+            Console.WriteLine("done");
+        }
+    }
+}
+```
+:::
+
+:::{tab-item} After
 ```csharp
 namespace N;
 
@@ -46,14 +65,9 @@ public class Widget
     }
 }
 ```
+:::
 
-### `csharp_new_line_before_finally = true`
-
-```ini
-csharp_new_line_before_finally = true
-```
-
-*No visible change on this snippet — the option affects other constructs.*
+::::
 
 ### `csharp_new_line_before_finally = false`
 

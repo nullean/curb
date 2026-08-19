@@ -17,7 +17,7 @@ Chop an initializer carrying more than this many elements.
 
 **Default:** `(not set)`
 
-## Examples
+## Example
 
 *This option accepts a freeform value. No canned example is generated.*
 

@@ -17,7 +17,7 @@ Columns a tab occupies when measuring line width.
 
 **Default:** `4`
 
-## Examples
+## Example
 
 *This option accepts a freeform value. No canned example is generated.*
 

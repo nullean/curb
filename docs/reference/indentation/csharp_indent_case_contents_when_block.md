@@ -18,12 +18,11 @@ Indent a braced case body. csharp_indent_case_contents governs other statements.
 
 **Default:** `true`
 
-## Examples
+## Example
 
-The snippet below is formatted with default options and then again with the option applied.
+::::{tab-set}
 
-**Snippet (formatted with defaults):**
-
+:::{tab-item} Before
 ```csharp
 namespace N;
 
@@ -33,8 +32,29 @@ public class Widget
     {
         switch (code)
         {
-            case 1:
-                return "one";
+            case 2:
+            {
+            var msg = "two";
+            return msg;
+            }
+            default:
+                return "other";
+        }
+    }
+}
+```
+:::
+
+:::{tab-item} After
+```csharp
+namespace N;
+
+public class Widget
+{
+    public string Name(int code)
+    {
+        switch (code)
+        {
             case 2:
                 {
                     var msg = "two";
@@ -46,14 +66,9 @@ public class Widget
     }
 }
 ```
+:::
 
-### `csharp_indent_case_contents_when_block = true`
-
-```ini
-csharp_indent_case_contents_when_block = true
-```
-
-*No visible change on this snippet — the option affects other constructs.*
+::::
 
 ### `csharp_indent_case_contents_when_block = false`
 
@@ -70,8 +85,6 @@ public class Widget
     {
         switch (code)
         {
-            case 1:
-                return "one";
             case 2:
             {
                 var msg = "two";

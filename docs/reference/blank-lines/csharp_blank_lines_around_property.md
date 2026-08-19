@@ -17,10 +17,39 @@ Blank lines before and after each property, indexer or event.
 
 **Default:** `0`
 
-## Examples
+## Example
 
-*This option accepts a freeform value. No canned example is generated.*
+::::{tab-set}
 
-```ini
-csharp_blank_lines_around_property = <value>
+:::{tab-item} Before
+```csharp
+namespace N;
+
+public class Widget
+{
+    public int X { get; set; }
+    public int Y { get; set; }
+    public int Z { get; set; }
+}
 ```
+:::
+
+:::{tab-item} After
+```csharp
+namespace N;
+
+public class Widget
+{
+    public int X { get; set; }
+
+    public int Y { get; set; }
+
+    public int Z { get; set; }
+}
+```
+:::
+
+::::
+
+*Setting shown: `csharp_blank_lines_around_property = 1`*
+

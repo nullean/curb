@@ -18,7 +18,7 @@ When a binary chain breaks, start the new line with the operator.
 
 **Default:** `true`
 
-## Examples
+## Example
 
 The snippet below is formatted with default options and then again with the option applied.
 

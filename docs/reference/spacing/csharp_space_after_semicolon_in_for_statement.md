@@ -18,12 +18,28 @@ Space after a semicolon in a for statement.
 
 **Default:** `true`
 
-## Examples
+## Example
 
-The snippet below is formatted with default options and then again with the option applied.
+::::{tab-set}
 
-**Snippet (formatted with defaults):**
+:::{tab-item} Before
+```csharp
+namespace N;
 
+public class Widget
+{
+    public int Sum(int n)
+    {
+        int total = 0;
+        for (int i = 0;i < n;i++)
+            total += i;
+        return total;
+    }
+}
+```
+:::
+
+:::{tab-item} After
 ```csharp
 namespace N;
 
@@ -33,21 +49,14 @@ public class Widget
     {
         int total = 0;
         for (int i = 0; i < n; i++)
-        {
             total += i;
-        }
         return total;
     }
 }
 ```
+:::
 
-### `csharp_space_after_semicolon_in_for_statement = true`
-
-```ini
-csharp_space_after_semicolon_in_for_statement = true
-```
-
-*No visible change on this snippet — the option affects other constructs.*
+::::
 
 ### `csharp_space_after_semicolon_in_for_statement = false`
 
@@ -64,9 +73,7 @@ public class Widget
     {
         int total = 0;
         for (int i = 0;i < n;i++)
-        {
             total += i;
-        }
         return total;
     }
 }

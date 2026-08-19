@@ -18,7 +18,7 @@ chop_always gives every initializer element its own line. Only honoured in deter
 
 **Default:** `chop_if_long`
 
-## Examples
+## Example
 
 The snippet below is formatted with default options and then again with the option applied.
 

@@ -156,6 +156,7 @@ internal static class Program
         var sb = new StringBuilder();
         sb.AppendLine("---");
         sb.AppendLine($"listing: {slug}");
+        sb.AppendLine($"description: {descriptor.Summary} Defaults to `{descriptor.Default}`.");
         sb.AppendLine("---");
         sb.AppendLine();
         sb.AppendLine(GroupedHeader);
@@ -179,21 +180,108 @@ internal static class Program
         sb.AppendLine($"**Default:** `{descriptor.Default}`");
         sb.AppendLine();
 
-        // Format snippet with default options first (the "before").
-        var defaultResult = formatter.Format(snippet, defaultOptions, produceText: true);
-        var defaultFormatted = defaultResult.Success ? (defaultResult.Text ?? snippet) : snippet;
-
-        // Examples section.
-        sb.AppendLine("## Examples");
-        sb.AppendLine();
-
         // Collect the iterable values (skip placeholder shapes like <integer>).
         var iterableValues = descriptor.Values
             .Where(v => !v.StartsWith('<') || !v.EndsWith('>'))
             .ToList();
 
-        if (iterableValues.Count == 0)
+        // Example section.
+        sb.AppendLine("## Example");
+        sb.AppendLine();
+
+        if (Snippets.BadSnippets.TryGetValue(descriptor.Key, out var badSnippet))
         {
+            // Determine the demo value and its output.
+            string? demoValue = null;
+            string? demoOutput = null;
+
+            if (Snippets.DemoValues.TryGetValue(descriptor.Key, out var forcedValue))
+            {
+                // Use the forced value (e.g., "1" for blank-line integer options).
+                var opts = BuildOptions(descriptor, forcedValue);
+                var r = formatter.Format(badSnippet, opts, produceText: true);
+                if (r.Success)
+                {
+                    demoValue = forcedValue;
+                    demoOutput = r.Text ?? badSnippet;
+                }
+            }
+            else
+            {
+                // Search iterable values for the first that produces a diff from the bad snippet.
+                foreach (var v in iterableValues)
+                {
+                    var opts = BuildOptions(descriptor, v);
+                    var r = formatter.Format(badSnippet, opts, produceText: true);
+                    if (r.Success && r.Text != null && r.Text != badSnippet)
+                    {
+                        demoValue = v;
+                        demoOutput = r.Text;
+                        break;
+                    }
+                }
+            }
+
+            // Emit the tab-set.
+            var afterContent = demoOutput ?? badSnippet;
+            sb.AppendLine("::::{tab-set}");
+            sb.AppendLine();
+            sb.AppendLine(":::{tab-item} Before");
+            sb.AppendLine("```csharp");
+            sb.Append(badSnippet.TrimEnd());
+            sb.AppendLine();
+            sb.AppendLine("```");
+            sb.AppendLine(":::");
+            sb.AppendLine();
+            sb.AppendLine(":::{tab-item} After");
+            sb.AppendLine("```csharp");
+            sb.Append(afterContent.TrimEnd());
+            sb.AppendLine();
+            sb.AppendLine("```");
+            sb.AppendLine(":::");
+            sb.AppendLine();
+            sb.AppendLine("::::");
+            sb.AppendLine();
+
+            if (demoOutput == null || demoOutput == badSnippet)
+            {
+                sb.AppendLine("*Curb recognises this key but does not yet reformat this construct — Before and After are identical.*");
+                sb.AppendLine();
+            }
+            else if (demoValue != null && demoValue != descriptor.Default)
+            {
+                sb.AppendLine($"*Setting shown: `{descriptor.Key} = {demoValue}`*");
+                sb.AppendLine();
+            }
+
+            // Show other distinct values as sub-sections.
+            foreach (var v in iterableValues)
+            {
+                if (v == demoValue)
+                    continue;
+                var opts = BuildOptions(descriptor, v);
+                var r = formatter.Format(badSnippet, opts, produceText: true);
+                if (!r.Success || r.Text == null || r.Text == afterContent)
+                    continue;
+                sb.AppendLine($"### `{descriptor.Key} = {v}`");
+                sb.AppendLine();
+                sb.AppendLine("```ini");
+                sb.AppendLine($"{descriptor.Key} = {v}");
+                sb.AppendLine("```");
+                sb.AppendLine();
+                sb.AppendLine("```csharp");
+                sb.Append(r.Text.TrimEnd());
+                sb.AppendLine();
+                sb.AppendLine("```");
+                sb.AppendLine();
+            }
+        }
+        else if (iterableValues.Count == 0)
+        {
+            // Format snippet with default options as the reference.
+            var defaultResult = formatter.Format(snippet, defaultOptions, produceText: true);
+            var defaultFormatted = defaultResult.Success ? (defaultResult.Text ?? snippet) : snippet;
+
             sb.AppendLine("*This option accepts a freeform value. No canned example is generated.*");
             sb.AppendLine();
             sb.AppendLine("```ini");
@@ -202,6 +290,10 @@ internal static class Program
         }
         else
         {
+            // Fallback: old behaviour for options without a bad snippet.
+            var defaultResult = formatter.Format(snippet, defaultOptions, produceText: true);
+            var defaultFormatted = defaultResult.Success ? (defaultResult.Text ?? snippet) : snippet;
+
             sb.AppendLine("The snippet below is formatted with default options and then again with the option applied.");
             sb.AppendLine();
             sb.AppendLine("**Snippet (formatted with defaults):**");

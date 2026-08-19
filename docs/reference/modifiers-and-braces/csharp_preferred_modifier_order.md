@@ -17,7 +17,7 @@ Reorder modifiers to the specified preference. IDE0036. Applied without a compil
 
 **Default:** `(not set)`
 
-## Examples
+## Example
 
 *This option accepts a freeform value. No canned example is generated.*
 

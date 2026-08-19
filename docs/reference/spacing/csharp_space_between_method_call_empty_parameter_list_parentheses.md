@@ -18,27 +18,41 @@ Space inside an empty argument list ().
 
 **Default:** `false`
 
-## Examples
+## Example
 
-The snippet below is formatted with default options and then again with the option applied.
+::::{tab-set}
 
-**Snippet (formatted with defaults):**
-
+:::{tab-item} Before
 ```csharp
 namespace N;
 
 public class Widget
 {
-    public void Register(string name, int value, bool active, string tag)
-    {
-    }
-
     public void Run()
     {
-        Register("curb", 42, true, "formatter");
+        var s = ToString( );
+        var h = GetHashCode( );
     }
 }
 ```
+:::
+
+:::{tab-item} After
+```csharp
+namespace N;
+
+public class Widget
+{
+    public void Run()
+    {
+        var s = ToString();
+        var h = GetHashCode();
+    }
+}
+```
+:::
+
+::::
 
 ### `csharp_space_between_method_call_empty_parameter_list_parentheses = true`
 
@@ -46,13 +60,16 @@ public class Widget
 csharp_space_between_method_call_empty_parameter_list_parentheses = true
 ```
 
-*No visible change on this snippet — the option affects other constructs.*
+```csharp
+namespace N;
 
-### `csharp_space_between_method_call_empty_parameter_list_parentheses = false`
-
-```ini
-csharp_space_between_method_call_empty_parameter_list_parentheses = false
+public class Widget
+{
+    public void Run()
+    {
+        var s = ToString( );
+        var h = GetHashCode( );
+    }
+}
 ```
-
-*No visible change on this snippet — the option affects other constructs.*
 

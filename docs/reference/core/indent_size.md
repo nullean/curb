@@ -17,7 +17,7 @@ Columns per indent level.
 
 **Default:** `4`
 
-## Examples
+## Example
 
 *This option accepts a freeform value. No canned example is generated.*
 

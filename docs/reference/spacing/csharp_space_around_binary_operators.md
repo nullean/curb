@@ -19,12 +19,11 @@ Spaces around binary and assignment operators.
 
 **Default:** `before_and_after`
 
-## Examples
+## Example
 
-The snippet below is formatted with default options and then again with the option applied.
+::::{tab-set}
 
-**Snippet (formatted with defaults):**
-
+:::{tab-item} Before
 ```csharp
 namespace N;
 
@@ -32,18 +31,27 @@ public class Widget
 {
     public bool Check(int a, int b, int c)
     {
-        return a > 0 && b > 0 && c > 0 && a + b > c && a + c > b && b + c > a;
+        return a>0&&b>0&&c>0&&a+b>c;
     }
 }
 ```
+:::
 
-### `csharp_space_around_binary_operators = before_and_after`
+:::{tab-item} After
+```csharp
+namespace N;
 
-```ini
-csharp_space_around_binary_operators = before_and_after
+public class Widget
+{
+    public bool Check(int a, int b, int c)
+    {
+        return a > 0 && b > 0 && c > 0 && a + b > c;
+    }
+}
 ```
+:::
 
-*No visible change on this snippet — the option affects other constructs.*
+::::
 
 ### `csharp_space_around_binary_operators = none`
 
@@ -58,7 +66,7 @@ public class Widget
 {
     public bool Check(int a, int b, int c)
     {
-        return a>0&&b>0&&c>0&&a+b>c&&a+c>b&&b+c>a;
+        return a>0&&b>0&&c>0&&a+b>c;
     }
 }
 ```
@@ -69,5 +77,15 @@ public class Widget
 csharp_space_around_binary_operators = ignore
 ```
 
-*No visible change on this snippet — the option affects other constructs.*
+```csharp
+namespace N;
+
+public class Widget
+{
+    public bool Check(int a, int b, int c)
+    {
+        return a>0&&b>0&&c>0&&a+b>c;
+    }
+}
+```
 

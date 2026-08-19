@@ -18,7 +18,7 @@ Ensure the file ends with a newline.
 
 **Default:** `true`
 
-## Examples
+## Example
 
 The snippet below is formatted with default options and then again with the option applied.
 

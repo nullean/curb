@@ -18,12 +18,29 @@ Put catch on its own line.
 
 **Default:** `true`
 
-## Examples
+## Example
 
-The snippet below is formatted with default options and then again with the option applied.
+::::{tab-set}
 
-**Snippet (formatted with defaults):**
+:::{tab-item} Before
+```csharp
+namespace N;
 
+public class Widget
+{
+    public int Parse(string s)
+    {
+        try {
+            return int.Parse(s);
+        } catch (FormatException) {
+            return 0;
+        }
+    }
+}
+```
+:::
+
+:::{tab-item} After
 ```csharp
 namespace N;
 
@@ -39,21 +56,12 @@ public class Widget
         {
             return 0;
         }
-        finally
-        {
-            Console.WriteLine("done");
-        }
     }
 }
 ```
+:::
 
-### `csharp_new_line_before_catch = true`
-
-```ini
-csharp_new_line_before_catch = true
-```
-
-*No visible change on this snippet — the option affects other constructs.*
+::::
 
 ### `csharp_new_line_before_catch = false`
 
@@ -74,10 +82,6 @@ public class Widget
         } catch (FormatException)
         {
             return 0;
-        }
-        finally
-        {
-            Console.WriteLine("done");
         }
     }
 }

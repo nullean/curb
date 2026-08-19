@@ -18,23 +18,43 @@ Space between a cast and its operand.
 
 **Default:** `false`
 
-## Examples
+## Example
 
-The snippet below is formatted with default options and then again with the option applied.
+::::{tab-set}
 
-**Snippet (formatted with defaults):**
-
+:::{tab-item} Before
 ```csharp
 namespace N;
 
 public class Widget
 {
-    public int Narrow(object o)
+    public int Narrow(object o, double d)
     {
-        return (int)o;
+        int x = (int) o;
+        float y = (float) d;
+        return x + (int) y;
     }
 }
 ```
+:::
+
+:::{tab-item} After
+```csharp
+namespace N;
+
+public class Widget
+{
+    public int Narrow(object o, double d)
+    {
+        int x = (int)o;
+        float y = (float)d;
+        return x + (int)y;
+    }
+}
+```
+:::
+
+::::
 
 ### `csharp_space_after_cast = true`
 
@@ -47,18 +67,12 @@ namespace N;
 
 public class Widget
 {
-    public int Narrow(object o)
+    public int Narrow(object o, double d)
     {
-        return (int) o;
+        int x = (int) o;
+        float y = (float) d;
+        return x + (int) y;
     }
 }
 ```
-
-### `csharp_space_after_cast = false`
-
-```ini
-csharp_space_after_cast = false
-```
-
-*No visible change on this snippet — the option affects other constructs.*
 

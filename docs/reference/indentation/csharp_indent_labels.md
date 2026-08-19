@@ -19,12 +19,29 @@ How goto labels are indented.
 
 **Default:** `one_less_than_current`
 
-## Examples
+## Example
 
-The snippet below is formatted with default options and then again with the option applied.
+::::{tab-set}
 
-**Snippet (formatted with defaults):**
+:::{tab-item} Before
+```csharp
+namespace N;
 
+public class Widget
+{
+    public void Run(bool skip)
+    {
+        if (skip)
+            goto end;
+        Console.WriteLine("working");
+            end:
+        Console.WriteLine("done");
+    }
+}
+```
+:::
+
+:::{tab-item} After
 ```csharp
 namespace N;
 
@@ -40,14 +57,9 @@ public class Widget
     }
 }
 ```
+:::
 
-### `csharp_indent_labels = one_less_than_current`
-
-```ini
-csharp_indent_labels = one_less_than_current
-```
-
-*No visible change on this snippet — the option affects other constructs.*
+::::
 
 ### `csharp_indent_labels = flush_left`
 

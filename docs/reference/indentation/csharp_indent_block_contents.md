@@ -18,33 +18,43 @@ Indent statements inside a block.
 
 **Default:** `true`
 
-## Examples
+## Example
 
-The snippet below is formatted with default options and then again with the option applied.
+::::{tab-set}
 
-**Snippet (formatted with defaults):**
-
+:::{tab-item} Before
 ```csharp
 namespace N;
 
 public class Widget
 {
-    public int Value { get; set; }
-
-    public int Double()
+    public void Run()
     {
-        return Value * 2;
+int x = 1;
+int y = 2;
+Console.WriteLine(x + y);
     }
 }
 ```
+:::
 
-### `csharp_indent_block_contents = true`
+:::{tab-item} After
+```csharp
+namespace N;
 
-```ini
-csharp_indent_block_contents = true
+public class Widget
+{
+    public void Run()
+    {
+        int x = 1;
+        int y = 2;
+        Console.WriteLine(x + y);
+    }
+}
 ```
+:::
 
-*No visible change on this snippet — the option affects other constructs.*
+::::
 
 ### `csharp_indent_block_contents = false`
 
@@ -57,11 +67,11 @@ namespace N;
 
 public class Widget
 {
-    public int Value { get; set; }
-
-    public int Double()
+    public void Run()
     {
-    return Value * 2;
+    int x = 1;
+    int y = 2;
+    Console.WriteLine(x + y);
     }
 }
 ```

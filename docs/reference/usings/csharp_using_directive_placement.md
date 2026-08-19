@@ -18,37 +18,37 @@ Move using directives inside or outside the namespace. IDE0065.
 
 **Default:** `(as written)`
 
-## Examples
+## Example
 
-The snippet below is formatted with default options and then again with the option applied.
+::::{tab-set}
 
-**Snippet (formatted with defaults):**
-
+:::{tab-item} Before
 ```csharp
 using System;
-using Foo.Bar;
 using System.Collections.Generic;
 
-namespace N;
-
-public class Widget { }
+namespace N
+{
+    public class Widget { }
+}
 ```
+:::
 
-### `csharp_using_directive_placement = inside_namespace`
-
-```ini
-csharp_using_directive_placement = inside_namespace
-```
-
+:::{tab-item} After
 ```csharp
-namespace N;
+namespace N
+{
+    using System;
+    using System.Collections.Generic;
 
-using System;
-using Foo.Bar;
-using System.Collections.Generic;
-
-public class Widget { }
+    public class Widget { }
+}
 ```
+:::
+
+::::
+
+*Setting shown: `csharp_using_directive_placement = inside_namespace`*
 
 ### `csharp_using_directive_placement = outside_namespace`
 
@@ -56,5 +56,13 @@ public class Widget { }
 csharp_using_directive_placement = outside_namespace
 ```
 
-*No visible change on this snippet — the option affects other constructs.*
+```csharp
+using System;
+using System.Collections.Generic;
+
+namespace N
+{
+    public class Widget { }
+}
+```
 

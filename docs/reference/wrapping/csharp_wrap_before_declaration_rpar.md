@@ -18,7 +18,7 @@ Put a broken parameter list's ) on its own line.
 
 **Default:** `(not set)`
 
-## Examples
+## Example
 
 The snippet below is formatted with default options and then again with the option applied.
 

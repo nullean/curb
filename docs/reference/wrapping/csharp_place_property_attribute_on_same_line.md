@@ -18,7 +18,7 @@ Where a property's attribute section goes.
 
 **Default:** `own_line`
 
-## Examples
+## Example
 
 The snippet below is formatted with default options and then again with the option applied.
 

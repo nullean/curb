@@ -18,12 +18,11 @@ Put each clause of a query expression on its own line.
 
 **Default:** `false`
 
-## Examples
+## Example
 
-The snippet below is formatted with default options and then again with the option applied.
+::::{tab-set}
 
-**Snippet (formatted with defaults):**
-
+:::{tab-item} Before
 ```csharp
 using System.Collections.Generic;
 using System.Linq;
@@ -38,13 +37,9 @@ public class Widget
     }
 }
 ```
+:::
 
-### `csharp_new_line_between_query_expression_clauses = true`
-
-```ini
-csharp_new_line_between_query_expression_clauses = true
-```
-
+:::{tab-item} After
 ```csharp
 using System.Collections.Generic;
 using System.Linq;
@@ -62,6 +57,11 @@ public class Widget
     }
 }
 ```
+:::
+
+::::
+
+*Setting shown: `csharp_new_line_between_query_expression_clauses = true`*
 
 ### `csharp_new_line_between_query_expression_clauses = false`
 
@@ -69,5 +69,18 @@ public class Widget
 csharp_new_line_between_query_expression_clauses = false
 ```
 
-*No visible change on this snippet — the option affects other constructs.*
+```csharp
+using System.Collections.Generic;
+using System.Linq;
+
+namespace N;
+
+public class Widget
+{
+    public IEnumerable<int> Even(List<int> nums)
+    {
+        return from n in nums where n % 2 == 0 orderby n select n;
+    }
+}
+```
 

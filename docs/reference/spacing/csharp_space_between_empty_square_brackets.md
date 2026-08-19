@@ -18,24 +18,33 @@ Space inside empty square brackets [].
 
 **Default:** `false`
 
-## Examples
+## Example
 
-The snippet below is formatted with default options and then again with the option applied.
+::::{tab-set}
 
-**Snippet (formatted with defaults):**
-
+:::{tab-item} Before
 ```csharp
 namespace N;
 
 public class Widget
 {
-    private int[] _data = new int[10];
-
-    public int this[int index] { get { return _data[index]; } set { _data[index] = value; } }
-
-    public int First => _data[0];
+    private int[ ] _data = new int[ ] { 1, 2, 3 };
 }
 ```
+:::
+
+:::{tab-item} After
+```csharp
+namespace N;
+
+public class Widget
+{
+    private int[] _data = new int[] { 1, 2, 3 };
+}
+```
+:::
+
+::::
 
 ### `csharp_space_between_empty_square_brackets = true`
 
@@ -48,19 +57,7 @@ namespace N;
 
 public class Widget
 {
-    private int[ ] _data = new int[10];
-
-    public int this[int index] { get { return _data[index]; } set { _data[index] = value; } }
-
-    public int First => _data[0];
+    private int[ ] _data = new int[ ] { 1, 2, 3 };
 }
 ```
-
-### `csharp_space_between_empty_square_brackets = false`
-
-```ini
-csharp_space_between_empty_square_brackets = false
-```
-
-*No visible change on this snippet — the option affects other constructs.*
 

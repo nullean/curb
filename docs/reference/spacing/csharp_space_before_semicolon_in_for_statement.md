@@ -18,11 +18,53 @@ Space before a semicolon in a for statement.
 
 **Default:** `false`
 
-## Examples
+## Example
 
-The snippet below is formatted with default options and then again with the option applied.
+::::{tab-set}
 
-**Snippet (formatted with defaults):**
+:::{tab-item} Before
+```csharp
+namespace N;
+
+public class Widget
+{
+    public int Sum(int n)
+    {
+        int total = 0;
+        for (int i = 0 ;i < n ;i++)
+            total += i;
+        return total;
+    }
+}
+```
+:::
+
+:::{tab-item} After
+```csharp
+namespace N;
+
+public class Widget
+{
+    public int Sum(int n)
+    {
+        int total = 0;
+        for (int i = 0 ; i < n ; i++)
+            total += i;
+        return total;
+    }
+}
+```
+:::
+
+::::
+
+*Setting shown: `csharp_space_before_semicolon_in_for_statement = true`*
+
+### `csharp_space_before_semicolon_in_for_statement = false`
+
+```ini
+csharp_space_before_semicolon_in_for_statement = false
+```
 
 ```csharp
 namespace N;
@@ -33,42 +75,9 @@ public class Widget
     {
         int total = 0;
         for (int i = 0; i < n; i++)
-        {
             total += i;
-        }
         return total;
     }
 }
 ```
-
-### `csharp_space_before_semicolon_in_for_statement = true`
-
-```ini
-csharp_space_before_semicolon_in_for_statement = true
-```
-
-```csharp
-namespace N;
-
-public class Widget
-{
-    public int Sum(int n)
-    {
-        int total = 0;
-        for (int i = 0 ; i < n ; i++)
-        {
-            total += i;
-        }
-        return total;
-    }
-}
-```
-
-### `csharp_space_before_semicolon_in_for_statement = false`
-
-```ini
-csharp_space_before_semicolon_in_for_statement = false
-```
-
-*No visible change on this snippet — the option affects other constructs.*
 

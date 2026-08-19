@@ -18,7 +18,7 @@ Remove trailing whitespace from each line.
 
 **Default:** `true`
 
-## Examples
+## Example
 
 The snippet below is formatted with default options and then again with the option applied.
 
