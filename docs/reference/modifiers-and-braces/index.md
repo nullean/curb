@@ -2,10 +2,4 @@
 
 # Modifiers and Braces
 
-3 options in this group.
-
-| Key | Default | Summary |
-|---|---|---|
-| [csharp_preferred_modifier_order](csharp_preferred_modifier_order.md) | `(not set)` | Reorder modifiers to the specified preference. IDE0036. Applied without a compilation. |
-| [csharp_prefer_braces](csharp_prefer_braces.md) | `false` | Add braces to unbraced control-flow bodies. IDE0011. Applied without a compilation. |
-| [csharp_style_namespace_declarations](csharp_style_namespace_declarations.md) | `(as written)` | Convert block namespaces to file-scoped. IDE0161. Applied without a compilation. |
+Controls modifier ordering (IDE0036), brace insertion for unbraced control-flow bodies (IDE0011), and conversion of block-scoped namespaces to file-scoped (IDE0161). All three are applied without a compilation.

@@ -56,6 +56,44 @@ internal static class Program
         [OptionGroup.Suppression] = "Suppression",
     };
 
+    private static readonly Dictionary<OptionGroup, string> GroupDescriptions = new()
+    {
+        [OptionGroup.Core] =
+            "The foundational file-level settings: indentation style and size, line endings, character encoding, " +
+            "final-newline and trailing-whitespace handling, and `max_line_length` — the column target that determines " +
+            "whether Curb reflows long lines or runs in preservation mode.",
+        [OptionGroup.NewLines] =
+            "Controls where Curb places line breaks around braces, `else`, `catch`, `finally`, and the members of " +
+            "object initialisers, anonymous types, and query expressions.",
+        [OptionGroup.Indentation] =
+            "Controls how deeply Curb indents case labels, case body contents, block contents, and goto labels, " +
+            "and whether brace tokens themselves receive an extra indent level.",
+        [OptionGroup.Spacing] =
+            "Controls every space Curb adds or removes: around binary operators and declarations, before and after " +
+            "commas, dots, semicolons in `for` headers, method-name/parenthesis gaps, and square brackets.",
+        [OptionGroup.Wrapping] =
+            "Controls how Curb breaks long lines: dot-chain wrapping, binary-expression wrapping, " +
+            "parameter and argument list chopping, attribute placement, and initialiser style. " +
+            "Most wrapping options are active only in deterministic mode (`max_line_length` set).",
+        [OptionGroup.BlankLines] =
+            "Controls the maximum number of consecutive blank lines Curb allows between declarations and between " +
+            "statements, and how many blank lines it enforces around namespaces, types, methods, properties, and fields.",
+        [OptionGroup.ExpressionBodies] =
+            "Controls when Curb converts block-bodied members — methods, constructors, operators, local functions, " +
+            "accessors, properties, and indexers — to expression bodies (`=>`). IDE0021–IDE0027 and IDE0061.",
+        [OptionGroup.Usings] =
+            "Controls whether Curb sorts `System.*` directives before all others, inserts blank lines between " +
+            "using groups, and moves `using` directives inside or outside the namespace declaration. IDE0065.",
+        [OptionGroup.ModifiersAndBraces] =
+            "Controls modifier ordering (IDE0036), brace insertion for unbraced control-flow bodies (IDE0011), " +
+            "and conversion of block-scoped namespaces to file-scoped (IDE0161). All three are applied without a compilation.",
+        [OptionGroup.TrailingCommas] =
+            "Controls whether Curb appends a trailing comma after the last element of multi-line and single-line lists.",
+        [OptionGroup.Suppression] =
+            "Options for excluding files from formatting entirely, adjusting the severity of the IDE0055 diagnostic, " +
+            "and inserting a file-header comment. IDE0073.",
+    };
+
     internal static int Main(string[] args)
     {
         var root = RepoRoot();
@@ -103,12 +141,7 @@ internal static class Program
             sb.AppendLine();
             sb.AppendLine($"# {title}");
             sb.AppendLine();
-            sb.AppendLine($"{descriptors.Count} option{(descriptors.Count == 1 ? "" : "s")} in this group.");
-            sb.AppendLine();
-            sb.AppendLine("| Key | Default | Summary |");
-            sb.AppendLine("|---|---|---|");
-            foreach (var d in descriptors)
-                sb.AppendLine($"| [{d.Key}]({d.Key}.md) | `{d.Default}` | {d.Summary} |");
+            sb.AppendLine(GroupDescriptions[group]);
 
             var path = Path.Combine(dir, "index.md");
             File.WriteAllText(path, sb.ToString(), Encoding.UTF8);
@@ -156,7 +189,7 @@ internal static class Program
         var sb = new StringBuilder();
         sb.AppendLine("---");
         sb.AppendLine($"listing: {slug}");
-        sb.AppendLine($"description: {descriptor.Summary} Defaults to `{descriptor.Default}`.");
+        sb.AppendLine($"description: \"{descriptor.Summary} Defaults to `{descriptor.Default}`\"");
         sb.AppendLine("---");
         sb.AppendLine();
         sb.AppendLine(GroupedHeader);
@@ -185,161 +218,72 @@ internal static class Program
             .Where(v => !v.StartsWith('<') || !v.EndsWith('>'))
             .ToList();
 
-        // Example section.
-        sb.AppendLine("## Example");
-        sb.AppendLine();
+        // Per-value Before/After sections — no overall "Example" header.
+        var input = Snippets.BadSnippets.TryGetValue(descriptor.Key, out var bad) ? bad : snippet;
 
-        if (Snippets.BadSnippets.TryGetValue(descriptor.Key, out var badSnippet))
+        var defaultResult = formatter.Format(input, defaultOptions, produceText: true);
+        var defaultOutput = defaultResult.Success ? (defaultResult.Text ?? input) : input;
+
+        if (iterableValues.Count == 0)
         {
-            // Determine the demo value and its output.
-            string? demoValue = null;
-            string? demoOutput = null;
-
-            if (Snippets.DemoValues.TryGetValue(descriptor.Key, out var forcedValue))
+            if (Snippets.DemoValues.TryGetValue(descriptor.Key, out var forceVal))
             {
-                // Use the forced value (e.g., "1" for blank-line integer options).
-                var opts = BuildOptions(descriptor, forcedValue);
-                var r = formatter.Format(badSnippet, opts, produceText: true);
-                if (r.Success)
-                {
-                    demoValue = forcedValue;
-                    demoOutput = r.Text ?? badSnippet;
-                }
+                var opts = BuildOptions(descriptor, forceVal);
+                var r = formatter.Format(input, opts, produceText: true);
+                var output = r.Success ? (r.Text ?? input) : input;
+                EmitValueSection(sb, descriptor.Key, forceVal, input, output);
             }
             else
             {
-                // Search iterable values for the first that produces a diff from the bad snippet.
-                foreach (var v in iterableValues)
-                {
-                    var opts = BuildOptions(descriptor, v);
-                    var r = formatter.Format(badSnippet, opts, produceText: true);
-                    if (r.Success && r.Text != null && r.Text != badSnippet)
-                    {
-                        demoValue = v;
-                        demoOutput = r.Text;
-                        break;
-                    }
-                }
-            }
-
-            // Emit the tab-set.
-            var afterContent = demoOutput ?? badSnippet;
-            sb.AppendLine("::::{tab-set}");
-            sb.AppendLine();
-            sb.AppendLine(":::{tab-item} Before");
-            sb.AppendLine("```csharp");
-            sb.Append(badSnippet.TrimEnd());
-            sb.AppendLine();
-            sb.AppendLine("```");
-            sb.AppendLine(":::");
-            sb.AppendLine();
-            sb.AppendLine(":::{tab-item} After");
-            sb.AppendLine("```csharp");
-            sb.Append(afterContent.TrimEnd());
-            sb.AppendLine();
-            sb.AppendLine("```");
-            sb.AppendLine(":::");
-            sb.AppendLine();
-            sb.AppendLine("::::");
-            sb.AppendLine();
-
-            if (demoOutput == null || demoOutput == badSnippet)
-            {
-                sb.AppendLine("*Curb recognises this key but does not yet reformat this construct — Before and After are identical.*");
-                sb.AppendLine();
-            }
-            else if (demoValue != null && demoValue != descriptor.Default)
-            {
-                sb.AppendLine($"*Setting shown: `{descriptor.Key} = {demoValue}`*");
-                sb.AppendLine();
-            }
-
-            // Show other distinct values as sub-sections.
-            foreach (var v in iterableValues)
-            {
-                if (v == demoValue)
-                    continue;
-                var opts = BuildOptions(descriptor, v);
-                var r = formatter.Format(badSnippet, opts, produceText: true);
-                if (!r.Success || r.Text == null || r.Text == afterContent)
-                    continue;
-                sb.AppendLine($"### `{descriptor.Key} = {v}`");
+                sb.AppendLine("*This option accepts a freeform value. No canned example is generated.*");
                 sb.AppendLine();
                 sb.AppendLine("```ini");
-                sb.AppendLine($"{descriptor.Key} = {v}");
+                sb.AppendLine($"{descriptor.Key} = <value>");
                 sb.AppendLine("```");
-                sb.AppendLine();
-                sb.AppendLine("```csharp");
-                sb.Append(r.Text.TrimEnd());
-                sb.AppendLine();
-                sb.AppendLine("```");
-                sb.AppendLine();
             }
-        }
-        else if (iterableValues.Count == 0)
-        {
-            // Format snippet with default options as the reference.
-            var defaultResult = formatter.Format(snippet, defaultOptions, produceText: true);
-            var defaultFormatted = defaultResult.Success ? (defaultResult.Text ?? snippet) : snippet;
-
-            sb.AppendLine("*This option accepts a freeform value. No canned example is generated.*");
-            sb.AppendLine();
-            sb.AppendLine("```ini");
-            sb.AppendLine($"{descriptor.Key} = <value>");
-            sb.AppendLine("```");
         }
         else
         {
-            // Fallback: old behaviour for options without a bad snippet.
-            var defaultResult = formatter.Format(snippet, defaultOptions, produceText: true);
-            var defaultFormatted = defaultResult.Success ? (defaultResult.Text ?? snippet) : snippet;
-
-            sb.AppendLine("The snippet below is formatted with default options and then again with the option applied.");
-            sb.AppendLine();
-            sb.AppendLine("**Snippet (formatted with defaults):**");
-            sb.AppendLine();
-            sb.AppendLine("```csharp");
-            sb.Append(defaultFormatted.TrimEnd());
-            sb.AppendLine();
-            sb.AppendLine("```");
-            sb.AppendLine();
-
             foreach (var value in iterableValues)
             {
-                sb.AppendLine($"### `{descriptor.Key} = {value}`");
-                sb.AppendLine();
-                sb.AppendLine("```ini");
-                sb.AppendLine($"{descriptor.Key} = {value}");
-                sb.AppendLine("```");
-                sb.AppendLine();
-
-                var options = BuildOptions(descriptor, value);
-                var result = formatter.Format(snippet, options, produceText: true);
-
-                if (!result.Success)
-                {
-                    sb.AppendLine($"*Could not format: {result.Message}*");
-                }
-                else
-                {
-                    var output = result.Text ?? snippet;
-                    if (output == defaultFormatted)
-                    {
-                        sb.AppendLine("*No visible change on this snippet — the option affects other constructs.*");
-                    }
-                    else
-                    {
-                        sb.AppendLine("```csharp");
-                        sb.Append(output.TrimEnd());
-                        sb.AppendLine();
-                        sb.AppendLine("```");
-                    }
-                }
-                sb.AppendLine();
+                var opts = BuildOptions(descriptor, value);
+                var r = formatter.Format(input, opts, produceText: true);
+                var output = r.Success ? (r.Text ?? input) : input;
+                // Default value: Before = raw input. Non-default: Before = default-formatted output.
+                var before = value == descriptor.Default ? input : defaultOutput;
+                EmitValueSection(sb, descriptor.Key, value, before, output);
             }
         }
 
         return sb.ToString();
+    }
+
+    private static void EmitValueSection(StringBuilder sb, string key, string value, string before, string after)
+    {
+        sb.AppendLine($"### `{key} = {value}`");
+        sb.AppendLine();
+        sb.AppendLine("```ini");
+        sb.AppendLine($"{key} = {value}");
+        sb.AppendLine("```");
+        sb.AppendLine();
+        sb.AppendLine("::::{tab-set}");
+        sb.AppendLine();
+        sb.AppendLine(":::{tab-item} Before");
+        sb.AppendLine("```csharp");
+        sb.Append(before.TrimEnd());
+        sb.AppendLine();
+        sb.AppendLine("```");
+        sb.AppendLine(":::");
+        sb.AppendLine();
+        sb.AppendLine(":::{tab-item} After");
+        sb.AppendLine("```csharp");
+        sb.Append(after.TrimEnd());
+        sb.AppendLine();
+        sb.AppendLine("```");
+        sb.AppendLine(":::");
+        sb.AppendLine();
+        sb.AppendLine("::::");
+        sb.AppendLine();
     }
 
     /// <summary>

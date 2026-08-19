@@ -2,14 +2,4 @@
 
 # Expression Bodies
 
-7 options in this group.
-
-| Key | Default | Summary |
-|---|---|---|
-| [csharp_style_expression_bodied_methods](csharp_style_expression_bodied_methods.md) | `false` | Convert eligible block-bodied methods to expression bodies. IDE0022. |
-| [csharp_style_expression_bodied_constructors](csharp_style_expression_bodied_constructors.md) | `false` | Convert eligible block-bodied constructors to expression bodies. IDE0021. |
-| [csharp_style_expression_bodied_operators](csharp_style_expression_bodied_operators.md) | `false` | Convert eligible block-bodied operators. IDE0023/IDE0024. |
-| [csharp_style_expression_bodied_local_functions](csharp_style_expression_bodied_local_functions.md) | `false` | Convert eligible block-bodied local functions. IDE0061. |
-| [csharp_style_expression_bodied_accessors](csharp_style_expression_bodied_accessors.md) | `false` | Convert eligible block-bodied accessors. IDE0027. |
-| [csharp_style_expression_bodied_properties](csharp_style_expression_bodied_properties.md) | `false` | Convert an eligible single-getter property to an expression body. IDE0025. |
-| [csharp_style_expression_bodied_indexers](csharp_style_expression_bodied_indexers.md) | `false` | Convert eligible block-bodied indexers. IDE0026. |
+Controls when Curb converts block-bodied members — methods, constructors, operators, local functions, accessors, properties, and indexers — to expression bodies (`=>`). IDE0021–IDE0027 and IDE0061.

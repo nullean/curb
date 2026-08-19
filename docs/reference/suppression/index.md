@@ -2,10 +2,4 @@
 
 # Suppression
 
-3 options in this group.
-
-| Key | Default | Summary |
-|---|---|---|
-| [generated_code](generated_code.md) | `false` | Skip this file entirely. Curb never formats files marked as generated. |
-| [dotnet_diagnostic.ide0055.severity](dotnet_diagnostic.ide0055.severity.md) | `warning` | Set this to none to opt a file out of formatting. |
-| [file_header_template](file_header_template.md) | `(not set)` | Insert a // comment header at the top of files missing one. IDE0073. |
+Options for excluding files from formatting entirely, adjusting the severity of the IDE0055 diagnostic, and inserting a file-header comment. IDE0073.

@@ -2,9 +2,4 @@
 
 # Trailing Commas
 
-2 options in this group.
-
-| Key | Default | Summary |
-|---|---|---|
-| [csharp_trailing_comma_in_multiline_lists](csharp_trailing_comma_in_multiline_lists.md) | `false` | Add a trailing comma after the last element of a list that breaks across lines. |
-| [csharp_trailing_comma_in_singleline_lists](csharp_trailing_comma_in_singleline_lists.md) | `false` | Add a trailing comma after the last element even when the list is on one line. |
+Controls whether Curb appends a trailing comma after the last element of multi-line and single-line lists.
