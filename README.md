@@ -1,3 +1,8 @@
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/nullean/curb/main/docs/images/curb-lockup.svg"/>
+  <img src="https://raw.githubusercontent.com/nullean/curb/main/docs/images/curb-lockup-light.svg" alt="curb" width="176" height="96"/>
+</picture>
+
 # Curb
 
 A C# formatter that reads your `.editorconfig` — all of it.
@@ -7,7 +12,7 @@ formatting options** (code style rule
 [IDE0055](https://learn.microsoft.com/dotnet/fundamentals/code-analysis/style-rules/ide0055)).
 Its defaults are Roslyn's defaults, so it agrees with Visual Studio and Rider out of the box.
 
-📖 **[Documentation](https://nullean.github.io/curb/)** — full option reference, design rationale,
+📖 **[Documentation](https://curb.nullean.net/)** — full option reference, design rationale,
 and the build integration guide.
 
 ## Why
@@ -20,7 +25,7 @@ cold on Newtonsoft.Json (945 files):
 | Newtonsoft.Json (945 files) | **0.26 s** | 3.47 s | 4.85 s |
 
 Across twelve real repositories Curb is 5–25× faster than `dotnet format` — fast enough to wire
-into `dotnet build` and forget about it. Full numbers: [Benchmarks](https://nullean.github.io/curb/benchmarks/).
+into `dotnet build` and forget about it. Full numbers: [Benchmarks](https://curb.nullean.net/benchmarks/).
 
 **Plays well with your IDE and `dotnet format`.** Curb supports the full set of `.editorconfig`
 formatting properties that Visual Studio, Rider and `dotnet format` read — all 39 `csharp_*` and
@@ -42,7 +47,7 @@ compilation — everything mechanical is already fixed before the compiler reads
 
 This is the recommended integration for most projects. It is particularly effective in agentic
 workflows: any code an agent writes or edits is formatted automatically on the next build, without
-the agent having to think about it. See [the build integration docs](https://nullean.github.io/curb/workflow/msbuild/).
+the agent having to think about it. See [the build integration docs](https://curb.nullean.net/workflow/msbuild/).
 
 ### CLI — pre-commit hooks, CI, scripting
 

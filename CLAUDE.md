@@ -65,9 +65,10 @@ Two things about the site are easy to get wrong:
 
 - **`docs/curb-landing.html` is not generated.** It is a standalone page CI copies over the generated
   `index.html`, so the build's `prefix` never reaches it. Its links are relative and resolve against a
-  `<base href="/formatter/">` that must stay in step with the workflow's `prefix: formatter` and with
-  `Documentation.PathPrefix`. `./build.sh docs` fails if the three drift apart — nothing else would
-  catch it, because docs-builder never reads the landing page.
+  `<base href="/">` — the site lives at the custom domain root `curb.nullean.net`. If the prefix
+  changes, `Documentation.PathPrefix`, the landing page `<base href>`, and the workflow `prefix:`
+  input must all agree. `./build.sh docs` fails if they drift apart — nothing else would catch it,
+  because docs-builder never reads the landing page.
 - **Prose uses `{{product}}`**, substituted from `_docset.yml`, so the codename can be changed in one
   place. Headings use the literal name on purpose — slugs are generated before substitution, so
   `## What {{product}} does` would anchor as `#what-product-does`.

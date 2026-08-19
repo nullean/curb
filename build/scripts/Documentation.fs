@@ -18,11 +18,13 @@ open ProcNet
 
 let private exec binary args = Proc.Exec(binary, List.toArray args) |> ignore
 
-/// The sub-path GitHub Pages serves this repo from. Three files have to agree on it: this one,
-/// `.github/workflows/docs.yml` (the `prefix:` input) and the `<base href>` in the landing page.
-/// `checkPrefixesAgree` below turns drift between them into a local failure rather than a 404 in
-/// production, because nothing else would catch it — docs-builder never reads the landing page.
-let PathPrefix = "curb"
+/// The sub-path GitHub Pages serves this repo from. Empty when the site is hosted at the domain
+/// root (curb.nullean.net). Three files have to agree on it: this one,
+/// `.github/workflows/docs.yml` (the `prefix:` input, absent when empty) and the `<base href>`
+/// in the landing page. `checkPrefixesAgree` below turns drift between them into a local failure
+/// rather than a 404 in production, because nothing else would catch it — docs-builder never
+/// reads the landing page.
+let PathPrefix = ""
 
 let private docsSource = "docs"
 let private landingPage = Path.Combine(docsSource, "curb-landing.html")
@@ -109,25 +111,33 @@ let ensureTool () =
 /// The landing page is not generated, so `--path-prefix` never reaches it: its links resolve against
 /// a hand-written <base href>. If that stops matching the prefix CI builds with, every link on the
 /// home page 404s in production and nothing else in the build would notice.
+///
+/// When PathPrefix is empty the site lives at the domain root. The landing page must have
+/// `<base href="/">` and the workflow must not supply a `prefix:` input.
 let checkPrefixesAgree () =
-    let expectedBase = sprintf "/%s/" PathPrefix
+    let expectedBase =
+        if PathPrefix = "" then "/" else sprintf "/%s/" PathPrefix
 
     let landing = File.ReadAllText landingPage
     let m = Text.RegularExpressions.Regex.Match(landing, "<base\\s+href=\"([^\"]*)\"")
     if not m.Success then
-        failwithf "%s has no <base href>; its relative links cannot resolve under a sub-path" landingPage
+        failwithf "%s has no <base href>; its relative links cannot resolve" landingPage
     if m.Groups[1].Value <> expectedBase then
         failwithf
-            "%s has <base href=\"%s\"> but the site builds with prefix '%s' (expected \"%s\"). See Documentation.PathPrefix."
+            "%s has <base href=\"%s\"> but the site builds with PathPrefix '%s' (expected \"%s\"). See Documentation.PathPrefix."
             landingPage m.Groups[1].Value PathPrefix expectedBase
 
     if File.Exists workflow then
         let yaml = File.ReadAllText workflow
         let w = Text.RegularExpressions.Regex.Match(yaml, "prefix:\\s*(\\S+)")
-        if w.Success && w.Groups[1].Value <> PathPrefix then
+        if PathPrefix = "" && w.Success then
+            failwithf
+                "%s has a 'prefix: %s' input but Documentation.PathPrefix is empty. Remove the prefix input or set PathPrefix."
+                workflow w.Groups[1].Value
+        elif PathPrefix <> "" && (not w.Success || w.Groups[1].Value <> PathPrefix) then
             failwithf
                 "%s builds with prefix '%s' but Documentation.PathPrefix is '%s'. These must agree."
-                workflow w.Groups[1].Value PathPrefix
+                workflow (if w.Success then w.Groups[1].Value else "(none)") PathPrefix
 
 // ─────────────────────────────  build  ─────────────────────────────
 
@@ -137,7 +147,10 @@ let build () =
     checkPrefixesAgree ()
     let tool = ensureTool ()
 
-    exec tool ["build"; "--path"; docsSource; "--path-prefix"; PathPrefix]
+    let args =
+        if PathPrefix = "" then ["build"; "--path"; docsSource]
+        else ["build"; "--path"; docsSource; "--path-prefix"; PathPrefix]
+    exec tool args
 
     if not (Directory.Exists htmlOutput) then
         failwithf "docs-builder reported success but %s does not exist" htmlOutput
@@ -181,37 +194,47 @@ let private notFound (response: HttpListenerResponse) (raw: string) =
     let body = Encoding.UTF8.GetBytes(sprintf "404 %s" raw)
     response.OutputStream.Write(body, 0, body.Length)
 
-/// Rather than staging the output under a directory literally named after the prefix — which would
-/// need either a copy or a symlink, and symlinks need privileges on Windows — the server strips the
-/// prefix from the request path. The bytes served are exactly the bytes CI publishes.
+/// When PathPrefix is empty the server serves from the root. When it is set the server strips the
+/// prefix from the request path rather than staging output under a sub-directory (which would need
+/// a copy or a symlink, and symlinks need privileges on Windows). Either way the bytes served are
+/// exactly the bytes CI publishes.
 let private handle (root: string) (context: HttpListenerContext) =
     let response = context.Response
     try
         try
             let raw = Uri.UnescapeDataString context.Request.Url.AbsolutePath
-            let mount = sprintf "/%s" PathPrefix
 
-            // Everything lives under the prefix, so bounce the bare root at it. Without this,
-            // hitting localhost:8080 gives a 404 and reads like the build failed.
-            if raw = "/" || raw = "" then response.Redirect(mount + "/")
-            elif raw = mount then response.Redirect(mount + "/")
-            elif not (raw.StartsWith(mount + "/", StringComparison.Ordinal)) then notFound response raw
-            else
-
-            let relative = raw.Substring(mount.Length).TrimStart('/')
-            let candidate = Path.GetFullPath(Path.Combine(root, relative))
-
-            // Never serve anything outside the output directory, whatever the request asks for.
-            if not (candidate.StartsWith(root, StringComparison.Ordinal)) then notFound response raw
-            elif File.Exists candidate then write response candidate
-            elif Directory.Exists candidate then
-                // A directory URL has to end in a slash, or every relative link inside the page it
-                // serves resolves one level too high.
-                if not (raw.EndsWith "/") then response.Redirect(raw + "/")
+            let relative =
+                if PathPrefix = "" then
+                    raw.TrimStart('/')
                 else
-                    let index = Path.Combine(candidate, "index.html")
-                    if File.Exists index then write response index else notFound response raw
-            else notFound response raw
+                    let mount = sprintf "/%s" PathPrefix
+                    if raw = "/" || raw = "" then
+                        response.Redirect(mount + "/")
+                        null
+                    elif raw = mount then
+                        response.Redirect(mount + "/")
+                        null
+                    elif not (raw.StartsWith(mount + "/", StringComparison.Ordinal)) then
+                        notFound response raw
+                        null
+                    else
+                        raw.Substring(mount.Length).TrimStart('/')
+
+            if relative <> null then
+                let candidate = Path.GetFullPath(Path.Combine(root, relative))
+
+                // Never serve anything outside the output directory, whatever the request asks for.
+                if not (candidate.StartsWith(root, StringComparison.Ordinal)) then notFound response raw
+                elif File.Exists candidate then write response candidate
+                elif Directory.Exists candidate then
+                    // A directory URL has to end in a slash, or every relative link inside the page
+                    // it serves resolves one level too high.
+                    if not (raw.EndsWith "/") then response.Redirect(raw + "/")
+                    else
+                        let index = Path.Combine(candidate, "index.html")
+                        if File.Exists index then write response index else notFound response raw
+                else notFound response raw
         with e ->
             response.StatusCode <- 500
             let body = Encoding.UTF8.GetBytes e.Message
@@ -221,7 +244,9 @@ let private handle (root: string) (context: HttpListenerContext) =
 
 let serve (port: int) =
     let root = Path.GetFullPath htmlOutput
-    let url = sprintf "http://localhost:%d/%s/" port PathPrefix
+    let url =
+        if PathPrefix = "" then sprintf "http://localhost:%d/" port
+        else sprintf "http://localhost:%d/%s/" port PathPrefix
 
     let listener = new HttpListener()
     listener.Prefixes.Add(sprintf "http://localhost:%d/" port)

@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192" role="img" aria-label="curb">
+  <defs>
+    <linearGradient id="fA" x1="0" y1="0" x2="1" y2="1"><stop offset="0.46" stop-color="#FFB03D"></stop><stop offset="0.54" stop-color="#A96BFF"></stop></linearGradient>
+    <radialGradient id="gA" cx="0.26" cy="0.14" r="1.1"><stop offset="0" stop-color="#1B2126"></stop><stop offset="0.55" stop-color="#0D1013"></stop><stop offset="1" stop-color="#08090B"></stop></radialGradient>
+    
+  </defs>
+  <path d="M46 0 H192 V192 H0 V46 A46 46 0 0 1 46 0 Z" fill="url(#fA)"></path>
+  <path d="M47 9 H183 V183 H9 V47 A38 38 0 0 1 47 9 Z" fill="url(#gA)"></path>
+  <path d="M47 10 H182 V182 H10 V47 A37 37 0 0 1 47 10 Z" fill="none" stroke="#08090B" stroke-width="2"></path>
+  <path d="M48 12.5 H179.5 V179.5 H12.5 V48 A35.5 35.5 0 0 1 48 12.5 Z" fill="none" stroke="#FFFFFF" stroke-opacity="0.16" stroke-width="1"></path>
+  <g font-family="JetBrains Mono, ui-monospace, SFMono-Regular, Menlo, monospace" font-size="92" font-weight="700">
+    <text class="cu-l" x="40.61" y="123.45" fill="#FFB03D">{</text>
+    <text class="cu-r" x="96" y="123.45" fill="#C39BFF">}</text>
+  </g>
+</svg>

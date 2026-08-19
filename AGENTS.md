@@ -9,7 +9,7 @@ width-aware reflow. It ships as a native-AOT `dotnet tool`.
 ./build.sh build          # dotnet build -c Release
 ./build.sh test           # runs tests/Nullean.Curb.Tests via `dotnet run`
 ./build.sh benchmark      # BenchmarkDotNet suite
-./build.sh docs           # builds docs/ and serves it at http://localhost:8080/formatter/
+./build.sh docs           # builds docs/ and serves it at http://localhost:8080/
 ./build.sh generatepackages
 ./build.sh conformance --corpus <path>   # byte-identity with dotnet format whitespace
 ./build.sh perf --corpus <path>          # times the AOT binary; gates on allocations
