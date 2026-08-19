@@ -12,12 +12,15 @@ placement.
 ## It's fast
 
 0.26 s on 945 files (Newtonsoft.Json), cold. `dotnet format whitespace` on the same files: 3.47 s.
-Across twelve real repositories, Curb is 5–25× faster. See [Benchmarks](benchmarks/index.md) for
-the full table.
+Across twelve real repositories, curb is 5–25× faster than `dotnet format whitespace` — and does
+more: reflow to line width, using-directive sorting, and syntax-level code style on top. See
+[Benchmarks](benchmarks/index.md) for the full table.
 
-Speed is what makes running on every build viable. The [build integration](workflow/msbuild.md)
-skips unchanged projects entirely via MSBuild's stamp mechanism; on a project where nothing changed,
-no process starts.
+Speed is what makes running on every build viable. All benchmark numbers are cold. Warm runs are
+faster still: the [build integration](workflow/msbuild.md) skips unchanged projects entirely —
+no process starts. For projects with changes, only the files that changed since the last build are
+reformatted. The local cache autoinvalidates after one week and clears with `dotnet clean`. curb is
+FAST cold, FASTER warm.
 
 ## It doesn't fight what you already run
 
