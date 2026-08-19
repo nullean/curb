@@ -26,8 +26,8 @@
 
   <!-- The package imports props before the project and targets after it, so the sample does the
        same rather than importing both at the top and testing an arrangement no consumer has. -->
-  <Import Project="../../src/Nullean.Curb.MSBuild/build/Nullean.Curb.MSBuild.props" />
+  <Import Project="../../src/Nullean.Curb.MSBuild/build/curb.props" />
 
-  <Import Project="../../src/Nullean.Curb.MSBuild/build/Nullean.Curb.MSBuild.targets" />
+  <Import Project="../../src/Nullean.Curb.MSBuild/build/curb.targets" />
 
 </Project>
