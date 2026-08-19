@@ -36,7 +36,7 @@ jobs:
       - name: Build documentation
         uses: elastic/docs-builder@main
         with:
-          prefix: formatter
+          prefix: curb
 
       # docs-builder has no landing-page feature. The branded page is a standalone document that
       # replaces the generated index.html here — docs/index.md survives as the "Home" nav entry.
