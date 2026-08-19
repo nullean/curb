@@ -3,67 +3,43 @@ name: docs
 on:
   push:
     branches: [main]
-  pull_request:
-    paths:
-      - 'docs/**'
-      - '.github/workflows/docs.yml'
   workflow_dispatch:
 
 permissions:
   contents: read
 
-# Pages allows one deployment at a time. Do not cancel in progress: a half-finished deploy is worse
-# than a queued one.
 concurrency:
   group: pages
   cancel-in-progress: false
 
 jobs:
-  # Builds on every pull request so a broken link or a page missing from the toc fails there rather
-  # than on main. Deliberately touches no Pages API and declares no environment, so it works from a
-  # fork and cannot stall on a deployment protection rule.
-  build-docs:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      # curb.nullean.net is a custom domain at the Pages root — no path prefix needed.
-      # docs-builder emits root-relative URLs; the CNAME in docs/ tells Pages which domain to accept.
-      - name: Build documentation
-        uses: elastic/docs-builder@main
-
-      # docs-builder has no landing-page feature. The branded page is a standalone document that
-      # replaces the generated index.html here — docs/index.md survives as the "Home" nav entry.
-      - name: Swap in the landing page
-        run: cp docs/curb-landing.html .artifacts/docs/html/index.html
-
-      - name: Copy robots.txt
-        run: cp docs/robots.txt .artifacts/docs/html/robots.txt
-
-      # Needs no Pages API, so it runs on pull requests too — it is what proves the output packages
-      # cleanly, and it is the artifact the deploy job publishes.
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: .artifacts/docs/html
-
-  deploy-docs:
-    needs: build-docs
-    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+  docs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
       pages: write
-      id-token: write        # required for the OIDC token actions/deploy-pages exchanges
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      # `enablement` creates the Pages site on the first run rather than leaving it as a manual
-      # setup step someone has to be told about.
-      - uses: actions/configure-pages@v5
-        with:
-          enablement: true
 
-      - name: Deploy to GitHub Pages
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Build documentation
+        uses: elastic/docs-builder@main
+
+      - name: Use custom landing page
+        run: cp docs/curb-landing.html .artifacts/docs/html/index.html
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v6.0.0
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v5.0.0
+        with:
+          path: .artifacts/docs/html
+
+      - name: Deploy artifact
         id: deployment
         uses: actions/deploy-pages@v4
