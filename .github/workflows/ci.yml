@@ -1,6 +1,11 @@
 name: Always be deploying
 
 on:
+  # Weekly full run — all five AOT legs and every corpus gate. Sunday 04:00 UTC, quiet time.
+  schedule:
+    - cron: '0 4 * * 0'
+  # Manual trigger for the same. Also lets you force a full run on a branch before tagging.
+  workflow_dispatch:
   pull_request:
     paths-ignore:
       - 'README.md'
@@ -21,26 +26,63 @@ concurrency:
 permissions:
   contents: read
 
+# ── Cost gating ─────────────────────────────────────────────────────────────────
+#
+# This repo is private, so runner minutes are billed and the multipliers matter:
+# macOS 10x, Windows 2x, Linux 1x. A full run costs ~40 billed minutes; a PR
+# run costs ~6. The gap comes from two sources:
+#
+#   1. The AOT matrix. Five RIDs on every PR burns ~22 billed minutes on legs
+#      that produce packages nobody sees — the upload is already gated on push.
+#      On pull requests, only linux-x64 runs (AOT must link and execute; that is
+#      proved; the other four RIDs get the same proof on every push to main).
+#
+#   2. Six heavy corpus steps that together account for ~12 of the 15 wall-clock
+#      minutes in the corpus job. They are correct and they belong in CI — they
+#      just do not need to run on every single commit. They run on every push to
+#      main that is also a tag, on the weekly schedule, and on workflow_dispatch.
+#      Everything else (safety checks, idempotency, cache assertions, smoke tests)
+#      runs on every trigger.
+#
+#      Steps gated on KERF_FULL_GATES:
+#        - Conformance with dotnet format              (32 s, no-width path)
+#        - Conformance with a width of 120 columns     (29 s, non-default width)
+#        - Conformance with the preservation opt-out   (31 s, non-default mode)
+#        - Churn, all three configurations             (35 s, reported not gated)
+#        - Speed and allocations                       (46 s, allocation ratio gate)
+#        - Cleaning a real solution leaves it building (468 s, two analyzer builds)
+#
+#      Step NOT gated (stays on every trigger):
+#        - Conformance with a width (deterministic, the default)
+#          This is the primary correctness claim held at --minimum 100 on the
+#          default path. It must not be conditional.
+#
+# The weekly run is a strict superset of a push-to-main run. A tag push is also
+# full, so no release ships against gates that last ran up to six days ago.
+
+env:
+  KERF_FULL_GATES: >-
+    ${{ github.event_name == 'schedule'
+     || github.event_name == 'workflow_dispatch'
+     || startsWith(github.ref, 'refs/tags/') }}
+
 jobs:
 
   # ── AOT pack matrix ─────────────────────────────────────────────────────────
   # Native AOT can only compile for the OS/arch it runs on, so each leg compiles
   # its own RID, smoke-tests the binary, and packs the per-RID tool package.
+  #
+  # On pull requests, only the linux-x64 leg runs. All five run on push, tags,
+  # weekly, and workflow_dispatch — wherever packages are produced or the full
+  # surface is exercised.
   aot-pack:
+    timeout-minutes: 20
     strategy:
       fail-fast: false   # a preempted arm runner must not cancel the whole matrix
       matrix:
-        include:
-          - rid: linux-x64
-            runner: ubuntu-latest
-          - rid: linux-arm64
-            runner: ubuntu-24.04-arm
-          - rid: win-x64
-            runner: windows-latest
-          - rid: win-arm64
-            runner: windows-11-arm
-          - rid: osx-arm64
-            runner: macos-latest
+        include: ${{ fromJSON(github.event_name == 'pull_request'
+          && '[{"rid":"linux-x64","runner":"ubuntu-latest"}]'
+          || '[{"rid":"linux-x64","runner":"ubuntu-latest"},{"rid":"linux-arm64","runner":"ubuntu-24.04-arm"},{"rid":"win-x64","runner":"windows-latest"},{"rid":"win-arm64","runner":"windows-11-arm"},{"rid":"osx-arm64","runner":"macos-latest"}]') }}
 
     runs-on: ${{ matrix.runner }}
     name: AOT pack (${{ matrix.rid }})
@@ -100,6 +142,7 @@ jobs:
   corpus:
     runs-on: ubuntu-latest
     name: Corpus and conformance
+    timeout-minutes: ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')) && 45 || 20 }}
 
     steps:
       - uses: actions/checkout@v6
@@ -146,7 +189,9 @@ jobs:
       # The product claim, as a number that must not go down.
       #
       # Two files out of 1,196 differ, both the arrow-clause anchor recorded in the plan's §1d.
+      # Gated weekly: the no-width conformance path is slower to regress and adds 32 s per run.
       - name: Conformance with dotnet format
+        if: env.KERF_FULL_GATES == 'true'
         run: ./build.sh conformance -s true --corpus /tmp/corpus --minimum 100
 
       # The corpus sets max_line_length = 160, so --reflow is the *default* path for it: a width selects
@@ -161,12 +206,16 @@ jobs:
       # The same file the preserving gate below loses, so this is parity with a known held defect rather
       # than a new one — fixing it by keying on the source misses the case entirely, and restructuring
       # the clause to key on the printed layout cost two files elsewhere.
+      # Gated weekly: a non-default width; a regression here shows up in the 160-column gate too.
       - name: Conformance with a width of 120 columns
+        if: env.KERF_FULL_GATES == 'true'
         run: ./build.sh conformance -s true --corpus /tmp/corpus --width 120 --minimum 99.9
 
       # The opt-out, which has to stay measurable now that a width no longer selects it. 99.92% — the
       # number the default used to be held to, on the same one file.
+      # Gated weekly: the opt-out is a non-default mode; a regression there will not affect the default path.
       - name: Conformance with the preservation opt-out
+        if: env.KERF_FULL_GATES == 'true'
         run: ./build.sh conformance -s true --corpus /tmp/corpus --reflow --preserve --minimum 99.9
 
       # Idempotency is what the default now buys by construction rather than by measurement: layout is a
@@ -189,7 +238,9 @@ jobs:
       # count alone is misleading here: the default and the opt-out differ by 150 files but by 2.7x in
       # changed lines. The no-width run is the "zero churn on an IDE0055-clean repository" claim, which the
       # README makes and which is worth keeping honest — it is 742 files of blank-line collapsing today.
+      # Gated weekly: these assert nothing and exist purely to refresh the docs numbers.
       - name: Churn, all three configurations
+        if: env.KERF_FULL_GATES == 'true'
         run: |
           ./build.sh churn -s true --corpus /tmp/corpus
           ./build.sh churn -s true --corpus /tmp/corpus --reflow
@@ -206,7 +257,10 @@ jobs:
       # parse where 18 did. Measured, on the same corpus and binary — 30.4x with verification on and
       # 28.9x with it off, against a 29.9x baseline whose own verified figure is higher than that.
       # The printing got no more expensive; there is simply more of it being checked.
+      # Gated weekly: allocation counts are deterministic; a regression here does not go unnoticed
+      # within a week, and the gate is per-commit on every full run (tag, schedule, dispatch).
       - name: Speed and allocations
+        if: env.KERF_FULL_GATES == 'true'
         run: ./build.sh perf -s true --corpus /tmp/corpus --maxallocationratio 31
 
       # Two-sided on purpose. The sample builds clean with Kerf in the way even though IDE0055 is an
@@ -252,7 +306,11 @@ jobs:
       # *global* property, since the SDK picks its analysers before Directory.Build.targets is read; and
       # neutralising the corpus's own `dotnet_diagnostic.IDE0005.severity = none`, because an .editorconfig
       # entry for a specific rule outranks a .globalconfig one whatever global_level says.
+      # Gated weekly: two analyzer-enabled solution builds of a foreign 1,200-file repo — 468 s, half the
+      # corpus job. cleanupsafety and cleanupsmoketest still run on every trigger; only the full
+      # build-clean-rebuild cycle is deferred.
       - name: Cleaning a real solution leaves it building
+        if: env.KERF_FULL_GATES == 'true'
         run: ./build.sh cleanupconformance -s true --corpus /tmp/corpus
 
       # Every expectation the suite asserts, written out and run through dotnet format. Until this
@@ -271,6 +329,7 @@ jobs:
   # ── Managed build / test / pack / publish ───────────────────────────────────
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs: aot-pack
     permissions:
       contents: write   # create GitHub release
