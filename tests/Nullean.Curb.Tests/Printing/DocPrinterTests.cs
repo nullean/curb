@@ -224,13 +224,11 @@ public class DocPrinterTests
 			// flat branch. Targeting the outer, broken group must override that.
 			using (arena.Group())
 			{
-				using (var ifBreak = arena.IfBreak(outerId))
-				{
-					using (ifBreak.Branch())
-						Text(arena, "abc");
-					using (ifBreak.Branch())
-						Text(arena, "def");
-				}
+				using var ifBreak = arena.IfBreak(outerId);
+				using (ifBreak.Branch())
+					Text(arena, "abc");
+				using (ifBreak.Branch())
+					Text(arena, "def");
 			}
 		}
 

@@ -1,5 +1,7 @@
 module Targets
 
+#nowarn "3391" // Nullable<int> implicit conversions from ProcNet's ExitCode
+
 open Argu
 open System
 open System.IO
