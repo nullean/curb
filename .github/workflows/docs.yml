@@ -40,6 +40,9 @@ jobs:
       - name: Copy robots.txt
         run: cp docs/robots.txt .artifacts/docs/html/robots.txt
 
+      - name: Copy CNAME
+        run: cp docs/CNAME .artifacts/docs/html/CNAME
+
       # Needs no Pages API, so it runs on pull requests too — it is what proves the output packages
       # cleanly, and it is the artifact the deploy job publishes.
       - uses: actions/upload-pages-artifact@v3
