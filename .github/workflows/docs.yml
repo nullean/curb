@@ -32,12 +32,6 @@ jobs:
       - name: Use custom landing page
         run: cp docs/curb-landing.html .artifacts/docs/html/index.html
 
-      - name: Copy CNAME
-        run: cp docs/CNAME .artifacts/docs/html/CNAME
-
-      - name: Copy robots.txt
-        run: cp docs/robots.txt .artifacts/docs/html/robots.txt
-
       - name: Setup Pages
         uses: actions/configure-pages@v6.0.0
 
