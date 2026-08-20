@@ -92,6 +92,11 @@
       <Curb_StampFile Condition="'$(Curb_StampFile)' == ''">$(IntermediateOutputPath)curb.stamp</Curb_StampFile>
       <Curb_FileList Condition="'$(Curb_FileList)' == ''">$(IntermediateOutputPath)curb.files</Curb_FileList>
 
+      <!-- Where `check` writes back the paths that would change, so the CURB0001 diagnostic below can
+           be attached to each of them instead of to the project. Only `check` ever writes it; `format`
+           leaves nothing unformatted to list. -->
+      <Curb_UnformattedFile Condition="'$(Curb_UnformattedFile)' == ''">$(IntermediateOutputPath)curb.unformatted</Curb_UnformattedFile>
+
       <!-- Per file rather than per project; see the note in the Curb target for what that buys. Here for
            the same reason as the other two, and per target framework for the same reason as the error
            log, so two inner builds of a multi-targeting project cannot write over each other. Set
@@ -164,24 +169,50 @@
       <_CurbInvocation Condition="'$(Curb_Exe)' != ''">&quot;$(Curb_Exe)&quot;</_CurbInvocation>
       <_CurbInvocation Condition="'$(Curb_Exe)' == ''">&quot;$(DOTNET_HOST_PATH)&quot; &quot;$(Curb_Dll)&quot;</_CurbInvocation>
       <_CurbCacheArg Condition="'$(Curb_Cache)' != 'false' and '$(Curb_CacheFile)' != ''">--cache &quot;$(Curb_CacheFile)&quot;</_CurbCacheArg>
+
+      <!-- Only `check` reads this back; a `format` run leaves nothing unformatted to name. -->
+      <_CurbUnformattedArg Condition="'$(_CurbCommand)' == 'check'">--unformatted-list-file &quot;$(Curb_UnformattedFile)&quot;</_CurbUnformattedArg>
     </PropertyGroup>
 
-    <Exec Command="$(_CurbInvocation) $(_CurbCommand) --msbuild-list-file &quot;$(Curb_FileList)&quot; $(_CurbCacheArg)"
+    <Exec Command="$(_CurbInvocation) $(_CurbCommand) --msbuild-list-file &quot;$(Curb_FileList)&quot; $(_CurbCacheArg) $(_CurbUnformattedArg)"
           StandardOutputImportance="$(Curb_LogLevel)"
           ContinueOnError="true"
           IgnoreExitCode="true">
       <Output TaskParameter="ExitCode" PropertyName="_CurbExitCode" />
     </Exec>
 
+    <!-- The file `check` wrote back, one unformatted path per line, so each diagnostic below lands on
+         the source file that actually needs reformatting instead of on this project — that is what a
+         GitHub Actions annotation anchors to, and $(MSBuildProjectFullPath) with no line number was
+         never actionable from the PR checks panel alone. -->
+    <ReadLinesFromFile File="$(Curb_UnformattedFile)" Condition="'$(_CurbExitCode)' == '1' and Exists('$(Curb_UnformattedFile)')">
+      <Output TaskParameter="Lines" ItemName="_CurbUnformattedFiles" />
+    </ReadLinesFromFile>
+
     <!-- Exit 1 is "some files are not formatted", which only `check` can produce. Anything else
          non-zero is Curb failing, and that is an error whatever the warnings setting says: a
          formatter that could not run has verified nothing, and saying so quietly would be worse
-         than not running at all. -->
-    <Warning Condition="'$(_CurbExitCode)' == '1' and '$(Curb_UnformattedAsWarnings)' == 'true'"
+         than not running at all.
+
+         Batches once per file: MSBuild runs a task once per distinct value of item metadata referenced
+         in its parameters, and %(_CurbUnformattedFiles.Identity) is exactly that. -->
+    <Warning Condition="'$(_CurbExitCode)' == '1' and '$(Curb_UnformattedAsWarnings)' == 'true' and '@(_CurbUnformattedFiles)' != ''"
+             Code="CURB0001"
+             File="%(_CurbUnformattedFiles.Identity)"
+             Text="This file is not formatted. Run 'curb format'." />
+
+    <Error Condition="'$(_CurbExitCode)' == '1' and '$(Curb_UnformattedAsWarnings)' != 'true' and '@(_CurbUnformattedFiles)' != ''"
+           Code="CURB0001"
+           File="%(_CurbUnformattedFiles.Identity)"
+           Text="This file is not formatted. Run 'curb format'." />
+
+    <!-- Fallback for a check that reported failure without naming a file, e.g. an older curb.dll
+         (built before the unformatted-list-file flag existed) supplied through $(Curb_Exe). -->
+    <Warning Condition="'$(_CurbExitCode)' == '1' and '$(Curb_UnformattedAsWarnings)' == 'true' and '@(_CurbUnformattedFiles)' == ''"
              Code="CURB0001"
              Text="Some files are not formatted. Run 'curb format', or build without Curb_Check=true." />
 
-    <Error Condition="'$(_CurbExitCode)' == '1' and '$(Curb_UnformattedAsWarnings)' != 'true'"
+    <Error Condition="'$(_CurbExitCode)' == '1' and '$(Curb_UnformattedAsWarnings)' != 'true' and '@(_CurbUnformattedFiles)' == ''"
            Code="CURB0001"
            Text="Some files are not formatted. Run 'curb format', or build without Curb_Check=true." />
 
@@ -194,7 +225,7 @@
     <Touch Condition="'$(_CurbExitCode)' == '0'" Files="$(Curb_StampFile)" AlwaysCreate="true" />
 
     <ItemGroup>
-      <FileWrites Include="$(Curb_StampFile);$(Curb_FileList);$(Curb_CacheFile)" />
+      <FileWrites Include="$(Curb_StampFile);$(Curb_FileList);$(Curb_CacheFile);$(Curb_UnformattedFile)" />
     </ItemGroup>
   </Target>
 
