@@ -170,7 +170,6 @@ public class NamespaceAndUsingTests : FormattingTest
 		""");
 
 	[Test]
-	[Skip("dotnet_sort_system_directives_first is not implemented — usings are never reordered")]
 	public Task System_usings_sort_to_the_top() => Formats(
 		"""
 		using Octokit;
