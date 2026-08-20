@@ -206,6 +206,163 @@ public class StatementTests : FormattingTest
 		}
 		""");
 
+	// ---- an empty catch or finally is always `{ }` ---------------------------------------------
+
+	/// <summary>
+	/// Curb's one unconditional opinion in this family: an empty <c>catch</c>/<c>finally</c> is
+	/// always <c>{ }</c>, whatever the source had and whatever the preserve options say. Unlike a
+	/// non-empty clause (below), this is <em>not</em> matching dotnet format — dotnet format is lazy
+	/// about this pair in both directions, so there is nothing of its to match, and <c>{ }</c> reads
+	/// better than the alternative either way.
+	/// See <see href="https://github.com/nullean/curb/issues/25">issue #25</see>.
+	/// </summary>
+	[Test]
+	public Task An_empty_catch_the_author_expanded_still_collapses() => Formats(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        try
+		        {
+		            Call();
+		        }
+		        catch
+		        {
+		        }
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        try
+		        {
+		            Call();
+		        }
+		        catch { }
+		    }
+		}
+		""");
+
+	[Test]
+	public Task An_empty_finally_the_author_expanded_still_collapses() => Formats(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        try
+		        {
+		            Call();
+		        }
+		        finally
+		        {
+		        }
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        try
+		        {
+		            Call();
+		        }
+		        finally { }
+		    }
+		}
+		""");
+
+	[Test]
+	public Task An_empty_catch_with_a_declaration_still_collapses() => Formats(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        try
+		        {
+		            Call();
+		        }
+		        catch (Exception e)
+		        {
+		        }
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        try
+		        {
+		            Call();
+		        }
+		        catch (Exception e) { }
+		    }
+		}
+		""");
+
+	[Test]
+	public Task An_empty_catch_with_a_declaration_and_filter_still_collapses() => Formats(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        try
+		        {
+		            Call();
+		        }
+		        catch (IOException ex) when (ex.HResult != 0)
+		        {
+		        }
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        try
+		        {
+		            Call();
+		        }
+		        catch (IOException ex) when (ex.HResult != 0) { }
+		    }
+		}
+		""");
+
+	[Test]
+	public Task An_empty_catch_stays_collapsed_with_both_preserve_options_off() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        try
+		        {
+		            Call();
+		        }
+		        catch { }
+		    }
+		}
+		""",
+		editorConfig: """
+		csharp_preserve_single_line_blocks = false
+		csharp_preserve_single_line_statements = false
+		""");
+
+	// A non-empty catch or finally is untouched by this: PrintStatementBody's alwaysJoinsEmpty is
+	// ignored once the block is not empty, so behaviour there is exactly what it was before.
+
 	// ---- local declarations -------------------------------------------------------------------
 
 	[Test]

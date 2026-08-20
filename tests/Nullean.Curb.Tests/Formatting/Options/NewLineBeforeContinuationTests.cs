@@ -206,9 +206,7 @@ public class NewLineBeforeContinuationTests : FormattingTest
 		        try
 		        {
 		        }
-		        catch (Exception e)
-		        {
-		        }
+		        catch (Exception e) { }
 		    }
 		}
 		""");
@@ -236,9 +234,7 @@ public class NewLineBeforeContinuationTests : FormattingTest
 		    {
 		        try
 		        {
-		        } catch (Exception e)
-		        {
-		        }
+		        } catch (Exception e) { }
 		    }
 		}
 		""",
@@ -273,13 +269,7 @@ public class NewLineBeforeContinuationTests : FormattingTest
 		    {
 		        try
 		        {
-		        } catch (ArgumentException)
-		        {
-		        } catch (Exception e) when (e.Message.Length > 0)
-		        {
-		        } catch
-		        {
-		        }
+		        } catch (ArgumentException) { } catch (Exception e) when (e.Message.Length > 0) { } catch { }
 		    }
 		}
 		""",
@@ -310,9 +300,7 @@ public class NewLineBeforeContinuationTests : FormattingTest
 		        try
 		        {
 		        }
-		        finally
-		        {
-		        }
+		        finally { }
 		    }
 		}
 		""");
@@ -340,9 +328,7 @@ public class NewLineBeforeContinuationTests : FormattingTest
 		    {
 		        try
 		        {
-		        } finally
-		        {
-		        }
+		        } finally { }
 		    }
 		}
 		""",
@@ -375,11 +361,7 @@ public class NewLineBeforeContinuationTests : FormattingTest
 		        try
 		        {
 		        }
-		        catch (Exception e)
-		        {
-		        } finally
-		        {
-		        }
+		        catch (Exception e) { } finally { }
 		    }
 		}
 		""",
@@ -424,11 +406,7 @@ public class NewLineBeforeContinuationTests : FormattingTest
 		            } else
 		            {
 		            }
-		        } catch (Exception e)
-		        {
-		        } finally
-		        {
-		        }
+		        } catch (Exception e) { } finally { }
 		    }
 		}
 		""",
@@ -448,9 +426,7 @@ public class NewLineBeforeContinuationTests : FormattingTest
 		        try
 		        {
 		        }
-		        finally
-		        {
-		        }
+		        finally { }
 		    }
 		}
 		""",

@@ -187,9 +187,7 @@ public class SpacingTests : FormattingTest
 		        try
 		        {
 		        }
-		        catch(Exception e) when(a)
-		        {
-		        }
+		        catch(Exception e) when(a) { }
 		    }
 		}
 		""",

@@ -437,7 +437,10 @@ internal static partial class Printers
 				TokenPrinter.Print(catchClause.Filter.CloseParenToken, context);
 			}
 
-			PrintStatementBody(catchClause.Block, BraceStyle.ControlBlocks, context);
+			// An empty catch always prints as `catch { }`, whatever csharp_preserve_single_line_blocks
+			// says and whatever the source had — see PrintStatementBody's alwaysJoinsEmpty. A non-empty
+			// body is unaffected: it follows the block's own rule, same as any other braced construct.
+			PrintStatementBody(catchClause.Block, BraceStyle.ControlBlocks, context, alwaysJoinsEmpty: true);
 		}
 
 		if (node.Finally is null)
@@ -445,7 +448,8 @@ internal static partial class Printers
 
 		BeforeContinuation(context.Options.NewLineBeforeFinally, followsABrace: true, context);
 		TokenPrinter.Print(node.Finally.FinallyKeyword, context);
-		PrintStatementBody(node.Finally.Block, BraceStyle.ControlBlocks, context);
+		// Same reasoning as catch, above.
+		PrintStatementBody(node.Finally.Block, BraceStyle.ControlBlocks, context, alwaysJoinsEmpty: true);
 	}
 
 	public static void UsingStatement(UsingStatementSyntax node, PrintContext context)

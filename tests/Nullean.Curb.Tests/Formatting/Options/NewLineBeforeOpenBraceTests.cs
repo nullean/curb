@@ -311,10 +311,8 @@ public class NewLineBeforeOpenBraceTests : FormattingTest
 		    {
 		        try {
 		        }
-		        catch (Exception e) {
-		        }
-		        finally {
-		        }
+		        catch (Exception e) { }
+		        finally { }
 		    }
 		}
 		""",
