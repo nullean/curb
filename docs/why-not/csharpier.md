@@ -90,24 +90,26 @@ sees on a fresh checkout. Both tools pay their full cost.
 Cold is the relevant baseline for CI environments and for anyone evaluating whether the tool is
 fast enough to run on every build. curb is fast cold.
 
-**Warm** — no file changes since the last run. CSharpier uses its file hash cache; curb evaluates
-the MSBuild stamp.
+**Warm** — subsequent build on the same machine. CSharpier uses its file hash cache; curb evaluates
+the MSBuild stamp. The "files changed" column shows curb reformatting the full project — the
+worst-case warm run, equivalent to cold.
 
-| repo | curb (warm) | CSharpier (warm) |
-|---|---|---|
-| serilog (216 files) | **no process** | 0.34 s |
-| FluentValidation (219 files) | **no process** | 0.21 s |
-| RestSharp (255 files) | **no process** | 0.30 s |
-| Humanizer (733 files) | **no process** | 0.51 s |
-| Newtonsoft.Json (945 files) | **no process** | 0.82 s |
-| ServiceStack (4,718 files) | **no process** | 1.87 s |
-| MassTransit (5,502 files) | **no process** | 0.83 s |
-| efcore (5,761 files) | **no process** | 2.49 s |
-| roslyn (17,167 files) | **no process** | 6.01 s |
+| repo | curb (no changes) | curb (files changed) | CSharpier (warm) |
+|---|---|---|---|
+| serilog | **no process** | **0.06 s** | 0.34 s |
+| FluentValidation | **no process** | **0.06 s** | 0.21 s |
+| RestSharp | **no process** | **0.07 s** | 0.30 s |
+| Humanizer | **no process** | **0.37 s** | 0.51 s |
+| Newtonsoft.Json | **no process** | **0.26 s** | 0.82 s |
+| ServiceStack | **no process** | **1.29 s** | 1.87 s |
+| MassTransit | **no process** | **0.62 s** | 0.83 s |
+| efcore | **no process** | **2.27 s** | 2.49 s |
+| roslyn | **no process** | 7.43 s | **6.01 s** |
 
-"No process" means MSBuild evaluated the stamp, saw no inputs had changed, and skipped the target
-entirely. CSharpier still walks and hashes every file in the project every time, even when nothing
-changed, to update its cache. On a large solution with many unchanged projects this adds up.
+When nothing changed, curb starts no process at all — MSBuild evaluates the stamp and exits. When
+files did change, curb still beats CSharpier warm on every repository except roslyn (17,167 files),
+where CSharpier's warmed-up cache edges ahead by about 1.4 s. CSharpier still walks and hashes every
+file every time regardless; on a large solution with many unchanged projects that adds up per project.
 
 curb is FAST cold, FASTER warm.
 
