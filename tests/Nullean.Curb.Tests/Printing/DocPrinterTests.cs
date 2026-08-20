@@ -684,4 +684,54 @@ public class DocPrinterTests
 		Render(BuildFill(["012"]), width: 1).Should().Be("012");
 		await Task.CompletedTask;
 	}
+
+	[Test]
+	public async Task Fill_forces_a_break_when_a_separator_carries_a_hard_line()
+	{
+		// A trailing // comment on a list element is exactly this shape: text, then an unconditional
+		// hard line the comma's own trailing trivia emits. Measuring the pair by width alone said it
+		// fit, and PrintLine renders a hard line as a bare space once the scope it is in has already
+		// committed to flat — so without checking for the hard line first, the fill swallowed
+		// whatever printed after it into the comment. Width is generous here so only that check, not
+		// the ordinary fits measurement, is what forces the break.
+		var arena = new DocArena();
+		using (var fill = arena.Fill())
+		{
+			using (fill.Item())
+				Text(arena, "0");
+			using (fill.Separator())
+			{
+				arena.Synthetic(SyntheticText.Comma);
+				arena.HardLine();
+			}
+			using (fill.Item())
+				Text(arena, "1");
+		}
+
+		Render(arena, width: 80).Should().Be("0,\n1");
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task Reflow_disabled_still_breaks_after_a_hard_line_inside_a_fill()
+	{
+		// The reflow-off shortcut forces everything flat unless something inside cannot be — a hard
+		// line is exactly that, and needs the same guard the width-generous case above does.
+		var arena = new DocArena();
+		using (var fill = arena.Fill())
+		{
+			using (fill.Item())
+				Text(arena, "0");
+			using (fill.Separator())
+			{
+				arena.Synthetic(SyntheticText.Comma);
+				arena.HardLine();
+			}
+			using (fill.Item())
+				Text(arena, "1");
+		}
+
+		Render(arena).Should().Be("0,\n1");
+		await Task.CompletedTask;
+	}
 }

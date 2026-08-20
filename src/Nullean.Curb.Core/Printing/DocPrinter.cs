@@ -295,21 +295,27 @@ internal sealed class DocPrinter
 	{
 		var end = index + doc.Length;
 
-		// Already decided flat: nothing inside can reintroduce a break, so every item and separator
-		// prints flat without spending a Fits call on each pair — the same short-circuit
-		// ResolveGroupMode takes for a nested group.
-		if (scope.Mode is PrintMode.Flat or PrintMode.ForceFlat)
+		// Already decided flat, or no width to exceed, and nothing inside forces a break regardless:
+		// every item and separator prints flat without spending a Fits call on each pair — the same
+		// short-circuit ResolveGroupMode takes for a nested group. Guarded on HasHardBreak because an
+		// unconditional line — most commonly a trailing // comment on an element — renders as a bare
+		// space rather than the newline it must be once it is reached inside a scope already
+		// committed to flat (see PrintLine), the same reason ResolveGroupMode checks IsBroken before
+		// either of its own shortcuts; a fill's items are not a group ResolveGroupMode ever resolves,
+		// so nothing else stands between one and that failure mode.
+		if (!_breaks.HasHardBreak(index, end))
 		{
-			RunSegment(index + 1, end, scope.Indent, scope.Mode, scope.SuppressWidth);
-			return;
-		}
+			if (scope.Mode is PrintMode.Flat or PrintMode.ForceFlat)
+			{
+				RunSegment(index + 1, end, scope.Indent, scope.Mode, scope.SuppressWidth);
+				return;
+			}
 
-		// With reflow off there is no width to exceed, so every item and separator is flat — not
-		// scope.Mode, which a Fill with nothing enclosing it sees as the root's default Break.
-		if (_width == FormatOptions.Off)
-		{
-			RunSegment(index + 1, end, scope.Indent, PrintMode.Flat, scope.SuppressWidth);
-			return;
+			if (_width == FormatOptions.Off)
+			{
+				RunSegment(index + 1, end, scope.Indent, PrintMode.Flat, scope.SuppressWidth);
+				return;
+			}
 		}
 
 		var child = index + 1;
@@ -321,7 +327,9 @@ internal sealed class DocPrinter
 			if (itemEnd >= end)
 			{
 				// The last item: no separator follows it, so there is no pair to look ahead to.
-				var lastMode = Fits(itemStart, itemEnd, scope) ? PrintMode.Flat : PrintMode.Break;
+				var lastMode = !_breaks.HasHardBreak(itemStart, itemEnd) && Fits(itemStart, itemEnd, scope)
+					? PrintMode.Flat
+					: PrintMode.Break;
 				RunSegment(itemStart, itemEnd, scope.Indent, lastMode, scope.SuppressWidth);
 				break;
 			}
@@ -330,8 +338,9 @@ internal sealed class DocPrinter
 			var sepEnd = sepStart + _arena[sepStart].Length;
 			var nextItemEnd = sepEnd + _arena[sepEnd].Length;
 
-			var pairFits = Fits(itemStart, nextItemEnd, scope);
-			var itemMode = pairFits || Fits(itemStart, itemEnd, scope) ? PrintMode.Flat : PrintMode.Break;
+			var pairFits = !_breaks.HasHardBreak(itemStart, nextItemEnd) && Fits(itemStart, nextItemEnd, scope);
+			var itemFitsAlone = !_breaks.HasHardBreak(itemStart, itemEnd) && Fits(itemStart, itemEnd, scope);
+			var itemMode = pairFits || itemFitsAlone ? PrintMode.Flat : PrintMode.Break;
 			var sepMode = pairFits ? PrintMode.Flat : PrintMode.Break;
 
 			RunSegment(itemStart, itemEnd, scope.Indent, itemMode, scope.SuppressWidth);

@@ -988,4 +988,43 @@ public class ClosingParenthesisTests : FormattingTest
 		}
 		""",
 		editorConfig: Deterministic + "csharp_wrap_parameters_style = wrap_if_long");
+
+	[Test]
+	public Task Wrap_if_long_forces_a_break_after_an_argument_with_a_trailing_comment() => Formats(
+		// A trailing // comment forces an unconditional line right there — see DocPrinter.PrintFill's
+		// HasHardBreak guard. Measuring only by width, as the fill's ordinary pair-fits check does,
+		// found room for the next argument on the same line, which is how a run of this shape reads
+		// the comment as swallowing gamma into itself and refuses to round-trip. This is the
+		// corpus-caught case (elastic/docs-builder's SupportedLanguages.cs), reduced to arguments —
+		// initializer elements hit the identical path.
+		//
+		// The blank line after `// first` is unrelated and predates this key: the same construct
+		// with no wrap_if_long key at all already inserts it, in both this and the non-fill path.
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        Call(
+		            alpha, // first
+		            beta,
+		            gamma
+		        );
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        Call(
+		            alpha, // first
+
+		            beta, gamma
+		        );
+		    }
+		}
+		""",
+		Narrower + "csharp_wrap_arguments_style = wrap_if_long");
 }
