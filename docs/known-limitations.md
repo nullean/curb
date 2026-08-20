@@ -5,14 +5,6 @@ description: Current limitations in Curb's formatting output and what to expect 
 
 # Known limitations
 
-## BOM handling
-
-{{product}} lists `charset` in its option catalog but always writes files without a byte-order mark
-(BOM). It never adds a BOM to files that lack one, and it strips a BOM from files that have one —
-which is incorrect for repositories that set `charset = utf-8-bom`.
-
-**Workaround:** If your repository sets `charset = utf-8-bom`, avoid using {{product}} in rewrite mode until this is fixed.
-
 ## Multi-line trivia keeps source line endings
 
 {{product}} emits multi-line trivia — doc comments, verbatim string literals — as a raw source span,
