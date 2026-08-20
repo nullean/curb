@@ -108,6 +108,23 @@ internal sealed class PrintContext(DocArena arena, SourceText text, FormatOption
 	/// </remarks>
 	public ushort MemberGroup { get; set; }
 
+	/// <summary>
+	/// The node whose continuation lines an enclosing printer already indented, or null.
+	/// </summary>
+	/// <remarks>
+	/// A binary chain — flattened by <c>csharp_wrap_chained_binary_expressions</c>, or left to the
+	/// ordinary per-operator recursion when that key is off — applies its own indent so an assignment
+	/// or a <c>return</c>, which supply none, still get one. An <c>if</c>/<c>while</c>/<c>do</c>
+	/// condition already sits inside the indent that opens out its parentheses, so without this the
+	/// chain's indent would stack on top of it. Set by <see cref="Printers.ConditionHeader"/> for the
+	/// top of the condition, and relayed one link at a time down a uniform chain's left spine by
+	/// <see cref="Printers.BinaryExpression"/> so every operand — not just the first — lands at that
+	/// one level. Compared by reference and cleared by the first reader, so a chain further inside the
+	/// condition — behind a cast or a prefix operator's own parentheses — is a different node and
+	/// still gets its own indent.
+	/// </remarks>
+	public SyntaxNode? IndentedCondition { get; set; }
+
 	/// <summary>Source spans a rewrite legitimately dropped, or null when nothing was dropped.</summary>
 	/// <remarks>
 	/// Expression bodies are the only thing that drops source today: a block's braces and its

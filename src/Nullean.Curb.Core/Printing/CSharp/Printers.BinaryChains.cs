@@ -23,7 +23,15 @@ internal static partial class Printers
 	/// binds the other way. A mixed chain is left to the ordinary path.
 	/// </para>
 	/// </remarks>
-	public static bool TryPrintBinaryChain(BinaryExpressionSyntax node, PrintContext context)
+	/// <param name="node">The outermost link of the chain, if it is one.</param>
+	/// <param name="context">The print context.</param>
+	/// <param name="callerAlreadyIndented">
+	/// True when <see cref="BinaryExpression"/> already found <paramref name="node"/> to be the
+	/// node <see cref="PrintContext.IndentedCondition"/> named — an enclosing <c>if</c>/<c>while</c>/
+	/// <c>do</c> condition already sitting inside its own indent — so the chain must not add a
+	/// second one on top of it.
+	/// </param>
+	public static bool TryPrintBinaryChain(BinaryExpressionSyntax node, PrintContext context, bool callerAlreadyIndented)
 	{
 		if (context.Options.WrapChainedBinaryExpressions is null)
 			return false;
@@ -67,7 +75,7 @@ internal static partial class Printers
 			}
 		}
 
-		using (arena.Indent())
+		using (arena.IndentIf(!callerAlreadyIndented))
 		{
 			// wrap_if_long packs operands onto a line until the next one would not fit, rather than
 			// the group's all-flat-or-all-broken choice the other two values make — see DocKind.Fill.
@@ -92,6 +100,12 @@ internal static partial class Printers
 
 			using (arena.Group())
 			{
+				// A count, not a fit measurement: chop_always is the same decision
+				// csharp_wrap_arguments_style's chop_always makes, forcing the break outright instead
+				// of leaving it to whether the chain fits.
+				if (context.Options.WrapChainedBinaryExpressions == WrapStyle.ChopAlways)
+					arena.BreakParent();
+
 				Node.Print(operands[0], context);
 
 				for (var i = 1; i < operands.Count; i++)

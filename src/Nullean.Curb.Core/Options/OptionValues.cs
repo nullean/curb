@@ -62,7 +62,7 @@ public static class OptionValues
 		"file_header_template" => options.FileHeaderTemplate ?? "   # no header is required",
 		"csharp_wrap_chained_binary_expressions" => options.WrapChainedBinaryExpressions is null
 			? "   # a chain that does not fit overflows the line rather than breaking"
-			: "chop_if_long",
+			: Wrap(options.WrapChainedBinaryExpressions),
 		"csharp_wrap_before_binary_opsign" => Bool(options.WrapBeforeBinaryOpsign),
 		"csharp_wrap_before_first_method_call" => options.WrapBeforeFirstMethodCall switch
 		{
@@ -75,6 +75,9 @@ public static class OptionValues
 		"csharp_place_constructor_initializer_on_same_line" => Bool(options.PlaceConstructorInitializerOnSameLine),
 		"csharp_wrap_before_arrow_with_expressions" => Bool(options.WrapBeforeArrowWithExpressions),
 		"csharp_wrap_after_dot_in_method_calls" => Bool(options.WrapAfterDotInMethodCalls),
+		"csharp_wrap_chained_method_calls" => options.WrapChainedMethodCalls is null
+			? "chop_if_long   # already the chain printer's own behaviour; the key is the opt-in"
+			: "chop_if_long",
 		"csharp_place_simple_enum_on_single_line" => Bool(options.PlaceSimpleEnumOnSingleLine),
 		"csharp_place_simple_accessorholder_on_single_line" => Bool(options.PlaceSimpleAccessorholderOnSingleLine),
 		"csharp_wrap_parameters_style" => Wrap(options.WrapParametersStyle),
@@ -112,6 +115,7 @@ public static class OptionValues
 		"csharp_blank_lines_after_using_list" => Lines(options.BlankLinesAfterUsingList),
 		"csharp_blank_lines_after_file_scoped_namespace_directive" => Lines(options.BlankLinesAfterFileScopedNamespace),
 		"csharp_max_initializer_elements_on_line" => Count(options.MaxInitializerElementsOnLine),
+		"csharp_max_chained_method_calls_on_line" => Count(options.MaxChainedMethodCallsOnLine),
 		"csharp_max_array_initializer_elements_on_line" => Count(options.MaxArrayInitializerElementsOnLine),
 		"csharp_max_formal_parameters_on_line" => Count(options.MaxParametersOnLine),
 		"csharp_max_invocation_arguments_on_line" => Count(options.MaxArgumentsOnLine),

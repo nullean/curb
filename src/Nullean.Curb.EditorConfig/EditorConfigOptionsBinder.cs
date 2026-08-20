@@ -295,33 +295,43 @@ public static class EditorConfigOptionsBinder
 
 		foreach (var prefix in ReSharperPrefixes)
 		{
-			if (!properties.TryGetValue(prefix + "wrap_chained_binary_expressions", out var binaryWrap))
+			if (!properties.TryGetValue(prefix + "wrap_chained_method_calls", out var methodChainWrap))
 				continue;
 
-			var colon = binaryWrap.LastIndexOf(':');
-			switch ((colon >= 0 ? binaryWrap[..colon] : binaryWrap).Trim().ToLowerInvariant())
+			var colon = methodChainWrap.LastIndexOf(':');
+			switch ((colon >= 0 ? methodChainWrap[..colon] : methodChainWrap).Trim().ToLowerInvariant())
 			{
 				case "chop_if_long":
-					options = options with { WrapChainedBinaryExpressions = WrapStyle.ChopIfLong };
+					// Confirms behaviour the chain printer already has unconditionally; see
+					// FormatOptions.WrapChainedMethodCalls.
+					options = options with { WrapChainedMethodCalls = WrapStyle.ChopIfLong };
+					break;
+				case "chop_always":
+					diagnostics?.Add(CurbDiagnostic.UnrecognisedValue(
+						prefix + "wrap_chained_method_calls", methodChainWrap,
+						"chop_if_long; chop_always is not supported, see csharp_max_chained_method_calls_on_line"));
 					break;
 				case "wrap_if_long":
-					// Forcing operands to pack moves indentation preservation mode's rules read from
-					// the source, the same reason wrap_arguments_style is deterministic-only.
-					if (options.KeepExistingLinebreaks)
-						diagnostics?.Add(CurbDiagnostic.RequiresDeterministicLayout(
-							prefix + "wrap_chained_binary_expressions"));
-					else
-						options = options with { WrapChainedBinaryExpressions = WrapStyle.WrapIfLong };
+					diagnostics?.Add(CurbDiagnostic.UnrecognisedValue(
+						prefix + "wrap_chained_method_calls", methodChainWrap,
+						"chop_if_long; wrap_if_long is not implemented"));
 					break;
 				default:
 					diagnostics?.Add(CurbDiagnostic.UnrecognisedValue(
-						prefix + "wrap_chained_binary_expressions", binaryWrap, "chop_if_long or wrap_if_long"));
+						prefix + "wrap_chained_method_calls", methodChainWrap, "chop_if_long"));
 					break;
 			}
 
 			break;
 		}
 
+		if (TryPrefixedCount(properties, "max_chained_method_calls_on_line", diagnostics, out var maxChainCalls))
+		{
+			if (options.KeepExistingLinebreaks)
+				diagnostics?.Add(CurbDiagnostic.RequiresDeterministicLayout("csharp_max_chained_method_calls_on_line"));
+			else
+				options = options with { MaxChainedMethodCallsOnLine = maxChainCalls };
+		}
 		if (TryPrefixedBool(properties, "wrap_before_first_method_call", diagnostics, out var wrapFirstCall))
 			options = options with { WrapBeforeFirstMethodCall = wrapFirstCall };
 
@@ -346,21 +356,21 @@ public static class EditorConfigOptionsBinder
 		if (TryPrefixedBool(properties, "place_simple_accessorholder_on_single_line", diagnostics, out var placeAccessors))
 			options = options with { PlaceSimpleAccessorholderOnSingleLine = placeAccessors };
 
-		// The parameter list's is admissible in either mode. The argument and initializer styles are not:
-		// forcing every one of those to break moves constructs whose indentation other rules read from
-		// the source, and the file then formats differently on its second pass — 140 corpus files for
-		// arguments against none for parameters. Deterministic layout has no rule that reads indentation
-		// from the source, which is exactly why they become available there.
+		// The parameter list's is admissible in either mode. The argument, initializer and chained-binary
+		// styles are not: forcing every one of those to break moves constructs whose indentation other
+		// rules read from the source, and the file then formats differently on its second pass — 140
+		// corpus files for arguments against none for parameters. Deterministic layout has no rule that
+		// reads indentation from the source, which is exactly why they become available there.
 		//
-		// wrap_chained_method_calls stays out. It cost 156 files in preservation mode and has not been
-		// measured under deterministic layout; the same silence as the several hundred other ReSharper
-		// keys Curb does not implement is the honest answer until it has.
+		// wrap_chained_method_calls is bound above, restricted to chop_if_long — its chop_always stays
+		// out for the same reason as the two below, and it cost 156 files besides.
 		options = options with
 		{
 			WrapParametersStyle = ParametersWrapStyle(),
 			WrapArgumentsStyle = DeterministicOnlyWrapStyle("wrap_arguments_style"),
 			WrapObjectAndCollectionInitializerStyle =
 				DeterministicOnlyWrapStyle("wrap_object_and_collection_initializer_style"),
+			WrapChainedBinaryExpressions = DeterministicOnlyWrapStyle("wrap_chained_binary_expressions"),
 		};
 
 		// Four of ReSharper's six. place_type_attribute_on_same_line and the accessorholder one are not

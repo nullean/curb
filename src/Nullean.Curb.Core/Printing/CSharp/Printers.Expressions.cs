@@ -41,7 +41,11 @@ internal static partial class Printers
 	/// A value that brings its own braces positions its own contents, so it takes a plain space
 	/// rather than a hanging indent — otherwise the whole construct sits one level too deep.
 	/// </remarks>
-	private static void OperandOnRight(SyntaxNode? right, PrintContext context, int operatorEnd = -1)
+	private static void OperandOnRight(
+		SyntaxNode? right,
+		PrintContext context,
+		int operatorEnd = -1,
+		bool suppressIndent = false)
 	{
 		var arena = context.Arena;
 
@@ -57,7 +61,7 @@ internal static partial class Printers
 		}
 
 		using (arena.Group())
-		using (arena.Indent())
+		using (arena.IndentIf(!suppressIndent))
 		{
 			// A Line is a space when flat; under `none` the break must not bring one back.
 			if (context.Options.SpaceAroundBinaryOperators == BinaryOperatorSpacing.BeforeAndAfter)
@@ -76,8 +80,25 @@ internal static partial class Printers
 			return;
 		}
 
-		if (TryPrintBinaryChain(node, context))
+		// Consumed here, unconditionally: this is the first printer every BinaryExpressionSyntax
+		// reaches, so a match can only mean ConditionHeader indented this exact node — or an
+		// enclosing link of the same chain relayed that below — and is waiting for this node to use
+		// that indent instead of adding its own. Cleared either way, so a chain nested behind a cast
+		// or a prefix operator's own parentheses — a different node — still gets its own.
+		var alreadyIndented = ReferenceEquals(context.IndentedCondition, node);
+		if (alreadyIndented)
+			context.IndentedCondition = null;
+
+		if (TryPrintBinaryChain(node, context, alreadyIndented))
 			return;
+
+		// Relayed one more link down: the rest of a uniform chain prints through node.Left at the
+		// same ambient indent, so its own continuation — reached once Left's BinaryExpression call
+		// gets here in turn — is still the condition's, not a nested construct's.
+		if (alreadyIndented
+			&& node.Left is BinaryExpressionSyntax left
+			&& left.OperatorToken.RawKind == node.OperatorToken.RawKind)
+			context.IndentedCondition = left;
 
 		Node.Print(node.Left, context);
 
@@ -105,7 +126,7 @@ internal static partial class Printers
 			return;
 		}
 
-		OperandOnRight(node.Right, context, node.OperatorToken.Span.End);
+		OperandOnRight(node.Right, context, node.OperatorToken.Span.End, alreadyIndented);
 	}
 
 	public static void AssignmentExpression(AssignmentExpressionSyntax node, PrintContext context)
@@ -466,69 +487,98 @@ internal static partial class Printers
 	public static void CollectionExpression(CollectionExpressionSyntax node, PrintContext context)
 	{
 		var arena = context.Arena;
-		TokenPrinter.Print(node.OpenBracketToken, context);
 
-		if (node.Elements.Count > 0)
+		if (node.Elements.Count == 0)
 		{
-			var asWritten = SpansLines(node, context);
-			var rewritesComma = RewritesTrailingComma(node.Elements, node.CloseBracketToken, context);
+			TokenPrinter.Print(node.OpenBracketToken, context);
+			TokenPrinter.Print(node.CloseBracketToken, context);
+			return;
+		}
 
-			// Published for the same reason an initializer's is: `new C([…]) { X = 1 }` hands the list no
-			// group to break, so the trailing initializer aims at this one instead.
-			var group = arena.NextGroupId();
-			context.OwnBlockGroup = group;
+		var asWritten = SpansLines(node, context);
+		var rewritesComma = RewritesTrailingComma(node.Elements, node.CloseBracketToken, context);
 
-			using (arena.Group(group))
+		// Published for the same reason an initializer's is: `new C([…]) { X = 1 }` hands the list no
+		// group to break, so the trailing initializer aims at this one instead.
+		var group = arena.NextGroupId();
+		context.OwnBlockGroup = group;
+
+		using (arena.Group(group))
+		{
+			// A collection expression is the third spelling of a collection initializer, so it answers
+			// to the same key. Deterministic mode only; see FormatOptions.
+			if (context.Options.WrapObjectAndCollectionInitializerStyle == WrapStyle.ChopAlways)
+				arena.BreakParent();
+
+			// Only for the value of an assignment or declarator — `int[] values = [...]` — where the
+			// bracket has somewhere else to go. A nested element (`[[1, 2], [3, 4]]`) or an argument
+			// (`Call([1, 2])`) is already positioned by its own container, and giving it a leading
+			// line of its own would put it a level out from what dotnet format produces, exactly as
+			// InitializerExpression's leadingLine is only ever true for the same kind of position.
+			//
+			// Soft, not the brace helpers' Normal line: EqualsValueClause and OperandOnRight already
+			// print the space that belongs here when this stays flat, so only the broken case needs
+			// anything from this line at all — a Normal line would double that space.
+			if (node.Parent is EqualsValueClauseSyntax or AssignmentExpressionSyntax
+				&& context.Options.NewLineBeforeOpenBrace.HasFlag(BraceStyle.ObjectCollectionArrayInitializers))
 			{
-				// A collection expression is the third spelling of a collection initializer, so it answers
-				// to the same key. Deterministic mode only; see FormatOptions.
-				if (context.Options.WrapObjectAndCollectionInitializerStyle == WrapStyle.ChopAlways)
-					arena.BreakParent();
-
-				using (arena.Indent())
+				using (arena.IndentIf(context.Options.IndentBraces))
 				{
-					Edge(node.SpanStart, node.Elements[0].SpanStart);
-					for (var i = 0; i < node.Elements.Count; i++)
-					{
-						Node.Print(node.Elements[i], context);
-						if (i >= node.Elements.SeparatorCount)
-							continue;
+					// The author already broke before this bracket — keep it, the same as
+					// InitializerExpression's own asWritten-broke branch, so preservation mode does
+					// not silently join what the author split across lines.
+					if (asWritten && context.AuthorBroke(node.Parent.SpanStart, node.SpanStart))
+						arena.HardLine();
+					else
+						arena.SoftLine(DocFlags.OnlyIfNotAtLineStart);
+				}
+			}
 
-						if (rewritesComma && i == node.Elements.Count - 1)
-							continue;
+			TokenPrinter.Print(node.OpenBracketToken, context);
 
-						Spacing.BeforeComma(context);
-						TokenPrinter.Print(node.Elements.GetSeparator(i), context);
+			using (arena.Indent())
+			{
+				Edge(node.SpanStart, node.Elements[0].SpanStart);
+				for (var i = 0; i < node.Elements.Count; i++)
+				{
+					Node.Print(node.Elements[i], context);
+					if (i >= node.Elements.SeparatorCount)
+						continue;
 
-						// A trailing comma runs straight into the closing bracket, not `, ]`.
-						if (i >= node.Elements.Count - 1)
-							continue;
+					if (rewritesComma && i == node.Elements.Count - 1)
+						continue;
 
-						if (!asWritten)
-							Spacing.AfterCommaBreakable(context);
-						else if (context.AuthorJoined(node.Elements[i].Span.End, node.Elements[i + 1].SpanStart))
-							Spacing.AfterComma(context);
-						else
-							arena.HardLine();
-					}
+					Spacing.BeforeComma(context);
+					TokenPrinter.Print(node.Elements.GetSeparator(i), context);
 
-					if (rewritesComma)
-						PrintTrailingComma(context);
+					// A trailing comma runs straight into the closing bracket, not `, ]`.
+					if (i >= node.Elements.Count - 1)
+						continue;
+
+					if (!asWritten)
+						Spacing.AfterCommaBreakable(context);
+					else if (context.AuthorJoined(node.Elements[i].Span.End, node.Elements[i + 1].SpanStart))
+						Spacing.AfterComma(context);
+					else
+						arena.HardLine();
 				}
 
-				Edge(node.Elements[^1].Span.End, node.Span.End);
+				if (rewritesComma)
+					PrintTrailingComma(context);
 			}
 
-			void Edge(int from, int to)
-			{
-				if (asWritten && context.AuthorBroke(from, to))
-					arena.HardLine();
-				else
-					Spacing.InsideBracketsBreakable(context);
-			}
+			Edge(node.Elements[^1].Span.End, node.Span.End);
 		}
 
 		TokenPrinter.Print(node.CloseBracketToken, context);
+
+		void Edge(int from, int to)
+		{
+			if (asWritten && context.AuthorBroke(from, to))
+				arena.HardLine();
+			else
+				Spacing.InsideBracketsBreakable(context);
+		}
 	}
 
 	public static void SimpleLambdaExpression(SimpleLambdaExpressionSyntax node, PrintContext context)
