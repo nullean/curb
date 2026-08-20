@@ -80,7 +80,11 @@ internal static class FormattingRun
 
 		string[] files;
 		if (explicitFiles is not null)
-			files = explicitFiles;
+			// The MSBuild integration hands over a project's whole compile set unfiltered — see this
+			// parameter's own doc comment — and a shared Directory.Build.props reaches every project
+			// that imports it, C# or not. @(Compile) for an .fsproj is real .fs paths, not an empty
+			// group, so nothing upstream of here already excludes them.
+			files = [.. explicitFiles.Where(IsFormattable)];
 		else
 		{
 			var root = fileSystem.Path.GetFullPath(target);
@@ -351,8 +355,15 @@ internal static class FormattingRun
 		return new FormattingRunSummary(files.Length, changed, cached, skipped, failed, unparsable, reparsed, coverage, exitCode);
 	}
 
+	/// <summary>
+	/// C# source outside a build-output folder. The directory walk already narrows to this with its
+	/// own <c>"*.cs"</c> glob before the bin/obj half of this ever runs; the extension half exists for
+	/// <paramref name="path"/>s an explicit file list handed over unfiltered, which is what a
+	/// non-C# project reaching Curb through a shared build import looks like from here.
+	/// </summary>
 	private static bool IsFormattable(string path) =>
-		!path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal)
+		path.EndsWith(".cs", StringComparison.OrdinalIgnoreCase)
+		&& !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal)
 		&& !path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.Ordinal);
 }
 
