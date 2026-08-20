@@ -638,13 +638,22 @@ public readonly record struct FormatOptions
 	/// <para>
 	/// The template's own lines are separated by a literal <c>\n</c> in the value, since an
 	/// EditorConfig value cannot span lines. Each becomes a <c>//</c> comment, and a blank line
-	/// follows the block — which is what Roslyn's fixer writes.
+	/// follows the block — which is what Roslyn's fixer writes. A <c>{fileName}</c> placeholder is
+	/// substituted with the file's own name, matching Roslyn.
 	/// </para>
 	/// <para>
-	/// Curb adds a missing header and never replaces one that is already there. Roslyn's fixer will
-	/// rewrite a header that differs from the template; telling "the wrong header" from "a comment
-	/// that happens to lead the file" needs more than the template to compare against, and deleting
-	/// somebody's copyright notice because it was worded differently is not a mistake worth risking.
+	/// Curb adds a missing header, and corrects a leading <c>//</c> block whose text does not match
+	/// the template — the same two verdicts Roslyn's own analyzer reports, compared the same way:
+	/// line count and, per line, trimmed content. A file that opens with a <c>/* */</c> block or a
+	/// <c>///</c> doc comment is left alone regardless of what it says: telling "the wrong header"
+	/// from "a comment that happens to lead the file" needs more structure than a syntax-only check
+	/// is willing to guess at for those forms, so only the shape Curb itself writes is ever rewritten.
+	/// </para>
+	/// <para>
+	/// Also left alone whenever the file's using directives will be sorted: the sorter treats a
+	/// leading comment-then-blank-line block as the file's own banner and reprints it verbatim ahead
+	/// of the reordered block, and a second, independent rewrite of the same trivia is not safe to
+	/// combine with that. See <c>UsingOrganiser.BannerEnd</c>.
 	/// </para>
 	/// <para>
 	/// An empty value means "no header", which Roslyn documents as the way to turn the rule off. It

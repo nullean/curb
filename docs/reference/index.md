@@ -134,5 +134,5 @@ Use the filter above to search by name. Each group below links to its own index.
 
 - [generated_code](suppression/generated_code.md) — Skip this file entirely. Curb never formats files marked as generated.
 - [dotnet_diagnostic.ide0055.severity](suppression/dotnet_diagnostic.ide0055.severity.md) — Set this to none to opt a file out of formatting.
-- [file_header_template](suppression/file_header_template.md) — Insert a // comment header at the top of files missing one. IDE0073.
+- [file_header_template](suppression/file_header_template.md) — Insert or correct a // comment header at the top of the file. Supports {fileName}. IDE0073.
 

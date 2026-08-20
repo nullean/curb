@@ -38,10 +38,11 @@ public abstract class FormattingTest
 	protected static Task Formats(
 		[LanguageInjection("csharp")][StringSyntax("C#")] string source,
 		[LanguageInjection("csharp")][StringSyntax("C#")] string expected,
-		[StringSyntax("ini")] string? editorConfig = null)
+		[StringSyntax("ini")] string? editorConfig = null,
+		string? fileName = null)
 	{
 		var options = TestOptions.Parse(editorConfig);
-		var actual = FormatOrFail(source, options, "source").TrimEnd('\n', '\r');
+		var actual = FormatOrFail(source, options, "source", fileName).TrimEnd('\n', '\r');
 		expected = expected.TrimEnd('\n', '\r');
 
 		ExpectationDump.Record(expected, editorConfig);
@@ -51,7 +52,7 @@ public abstract class FormattingTest
 
 		// The expected output must be a fixed point. CSharpier's harness has no equivalent check,
 		// and every idempotency bug found so far grew a blank line or an indent level per run.
-		var second = FormatOrFail(expected, options, "expected output").TrimEnd('\n', '\r');
+		var second = FormatOrFail(expected, options, "expected output", fileName).TrimEnd('\n', '\r');
 		if (!string.Equals(second, expected, StringComparison.Ordinal))
 		{
 			throw new FormattingAssertionException(
@@ -73,8 +74,9 @@ public abstract class FormattingTest
 	/// </remarks>
 	protected static Task Unchanged(
 		[LanguageInjection("csharp")][StringSyntax("C#")] string source,
-		[StringSyntax("ini")] string? editorConfig = null) =>
-		Formats(source, source, editorConfig);
+		[StringSyntax("ini")] string? editorConfig = null,
+		string? fileName = null) =>
+		Formats(source, source, editorConfig, fileName);
 
 	/// <summary>
 	/// Asserts what an opinion does when it is on and, just as importantly, that it does nothing
@@ -157,10 +159,10 @@ public abstract class FormattingTest
 	/// Runs the formatter with every safety net engaged, including the round-trip token comparer
 	/// forced on so the risk detector is bypassed rather than trusted.
 	/// </summary>
-	private static string FormatOrFail(string source, in FormatOptions options, string what)
+	private static string FormatOrFail(string source, in FormatOptions options, string what, string? fileName = null)
 	{
 		using var formatter = new CSharpFormatter();
-		var result = formatter.Format(source, options, produceText: true, forceRoundTrip: true, verifyRoundTrip: true);
+		var result = formatter.Format(source, options, fileName, produceText: true, forceRoundTrip: true, verifyRoundTrip: true);
 
 		if (result.Status != FormatStatus.Formatted)
 			throw new FormattingAssertionException($"formatting the {what} failed with {result.Status}: {result.Message}");

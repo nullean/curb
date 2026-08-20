@@ -65,6 +65,11 @@ public sealed class CSharpFormatter : IDisposable
 
 	/// <param name="source">The C# text to format.</param>
 	/// <param name="options">Layout settings, normally bound from <c>.editorconfig</c>.</param>
+	/// <param name="fileName">
+	/// The file's name, without its directory, for the <c>{fileName}</c> placeholder in
+	/// <c>file_header_template</c>. Null when the caller has no path to give — the placeholder is
+	/// then replaced with an empty string, the same as Roslyn does for a path-less document.
+	/// </param>
 	/// <param name="expandUnhandled">Benchmark-only cost model; see <c>PrintContext.ExpandUnhandled</c>.</param>
 	/// <param name="forceRoundTrip">
 	/// Re-parse even where the printer proved no boundary moved. The conditional check is trusted in
@@ -84,6 +89,7 @@ public sealed class CSharpFormatter : IDisposable
 	public FormatResult Format(
 		string source,
 		in FormatOptions options,
+		string? fileName = null,
 		bool produceText = true,
 		bool expandUnhandled = false,
 		bool verifyRoundTrip = false,
@@ -101,6 +107,7 @@ public sealed class CSharpFormatter : IDisposable
 
 		var context = new PrintContext(_arena, parsed.Text, options)
 		{
+			FileName = fileName,
 			ExpandUnhandled = expandUnhandled,
 			UnhandledByKind = UnhandledByKind,
 			Suppressed = FormattingSuppression.Scan(parsed.Root, source.AsSpan()),
@@ -168,14 +175,16 @@ public sealed class CSharpFormatter : IDisposable
 			null);
 	}
 
-	/// <summary>The header text the printer inserted, or null when it inserted none.</summary>
+	/// <summary>The header text the printer wrote, or null when it did not touch the top of the file.</summary>
 	/// <remarks>
 	/// The comment markers and the newlines the printer put between the template's lines, since the
-	/// verifier compares what was written rather than what was configured.
+	/// verifier compares what was written rather than what was configured. Used for both an
+	/// inserted header and one that replaced a mismatched <c>//</c> block — either way, the output
+	/// starts with exactly this.
 	/// </remarks>
 	private static string? HeaderFor(PrintContext context, in FormatOptions options) =>
 		context.FileHeaderAdded && options.FileHeaderTemplate is { } template
-			? string.Concat(template.Split("\\n").Select(line => line.Length == 0 ? "//" : "// " + line))
+			? FileHeaderText.Rendered(template, context.FileName)
 			: null;
 
 	/// <summary>Returns the pooled buffers this formatter holds.</summary>

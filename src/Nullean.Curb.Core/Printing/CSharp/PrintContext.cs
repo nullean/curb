@@ -148,8 +148,36 @@ internal sealed class PrintContext(DocArena arena, SourceText text, FormatOption
 		return held;
 	}
 
-	/// <summary>True when a file header was inserted that the source did not have.</summary>
+	/// <summary>
+	/// The file's name, without its directory, or null when the caller did not supply a path.
+	/// </summary>
+	/// <remarks>Read only for the <c>{fileName}</c> placeholder in <c>file_header_template</c>.</remarks>
+	public string? FileName { get; init; }
+
+	/// <summary>True when a file header was written that the source did not already carry, verbatim.</summary>
+	/// <remarks>Covers both an inserted header and one that replaced a mismatched <c>//</c> block.</remarks>
 	public bool FileHeaderAdded { get; set; }
+
+	/// <summary>
+	/// The <see cref="SyntaxToken.SpanStart"/> of the token whose leading trivia should have its
+	/// first <see cref="HeaderSkipCount"/> entries skipped, or 0 when nothing is pending.
+	/// </summary>
+	/// <remarks>
+	/// <para>
+	/// Set by the file-header printer when it replaces a mismatched header or an existing run of
+	/// blank lines: those trivia entries belong to the compilation unit's first token, but that
+	/// token is not always the first one <see cref="TokenPrinter"/> reaches — moving using
+	/// directives inside a namespace defers printing them until after the namespace itself, so a
+	/// one-shot "skip whatever comes next" flag would apply to the wrong token's trivia. Matching on
+	/// <see cref="SyntaxToken.SpanStart"/> instead makes the skip find its token wherever printing
+	/// visits it.
+	/// </para>
+	/// <para>Consumed (and reset to 0) the first time it matches, so it never fires twice.</para>
+	/// </remarks>
+	public int HeaderSkipTokenPosition { get; set; }
+
+	/// <summary>How many leading trivia entries to skip on the token named by <see cref="HeaderSkipTokenPosition"/>.</summary>
+	public int HeaderSkipCount { get; set; }
 
 	/// <summary>True when a block namespace was rewritten as a file-scoped one.</summary>
 	public bool NamespaceUnwrapped { get; set; }

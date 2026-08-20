@@ -70,6 +70,25 @@ internal static class UsingOrganiser
 		return null;
 	}
 
+	/// <summary>
+	/// True when sorting is configured and structurally eligible for this compilation unit's using
+	/// block, regardless of whether the directives happen to already be in order.
+	/// </summary>
+	/// <remarks>
+	/// Unlike <see cref="Order"/>, this does not shortcut when sorting would not visibly move
+	/// anything — a caller deciding whether a leading comment counts as the sort's "banner" (and so
+	/// is off limits to rewrite some other way) needs an answer that holds before and after sorting
+	/// normalises the block. Answering with <see cref="Order"/> directly would say "eligible" while
+	/// the block is out of order and "not eligible" once a first run has sorted it, so whatever the
+	/// caller declined to touch on the first run it would happily touch on the second — a formatter
+	/// that is not idempotent on its own output.
+	/// </remarks>
+	public static bool IsEligible(SyntaxNode container, SyntaxList<UsingDirectiveSyntax> usings, in FormatOptions options) =>
+		options.SortUsings != UsingOrder.AsWritten
+		&& usings.Count >= 2
+		&& !container.ContainsDirectives
+		&& !HasContentAfterBanner(usings[0]);
+
 	/// <summary>True when a blank line belongs between these two directives.</summary>
 	/// <remarks>
 	/// A group is a run sharing a first namespace segment, which is only meaningful once the list is

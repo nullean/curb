@@ -165,6 +165,6 @@ public sealed record OptionDescriptor(
 		// ---- Suppression (3) ----------------------------------------------------------------
 		new("generated_code", OptionGroup.Suppression, ["true", "false"], "false", "Skip this file entirely. Curb never formats files marked as generated.", "basic_method"),
 		new("dotnet_diagnostic.ide0055.severity", OptionGroup.Suppression, ["none", "silent", "suggestion", "warning", "error"], "warning", "Set this to none to opt a file out of formatting.", "basic_method"),
-		new("file_header_template", OptionGroup.Suppression, ["<template>", "unset"], "(not set)", "Insert a // comment header at the top of files missing one. IDE0073.", "basic_method"),
+		new("file_header_template", OptionGroup.Suppression, ["<template>", "unset"], "(not set)", "Insert or correct a // comment header at the top of the file. Supports {fileName}. IDE0073.", "basic_method"),
 	];
 }

@@ -224,16 +224,20 @@ internal static class Program
         var defaultResult = formatter.Format(input, defaultOptions, produceText: true);
         var defaultOutput = defaultResult.Success ? (defaultResult.Text ?? input) : input;
 
+        // A concrete demo value stands in for a freeform placeholder like <template>, which is
+        // filtered out of iterableValues below since there is nothing to iterate. Emitted first, so
+        // the freeform shape is shown before whatever named values the option also accepts.
+        if (Snippets.DemoValues.TryGetValue(descriptor.Key, out var forceVal))
+        {
+            var opts = BuildOptions(descriptor, forceVal);
+            var r = formatter.Format(input, opts, produceText: true);
+            var output = r.Success ? (r.Text ?? input) : input;
+            EmitValueSection(sb, descriptor.Key, forceVal, input, output);
+        }
+
         if (iterableValues.Count == 0)
         {
-            if (Snippets.DemoValues.TryGetValue(descriptor.Key, out var forceVal))
-            {
-                var opts = BuildOptions(descriptor, forceVal);
-                var r = formatter.Format(input, opts, produceText: true);
-                var output = r.Success ? (r.Text ?? input) : input;
-                EmitValueSection(sb, descriptor.Key, forceVal, input, output);
-            }
-            else
+            if (!Snippets.DemoValues.ContainsKey(descriptor.Key))
             {
                 sb.AppendLine("*This option accepts a freeform value. No canned example is generated.*");
                 sb.AppendLine();
@@ -450,8 +454,10 @@ internal static class Program
             "generated_code" => opts with { Excluded = b },
             "dotnet_diagnostic.ide0055.severity" => value == "none" ? opts with { Excluded = true } : opts,
 
-            // Keys with no runtime effect in FormatOptions (file_header_template, modifier order, max counts).
-            "file_header_template" => opts with { FileHeaderTemplate = value },
+            // "unset" turns the rule off, the same as an absent or empty key — not a literal template.
+            "file_header_template" => value == "unset" ? opts : opts with { FileHeaderTemplate = value },
+
+            // Keys with no runtime effect in FormatOptions (modifier order, max counts).
             "csharp_preferred_modifier_order" => opts,
             "max_line_length" => value == "off" ? opts : opts with { MaxLineLength = int.TryParse(value, out var w) ? w : FormatOptions.Off },
 

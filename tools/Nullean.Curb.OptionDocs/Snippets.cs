@@ -1465,5 +1465,6 @@ public static class Snippets
         ["csharp_blank_lines_inside_type"] = "1",
         ["csharp_blank_lines_around_namespace"] = "1",
         ["csharp_blank_lines_after_using_list"] = "1",
+        ["file_header_template"] = "Copyright (c) Example Corp.\\nLicensed under the MIT license.",
     };
 }
