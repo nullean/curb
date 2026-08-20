@@ -51,27 +51,54 @@ internal static partial class Printers
 		var arena = context.Arena;
 		var before = context.Options.WrapBeforeBinaryOpsign;
 
-		using (arena.Group())
+		void PrintOperator(int operatorIndex)
+		{
+			if (before)
+			{
+				arena.Line();
+				TokenPrinter.Print(operators[operatorIndex], context);
+				arena.Synthetic(SyntheticText.Space);
+			}
+			else
+			{
+				arena.Synthetic(SyntheticText.Space);
+				TokenPrinter.Print(operators[operatorIndex], context);
+				arena.Line();
+			}
+		}
+
 		using (arena.Indent())
 		{
-			Node.Print(operands[0], context);
-
-			for (var i = 1; i < operands.Count; i++)
+			// wrap_if_long packs operands onto a line until the next one would not fit, rather than
+			// the group's all-flat-or-all-broken choice the other two values make — see DocKind.Fill.
+			if (context.Options.WrapChainedBinaryExpressions == WrapStyle.WrapIfLong)
 			{
-				if (before)
+				using var fill = arena.Fill();
+
+				using (fill.Item())
+					Node.Print(operands[0], context);
+
+				for (var i = 1; i < operands.Count; i++)
 				{
-					arena.Line();
-					TokenPrinter.Print(operators[i - 1], context);
-					arena.Synthetic(SyntheticText.Space);
-				}
-				else
-				{
-					arena.Synthetic(SyntheticText.Space);
-					TokenPrinter.Print(operators[i - 1], context);
-					arena.Line();
+					using (fill.Separator())
+						PrintOperator(i - 1);
+
+					using (fill.Item())
+						Node.Print(operands[i], context);
 				}
 
-				Node.Print(operands[i], context);
+				return true;
+			}
+
+			using (arena.Group())
+			{
+				Node.Print(operands[0], context);
+
+				for (var i = 1; i < operands.Count; i++)
+				{
+					PrintOperator(i - 1);
+					Node.Print(operands[i], context);
+				}
 			}
 		}
 

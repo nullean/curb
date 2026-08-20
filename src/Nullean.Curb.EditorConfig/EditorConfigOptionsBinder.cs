@@ -305,15 +305,17 @@ public static class EditorConfigOptionsBinder
 					options = options with { WrapChainedBinaryExpressions = WrapStyle.ChopIfLong };
 					break;
 				case "wrap_if_long":
-					// The fill layout, which the document printer has no primitive for. Reported
-					// rather than silently treated as the other one.
-					diagnostics?.Add(CurbDiagnostic.UnrecognisedValue(
-						prefix + "wrap_chained_binary_expressions", binaryWrap,
-						"chop_if_long; wrap_if_long is not implemented"));
+					// Forcing operands to pack moves indentation preservation mode's rules read from
+					// the source, the same reason wrap_arguments_style is deterministic-only.
+					if (options.KeepExistingLinebreaks)
+						diagnostics?.Add(CurbDiagnostic.RequiresDeterministicLayout(
+							prefix + "wrap_chained_binary_expressions"));
+					else
+						options = options with { WrapChainedBinaryExpressions = WrapStyle.WrapIfLong };
 					break;
 				default:
 					diagnostics?.Add(CurbDiagnostic.UnrecognisedValue(
-						prefix + "wrap_chained_binary_expressions", binaryWrap, "chop_if_long"));
+						prefix + "wrap_chained_binary_expressions", binaryWrap, "chop_if_long or wrap_if_long"));
 					break;
 			}
 
@@ -355,7 +357,7 @@ public static class EditorConfigOptionsBinder
 		// keys Curb does not implement is the honest answer until it has.
 		options = options with
 		{
-			WrapParametersStyle = WrapStyleOf(properties, "wrap_parameters_style", diagnostics),
+			WrapParametersStyle = ParametersWrapStyle(),
 			WrapArgumentsStyle = DeterministicOnlyWrapStyle("wrap_arguments_style"),
 			WrapObjectAndCollectionInitializerStyle =
 				DeterministicOnlyWrapStyle("wrap_object_and_collection_initializer_style"),
@@ -614,6 +616,21 @@ public static class EditorConfigOptionsBinder
 			return null;
 		}
 
+		// wrap_parameters_style is admissible in either mode for chop_always — see the remark above
+		// this method's caller — but wrap_if_long packs elements by measuring width the same way
+		// chop_always forces a break, and that is exactly the risk preservation mode cannot take: a
+		// break introduced by packing moves indentation another rule would otherwise read from the
+		// source. Only this one value needs the check the other three keys apply to themselves whole.
+		WrapStyle? ParametersWrapStyle()
+		{
+			var style = WrapStyleOf(properties, "wrap_parameters_style", diagnostics);
+			if (style != WrapStyle.WrapIfLong || !options.KeepExistingLinebreaks)
+				return style;
+
+			diagnostics?.Add(CurbDiagnostic.RequiresDeterministicLayout("csharp_wrap_parameters_style"));
+			return null;
+		}
+
 		AttributePlacement DeterministicOnlyPlacement(string suffix)
 		{
 			var placement = PlacementOf(properties, suffix, diagnostics);
@@ -717,14 +734,6 @@ public static class EditorConfigOptionsBinder
 		}
 	}
 
-	/// <summary>Reads one of ReSharper's wrapping styles, under its four spellings.</summary>
-	/// <remarks>
-	/// <para>
-	/// <c>wrap_if_long</c> is the fill layout — pack elements onto a line until the width runs out —
-	/// which the document printer has no primitive for, so it is reported rather than silently
-	/// treated as one of the others.
-	/// </para>
-	/// </remarks>
 	/// <summary>Reads one <c>place_*_attribute_on_same_line</c> key, under all four ReSharper spellings.</summary>
 	/// <remarks>
 	/// ReSharper writes the conditional value as <c>if_owner_is_single_line</c> and the other two as plain
@@ -764,6 +773,14 @@ public static class EditorConfigOptionsBinder
 		return null;
 	}
 
+	/// <summary>Reads one of ReSharper's wrapping styles, under its four spellings.</summary>
+	/// <remarks>
+	/// <c>wrap_if_long</c> is the fill layout: pack elements onto a line until the next one would not
+	/// fit, rather than <c>chop_if_long</c>'s all-flat-or-all-broken choice or <c>chop_always</c>'s
+	/// unconditional one. Some callers restrict it to deterministic layout the same way they restrict
+	/// <c>chop_always</c> — see <c>DeterministicOnlyWrapStyle</c> and <c>ParametersWrapStyle</c> — since
+	/// forcing a break by measuring width carries the same risk in preservation mode either value does.
+	/// </remarks>
 	private static WrapStyle? WrapStyleOf(
 		IReadOnlyDictionary<string, string> properties,
 		string key,
@@ -782,12 +799,10 @@ public static class EditorConfigOptionsBinder
 				case "chop_if_long":
 					return WrapStyle.ChopIfLong;
 				case "wrap_if_long":
-					diagnostics?.Add(CurbDiagnostic.UnrecognisedValue(
-						prefix + key, raw, "chop_always or chop_if_long; wrap_if_long is not implemented"));
-					return null;
+					return WrapStyle.WrapIfLong;
 				default:
 					diagnostics?.Add(CurbDiagnostic.UnrecognisedValue(
-						prefix + key, raw, "chop_always or chop_if_long"));
+						prefix + key, raw, "chop_always, chop_if_long or wrap_if_long"));
 					return null;
 			}
 		}

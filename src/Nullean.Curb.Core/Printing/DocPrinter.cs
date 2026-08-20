@@ -47,6 +47,7 @@ internal sealed class DocPrinter
 	private int _column;
 	private int _tabWidth = 4;
 	private bool _useTabs;
+	private bool _trimTrailingWhitespace;
 
 	/// <summary>Columns captured by <see cref="DocKind.Anchor"/>, read back by an aligned break.</summary>
 	private readonly int[] _anchors = new int[4];
@@ -78,6 +79,7 @@ internal sealed class DocPrinter
 		_useTabs = options.UseTabs;
 		_endOfLine = options.ResolveEndOfLine(source.Span);
 		_width = options.MaxLineLength;
+		_trimTrailingWhitespace = options.TrimTrailingWhitespace;
 		_column = 0;
 		_depth = 0;
 		_lastSourceEnd = -1;
@@ -96,7 +98,7 @@ internal sealed class DocPrinter
 		_breaks.Run(arena);
 		EnsureGroupModes(arena.Count);
 
-		Walk(options);
+		RunSegment(0, arena.Count, 0, PrintMode.Break, false);
 
 		// insert_final_newline terminates the last line; a file with no lines has nothing to
 		// terminate, so an empty result stays empty rather than becoming a lone newline.
@@ -106,23 +108,37 @@ internal sealed class DocPrinter
 			output.RemoveTrailingNewLines();
 	}
 
-	private void Walk(in FormatOptions options)
+	/// <summary>
+	/// Walks <c>[start, end)</c> under one freshly pushed scope, and returns once that scope has
+	/// closed.
+	/// </summary>
+	/// <remarks>
+	/// The whole document is one call from <see cref="Print"/> with <c>[0, count)</c>. A construct that
+	/// needs to make more than one flat-or-broken decision within itself — today, only
+	/// <see cref="PrintFill"/> — calls back in in for one child at a time instead, which is safe because
+	/// scopes are a stack: pushing more on top while an outer call is still on it is exactly what a
+	/// stack is for, and <paramref name="start"/>/<paramref name="end"/> bound each call to its own
+	/// slice of the arena regardless of how deep it is nested.
+	/// </remarks>
+	private void RunSegment(int start, int end, int indent, PrintMode mode, bool suppressWidth)
 	{
-		var count = _arena.Count;
-		Push(new Scope(count, 0, PrintMode.Break, -1, false));
+		var baseDepth = _depth;
+		Push(new Scope(end, indent, mode, -1, suppressWidth));
 
-		var i = 0;
-		while (i < count)
+		var i = start;
+		while (i < end)
 		{
-			// Close every scope the cursor has passed, honouring resume points as we go.
-			while (_depth > 1 && i >= _scopes[_depth - 1].End)
+			// Close every scope the cursor has passed, honouring resume points as we go. Bounded to
+			// this call's own scopes: an outer call's scopes below baseDepth are none of this one's
+			// business, and closing past them would pop a scope this call never pushed.
+			while (_depth > baseDepth + 1 && i >= _scopes[_depth - 1].End)
 			{
 				var closed = _scopes[--_depth];
 				if (closed.Resume > i)
 					i = closed.Resume;
 			}
 
-			if (i >= count)
+			if (i >= end)
 				break;
 
 			var scope = _scopes[_depth - 1];
@@ -167,7 +183,7 @@ internal sealed class DocPrinter
 					break;
 
 				case DocKind.Line:
-					PrintLine(doc, scope, options);
+					PrintLine(doc, scope);
 					i++;
 					break;
 
@@ -183,8 +199,8 @@ internal sealed class DocPrinter
 							break;
 						}
 
-						var indent = doc.B == Doc.IndentToRoot ? 0 : scope.Indent + doc.B;
-						Push(new Scope(i + doc.Length, Math.Max(0, indent), scope.Mode, -1, scope.SuppressWidth));
+						var indentLevel = doc.B == Doc.IndentToRoot ? 0 : scope.Indent + doc.B;
+						Push(new Scope(i + doc.Length, Math.Max(0, indentLevel), scope.Mode, -1, scope.SuppressWidth));
 						i++;
 						break;
 					}
@@ -201,10 +217,10 @@ internal sealed class DocPrinter
 
 				case DocKind.Group:
 					{
-						var mode = ResolveGroupMode(i, doc, scope);
+						var groupMode = ResolveGroupMode(i, doc, scope);
 						if (doc.GroupId != 0)
-							_groupModes[doc.GroupId] = mode;
-						Push(new Scope(i + doc.Length, scope.Indent, mode, -1, scope.SuppressWidth));
+							_groupModes[doc.GroupId] = groupMode;
+						Push(new Scope(i + doc.Length, scope.Indent, groupMode, -1, scope.SuppressWidth));
 						i++;
 						break;
 					}
@@ -212,11 +228,11 @@ internal sealed class DocPrinter
 				case DocKind.ConditionalGroup:
 					{
 						var chosen = ChooseOption(i, doc, scope);
-						var mode = _breaks.IsBroken(i) ? PrintMode.Break : PrintMode.Flat;
+						var conditionalMode = _breaks.IsBroken(i) ? PrintMode.Break : PrintMode.Flat;
 						if (doc.GroupId != 0)
-							_groupModes[doc.GroupId] = mode;
+							_groupModes[doc.GroupId] = conditionalMode;
 
-						Push(new Scope(chosen + _arena[chosen].Length, scope.Indent, mode, i + doc.Length, scope.SuppressWidth));
+						Push(new Scope(chosen + _arena[chosen].Length, scope.Indent, conditionalMode, i + doc.Length, scope.SuppressWidth));
 						i = chosen;
 						break;
 					}
@@ -236,6 +252,11 @@ internal sealed class DocPrinter
 						break;
 					}
 
+				case DocKind.Fill:
+					PrintFill(i, doc, scope);
+					i += doc.Length;
+					break;
+
 				default:
 					// Every DocKind is handled above, so this is unreachable today. It throws rather
 					// than skipping so that a kind added later fails loudly here instead of being
@@ -243,9 +264,86 @@ internal sealed class DocPrinter
 					throw new InvalidOperationException($"doc {i} has unhandled kind {doc.Kind}");
 			}
 		}
+
+		// Pop back to where this call started. The loop above only pops scopes strictly finished
+		// before `end`; the one pushed here closes exactly at `end`, so it — and, defensively, anything
+		// still open under it — is popped explicitly rather than by one more iteration that never runs.
+		_depth = baseDepth;
 	}
 
-	private void PrintLine(in Doc doc, in Scope scope, in FormatOptions options)
+	/// <summary>
+	/// Packs a <see cref="DocKind.Fill"/>'s alternating item/separator children onto a line, breaking a
+	/// separator only when the pair it joins would not fit.
+	/// </summary>
+	/// <remarks>
+	/// <para>
+	/// The decision is the same one Prettier's <c>fill</c> makes, adapted to run incrementally rather
+	/// than by recursing on "the rest": for every item but the last, measure the item together with its
+	/// trailing separator and the item after it (<c>pairFits</c>). If that fits, both print flat — the
+	/// separator stays a space. If not, the separator breaks, and the item alone still prints flat when
+	/// it fits by itself; only an item that does not even fit alone prints broken.
+	/// </para>
+	/// <para>
+	/// <see cref="Fits"/> already measures "flat here, then whatever follows up to the next real break"
+	/// — exactly what a fill decision needs — so no new measurement primitive was needed, only this
+	/// orchestration. Reusing it for a range that does not start where the enclosing scope's own
+	/// candidate started is why <see cref="Fits"/> takes explicit bounds rather than reading them off
+	/// the scope.
+	/// </para>
+	/// </remarks>
+	private void PrintFill(int index, in Doc doc, in Scope scope)
+	{
+		var end = index + doc.Length;
+
+		// Already decided flat: nothing inside can reintroduce a break, so every item and separator
+		// prints flat without spending a Fits call on each pair — the same short-circuit
+		// ResolveGroupMode takes for a nested group.
+		if (scope.Mode is PrintMode.Flat or PrintMode.ForceFlat)
+		{
+			RunSegment(index + 1, end, scope.Indent, scope.Mode, scope.SuppressWidth);
+			return;
+		}
+
+		// With reflow off there is no width to exceed, so every item and separator is flat — not
+		// scope.Mode, which a Fill with nothing enclosing it sees as the root's default Break.
+		if (_width == FormatOptions.Off)
+		{
+			RunSegment(index + 1, end, scope.Indent, PrintMode.Flat, scope.SuppressWidth);
+			return;
+		}
+
+		var child = index + 1;
+		while (child < end)
+		{
+			var itemStart = child;
+			var itemEnd = itemStart + _arena[itemStart].Length;
+
+			if (itemEnd >= end)
+			{
+				// The last item: no separator follows it, so there is no pair to look ahead to.
+				var lastMode = Fits(itemStart, itemEnd, scope) ? PrintMode.Flat : PrintMode.Break;
+				RunSegment(itemStart, itemEnd, scope.Indent, lastMode, scope.SuppressWidth);
+				break;
+			}
+
+			var sepStart = itemEnd;
+			var sepEnd = sepStart + _arena[sepStart].Length;
+			var nextItemEnd = sepEnd + _arena[sepEnd].Length;
+
+			var pairFits = Fits(itemStart, nextItemEnd, scope);
+			var itemMode = pairFits || Fits(itemStart, itemEnd, scope) ? PrintMode.Flat : PrintMode.Break;
+			var sepMode = pairFits ? PrintMode.Flat : PrintMode.Break;
+
+			RunSegment(itemStart, itemEnd, scope.Indent, itemMode, scope.SuppressWidth);
+			RunSegment(sepStart, sepEnd, scope.Indent, sepMode, scope.SuppressWidth);
+
+			// To the item just printed, past its own separator — not past the next item too, which
+			// this iteration only measured as pairFits's lookahead and never actually printed.
+			child = sepEnd;
+		}
+	}
+
+	private void PrintLine(in Doc doc, in Scope scope)
 	{
 		var type = doc.LineType;
 
@@ -278,7 +376,7 @@ internal sealed class DocPrinter
 			return;
 		}
 
-		if (options.TrimTrailingWhitespace && !doc.Flags.HasFlag(DocFlags.NoTrim))
+		if (_trimTrailingWhitespace && !doc.Flags.HasFlag(DocFlags.NoTrim))
 			_output.TrimTrailingWhitespace();
 
 		if (doc.Flags.HasFlag(DocFlags.Reindent))

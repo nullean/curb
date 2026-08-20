@@ -226,7 +226,7 @@ public static class OptionValues
 	{
 		WrapStyle.ChopAlways => "chop_always",
 		WrapStyle.ChopIfLong => "chop_if_long",
-		WrapStyle.WrapIfLong => "chop_if_long   # wrap_if_long is not implemented",
+		WrapStyle.WrapIfLong => "wrap_if_long",
 		_ => "chop_if_long   # width decides; the key is the opt-in",
 	};
 

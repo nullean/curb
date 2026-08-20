@@ -58,6 +58,15 @@ internal static class DocValidator
 						throw new DocArenaCorruptException($"doc {i} is a leaf ({doc.Kind}) but claims {doc.Length} slots");
 					break;
 
+				case DocKind.Fill:
+					{
+						if (doc.B != 0 && (doc.B & 1) == 0)
+							throw new DocArenaCorruptException($"doc {i} is a fill with an even number of children ({doc.B}); a fill must end on an item");
+
+						ValidateRange(arena, i + 1, i + doc.Length, sourceLength);
+						break;
+					}
+
 				case DocKind.IfBreak:
 					{
 						// Exactly two branches, flat first, and the stored flat length must agree with

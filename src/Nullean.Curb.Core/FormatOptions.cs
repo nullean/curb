@@ -11,7 +11,7 @@ public enum WrapStyle
 	/// <summary>Every element on its own line, fit or not.</summary>
 	ChopAlways,
 
-	/// <summary>Pack elements onto a line until the width runs out. Not implemented.</summary>
+	/// <summary>Pack elements onto a line until the next one would not fit.</summary>
 	WrapIfLong,
 }
 
@@ -760,9 +760,11 @@ public readonly record struct FormatOptions
 	/// whether or not the list fits. Null leaves width to decide, which is <c>chop_if_long</c>.
 	/// </summary>
 	/// <remarks>
-	/// The breaking direction again, and safe for the same reason the counts are: it asks nothing
-	/// about the layout being decided. <c>wrap_if_long</c> — the fill layout — is reported as
-	/// unimplemented rather than quietly treated as one of the others.
+	/// The breaking direction again, and <c>chop_always</c> is safe for the same reason the counts
+	/// are: it asks nothing about the layout being decided. <c>wrap_if_long</c> packs by measuring
+	/// width instead, which carries the same preservation-mode risk <see cref="WrapArgumentsStyle"/>
+	/// documents, so that one value alone is admissible only under <see cref="KeepExistingLinebreaks"/>
+	/// <c>= false</c> — the sole asymmetry within this one key.
 	/// </remarks>
 	public WrapStyle? WrapParametersStyle { get; init; }
 
@@ -943,9 +945,12 @@ public readonly record struct FormatOptions
 	/// key that gives them somewhere to go.
 	/// </para>
 	/// <para>
-	/// Only <c>chop_if_long</c> is implemented: every operand on its own line once the chain does not
-	/// fit. <c>wrap_if_long</c> is the fill layout, packing operands until the width runs out, and the
-	/// document printer has no primitive for it.
+	/// <c>chop_if_long</c> gives every operand its own line once the chain does not fit.
+	/// <c>wrap_if_long</c> packs operands onto a line until the next one would not fit instead —
+	/// admissible only under <see cref="KeepExistingLinebreaks"/> <c>= false</c>, the same restriction
+	/// <see cref="WrapArgumentsStyle"/> carries and for the same reason: packing decides a break by
+	/// measuring width, and preservation mode has rules elsewhere that read that break's indentation
+	/// from the source.
 	/// </para>
 	/// </remarks>
 	public WrapStyle? WrapChainedBinaryExpressions { get; init; }

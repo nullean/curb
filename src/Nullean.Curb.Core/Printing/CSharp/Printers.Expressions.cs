@@ -331,28 +331,64 @@ internal static partial class Printers
 				if (chopAlways || (limit is { } elements && node.Expressions.Count > elements && !IsInsideArguments(node)))
 					arena.BreakParent();
 
+				// wrap_if_long packs elements onto a line until the next one would not fit. openItOut
+				// asks for one member per line unconditionally, a stronger and more specific request
+				// than "pack what fits", so it wins when both are set.
+				var fill = context.Options.WrapObjectAndCollectionInitializerStyle == WrapStyle.WrapIfLong
+					&& !openItOut;
+
 				var rewritesComma = RewritesTrailingComma(node.Expressions, node.CloseBraceToken, context);
 
 				using (arena.Indent())
 				{
-					InsideBrace(node.OpenBraceToken.Span.End, node.Expressions[0].SpanStart);
-					for (var i = 0; i < node.Expressions.Count; i++)
+					if (fill)
 					{
-						Node.Print(node.Expressions[i], context);
-						if (i >= node.Expressions.SeparatorCount)
-							continue;
+						// Outside the fill, not one of its item/separator children — the same shape as
+						// the leading gap ParameterList and the argument list print around their own
+						// fill-based PrintSeparated call.
+						arena.Line();
+						using var f = arena.Fill();
 
-						// The source's own trailing comma is suppressed when the printer is deciding
-						// this list's, so that the two cannot both emit one.
-						if (rewritesComma && i == node.Expressions.Count - 1)
-							continue;
+						for (var i = 0; i < node.Expressions.Count; i++)
+						{
+							using (f.Item())
+								Node.Print(node.Expressions[i], context);
 
-						Spacing.BeforeComma(context);
-						TokenPrinter.Print(node.Expressions.GetSeparator(i), context);
+							if (i >= node.Expressions.SeparatorCount)
+								continue;
 
-						// A trailing separator is followed by the closing line, not by another one.
-						if (i < node.Expressions.Count - 1)
-							Separator(node.Expressions[i].Span.End, node.Expressions[i + 1].SpanStart);
+							if (rewritesComma && i == node.Expressions.Count - 1)
+								continue;
+
+							using (f.Separator())
+							{
+								Spacing.BeforeComma(context);
+								TokenPrinter.Print(node.Expressions.GetSeparator(i), context);
+								Spacing.AfterCommaBreakable(context);
+							}
+						}
+					}
+					else
+					{
+						InsideBrace(node.OpenBraceToken.Span.End, node.Expressions[0].SpanStart);
+						for (var i = 0; i < node.Expressions.Count; i++)
+						{
+							Node.Print(node.Expressions[i], context);
+							if (i >= node.Expressions.SeparatorCount)
+								continue;
+
+							// The source's own trailing comma is suppressed when the printer is deciding
+							// this list's, so that the two cannot both emit one.
+							if (rewritesComma && i == node.Expressions.Count - 1)
+								continue;
+
+							Spacing.BeforeComma(context);
+							TokenPrinter.Print(node.Expressions.GetSeparator(i), context);
+
+							// A trailing separator is followed by the closing line, not by another one.
+							if (i < node.Expressions.Count - 1)
+								Separator(node.Expressions[i].Span.End, node.Expressions[i + 1].SpanStart);
+						}
 					}
 
 					if (rewritesComma)

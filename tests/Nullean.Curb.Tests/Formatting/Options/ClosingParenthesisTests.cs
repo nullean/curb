@@ -792,4 +792,139 @@ public class ClosingParenthesisTests : FormattingTest
 		}
 		""",
 		editorConfig: "csharp_wrap_object_and_collection_initializer_style = chop_always");
+
+	// ---- wrap if long: the fill layout --------------------------------------------------------------
+
+	/// <summary>
+	/// <c>wrap_if_long</c> on <c>csharp_wrap_parameters_style</c>, <c>csharp_wrap_arguments_style</c>,
+	/// <c>csharp_wrap_object_and_collection_initializer_style</c> and
+	/// <c>csharp_wrap_chained_binary_expressions</c>: pack elements onto a line until the next one would
+	/// not fit, rather than <c>chop_if_long</c>'s all-or-nothing group or <c>chop_always</c>'s
+	/// unconditional one-per-line.
+	/// </summary>
+	/// <remarks>
+	/// Deterministic mode only, the same restriction <c>chop_always</c> carries for arguments and
+	/// initializers — packing decides a break by measuring width, and preservation mode has rules
+	/// elsewhere that read that break's indentation from the source. Unlike <c>chop_always</c>, which is
+	/// admissible in either mode for parameters, <c>wrap_if_long</c> carries the restriction there too:
+	/// see <c>OptionsBindingTests</c>.
+	/// </remarks>
+	private const string Narrower = "max_line_length = 50\n";
+
+	[Test]
+	public Task Parameters_pack_onto_a_line_with_wrap_if_long() => Formats(
+		"""
+		public class C
+		{
+		    public void M(int alpha, int beta, int gamma, int delta, int epsilon)
+		    {
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M(
+		        int alpha, int beta, int gamma, int delta,
+		        int epsilon
+		    )
+		    { }
+		}
+		""",
+		Narrower + "csharp_wrap_parameters_style = wrap_if_long");
+
+	[Test]
+	public Task Arguments_pack_onto_a_line_with_wrap_if_long() => Formats(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        Call(alpha, beta, gamma, delta, epsilon, zeta);
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        Call(
+		            alpha, beta, gamma, delta, epsilon,
+		            zeta
+		        );
+		    }
+		}
+		""",
+		Narrower + "csharp_wrap_arguments_style = wrap_if_long");
+
+	[Test]
+	public Task Initializer_elements_pack_onto_a_line_with_wrap_if_long() => Formats(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        var arr = new[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13 };
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        var arr = new[]
+		        {
+		            1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
+		            13
+		        };
+		    }
+		}
+		""",
+		Narrower + "csharp_wrap_object_and_collection_initializer_style = wrap_if_long");
+
+	[Test]
+	public Task Binary_operands_pack_onto_a_line_with_wrap_if_long() => Formats(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        var ok = alpha && beta && gamma && delta && epsilon && zeta;
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        var ok = alpha && beta && gamma && delta
+		            && epsilon && zeta;
+		    }
+		}
+		""",
+		Narrower + "csharp_wrap_chained_binary_expressions = wrap_if_long");
+
+	[Test]
+	public Task Wrap_if_long_stays_flat_when_everything_fits() => Formats(
+		// Deterministic mode collapses an empty body to `{ }` regardless of this key — the fixture
+		// is here to show the parameter list itself stays joined, not to test that collapse.
+		"""
+		public class C
+		{
+		    public void M(int a, int b)
+		    {
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M(int a, int b)
+		    { }
+		}
+		""",
+		editorConfig: Deterministic + "csharp_wrap_parameters_style = wrap_if_long");
 }

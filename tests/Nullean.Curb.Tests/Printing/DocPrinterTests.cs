@@ -575,4 +575,113 @@ public class DocPrinterTests
 		rendered.Should().Be("012 345", "the outer group still had the option of fitting on one line");
 		await Task.CompletedTask;
 	}
+
+	// ---- fill ---------------------------------------------------------------------------------------
+
+	private static void CommaSeparator(DocArena arena)
+	{
+		arena.Synthetic(SyntheticText.Comma);
+		arena.Line();
+	}
+
+	private static DocArena BuildFill(string[] items)
+	{
+		var arena = new DocArena();
+		using (var fill = arena.Fill())
+		{
+			for (var i = 0; i < items.Length; i++)
+			{
+				using (fill.Item())
+					Text(arena, items[i]);
+
+				if (i < items.Length - 1)
+					using (fill.Separator())
+						CommaSeparator(arena);
+			}
+		}
+		return arena;
+	}
+
+	[Test]
+	public async Task Fill_packs_everything_flat_when_it_all_fits()
+	{
+		Render(BuildFill(["0", "1", "2", "3"]), width: 80).Should().Be("0, 1, 2, 3");
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task Fill_breaks_only_where_the_next_pair_does_not_fit()
+	{
+		// "0, 1" (4 columns) fits in 5; the next pair, "1, 2" starting at column 3, does not, so the
+		// separator after 1 breaks — its comma still prints, only the line inside it does, giving a
+		// trailing comma before the break — and item 1 still prints flat because it fits alone. The
+		// same reasoning repeats from the fresh line: "2, 3" fits, so the list ends up two per line.
+		Render(BuildFill(["0", "1", "2", "3"]), width: 5).Should().Be("0, 1,\n2, 3");
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task Fill_gives_every_item_its_own_line_once_no_pair_fits()
+	{
+		Render(BuildFill(["0", "1", "2", "3"]), width: 1).Should().Be("0,\n1,\n2,\n3");
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task Fill_indents_the_lines_it_breaks_to()
+	{
+		var arena = new DocArena();
+		using (arena.Indent())
+		{
+			arena.HardLine();
+			using var fill = arena.Fill();
+
+			using (fill.Item())
+				Text(arena, "0");
+			using (fill.Separator())
+				CommaSeparator(arena);
+			using (fill.Item())
+				Text(arena, "1");
+			using (fill.Separator())
+				CommaSeparator(arena);
+			using (fill.Item())
+				Text(arena, "2");
+		}
+
+		Render(arena, width: 1).Should().Be("\n  0,\n  1,\n  2", "indent_size is 2");
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task ForceFlat_keeps_a_fill_flat_regardless_of_width()
+	{
+		var arena = new DocArena();
+		using (arena.ForceFlat())
+		using (var fill = arena.Fill())
+		{
+			using (fill.Item())
+				Text(arena, "0123456789");
+			using (fill.Separator())
+				CommaSeparator(arena);
+			using (fill.Item())
+				Text(arena, "abcdefghij");
+		}
+
+		Render(arena, width: 3).Should().Be("0123456789, abcdefghij");
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task Reflow_disabled_never_breaks_a_fill()
+	{
+		Render(BuildFill(["0123456789", "abcdefghij"])).Should().Be("0123456789, abcdefghij");
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task A_single_item_fill_needs_no_separator_decision()
+	{
+		Render(BuildFill(["012"]), width: 1).Should().Be("012");
+		await Task.CompletedTask;
+	}
 }

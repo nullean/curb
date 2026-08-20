@@ -576,7 +576,8 @@ internal static partial class Printers
 					else
 						Spacing.InsideDeclarationParens(context);
 
-					PrintSeparated(node.Parameters, context, asWritten);
+					PrintSeparated(node.Parameters, context, asWritten,
+						fill: context.Options.WrapParametersStyle == WrapStyle.WrapIfLong);
 				}
 
 				// csharp_wrap_before_declaration_rpar takes the decision away from both the author and
@@ -764,7 +765,8 @@ internal static partial class Printers
 					else
 						Spacing.InsideCallParens(context);
 
-					PrintSeparated(node.Arguments, context, asWritten, node.OpenParenToken.Span.End);
+					PrintSeparated(node.Arguments, context, asWritten, node.OpenParenToken.Span.End,
+						fill: context.Options.WrapArgumentsStyle == WrapStyle.WrapIfLong);
 				}
 
 				var rpar = context.Options.WrapBeforeInvocationRpar;
@@ -1737,14 +1739,45 @@ internal static partial class Printers
 	/// End of the token the list opens after. Used to tell an argument that sits inline from one the
 	/// author put on a line of its own, which is what decides where a nested block anchors.
 	/// </param>
+	/// <param name="fill">
+	/// <c>wrap_if_long</c>: pack elements onto a line until the next one does not fit, rather than the
+	/// enclosing group's all-flat-or-all-broken choice. Mutually exclusive with <paramref name="asWritten"/>
+	/// in practice — the binder restricts <c>wrap_if_long</c> to deterministic layout, which never asks
+	/// for the author's own arrangement — so the ordinary per-element indent-and-break-position logic
+	/// below is not needed here and is skipped rather than reused.
+	/// </param>
 	private static void PrintSeparated<T>(
 		SeparatedSyntaxList<T> list,
 		PrintContext context,
 		bool asWritten = false,
-		int anchorEnd = -1)
+		int anchorEnd = -1,
+		bool fill = false)
 		where T : SyntaxNode
 	{
 		var arena = context.Arena;
+
+		if (fill)
+		{
+			using var f = arena.Fill();
+
+			for (var i = 0; i < list.Count; i++)
+			{
+				using (f.Item())
+					Node.Print(list[i], context);
+
+				if (i >= list.SeparatorCount)
+					continue;
+
+				using (f.Separator())
+				{
+					Spacing.BeforeComma(context);
+					TokenPrinter.Print(list.GetSeparator(i), context);
+					Spacing.AfterCommaBreakable(context);
+				}
+			}
+
+			return;
+		}
 
 		for (var i = 0; i < list.Count; i++)
 		{

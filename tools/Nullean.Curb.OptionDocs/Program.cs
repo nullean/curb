@@ -413,10 +413,10 @@ internal static class Program
             "csharp_place_simple_enum_on_single_line" => opts with { PlaceSimpleEnumOnSingleLine = b },
             "csharp_place_simple_accessorholder_on_single_line" => opts with { PlaceSimpleAccessorholderOnSingleLine = b },
             "csharp_wrap_before_binary_opsign" => opts with { WrapBeforeBinaryOpsign = b },
-            "csharp_wrap_chained_binary_expressions" => opts with { WrapChainedBinaryExpressions = WrapStyle.ChopIfLong },
-            "csharp_wrap_parameters_style" => opts with { WrapParametersStyle = value == "chop_always" ? WrapStyle.ChopAlways : WrapStyle.ChopIfLong },
-            "csharp_wrap_arguments_style" => opts with { WrapArgumentsStyle = value == "chop_always" ? WrapStyle.ChopAlways : WrapStyle.ChopIfLong },
-            "csharp_wrap_object_and_collection_initializer_style" => opts with { WrapObjectAndCollectionInitializerStyle = value == "chop_always" ? WrapStyle.ChopAlways : WrapStyle.ChopIfLong },
+            "csharp_wrap_chained_binary_expressions" => opts with { WrapChainedBinaryExpressions = ParseWrapStyle(value) },
+            "csharp_wrap_parameters_style" => opts with { WrapParametersStyle = ParseWrapStyle(value) },
+            "csharp_wrap_arguments_style" => opts with { WrapArgumentsStyle = ParseWrapStyle(value) },
+            "csharp_wrap_object_and_collection_initializer_style" => opts with { WrapObjectAndCollectionInitializerStyle = ParseWrapStyle(value) },
             "csharp_wrap_before_declaration_rpar" => opts with { WrapBeforeDeclarationRpar = b },
             "csharp_wrap_before_invocation_rpar" => opts with { WrapBeforeInvocationRpar = b },
             "csharp_place_method_attribute_on_same_line" => opts with { PlaceMethodAttributeOnSameLine = value == "if_owner_is_single_line" ? AttributePlacement.IfOwnerIsSingleLine : AttributePlacement.OwnLine },
@@ -481,5 +481,12 @@ internal static class Program
         "true" => ExpressionBodyStyle.Always,
         "when_on_single_line" => ExpressionBodyStyle.WhenOnSingleLine,
         _ => ExpressionBodyStyle.AsWritten,
+    };
+
+    private static WrapStyle ParseWrapStyle(string value) => value switch
+    {
+        "chop_always" => WrapStyle.ChopAlways,
+        "wrap_if_long" => WrapStyle.WrapIfLong,
+        _ => WrapStyle.ChopIfLong,
     };
 }
