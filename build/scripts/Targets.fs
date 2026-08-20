@@ -1055,6 +1055,7 @@ type private RepoResult = {
     Files: int
     Configs: int
     CurbSeconds: float
+    CurbWarmSeconds: float
     CspSeconds: float
     CspWarmSeconds: float
     DnfSeconds: float
@@ -1155,7 +1156,7 @@ let private compare (arguments:ParseResults<Arguments>) =
         configureCorpus arguments cspDir
         configureCorpus arguments dnfDir
 
-        // Curb — best of 3.
+        // Curb cold — best of 3.
         // Uses execResult (not exec) so a verification failure on one file does not abort the run.
         // Exit code 3 means a file could not be verified and was left untouched — expected on repos
         // with raw string literals or BOM handling; the changed-file count still reflects what happened.
@@ -1166,6 +1167,16 @@ let private compare (arguments:ParseResults<Arguments>) =
                 sw.Stop()
                 sw.Elapsed.TotalSeconds ]
             |> List.min
+
+        // Curb warm — run with --cache enabled. curbDir is already formatted, so the first run
+        // populates the cache; the second run is the warm measurement (all files are cache hits).
+        let curbCachePath = Path.Combine(scratch, repo.Name + "_curb.cache")
+        execResult binary ["format"; curbDir; "--cache"; curbCachePath] |> ignore
+        let curbWarmSec =
+            let sw = Diagnostics.Stopwatch.StartNew()
+            execResult binary ["format"; curbDir; "--cache"; curbCachePath] |> ignore
+            sw.Stop()
+            sw.Elapsed.TotalSeconds
 
         // CSharpier cache path — machine-global, content-hash keyed, outside the repo tree.
         // Clearing it before each cold run is the only way to get accurate formatting times.
@@ -1233,14 +1244,15 @@ let private compare (arguments:ParseResults<Arguments>) =
 
         let r = {
             Name = repo.Name; Files = files; Configs = configs
-            CurbSeconds = curbSec; CspSeconds = cspSec; CspWarmSeconds = cspWarmSec; DnfSeconds = dnfSec
+            CurbSeconds = curbSec; CurbWarmSeconds = curbWarmSec
+            CspSeconds = cspSec; CspWarmSeconds = cspWarmSec; DnfSeconds = dnfSec
             CurbChanged = curbChanged; CspChanged = cspChanged; DnfChanged = dnfChanged
             CurbNotFixpt = curbNotFixpt; CspNotFixpt = cspNotFixpt; CurbSecond = curbSecond
         }
         results.Add(r)
-        printfn "%s: curb %.2f s, csp cold %.2f s, csp warm %.2f s, dnf %.2f s; changed %d/%d/%d; not-fixpt %d/%d; 2nd %d"
-            r.Name r.CurbSeconds r.CspSeconds r.CspWarmSeconds r.DnfSeconds r.CurbChanged r.CspChanged r.DnfChanged
-            r.CurbNotFixpt r.CspNotFixpt r.CurbSecond
+        printfn "%s: curb cold %.2f s, curb warm %.2f s, csp cold %.2f s, csp warm %.2f s, dnf %.2f s; changed %d/%d/%d; not-fixpt %d/%d; 2nd %d"
+            r.Name r.CurbSeconds r.CurbWarmSeconds r.CspSeconds r.CspWarmSeconds r.DnfSeconds
+            r.CurbChanged r.CspChanged r.DnfChanged r.CurbNotFixpt r.CspNotFixpt r.CurbSecond
 
     // Emit the table (markdown format; not-fixpt and 2nd-idem columns are in churn.md).
     let header = "| repo | files | Curb | dotnet format | CSharpier |\n|---|---|---|---|---|"

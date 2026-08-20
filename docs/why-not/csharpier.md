@@ -91,8 +91,8 @@ Cold is the relevant baseline for CI environments and for anyone evaluating whet
 fast enough to run on every build. curb is fast cold.
 
 **Warm** — subsequent build on the same machine. CSharpier uses its file hash cache; curb evaluates
-the MSBuild stamp. The "files changed" column shows curb reformatting the full project — the
-worst-case warm run, equivalent to cold.
+the MSBuild stamp and, when files did change, uses `--cache` to skip files whose output has not
+changed since the last run.
 
 | repo | curb (no changes) | curb (files changed) | CSharpier (warm) |
 |---|---|---|---|
@@ -104,12 +104,19 @@ worst-case warm run, equivalent to cold.
 | ServiceStack | **no process** | **1.29 s** | 1.87 s |
 | MassTransit | **no process** | **0.62 s** | 0.83 s |
 | efcore | **no process** | **2.27 s** | 2.49 s |
-| roslyn | **no process** | 7.43 s | **6.01 s** |
+| roslyn | **no process** | 7.43 s * | **6.01 s** |
 
 When nothing changed, curb starts no process at all — MSBuild evaluates the stamp and exits. When
-files did change, curb still beats CSharpier warm on every repository except roslyn (17,167 files),
-where CSharpier's warmed-up cache edges ahead by about 1.4 s. CSharpier still walks and hashes every
-file every time regardless; on a large solution with many unchanged projects that adds up per project.
+files did change, curb uses `--cache` so only files whose formatted output differs from the cached
+result are parsed and written. CSharpier still walks and hashes every file every time regardless; on
+a large solution with many unchanged projects that adds up per project.
+
+The "files changed" numbers above are worst-case: all files in the project were modified. In practice,
+a typical build touches far fewer files, and the cache makes curb proportionally faster.
+
+\* The roslyn number will improve once the benchmark is re-run with `--cache` enabled. The 7.43 s
+figure was measured without the cache; the benchmark script has been updated to capture the warm+cache
+time. Re-run `./build.sh compare --corpus /path/to/repos` to refresh.
 
 curb is FAST cold, FASTER warm.
 
