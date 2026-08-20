@@ -920,7 +920,12 @@ public class ClosingParenthesisTests : FormattingTest
 		Narrower + "csharp_wrap_arguments_style = wrap_if_long");
 
 	[Test]
-	public Task Initializer_elements_pack_onto_a_line_with_wrap_if_long() => Formats(
+	public Task Wrap_if_long_is_refused_for_initializers_and_falls_back_to_ordinary_reflow() => Formats(
+		// dotnet format forces one member per line once an initializer opens out, unconditionally —
+		// even with csharp_new_line_before_members_in_object_initializers = false. A packed layout
+		// could never be a fixed point of that, so the binder refuses the value outright (see
+		// OptionsBindingTests) and this falls back to Curb's ordinary width-driven breaking, the
+		// same output chop_if_long already produces.
 		"""
 		public class C
 		{
@@ -937,7 +942,18 @@ public class ClosingParenthesisTests : FormattingTest
 		    {
 		        var arr = new[]
 		        {
-		            1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
+		            1,
+		            2,
+		            3,
+		            4,
+		            5,
+		            6,
+		            7,
+		            8,
+		            9,
+		            10,
+		            11,
+		            12,
 		            13
 		        };
 		    }

@@ -293,34 +293,51 @@ public class OptionsBindingTests
 			max_line_length = 120
 			csharp_wrap_parameters_style = wrap_if_long
 			csharp_wrap_arguments_style = wrap_if_long
-			csharp_wrap_object_and_collection_initializer_style = wrap_if_long
 			csharp_wrap_chained_binary_expressions = wrap_if_long
 			""", out var diagnostics);
 
 		diagnostics.Should().BeEmpty();
 		options.WrapParametersStyle.Should().Be(WrapStyle.WrapIfLong);
 		options.WrapArgumentsStyle.Should().Be(WrapStyle.WrapIfLong);
-		options.WrapObjectAndCollectionInitializerStyle.Should().Be(WrapStyle.WrapIfLong);
 		options.WrapChainedBinaryExpressions.Should().Be(WrapStyle.WrapIfLong);
 		await Task.CompletedTask;
 	}
 
 	[Test]
-	public async Task Wrap_if_long_needs_deterministic_layout_on_the_three_keys_already_restricted_there()
+	public async Task Wrap_if_long_needs_deterministic_layout_on_the_two_keys_already_restricted_there()
 	{
 		var options = Bind("""
 			root = true
 
 			[*.cs]
 			csharp_wrap_arguments_style = wrap_if_long
-			csharp_wrap_object_and_collection_initializer_style = wrap_if_long
 			csharp_wrap_chained_binary_expressions = wrap_if_long
 			""", out var diagnostics);
 
-		diagnostics.Should().HaveCount(3).And.OnlyContain(d => d.Id == "CURB1005");
+		diagnostics.Should().HaveCount(2).And.OnlyContain(d => d.Id == "CURB1005");
 		options.WrapArgumentsStyle.Should().BeNull();
-		options.WrapObjectAndCollectionInitializerStyle.Should().BeNull();
 		options.WrapChainedBinaryExpressions.Should().BeNull();
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task Wrap_if_long_is_not_offered_for_initializers_at_all()
+	{
+		// Measured directly: dotnet format forces one member per line once an initializer opens out,
+		// unconditionally, so a packed layout is never a fixed point of it — unlike parameters,
+		// arguments and chained binary expressions, which carry no such rule from dotnet format. This
+		// is refused outright rather than merely gated to deterministic layout, in either mode.
+		var options = Bind("""
+			root = true
+
+			[*.cs]
+			max_line_length = 120
+			csharp_wrap_object_and_collection_initializer_style = wrap_if_long
+			""", out var diagnostics);
+
+		diagnostics.Should().ContainSingle().Which.Id.Should().Be("CURB1001");
+		diagnostics[0].Message.Should().Contain("chop_always or chop_if_long");
+		options.WrapObjectAndCollectionInitializerStyle.Should().BeNull("the value was refused, not applied");
 		await Task.CompletedTask;
 	}
 

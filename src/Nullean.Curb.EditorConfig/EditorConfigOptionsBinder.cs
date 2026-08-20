@@ -368,8 +368,7 @@ public static class EditorConfigOptionsBinder
 		{
 			WrapParametersStyle = ParametersWrapStyle(),
 			WrapArgumentsStyle = DeterministicOnlyWrapStyle("wrap_arguments_style"),
-			WrapObjectAndCollectionInitializerStyle =
-				DeterministicOnlyWrapStyle("wrap_object_and_collection_initializer_style"),
+			WrapObjectAndCollectionInitializerStyle = InitializerWrapStyle(),
 			WrapChainedBinaryExpressions = DeterministicOnlyWrapStyle("wrap_chained_binary_expressions"),
 		};
 
@@ -638,6 +637,25 @@ public static class EditorConfigOptionsBinder
 				return style;
 
 			diagnostics?.Add(CurbDiagnostic.RequiresDeterministicLayout("csharp_wrap_parameters_style"));
+			return null;
+		}
+
+		// wrap_if_long is not offered here at all, the one value this key cannot take even under
+		// DeterministicOnlyWrapStyle's ordinary gate. Measured directly: dotnet format forces every
+		// member of an object or collection initializer onto its own line once it has opened out,
+		// unconditionally — even with csharp_new_line_before_members_in_object_initializers = false
+		// — so a packed layout is never a fixed point of it. Parameters, arguments and chained binary
+		// expressions carry no such rule from dotnet format, which is why they can offer it.
+		WrapStyle? InitializerWrapStyle()
+		{
+			var style = DeterministicOnlyWrapStyle("wrap_object_and_collection_initializer_style");
+			if (style != WrapStyle.WrapIfLong)
+				return style;
+
+			diagnostics?.Add(CurbDiagnostic.UnrecognisedValue(
+				"csharp_wrap_object_and_collection_initializer_style", "wrap_if_long",
+				"chop_always or chop_if_long; wrap_if_long is not supported here — dotnet format forces "
+				+ "one member per line once an initializer opens out, so a packed layout could never stay put"));
 			return null;
 		}
 

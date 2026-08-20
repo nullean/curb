@@ -790,9 +790,17 @@ public readonly record struct FormatOptions
 	/// the initializer fits.
 	/// </summary>
 	/// <remarks>
+	/// <para>
 	/// Deterministic mode only, for the same measured reason as <see cref="WrapArgumentsStyle"/>. The
 	/// count-based half of this family — <see cref="MaxInitializerElementsOnLine"/> — is admissible in
 	/// both modes, because a count is not a layout question.
+	/// </para>
+	/// <para>
+	/// <c>wrap_if_long</c> is not offered here, the one construct where it never can be: dotnet format
+	/// forces every member onto its own line once an initializer has opened out, unconditionally, so a
+	/// packed layout is never a fixed point of it — measured directly, not inferred. Parameters,
+	/// arguments and chained binary expressions carry no such rule from dotnet format.
+	/// </para>
 	/// </remarks>
 	public WrapStyle? WrapObjectAndCollectionInitializerStyle { get; init; }
 
