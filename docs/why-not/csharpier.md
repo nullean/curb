@@ -143,8 +143,7 @@ filed down. That counts for something.
 curb is new. The architecture is different, the goals are different, and the test suite is extensive
 — curb has broad formatting test coverage and its output is CI-gated to be byte-identical to
 `dotnet format whitespace` across 41,000 files — but it has not yet had the years of production use
-that CSharpier has. If you need a formatter with a long track record, CSharpier is the safer pick
-today.
+that CSharpier has.
 
 That said, if any of the above differences matter to you — IDE0055 compatibility, no editor plugin,
 MSBuild-native incrementality, respecting your existing `.editorconfig` — we would love for you to
