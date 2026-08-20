@@ -64,6 +64,24 @@ public enum BraceRequirement
 	WhenMultiline,
 }
 
+/// <summary>What <c>[resharper_]csharp_empty_block_style</c> asks for.</summary>
+/// <remarks>
+/// ReSharper's own key rather than one of dotnet format's — see <see cref="FormatOptions.EmptyBlockStyle"/>
+/// for how it relates to <see cref="FormatOptions.PreserveSingleLineBlocks"/>, which already collapses an
+/// empty pair without moving it.
+/// </remarks>
+public enum EmptyBlockStyle
+{
+	/// <summary>Force an empty pair apart onto two lines, even one the author or preservation joined.</summary>
+	Multiline,
+
+	/// <summary>Collapse an empty pair to <c>{ }</c>, wherever <c>csharp_new_line_before_open_brace</c> puts it.</summary>
+	Together,
+
+	/// <summary>Collapse an empty pair to <c>{ }</c> and keep it on the owner's line, whatever the brace option says.</summary>
+	TogetherSameLine,
+}
+
 /// <summary>What <c>charset</c> asks for, to the extent Curb writes it.</summary>
 public enum Charset : byte
 {
@@ -340,6 +358,28 @@ public readonly record struct FormatOptions
 	/// </para>
 	/// </remarks>
 	public bool PreserveSingleLineBlocks { get; init; } = true;
+
+	/// <summary>
+	/// How an empty brace pair on a method, constructor, accessor or control-flow body is laid out.
+	/// <c>[resharper_]csharp_empty_block_style</c> / <c>[resharper_]empty_block_style</c>, unset by default.
+	/// </summary>
+	/// <remarks>
+	/// <para>
+	/// ReSharper's own key, and independent of <see cref="PreserveSingleLineBlocks"/>: that option already
+	/// collapses an empty pair to <c>{ }</c> once <c>csharp_keep_existing_linebreaks</c> is false, but never
+	/// moves it — the brace still goes wherever <c>csharp_new_line_before_open_brace</c> puts it. This key
+	/// is the opt-in for actually moving it, which is what <c>together_same_line</c> is for: an empty
+	/// constructor or method stays <c>private C() { }</c> on one line even when every other brace in the
+	/// file breaks onto its own.
+	/// </para>
+	/// <para>
+	/// Unset leaves every existing rule exactly as it was — <c>Together</c> and <c>TogetherSameLine</c> are
+	/// both opt-in collapsing, unconditional on <see cref="PreserveSingleLineBlocks"/> and on layout mode,
+	/// and <c>Multiline</c> is the opposite opt-in: it forces an empty pair the author or preservation would
+	/// have kept joined apart onto two lines instead.
+	/// </para>
+	/// </remarks>
+	public EmptyBlockStyle? EmptyBlockStyle { get; init; }
 
 	/// <summary>
 	/// Keep a statement the author left on one line on one line.

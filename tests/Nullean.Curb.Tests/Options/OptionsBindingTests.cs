@@ -341,6 +341,46 @@ public class OptionsBindingTests
 	}
 
 	[Test]
+	public async Task Empty_block_style_binds_under_all_four_resharper_spellings()
+	{
+		foreach (var key in new[]
+		{
+			"resharper_csharp_empty_block_style",
+			"csharp_empty_block_style",
+			"resharper_empty_block_style",
+			"empty_block_style",
+		})
+		{
+			var options = Bind($"root = true\n\n[*.cs]\n{key} = together_same_line\n", out var diagnostics);
+
+			diagnostics.Should().BeEmpty(key);
+			options.EmptyBlockStyle.Should().Be(EmptyBlockStyle.TogetherSameLine, key);
+		}
+
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task An_unrecognised_empty_block_style_value_is_reported()
+	{
+		var options = Bind("root = true\n\n[*.cs]\ncsharp_empty_block_style = sometimes\n", out var diagnostics);
+
+		diagnostics.Should().ContainSingle().Which.Id.Should().Be("CURB1001");
+		options.EmptyBlockStyle.Should().BeNull();
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task Empty_block_style_is_unset_by_default()
+	{
+		var options = Bind("root = true\n\n[*.cs]\n", out var diagnostics);
+
+		diagnostics.Should().BeEmpty();
+		options.EmptyBlockStyle.Should().BeNull();
+		await Task.CompletedTask;
+	}
+
+	[Test]
 	public async Task Code_style_and_naming_keys_are_not_our_business()
 	{
 		Bind("""

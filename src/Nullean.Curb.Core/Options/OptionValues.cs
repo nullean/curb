@@ -43,6 +43,13 @@ public static class OptionValues
 			_ => "   # the byte-order mark each file arrived with is kept",
 		},
 
+		"csharp_empty_block_style" => options.EmptyBlockStyle switch
+		{
+			EmptyBlockStyle.Multiline => "multiline",
+			EmptyBlockStyle.Together => "together",
+			EmptyBlockStyle.TogetherSameLine => "together_same_line",
+			_ => "   # csharp_preserve_single_line_blocks governs an empty pair instead",
+		},
 		"csharp_trailing_comma_in_multiline_lists" => Bool(options.TrailingCommaInMultilineLists),
 		"csharp_trailing_comma_in_singleline_lists" => Bool(options.TrailingCommaInSinglelineLists),
 		"csharp_style_expression_bodied_methods" => Expression(options.ExpressionBodiedMethods),

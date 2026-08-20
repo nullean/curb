@@ -101,6 +101,7 @@ public sealed record OptionDescriptor(
 
 		// ---- Wrapping (26) ------------------------------------------------------------------
 		new("csharp_preserve_single_line_blocks", OptionGroup.Wrapping, ["true", "false"], "true", "Allow a block the author wrote on one line to stay on one line.", "single_line_block"),
+		new("csharp_empty_block_style", OptionGroup.Wrapping, ["multiline", "together", "together_same_line"], "(not set)", "How an empty method, constructor, accessor or control-flow body is laid out. together_same_line keeps { } on the signature's line.", "single_line_block"),
 		new("csharp_preserve_single_line_statements", OptionGroup.Wrapping, ["true", "false"], "true", "Allow a control-flow body the author left on its header's line to stay there.", "if_else"),
 		new("csharp_keep_existing_linebreaks", OptionGroup.Wrapping, ["true", "false"], "(derived from max_line_length)", "Preservation mode. Defaults to true when max_line_length is off.", "long_chain"),
 		new("csharp_wrap_before_first_method_call", OptionGroup.Wrapping, ["true", "false"], "(not set)", "When a chain breaks, break before the first call too, leaving the receiver on its own line.", "long_chain"),
