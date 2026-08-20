@@ -1459,9 +1459,27 @@ internal static partial class Printers
 	/// is on its own line. dotnet format keeps them: with statements off and blocks on,
 	/// <c>if (a) { return; }</c> becomes <c>if (a)</c> then <c>{ return; }</c>, not a full expansion.
 	/// </remarks>
-	internal static void PrintStatementBody(SyntaxNode body, BraceStyle construct, PrintContext context)
+	/// <param name="body">The braced body to emit.</param>
+	/// <param name="construct">Which csharp_new_line_before_open_brace flag governs its brace.</param>
+	/// <param name="context">Per-file printing state.</param>
+	/// <param name="alwaysJoinsEmpty">
+	/// True for a <c>catch</c> or <c>finally</c> block: an empty one always prints as <c>{ }</c> glued
+	/// to whatever precedes it (the keyword, or its declaration/filter), whatever the source had and
+	/// whatever <c>csharp_preserve_single_line_blocks</c> says. Curb's own opinion, not dotnet format's
+	/// — dotnet format is lazy about this pair in both directions, so there is nothing of its to match
+	/// either way, and an unconditional <c>{ }</c> is the cleaner default. A non-empty body is
+	/// unaffected: it follows the same rule as any other braced construct. Ignored when the body is
+	/// not empty, and when <c>csharp_empty_block_style</c> is set — an explicit opinion beats an
+	/// implicit one.
+	/// </param>
+	internal static void PrintStatementBody(
+		SyntaxNode body,
+		BraceStyle construct,
+		PrintContext context,
+		bool alwaysJoinsEmpty = false)
 	{
-		var joinsHeader = JoinsEmptyBracesToHeader(body, context);
+		var forcesEmptyJoin = alwaysJoinsEmpty && context.Options.EmptyBlockStyle is null && IsEmptyBraces(body);
+		var joinsHeader = forcesEmptyJoin || JoinsEmptyBracesToHeader(body, context);
 		var flat = joinsHeader || KeepsOneLine(body, context) || CollapsesEmptyBraces(body, context);
 
 		if (joinsHeader)

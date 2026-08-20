@@ -311,9 +311,7 @@ public class PreserveSingleLineTests : FormattingTest
 		        try
 		        {
 		        }
-		        catch (Exception e)
-		        {
-		        }
+		        catch (Exception e) { }
 		    }
 		}
 		""");
@@ -397,8 +395,12 @@ public class PreserveSingleLineTests : FormattingTest
 		""",
 		editorConfig: "csharp_preserve_single_line_statements = false");
 
+	/// <summary>
+	/// An empty catch is Curb's one unconditional opinion in this family: <c>{ }</c> whatever these
+	/// options say. See <see href="https://github.com/nullean/curb/issues/25">issue #25</see> and
+	/// <c>Printers.Statements.JoinsClauseToBlock</c> for why.
+	/// </summary>
 	[Test]
-	[Skip("dotnet format keeps an empty `catch { }` collapsed even with both preserve options off; Curb expands it like any other block")]
 	public Task An_empty_catch_stays_collapsed_when_everything_else_expands() => Formats(
 		"""
 		public class C

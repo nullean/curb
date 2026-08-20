@@ -131,9 +131,7 @@ public class ParenthesisSpacingTests : FormattingTest
 		        try
 		        {
 		        }
-		        catch ( Exception e ) when ( a )
-		        {
-		        }
+		        catch ( Exception e ) when ( a ) { }
 		    }
 		}
 		""",
