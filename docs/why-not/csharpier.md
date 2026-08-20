@@ -134,6 +134,22 @@ curb with no `.editorconfig` at all formats to Roslyn's defaults: the same outpu
 `dotnet format whitespace` produce. There is no style to buy into. Adopt it project by project, and
 it agrees with what your IDE already does.
 
+## Maturity
+
+CSharpier has been around longer and has real-world adoption across a wide range of .NET projects.
+It has proven itself in production, accumulated community knowledge, and the rough edges have been
+filed down. That counts for something.
+
+curb is new. The architecture is different, the goals are different, and the test suite is extensive
+— curb has broad formatting test coverage and its output is CI-gated to be byte-identical to
+`dotnet format whitespace` across 41,000 files — but it has not yet had the years of production use
+that CSharpier has. If you need a formatter with a long track record, CSharpier is the safer pick
+today.
+
+That said, if any of the above differences matter to you — IDE0055 compatibility, no editor plugin,
+MSBuild-native incrementality, respecting your existing `.editorconfig` — we would love for you to
+give curb a try and tell us what you find.
+
 ## When CSharpier makes sense
 
 If you want zero configuration and are happy with CSharpier's built-in style, it is a reasonable
