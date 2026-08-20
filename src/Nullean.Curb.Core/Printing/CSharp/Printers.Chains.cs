@@ -100,6 +100,14 @@ internal static partial class Printers
 			using (arena.Group())
 			using (arena.Indent())
 			{
+				// csharp_max_chained_method_calls_on_line, deterministic mode only. Forces the break this
+				// group would otherwise only take when the joined chain does not fit. Guarded the same way
+				// csharp_max_initializer_elements_on_line's count is: not for a chain sitting in a call's
+				// arguments, where the break is measured by whatever encloses it.
+				if (context.Options.MaxChainedMethodCallsOnLine is { } maxCalls
+					&& links.Count > maxCalls && !IsInsideArguments(node))
+					arena.BreakParent();
+
 				// csharp_wrap_after_dot_in_method_calls puts the dot on the tail of the line it follows
 				// rather than the head of the line it introduces. Only the dot moves; where the chain
 				// breaks is decided exactly as before, which is why the break predicate had to stop asking

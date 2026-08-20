@@ -320,6 +320,46 @@ public static class EditorConfigOptionsBinder
 			break;
 		}
 
+		foreach (var prefix in ReSharperPrefixes)
+		{
+			if (!properties.TryGetValue(prefix + "wrap_chained_method_calls", out var methodChainWrap))
+				continue;
+
+			var colon = methodChainWrap.LastIndexOf(':');
+			switch ((colon >= 0 ? methodChainWrap[..colon] : methodChainWrap).Trim().ToLowerInvariant())
+			{
+				case "chop_if_long":
+					// Confirms behaviour the chain printer already has unconditionally; see
+					// FormatOptions.WrapChainedMethodCalls.
+					options = options with { WrapChainedMethodCalls = WrapStyle.ChopIfLong };
+					break;
+				case "chop_always":
+					diagnostics?.Add(CurbDiagnostic.UnrecognisedValue(
+						prefix + "wrap_chained_method_calls", methodChainWrap,
+						"chop_if_long; chop_always is not supported, see csharp_max_chained_method_calls_on_line"));
+					break;
+				case "wrap_if_long":
+					diagnostics?.Add(CurbDiagnostic.UnrecognisedValue(
+						prefix + "wrap_chained_method_calls", methodChainWrap,
+						"chop_if_long; wrap_if_long is not implemented"));
+					break;
+				default:
+					diagnostics?.Add(CurbDiagnostic.UnrecognisedValue(
+						prefix + "wrap_chained_method_calls", methodChainWrap, "chop_if_long"));
+					break;
+			}
+
+			break;
+		}
+
+		if (TryPrefixedCount(properties, "max_chained_method_calls_on_line", diagnostics, out var maxChainCalls))
+		{
+			if (options.KeepExistingLinebreaks)
+				diagnostics?.Add(CurbDiagnostic.RequiresDeterministicLayout("csharp_max_chained_method_calls_on_line"));
+			else
+				options = options with { MaxChainedMethodCallsOnLine = maxChainCalls };
+		}
+
 		if (TryPrefixedBool(properties, "wrap_before_first_method_call", diagnostics, out var wrapFirstCall))
 			options = options with { WrapBeforeFirstMethodCall = wrapFirstCall };
 
@@ -350,9 +390,8 @@ public static class EditorConfigOptionsBinder
 		// arguments against none for parameters. Deterministic layout has no rule that reads indentation
 		// from the source, which is exactly why they become available there.
 		//
-		// wrap_chained_method_calls stays out. It cost 156 files in preservation mode and has not been
-		// measured under deterministic layout; the same silence as the several hundred other ReSharper
-		// keys Curb does not implement is the honest answer until it has.
+		// wrap_chained_method_calls is bound above, restricted to chop_if_long — its chop_always stays
+		// out for the same reason as the two below, and it cost 156 files besides.
 		options = options with
 		{
 			WrapParametersStyle = WrapStyleOf(properties, "wrap_parameters_style", diagnostics),
