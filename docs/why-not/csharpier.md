@@ -77,15 +77,18 @@ sees on a fresh checkout. Both tools pay their full cost.
 
 | repo | curb (cold) | CSharpier (cold) |
 |---|---|---|
-| serilog (216 files) | **0.06 s** | 0.73 s |
-| FluentValidation (219 files) | **0.06 s** | 0.59 s |
-| RestSharp (255 files) | **0.07 s** | 0.63 s |
-| Humanizer (733 files) | **0.37 s** | 3.45 s |
-| Newtonsoft.Json (945 files) | **0.26 s** | 4.85 s |
-| ServiceStack (4,718 files) | **1.29 s** | 12.84 s |
-| MassTransit (5,502 files) | **0.62 s** | 4.75 s |
-| efcore (5,761 files) | **2.27 s** | 19.78 s |
-| roslyn (17,167 files) | **7.43 s** | 64.83 s |
+| serilog (216 files) | **0.06 s** | 0.64 s |
+| FluentValidation (219 files) | **0.05 s** | 0.54 s |
+| RestSharp (255 files) | **0.08 s** | 0.69 s |
+| logging-log4net (376 files) | **0.14 s** | 1.21 s |
+| AutoMapper (512 files) | **0.10 s** | 1.16 s |
+| Humanizer (733 files) | **0.36 s** | 4.33 s |
+| quartznet (765 files) | **0.25 s** | 1.90 s |
+| Newtonsoft.Json (945 files) | **0.30 s** | 4.45 s |
+| ServiceStack (4,718 files) | **1.11 s** | 11.48 s |
+| MassTransit (5,502 files) | **0.56 s** | 4.23 s |
+| efcore (5,761 files) | **2.15 s** | 19.12 s |
+| roslyn (17,167 files) | **7.26 s** | 59.67 s |
 
 Cold is the relevant baseline for CI environments and for anyone evaluating whether the tool is
 fast enough to run on every build. curb is fast cold.
@@ -96,27 +99,26 @@ changed since the last run.
 
 | repo | curb (no changes) | curb (files changed) | CSharpier (warm) |
 |---|---|---|---|
-| serilog | **no process** | **0.06 s** | 0.34 s |
-| FluentValidation | **no process** | **0.06 s** | 0.21 s |
-| RestSharp | **no process** | **0.07 s** | 0.30 s |
-| Humanizer | **no process** | **0.37 s** | 0.51 s |
-| Newtonsoft.Json | **no process** | **0.26 s** | 0.82 s |
-| ServiceStack | **no process** | **1.29 s** | 1.87 s |
-| MassTransit | **no process** | **0.62 s** | 0.83 s |
-| efcore | **no process** | **2.27 s** | 2.49 s |
-| roslyn | **no process** | 7.43 s * | **6.01 s** |
+| serilog | **no process** | **0.03 s** | 0.29 s |
+| FluentValidation | **no process** | **0.03 s** | 0.19 s |
+| RestSharp | **no process** | **0.06 s** | 0.34 s |
+| logging-log4net | **no process** | **0.05 s** | 0.42 s |
+| AutoMapper | **no process** | **0.04 s** | 0.42 s |
+| Humanizer | **no process** | **0.16 s** | 0.46 s |
+| quartznet | **no process** | **0.06 s** | 0.32 s |
+| Newtonsoft.Json | **no process** | **0.12 s** | 0.22 s |
+| ServiceStack | **no process** | **0.22 s** | 1.15 s |
+| MassTransit | **no process** | **0.20 s** | 0.70 s |
+| efcore | **no process** | **0.49 s** | 3.12 s |
+| roslyn | **no process** | **1.15 s** | 5.12 s |
 
 When nothing changed, curb starts no process at all — MSBuild evaluates the stamp and exits. When
 files did change, curb uses `--cache` so only files whose formatted output differs from the cached
 result are parsed and written. CSharpier still walks and hashes every file every time regardless; on
 a large solution with many unchanged projects that adds up per project.
 
-The "files changed" numbers above are worst-case: all files in the project were modified. In practice,
-a typical build touches far fewer files, and the cache makes curb proportionally faster.
-
-\* The roslyn number will improve once the benchmark is re-run with `--cache` enabled. The 7.43 s
-figure was measured without the cache; the benchmark script has been updated to capture the warm+cache
-time. Re-run `./build.sh compare --corpus /path/to/repos` to refresh.
+The "files changed" column is worst-case: all files in the project were modified. In practice a
+typical build touches far fewer files, and curb reformats only those.
 
 curb is FAST cold, FASTER warm.
 

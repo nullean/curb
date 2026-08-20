@@ -12,20 +12,20 @@ each repository.
 
 <!-- RESULTS -->
 
-| repo | files | curb | dnf whitespace | CSharpier |
+| repo | files | Curb | dotnet format | CSharpier |
 |---|---|---|---|---|
-| serilog | 216 | 0.06 s | 1.23 s | 0.73 s |
-| FluentValidation | 219 | 0.06 s | 1.48 s | 0.59 s |
-| RestSharp | 255 | 0.07 s | 1.35 s | 0.63 s |
-| logging-log4net | 376 | 0.15 s | 3.15 s | 1.30 s |
-| AutoMapper | 512 | 0.12 s | 2.33 s | 1.23 s |
-| Humanizer | 733 | 0.37 s | 3.35 s | 3.45 s |
-| quartznet | 765 | 0.30 s | 2.77 s | 2.12 s |
-| Newtonsoft.Json | 945 | 0.26 s | 3.47 s | 4.85 s |
-| ServiceStack | 4,718 | 1.29 s | 9.96 s | 12.84 s |
-| MassTransit | 5,502 | 0.62 s | 8.30 s | 4.75 s |
-| efcore | 5,761 | 2.27 s | 17.85 s | 19.78 s |
-| roslyn | 17,167 | 7.43 s | 33.61 s | 64.83 s |
+| serilog | 216 | 0.06 s | 1.08 s | 0.64 s |
+| FluentValidation | 219 | 0.05 s | 1.35 s | 0.54 s |
+| RestSharp | 255 | 0.08 s | 1.25 s | 0.69 s |
+| logging-log4net | 376 | 0.14 s | 2.82 s | 1.21 s |
+| AutoMapper | 512 | 0.10 s | 3.83 s | 1.16 s |
+| Humanizer | 733 | 0.36 s | 3.25 s | 4.33 s |
+| quartznet | 765 | 0.25 s | 2.40 s | 1.90 s |
+| Newtonsoft.Json | 945 | 0.30 s | 2.57 s | 4.45 s |
+| ServiceStack | 4,718 | 1.11 s | 8.78 s | 11.48 s |
+| MassTransit | 5,502 | 0.56 s | 7.15 s | 4.23 s |
+| efcore | 5,761 | 2.15 s | 16.87 s | 19.12 s |
+| roslyn | 17,167 | 7.26 s | 29.31 s | 59.67 s |
 
 <!-- /RESULTS -->
 
