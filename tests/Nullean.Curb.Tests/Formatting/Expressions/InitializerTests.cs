@@ -212,6 +212,34 @@ public class InitializerTests : FormattingTest
 		""");
 
 	[Test]
+	public Task An_author_broken_collection_expression_keeps_its_bracket_on_its_own_line() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        int[] values =
+		        [
+		            alpha,
+		            beta,
+		        ];
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_reassigned_collection_expression_keeps_its_bracket_hugged_when_it_fits() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M(int[] values)
+		    {
+		        values = [alpha, beta];
+		    }
+		}
+		""");
+
+	[Test]
 	public Task Anonymous_object() => Unchanged(
 		"""
 		public class C

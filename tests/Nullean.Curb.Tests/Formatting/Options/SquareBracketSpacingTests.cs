@@ -331,7 +331,8 @@ public class SquareBracketSpacingTests : FormattingTest
 		{
 		    public void M()
 		    {
-		        int[] e = [
+		        int[] e =
+		        [
 		            firstElement,
 		            secondElement,
 		            thirdElement
