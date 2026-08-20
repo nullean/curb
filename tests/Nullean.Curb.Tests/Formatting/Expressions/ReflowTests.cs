@@ -72,7 +72,6 @@ public class ReflowTests : FormattingTest
 		editorConfig: "max_line_length = 30");
 
 	[Test]
-	[Skip("the value breaks after `=` and the bracket double-indents; same gap as query clauses")]
 	public Task Collection_expression_breaks_one_per_line() => Formats(
 		"""
 		public class C
@@ -89,6 +88,35 @@ public class ReflowTests : FormattingTest
 		    public void M()
 		    {
 		        int[] values =
+		        [
+		            alpha,
+		            beta,
+		            gamma
+		        ];
+		    }
+		}
+		""",
+		editorConfig: "max_line_length = 30");
+
+	[Test]
+	public Task A_reassigned_collection_expression_breaks_the_same_way() => Formats(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        int[] values;
+		        values = [alpha, beta, gamma];
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        int[] values;
+		        values =
 		        [
 		            alpha,
 		            beta,

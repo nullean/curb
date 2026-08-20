@@ -451,69 +451,98 @@ internal static partial class Printers
 	public static void CollectionExpression(CollectionExpressionSyntax node, PrintContext context)
 	{
 		var arena = context.Arena;
-		TokenPrinter.Print(node.OpenBracketToken, context);
 
-		if (node.Elements.Count > 0)
+		if (node.Elements.Count == 0)
 		{
-			var asWritten = SpansLines(node, context);
-			var rewritesComma = RewritesTrailingComma(node.Elements, node.CloseBracketToken, context);
+			TokenPrinter.Print(node.OpenBracketToken, context);
+			TokenPrinter.Print(node.CloseBracketToken, context);
+			return;
+		}
 
-			// Published for the same reason an initializer's is: `new C([…]) { X = 1 }` hands the list no
-			// group to break, so the trailing initializer aims at this one instead.
-			var group = arena.NextGroupId();
-			context.OwnBlockGroup = group;
+		var asWritten = SpansLines(node, context);
+		var rewritesComma = RewritesTrailingComma(node.Elements, node.CloseBracketToken, context);
 
-			using (arena.Group(group))
+		// Published for the same reason an initializer's is: `new C([…]) { X = 1 }` hands the list no
+		// group to break, so the trailing initializer aims at this one instead.
+		var group = arena.NextGroupId();
+		context.OwnBlockGroup = group;
+
+		using (arena.Group(group))
+		{
+			// A collection expression is the third spelling of a collection initializer, so it answers
+			// to the same key. Deterministic mode only; see FormatOptions.
+			if (context.Options.WrapObjectAndCollectionInitializerStyle == WrapStyle.ChopAlways)
+				arena.BreakParent();
+
+			// Only for the value of an assignment or declarator — `int[] values = [...]` — where the
+			// bracket has somewhere else to go. A nested element (`[[1, 2], [3, 4]]`) or an argument
+			// (`Call([1, 2])`) is already positioned by its own container, and giving it a leading
+			// line of its own would put it a level out from what dotnet format produces, exactly as
+			// InitializerExpression's leadingLine is only ever true for the same kind of position.
+			//
+			// Soft, not the brace helpers' Normal line: EqualsValueClause and OperandOnRight already
+			// print the space that belongs here when this stays flat, so only the broken case needs
+			// anything from this line at all — a Normal line would double that space.
+			if (node.Parent is EqualsValueClauseSyntax or AssignmentExpressionSyntax
+				&& context.Options.NewLineBeforeOpenBrace.HasFlag(BraceStyle.ObjectCollectionArrayInitializers))
 			{
-				// A collection expression is the third spelling of a collection initializer, so it answers
-				// to the same key. Deterministic mode only; see FormatOptions.
-				if (context.Options.WrapObjectAndCollectionInitializerStyle == WrapStyle.ChopAlways)
-					arena.BreakParent();
-
-				using (arena.Indent())
+				using (arena.IndentIf(context.Options.IndentBraces))
 				{
-					Edge(node.SpanStart, node.Elements[0].SpanStart);
-					for (var i = 0; i < node.Elements.Count; i++)
-					{
-						Node.Print(node.Elements[i], context);
-						if (i >= node.Elements.SeparatorCount)
-							continue;
+					// The author already broke before this bracket — keep it, the same as
+					// InitializerExpression's own asWritten-broke branch, so preservation mode does
+					// not silently join what the author split across lines.
+					if (asWritten && context.AuthorBroke(node.Parent.SpanStart, node.SpanStart))
+						arena.HardLine();
+					else
+						arena.SoftLine(DocFlags.OnlyIfNotAtLineStart);
+				}
+			}
 
-						if (rewritesComma && i == node.Elements.Count - 1)
-							continue;
+			TokenPrinter.Print(node.OpenBracketToken, context);
 
-						Spacing.BeforeComma(context);
-						TokenPrinter.Print(node.Elements.GetSeparator(i), context);
+			using (arena.Indent())
+			{
+				Edge(node.SpanStart, node.Elements[0].SpanStart);
+				for (var i = 0; i < node.Elements.Count; i++)
+				{
+					Node.Print(node.Elements[i], context);
+					if (i >= node.Elements.SeparatorCount)
+						continue;
 
-						// A trailing comma runs straight into the closing bracket, not `, ]`.
-						if (i >= node.Elements.Count - 1)
-							continue;
+					if (rewritesComma && i == node.Elements.Count - 1)
+						continue;
 
-						if (!asWritten)
-							Spacing.AfterCommaBreakable(context);
-						else if (context.AuthorJoined(node.Elements[i].Span.End, node.Elements[i + 1].SpanStart))
-							Spacing.AfterComma(context);
-						else
-							arena.HardLine();
-					}
+					Spacing.BeforeComma(context);
+					TokenPrinter.Print(node.Elements.GetSeparator(i), context);
 
-					if (rewritesComma)
-						PrintTrailingComma(context);
+					// A trailing comma runs straight into the closing bracket, not `, ]`.
+					if (i >= node.Elements.Count - 1)
+						continue;
+
+					if (!asWritten)
+						Spacing.AfterCommaBreakable(context);
+					else if (context.AuthorJoined(node.Elements[i].Span.End, node.Elements[i + 1].SpanStart))
+						Spacing.AfterComma(context);
+					else
+						arena.HardLine();
 				}
 
-				Edge(node.Elements[^1].Span.End, node.Span.End);
+				if (rewritesComma)
+					PrintTrailingComma(context);
 			}
 
-			void Edge(int from, int to)
-			{
-				if (asWritten && context.AuthorBroke(from, to))
-					arena.HardLine();
-				else
-					Spacing.InsideBracketsBreakable(context);
-			}
+			Edge(node.Elements[^1].Span.End, node.Span.End);
 		}
 
 		TokenPrinter.Print(node.CloseBracketToken, context);
+
+		void Edge(int from, int to)
+		{
+			if (asWritten && context.AuthorBroke(from, to))
+				arena.HardLine();
+			else
+				Spacing.InsideBracketsBreakable(context);
+		}
 	}
 
 	public static void SimpleLambdaExpression(SimpleLambdaExpressionSyntax node, PrintContext context)
