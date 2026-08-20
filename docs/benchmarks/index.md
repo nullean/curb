@@ -12,7 +12,7 @@ each repository.
 
 <!-- RESULTS -->
 
-| repo | files | Curb | dotnet format | CSharpier |
+| repo | files | curb | dnf whitespace | CSharpier |
 |---|---|---|---|---|
 | serilog | 216 | 0.06 s | 1.08 s | 0.64 s |
 | FluentValidation | 219 | 0.05 s | 1.35 s | 0.54 s |

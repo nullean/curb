@@ -1255,7 +1255,7 @@ let private compare (arguments:ParseResults<Arguments>) =
             r.CurbChanged r.CspChanged r.DnfChanged r.CurbNotFixpt r.CspNotFixpt r.CurbSecond
 
     // Emit the table (markdown format; not-fixpt and 2nd-idem columns are in churn.md).
-    let header = "| repo | files | Curb | dotnet format | CSharpier |\n|---|---|---|---|---|"
+    let header = "| repo | files | curb | dnf whitespace | CSharpier |\n|---|---|---|---|---|"
     let rows =
         results
         |> Seq.map (fun r ->
