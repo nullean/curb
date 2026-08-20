@@ -202,7 +202,9 @@ internal static class FormattingRun
 					return ValueTask.CompletedTask;
 				}
 
-				var result = formatter.Format(source, item.Options, produceText: write, expandUnhandled: expandUnhandled, verifyRoundTrip: verifyRoundTrip);
+				var result = formatter.Format(
+					source, item.Options, fileSystem.Path.GetFileName(item.Path),
+					produceText: write, expandUnhandled: expandUnhandled, verifyRoundTrip: verifyRoundTrip);
 
 				switch (result.Status)
 				{

@@ -101,7 +101,17 @@ internal static class TokenPrinter
 	internal static void PrintLeadingTrivia(SyntaxToken token, PrintContext context, bool trailingBreak = true)
 	{
 		var leading = token.LeadingTrivia;
-		if (leading.Count == 0)
+
+		// A file-header replacement or blank-line skip pending for exactly this token. See
+		// PrintContext.HeaderSkipTokenPosition for why this cannot be a simple "skip the next call".
+		var skip = 0;
+		if (context.HeaderSkipCount > 0 && token.SpanStart == context.HeaderSkipTokenPosition)
+		{
+			skip = context.HeaderSkipCount;
+			context.HeaderSkipCount = 0;
+		}
+
+		if (leading.Count <= skip)
 			return;
 
 		var arena = context.Arena;
@@ -114,8 +124,9 @@ internal static class TokenPrinter
 		// True while emitting a run of comments that began aligned under a trailing comment.
 		var alignedRun = false;
 
-		foreach (var trivia in leading)
+		for (var i = skip; i < leading.Count; i++)
 		{
+			var trivia = leading[i];
 			switch (trivia.Kind())
 			{
 				case SyntaxKind.WhitespaceTrivia:

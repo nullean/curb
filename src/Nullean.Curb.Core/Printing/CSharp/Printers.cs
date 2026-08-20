@@ -1740,14 +1740,21 @@ internal static partial class Printers
 	}
 
 	/// <summary>
-	/// Emits <c>file_header_template</c> at the top of a file that has no header yet.
+	/// Emits <c>file_header_template</c> at the top of the file, inserting it if missing and
+	/// correcting it if a leading <c>//</c> block does not match.
 	/// </summary>
 	/// <remarks>
-	/// Added, never replaced. Roslyn's fixer rewrites a header that differs from the template, but
-	/// telling "the wrong header" from "a comment that happens to lead the file" needs more than the
-	/// template to compare against, and deleting somebody's copyright notice because it was worded
-	/// differently is not a mistake worth risking. A file that already opens with a comment is left
-	/// alone.
+	/// <para>
+	/// Only a leading run of <c>//</c> comments is ever rewritten — the shape both Roslyn's fixer and
+	/// this printer write, so it is the one shape Curb can tell "the wrong header" from "a comment
+	/// that happens to lead the file" with nothing more than the template to compare against. A file
+	/// that opens with a <c>/* */</c> block or a <c>///</c> doc comment is left alone entirely:
+	/// rewriting those reliably needs more structure than a syntax-only check is willing to guess at.
+	/// </para>
+	/// <para>
+	/// A directive at the top (<c>#if</c>) is not a header either way, so a file opening with one
+	/// still gets a header inserted ahead of it.
+	/// </para>
 	/// </remarks>
 	private static void PrintFileHeader(CompilationUnitSyntax node, PrintContext context)
 	{
@@ -1755,12 +1762,41 @@ internal static partial class Printers
 			return;
 
 		var first = node.GetFirstToken(includeZeroWidth: true);
-		if (OpensWithAComment(first))
+		var leading = first.LeadingTrivia;
+		var scan = ScanExistingHeader(leading, context);
+
+		if (scan.CommentLines is { } existingLines)
+		{
+			if (HeaderMatches(existingLines, template, context.FileName))
+				return;
+
+			if (UsingOrganiserOwnsLeadingTrivia(node, first, context))
+			{
+				// The using organiser is about to split this very trivia into a "banner" it prints
+				// verbatim ahead of the sorted block (see UsingOrganiser.BannerEnd). Two rewrites of
+				// the same region cannot coexist, so this run leaves the mismatched header alone
+				// rather than risk printing it twice.
+				return;
+			}
+
+			SkipExistingTrivia(context, first, leading, scan.ConsumedCount);
+		}
+		else if (scan.StoppedAtUnreplaceableComment)
+		{
+			// A block or doc comment already opens the file. Leave it exactly as it is.
 			return;
+		}
+		else if (scan.ConsumedCount > 0 && !UsingOrganiserOwnsLeadingTrivia(node, first, context))
+		{
+			// Nothing recognisable as a header, but the file started with blank lines (or those
+			// blank lines led into something else, like a directive). Skip them so inserting the
+			// header does not leave a blank line in front of it, matching Roslyn's fixer.
+			SkipExistingTrivia(context, first, leading, scan.ConsumedCount);
+		}
 
 		var arena = context.Arena;
 
-		foreach (var line in template.Split("\\n"))
+		foreach (var line in FileHeaderText.Lines(template, context.FileName))
 		{
 			arena.HeaderLine(line);
 			arena.HardLine();
@@ -1771,20 +1807,116 @@ internal static partial class Printers
 		context.FileHeaderAdded = true;
 	}
 
-	private static bool OpensWithAComment(SyntaxToken first)
+	private static void SkipExistingTrivia(PrintContext context, SyntaxToken first, SyntaxTriviaList leading, int count)
 	{
-		foreach (var trivia in first.LeadingTrivia)
-		{
-			if (trivia.Kind() is SyntaxKind.WhitespaceTrivia or SyntaxKind.EndOfLineTrivia)
-				continue;
+		context.Dropped(TextSpan.FromBounds(leading[0].FullSpan.Start, leading[count - 1].FullSpan.End));
+		context.HeaderSkipTokenPosition = first.SpanStart;
+		context.HeaderSkipCount = count;
+	}
 
-			// A directive at the top is not a header, so a file opening with `#if` can still get one.
-			return trivia.Kind() is SyntaxKind.SingleLineCommentTrivia
-				or SyntaxKind.MultiLineCommentTrivia
-				or SyntaxKind.SingleLineDocumentationCommentTrivia;
+	/// <summary>
+	/// True when the file's first token is the first using directive's own first token, and sorting
+	/// will actually reorder that block — the one case where <see cref="TokenPrinter"/>'s ordinary
+	/// leading-trivia walk is not what prints that token's trivia. <see cref="PrintUsings"/> splits a
+	/// leading comment-then-blank-line "banner" off the first directive and emits it verbatim itself
+	/// (<see cref="UsingOrganiser.BannerEnd"/>), so a header rewrite here would either be printed
+	/// twice or fight that logic for the same characters.
+	/// </summary>
+	private static bool UsingOrganiserOwnsLeadingTrivia(CompilationUnitSyntax node, SyntaxToken first, PrintContext context) =>
+		node.Usings.Count > 0
+		&& first == node.Usings[0].GetFirstToken(includeZeroWidth: true)
+		&& UsingOrganiser.IsEligible(node, node.Usings, context.Options);
+
+	/// <summary>What scanning the compilation unit's leading trivia from its very start found.</summary>
+	/// <param name="ConsumedCount">
+	/// How many leading trivia entries make up whatever was found — a run of blank lines, a run of
+	/// blank lines followed by a <c>//</c> block, or (with <see cref="CommentLines"/> null and
+	/// <see cref="StoppedAtUnreplaceableComment"/> false) just the blank lines in front of something
+	/// else entirely. Zero when the very first trivia is already something other than whitespace.
+	/// </param>
+	/// <param name="CommentLines">
+	/// The trimmed text of each <c>//</c> line in a header block found at the top, or null when there
+	/// is none.
+	/// </param>
+	/// <param name="StoppedAtUnreplaceableComment">
+	/// True when the scan stopped at a <c>/* */</c> or <c>///</c> comment — a header Curb will not
+	/// rewrite.
+	/// </param>
+	private readonly record struct HeaderScan(int ConsumedCount, List<string>? CommentLines, bool StoppedAtUnreplaceableComment);
+
+	/// <summary>
+	/// Walks leading trivia from the start of the file, collecting a leading <c>//</c> block the same
+	/// way Roslyn's fixer does: comments and single line breaks extend it, a second consecutive line
+	/// break ends it (and is consumed with it), and anything else ends it without being consumed.
+	/// </summary>
+	private static HeaderScan ScanExistingHeader(SyntaxTriviaList leading, PrintContext context)
+	{
+		var onBlankLine = false;
+		List<string>? lines = null;
+		var i = 0;
+
+		for (; i < leading.Count; i++)
+		{
+			var trivia = leading[i];
+			switch (trivia.Kind())
+			{
+				case SyntaxKind.SingleLineCommentTrivia:
+					(lines ??= []).Add(CommentContent(trivia, context));
+					onBlankLine = false;
+					break;
+
+				case SyntaxKind.WhitespaceTrivia:
+					break;
+
+				case SyntaxKind.EndOfLineTrivia:
+					if (onBlankLine)
+					{
+						i++;
+						goto stop;
+					}
+					onBlankLine = true;
+					break;
+
+				case SyntaxKind.MultiLineCommentTrivia:
+				case SyntaxKind.SingleLineDocumentationCommentTrivia:
+				case SyntaxKind.MultiLineDocumentationCommentTrivia:
+					if (lines is null)
+						return new HeaderScan(i, null, StoppedAtUnreplaceableComment: true);
+					goto stop;
+
+				default:
+					goto stop;
+			}
 		}
 
-		return false;
+	stop:
+		return new HeaderScan(i, lines, StoppedAtUnreplaceableComment: false);
+	}
+
+	/// <summary>The text of a <c>//</c> comment after its marker, trimmed on both ends.</summary>
+	private static string CommentContent(SyntaxTrivia trivia, PrintContext context)
+	{
+		var span = trivia.Span;
+		return span.Length <= 2 ? string.Empty : context.Text.ToString(new TextSpan(span.Start + 2, span.Length - 2)).Trim();
+	}
+
+	/// <summary>
+	/// Compares an existing header's lines against the template, the way Roslyn's analyzer does:
+	/// same number of lines, each equal to the corresponding template line once both are trimmed.
+	/// </summary>
+	private static bool HeaderMatches(List<string> existingLines, string template, string? fileName)
+	{
+		var expected = FileHeaderText.Lines(template, fileName);
+		if (expected.Length != existingLines.Count)
+			return false;
+
+		for (var i = 0; i < expected.Length; i++)
+		{
+			if (!string.Equals(expected[i].Trim(), existingLines[i], StringComparison.Ordinal))
+				return false;
+		}
+
+		return true;
 	}
 
 	/// <summary>
