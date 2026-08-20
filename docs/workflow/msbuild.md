@@ -64,12 +64,13 @@ dotnet build -p:Curb_Check=true               # check without rewriting
 | `Curb_Cache` | `true` | Reuse the previous run's verdict for files that have not changed. Set `false` to build without a cache. |
 | `Curb_CacheFile` | `$(IntermediateOutputPath)curb.cache` | Where that cache lives. |
 | `Curb_FileList` | `$(IntermediateOutputPath)curb.files` | The compile set handed to the CLI. |
+| `Curb_UnformattedFile` | `$(IntermediateOutputPath)curb.unformatted` | The paths `check` reports back as unformatted, one per line — what the target reads to attach CURB0001 to each of them. |
 
 ## Diagnostics
 
 | Code | Severity | Meaning |
 |---|---|---|
-| `CURB0001` | error, or warning with `Curb_UnformattedAsWarnings` | Some files are not formatted. Only `check` can produce this. |
+| `CURB0001` | error, or warning with `Curb_UnformattedAsWarnings` | A file is not formatted. Only `check` can produce this, and it is raised once per unformatted file, attached to that file — not to the project — so a GitHub Actions annotation names the file a reviewer needs to look at. |
 | `CURB0002` | error, always | {{product}} itself failed. This is an error whatever the warnings setting says — a formatter that could not run has verified nothing, and saying so quietly would be worse than not running at all. |
 
 ## How incrementality works
