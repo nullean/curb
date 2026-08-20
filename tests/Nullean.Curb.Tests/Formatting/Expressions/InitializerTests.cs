@@ -437,9 +437,14 @@ public class InitializerTests : FormattingTest
 
 	// ---- LINQ ---------------------------------------------------------------------------------
 
+	/// <summary>
+	/// Continuation clauses align under <c>from</c> — measured against real <c>dotnet format</c>, which
+	/// does the same regardless of indent style. The three tests below used to be skipped with a claim
+	/// that this diverged from dotnet format; it does not. A flat, one-level-deeper indent (what a
+	/// human is likely to type first) is therefore the input, not the expectation.
+	/// </summary>
 	[Test]
-	[Skip("query clause layout diverges from dotnet format — the value breaks after `=` and clauses double-indent")]
-	public Task Query_expression_clauses_go_one_per_line() => Unchanged(
+	public Task Query_expression_clauses_go_one_per_line() => Formats(
 		"""
 		public class C
 		{
@@ -451,11 +456,22 @@ public class InitializerTests : FormattingTest
 		            select item;
 		    }
 		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        var result = from item in items
+		                     where item > 0
+		                     orderby item descending
+		                     select item;
+		    }
+		}
 		""");
 
 	[Test]
-	[Skip("query clause layout diverges from dotnet format — the value breaks after `=` and clauses double-indent")]
-	public Task Query_with_a_let_clause() => Unchanged(
+	public Task Query_with_a_let_clause() => Formats(
 		"""
 		public class C
 		{
@@ -466,11 +482,21 @@ public class InitializerTests : FormattingTest
 		            select doubled;
 		    }
 		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        var result = from item in items
+		                     let doubled = item * 2
+		                     select doubled;
+		    }
+		}
 		""");
 
 	[Test]
-	[Skip("query clause layout diverges from dotnet format — the value breaks after `=` and clauses double-indent")]
-	public Task Query_with_a_group_clause() => Unchanged(
+	public Task Query_with_a_group_clause() => Formats(
 		"""
 		public class C
 		{
@@ -478,6 +504,16 @@ public class InitializerTests : FormattingTest
 		    {
 		        var result = from item in items
 		            group item by item.Key;
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        var result = from item in items
+		                     group item by item.Key;
 		    }
 		}
 		""");
