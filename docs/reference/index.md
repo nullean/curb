@@ -75,7 +75,7 @@ Use the filter above to search by name. Each group below links to its own index.
 - [csharp_wrap_after_dot_in_method_calls](wrapping/csharp_wrap_after_dot_in_method_calls.md) — When a chain breaks, leave the dot at the end of the preceding line.
 - [csharp_place_simple_enum_on_single_line](wrapping/csharp_place_simple_enum_on_single_line.md) — Allow a short enum body to stay on one line.
 - [csharp_place_simple_accessorholder_on_single_line](wrapping/csharp_place_simple_accessorholder_on_single_line.md) — Allow { get; set; } to stay on the property's line.
-- [csharp_wrap_chained_binary_expressions](wrapping/csharp_wrap_chained_binary_expressions.md) — Break each operand of a long && or || chain onto its own line.
+- [csharp_wrap_chained_binary_expressions](wrapping/csharp_wrap_chained_binary_expressions.md) — Break each operand of a long && or || chain onto its own line. chop_always breaks regardless of width. Only honoured in deterministic mode (max_line_length set).
 - [csharp_wrap_before_binary_opsign](wrapping/csharp_wrap_before_binary_opsign.md) — When a binary chain breaks, start the new line with the operator.
 - [csharp_wrap_parameters_style](wrapping/csharp_wrap_parameters_style.md) — chop_always gives every parameter its own line regardless of width.
 - [csharp_wrap_arguments_style](wrapping/csharp_wrap_arguments_style.md) — chop_always gives every argument its own line. Only honoured in deterministic mode (max_line_length set).

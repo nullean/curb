@@ -943,9 +943,14 @@ public readonly record struct FormatOptions
 	/// key that gives them somewhere to go.
 	/// </para>
 	/// <para>
-	/// Only <c>chop_if_long</c> is implemented: every operand on its own line once the chain does not
-	/// fit. <c>wrap_if_long</c> is the fill layout, packing operands until the width runs out, and the
-	/// document printer has no primitive for it.
+	/// <c>chop_if_long</c> breaks once the chain does not fit; <c>chop_always</c> breaks every
+	/// operand onto its own line regardless of width, the same distinction
+	/// <see cref="WrapArgumentsStyle"/> draws. <c>wrap_if_long</c> is the fill layout, packing
+	/// operands until the width runs out, and the document printer has no primitive for it.
+	/// </para>
+	/// <para>
+	/// Deterministic mode only, for the same reason as <see cref="WrapArgumentsStyle"/>: forcing a
+	/// break moves operand indentation that preservation mode's rules read from the source.
 	/// </para>
 	/// </remarks>
 	public WrapStyle? WrapChainedBinaryExpressions { get; init; }

@@ -451,8 +451,11 @@ public class ControlFlowTests : FormattingTest
 		""");
 
 	[Test]
-	[Skip("binary chains are not flattened — operators trail the line and continuations double-indent")]
 	public Task Condition_breaks_when_it_does_not_fit() => Formats(
+		// csharp_wrap_chained_binary_expressions is not set, so this is the ordinary per-operator
+		// path rather than the chain flattener — the operator trails the line it follows rather
+		// than leading the next, since csharp_wrap_before_binary_opsign only applies once that key
+		// is breaking a chain. Every operand still lands one level in from `if` (issue #11).
 		"""
 		public class C
 		{
@@ -471,9 +474,9 @@ public class ControlFlowTests : FormattingTest
 		    public void M()
 		    {
 		        if (
-		            alphaCondition
-		            && betaCondition
-		            && gammaCondition
+		            alphaCondition &&
+		            betaCondition &&
+		            gammaCondition
 		        )
 		        {
 		            Call();

@@ -112,7 +112,7 @@ public sealed record OptionDescriptor(
 		new("csharp_wrap_after_dot_in_method_calls", OptionGroup.Wrapping, ["true", "false"], "false", "When a chain breaks, leave the dot at the end of the preceding line.", "long_chain"),
 		new("csharp_place_simple_enum_on_single_line", OptionGroup.Wrapping, ["true", "false"], "true", "Allow a short enum body to stay on one line.", "simple_enum"),
 		new("csharp_place_simple_accessorholder_on_single_line", OptionGroup.Wrapping, ["true", "false"], "true", "Allow { get; set; } to stay on the property's line.", "property"),
-		new("csharp_wrap_chained_binary_expressions", OptionGroup.Wrapping, ["chop_if_long"], "(not set)", "Break each operand of a long && or || chain onto its own line.", "binary_ops"),
+		new("csharp_wrap_chained_binary_expressions", OptionGroup.Wrapping, ["chop_always", "chop_if_long"], "(not set)", "Break each operand of a long && or || chain onto its own line. chop_always breaks regardless of width. Only honoured in deterministic mode (max_line_length set).", "binary_ops"),
 		new("csharp_wrap_before_binary_opsign", OptionGroup.Wrapping, ["true", "false"], "true", "When a binary chain breaks, start the new line with the operator.", "binary_ops"),
 		new("csharp_wrap_parameters_style", OptionGroup.Wrapping, ["chop_always", "chop_if_long"], "chop_if_long", "chop_always gives every parameter its own line regardless of width.", "method_decl"),
 		new("csharp_wrap_arguments_style", OptionGroup.Wrapping, ["chop_always", "chop_if_long"], "chop_if_long", "chop_always gives every argument its own line. Only honoured in deterministic mode (max_line_length set).", "call_args"),

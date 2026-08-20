@@ -178,6 +178,41 @@ public class OptionsBindingTests
 		await Task.CompletedTask;
 	}
 
+	[Test]
+	public async Task A_binary_chop_style_that_needs_deterministic_layout_says_so()
+	{
+		// The same risk as csharp_wrap_object_and_collection_initializer_style above: forcing every
+		// operand onto its own line moves indentation preservation mode's rules would otherwise read
+		// from the source.
+		var options = Bind("""
+			root = true
+
+			[*.cs]
+			csharp_wrap_chained_binary_expressions = chop_always
+			""", out var diagnostics);
+
+		diagnostics.Should().ContainSingle().Which.Id.Should().Be("CURB1005");
+		diagnostics[0].Message.Should().Contain("csharp_keep_existing_linebreaks = false");
+		options.WrapChainedBinaryExpressions.Should().BeNull("the key was dropped, not applied");
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task The_binary_chop_style_binds_under_deterministic_layout()
+	{
+		var options = Bind("""
+			root = true
+
+			[*.cs]
+			max_line_length = 120
+			csharp_wrap_chained_binary_expressions = chop_always
+			""", out var diagnostics);
+
+		diagnostics.Should().BeEmpty();
+		options.WrapChainedBinaryExpressions.Should().Be(WrapStyle.ChopAlways);
+		await Task.CompletedTask;
+	}
+
 	// ---- the mode resolves from the width -----------------------------------------------------------
 
 	/// <summary>

@@ -431,9 +431,10 @@ public class ClosingParenthesisTests : FormattingTest
 	/// <summary>Deterministic layout breaks it instead, without needing the chain key at all.</summary>
 	/// <remarks>
 	/// The operands are reached through <c>OperandOnRight</c>, which offers a break wherever it is not
-	/// reproducing an author's arrangement — so in this mode the condition never overflows. The stepped
-	/// indent is the chain's own nesting showing through, which is why the chain key still earns its place:
-	/// it flattens the whole chain to one level.
+	/// reproducing an author's arrangement — so in this mode the condition never overflows. Every
+	/// operand still lands one level in from `if`, not one further per nested operator: ConditionHeader
+	/// hands its own indent down through <c>PrintContext.IndentedCondition</c>, and each link of the
+	/// chain relays it to the next rather than opening a second one on top (issue #11).
 	/// </remarks>
 	[Test]
 	public Task A_long_condition_breaks_under_deterministic_layout() => Formats(
@@ -455,7 +456,7 @@ public class ClosingParenthesisTests : FormattingTest
 		    {
 		        if (
 		            firstCondition && secondCondition &&
-		                thirdCondition && fourth
+		            thirdCondition && fourth
 		        )
 		        { }
 		    }
@@ -569,6 +570,66 @@ public class ClosingParenthesisTests : FormattingTest
 		}
 		""",
 		editorConfig: Narrow + "\ncsharp_wrap_chained_binary_expressions = chop_if_long");
+
+	[Test]
+	public Task An_if_condition_gets_one_level_of_indent_not_two() => Formats(
+		// ConditionHeader already indents the condition once, for the break just inside `(`. Without
+		// suppressing it, the chain's own indent stacked on top and doubled it (issue #11).
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        if (firstCondition && secondCondition && thirdCondition)
+		        {
+		        }
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        if (
+		            firstCondition
+		            && secondCondition
+		            && thirdCondition
+		        )
+		        { }
+		    }
+		}
+		""",
+		editorConfig: Narrow + "\ncsharp_wrap_chained_binary_expressions = chop_if_long");
+
+	[Test]
+	public Task Chop_always_breaks_an_if_condition_even_when_it_fits() => Formats(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        if (a && b && c)
+		        {
+		        }
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        if (
+		            a
+		            && b
+		            && c
+		        )
+		        { }
+		    }
+		}
+		""",
+		editorConfig: "max_line_length = 120\ncsharp_wrap_chained_binary_expressions = chop_always");
 
 	// ---- initializer element counts ---------------------------------------------------------------------
 

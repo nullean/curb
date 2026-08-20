@@ -236,6 +236,9 @@ internal static partial class Printers
 				else
 					Spacing.InsideControlFlowParensBreakable(context);
 
+				// Told to a binary chain the condition might be, so it does not indent a second time
+				// on top of this one — see PrintContext.IndentedCondition.
+				context.IndentedCondition = condition;
 				Node.Print(condition, context);
 			}
 
