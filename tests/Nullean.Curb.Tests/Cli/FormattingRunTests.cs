@@ -101,4 +101,26 @@ public class FormattingRunTests
 		bytes.Take(3).Should().Equal(0xEF, 0xBB, 0xBF);
 		await Task.CompletedTask;
 	}
+
+	[Test]
+	public async Task A_write_failure_in_one_file_is_reported_rather_than_aborting_the_run()
+	{
+		// A read-only file's write throws inside the worker — standing in for any per-file fault,
+		// printer bug included, that has nothing to do with the rest of the tree. Chosen because
+		// MockFileSystem genuinely throws UnauthorizedAccessException for it, without a fake seam.
+		var fs = Repo();
+		fs.AddFile($"{Root}/A.cs", new MockFileData("class A {    }"));
+		fs.AddFile($"{Root}/Broken.cs", new MockFileData("class Broken {    }"));
+		fs.File.SetAttributes($"{Root}/Broken.cs", FileAttributes.ReadOnly);
+
+		var summary = FormattingRun.Execute(fs, Root, write: true);
+
+		summary.Failed.Should().Be(1, "the broken file is reported, not silently dropped");
+		summary.Changed.Should().Be(1, "the other file in the same run still gets formatted");
+		summary.ExitCode.Should().Be(3);
+		fs.File.ReadAllText($"{Root}/A.cs").Should().Be("class A { }\n", "the rest of the tree was not aborted");
+		fs.File.ReadAllText($"{Root}/Broken.cs").Should().Be(
+			"class Broken {    }", "a file the write failed for is left exactly as it was found");
+		await Task.CompletedTask;
+	}
 }

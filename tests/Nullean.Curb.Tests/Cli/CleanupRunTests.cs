@@ -109,4 +109,55 @@ public class CleanupRunTests
 
 		await Task.CompletedTask;
 	}
+
+	[Test]
+	public async Task A_write_failure_in_one_file_is_reported_rather_than_aborting_the_run()
+	{
+		// A read-only file's write throws inside the worker — standing in for any per-file fault,
+		// cleaner or formatter bug included, that has nothing to do with the rest of the batch.
+		// Chosen because MockFileSystem genuinely throws UnauthorizedAccessException for it,
+		// without a fake seam. Mirrors FormattingRunTests' coverage of the same contract.
+		var fs = Repo("root = true\n\n[*.cs]\nindent_style = space\n");
+
+		const string source =
+			"""
+			namespace N;
+
+			public sealed class Widget
+			{
+				private string _name;
+
+				public Widget() => _name = "w";
+			}
+
+			""";
+
+		var text = SourceText.From(source);
+		var offset = source.IndexOf("_name;", StringComparison.Ordinal);
+		var line = text.Lines.GetLineFromPosition(offset);
+		var position = $"{line.LineNumber + 1},{offset - line.Start + 1}";
+
+		var diagnosticLine =
+			$"{Root}/Widget.cs({position}): warning IDE0044: Make field readonly (https://example/ide0044) [{Root}/e1.csproj::TargetFramework=net10.0]\n"
+			+ $"{Root}/Broken.cs({position}): warning IDE0044: Make field readonly (https://example/ide0044) [{Root}/e1.csproj::TargetFramework=net10.0]\n";
+
+		fs.AddFile($"{Root}/Widget.cs", new MockFileData(source));
+		fs.AddFile($"{Root}/Broken.cs", new MockFileData(source));
+		fs.AddFile($"{Root}/curb.sarif", new MockFileData(diagnosticLine));
+		fs.File.SetAttributes($"{Root}/Broken.cs", FileAttributes.ReadOnly);
+
+		fs.File.SetLastWriteTimeUtc($"{Root}/Widget.cs", DateTime.UtcNow);
+		fs.File.SetLastWriteTimeUtc($"{Root}/Broken.cs", DateTime.UtcNow);
+		fs.File.SetLastWriteTimeUtc($"{Root}/curb.sarif", DateTime.UtcNow.AddMinutes(1));
+
+		var exitCode = CleanupRun.Execute(fs, Root, write: true);
+
+		exitCode.Should().Be(3, "one file failed to write");
+		fs.File.ReadAllText($"{Root}/Widget.cs").Should().Contain(
+			"private readonly string _name;", "the other file in the same batch still gets cleaned");
+		fs.File.ReadAllText($"{Root}/Broken.cs").Should().Be(
+			source, "a file the write failed for is left exactly as it was found");
+
+		await Task.CompletedTask;
+	}
 }

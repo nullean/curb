@@ -139,72 +139,92 @@ internal static class CleanupRun
 					return worker;
 				}
 
-				// Read bytes rather than text: ReadAllText silently swallows a byte-order mark and
-				// WriteAllText silently writes none, so `charset` was unobservable at both ends —
-				// the same bug FormattingRun.cs fixes for `curb format`.
-				var bytes = fileSystem.File.ReadAllBytes(path);
-				var hadBom = bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF;
-				var source = Utf8.GetString(hadBom ? bytes.AsSpan(3) : bytes);
-
-				// The file's own opt-outs, honoured exactly as the formatter honours them.
-				if (options[index].Excluded || CSharpSource.HasGeneratedHeader(source))
+				// A bug in the cleaner or the formatter, or a failed write — a read-only file, a
+				// permission error — is one file's problem, not the run's. Isolated per item rather
+				// than left to escape Parallel.ForEach, which would abort every file still queued
+				// behind it on the strength of one the cleaner was never meant to survive. The file
+				// is reported and, because every write below only follows a successful clean, left
+				// exactly as it was found.
+				try
 				{
-					Interlocked.Increment(ref skipped);
-					return worker;
-				}
+					// Read bytes rather than text: ReadAllText silently swallows a byte-order mark and
+					// WriteAllText silently writes none, so `charset` was unobservable at both ends —
+					// the same bug FormattingRun.cs fixes for `curb format`.
+					var bytes = fileSystem.File.ReadAllBytes(path);
+					var hadBom = bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF;
+					var source = Utf8.GetString(hadBom ? bytes.AsSpan(3) : bytes);
 
-				// The freshness gate. A span is an offset into the bytes the compiler read; applying it to
-				// different bytes is how a tool corrupts source. Edited since the build, so it waits for
-				// the next one — and the count is reported rather than passed over.
-				if (fileSystem.FileInfo.New(path).LastWriteTimeUtc > newest)
-				{
-					Interlocked.Increment(ref stale);
-					return worker;
-				}
-
-				var result = worker.Cleaner.Clean(source, diagnostics);
-				Interlocked.Add(ref refused, result.Refusals.Count);
-
-				foreach (var left in result.Unfixed)
-					unfixed.Add(left);
-
-				foreach (var refusal in result.Refusals)
-					messages.Add($"{path}: {refusal}");
-
-				switch (result.Status)
-				{
-					case CleanupStatus.SyntaxError:
-					case CleanupStatus.VerificationFailed:
-						Interlocked.Increment(ref failed);
-						messages.Add($"{path}: {result.Message}");
+					// The file's own opt-outs, honoured exactly as the formatter honours them.
+					if (options[index].Excluded || CSharpSource.HasGeneratedHeader(source))
+					{
+						Interlocked.Increment(ref skipped);
 						return worker;
+					}
+
+					// The freshness gate. A span is an offset into the bytes the compiler read; applying it to
+					// different bytes is how a tool corrupts source. Edited since the build, so it waits for
+					// the next one — and the count is reported rather than passed over.
+					if (fileSystem.FileInfo.New(path).LastWriteTimeUtc > newest)
+					{
+						Interlocked.Increment(ref stale);
+						return worker;
+					}
+
+					var result = worker.Cleaner.Clean(source, diagnostics);
+					Interlocked.Add(ref refused, result.Refusals.Count);
+
+					foreach (var left in result.Unfixed)
+						unfixed.Add(left);
+
+					foreach (var refusal in result.Refusals)
+						messages.Add($"{path}: {refusal}");
+
+					switch (result.Status)
+					{
+						case CleanupStatus.SyntaxError:
+						case CleanupStatus.VerificationFailed:
+							Interlocked.Increment(ref failed);
+							messages.Add($"{path}: {result.Message}");
+							return worker;
+					}
+
+					if (!result.Changed || result.Text is null)
+						return worker;
+
+					if (!write)
+					{
+						Interlocked.Increment(ref changed);
+						Interlocked.Add(ref applied, result.Applied);
+						return worker;
+					}
+
+					// Formatted before it is written. A removed directive leaves the blank-line rules with an
+					// opinion, and leaving that to the next build would mean IDE0055 reported against Curb's
+					// own output — which is the one thing the formatter's placement exists to prevent.
+					var formatted = worker.Formatter.Format(result.Text, options[index], produceText: true, verifyRoundTrip: true);
+					var output = formatted.Success && formatted.Text is not null ? formatted.Text : result.Text;
+
+					var wantsBom = options[index].Charset switch
+					{
+						Charset.Utf8Bom => true,
+						Charset.Utf8 => false,
+						Charset.Preserve => hadBom,
+						_ => hadBom,
+					};
+
+					// After the write, not before: a write that throws is caught below and counted as
+					// failed, and a file only counts as changed once it actually is.
+					fileSystem.File.WriteAllText(path, output, wantsBom ? Utf8WithBom : Utf8);
+					Interlocked.Increment(ref changed);
+					Interlocked.Add(ref applied, result.Applied);
+					return worker;
 				}
-
-				if (!result.Changed || result.Text is null)
-					return worker;
-
-				Interlocked.Increment(ref changed);
-				Interlocked.Add(ref applied, result.Applied);
-
-				if (!write)
-					return worker;
-
-				// Formatted before it is written. A removed directive leaves the blank-line rules with an
-				// opinion, and leaving that to the next build would mean IDE0055 reported against Curb's
-				// own output — which is the one thing the formatter's placement exists to prevent.
-				var formatted = worker.Formatter.Format(result.Text, options[index], produceText: true, verifyRoundTrip: true);
-				var output = formatted.Success && formatted.Text is not null ? formatted.Text : result.Text;
-
-				var wantsBom = options[index].Charset switch
+				catch (Exception exception)
 				{
-					Charset.Utf8Bom => true,
-					Charset.Utf8 => false,
-					Charset.Preserve => hadBom,
-					_ => hadBom,
-				};
-
-				fileSystem.File.WriteAllText(path, output, wantsBom ? Utf8WithBom : Utf8);
-				return worker;
+					Interlocked.Increment(ref failed);
+					messages.Add($"{path}: internal error — {exception.Message}");
+					return worker;
+				}
 			},
 			worker => worker.Formatter.Dispose());
 
