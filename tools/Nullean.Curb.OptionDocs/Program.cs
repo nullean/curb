@@ -403,7 +403,7 @@ internal static class Program
             "csharp_place_simple_enum_on_single_line" => opts with { PlaceSimpleEnumOnSingleLine = b },
             "csharp_place_simple_accessorholder_on_single_line" => opts with { PlaceSimpleAccessorholderOnSingleLine = b },
             "csharp_wrap_before_binary_opsign" => opts with { WrapBeforeBinaryOpsign = b },
-            "csharp_wrap_chained_binary_expressions" => opts with { WrapChainedBinaryExpressions = WrapStyle.ChopIfLong },
+            "csharp_wrap_chained_binary_expressions" => opts with { WrapChainedBinaryExpressions = value == "chop_always" ? WrapStyle.ChopAlways : WrapStyle.ChopIfLong },
             "csharp_wrap_parameters_style" => opts with { WrapParametersStyle = value == "chop_always" ? WrapStyle.ChopAlways : WrapStyle.ChopIfLong },
             "csharp_wrap_arguments_style" => opts with { WrapArgumentsStyle = value == "chop_always" ? WrapStyle.ChopAlways : WrapStyle.ChopIfLong },
             "csharp_wrap_object_and_collection_initializer_style" => opts with { WrapObjectAndCollectionInitializerStyle = value == "chop_always" ? WrapStyle.ChopAlways : WrapStyle.ChopIfLong },
