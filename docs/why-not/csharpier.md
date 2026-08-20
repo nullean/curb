@@ -93,32 +93,48 @@ sees on a fresh checkout. Both tools pay their full cost.
 Cold is the relevant baseline for CI environments and for anyone evaluating whether the tool is
 fast enough to run on every build. curb is fast cold.
 
-**Warm** — subsequent build on the same machine. CSharpier uses its file hash cache; curb evaluates
-the MSBuild stamp and, when files did change, uses `--cache` to skip files whose output has not
-changed since the last run.
+**Warm, nothing changed** — subsequent build where no source files were modified. curb evaluates the
+MSBuild stamp and exits; CSharpier walks and hashes every file to check its cache.
 
-| repo | curb (no changes) | curb (files changed) | CSharpier (warm) |
-|---|---|---|---|
-| serilog | **no process** | **0.03 s** | 0.29 s |
-| FluentValidation | **no process** | **0.03 s** | 0.19 s |
-| RestSharp | **no process** | **0.06 s** | 0.34 s |
-| logging-log4net | **no process** | **0.05 s** | 0.42 s |
-| AutoMapper | **no process** | **0.04 s** | 0.42 s |
-| Humanizer | **no process** | **0.16 s** | 0.46 s |
-| quartznet | **no process** | **0.06 s** | 0.32 s |
-| Newtonsoft.Json | **no process** | **0.12 s** | 0.22 s |
-| ServiceStack | **no process** | **0.22 s** | 1.15 s |
-| MassTransit | **no process** | **0.20 s** | 0.70 s |
-| efcore | **no process** | **0.49 s** | 3.12 s |
-| roslyn | **no process** | **1.15 s** | 5.12 s |
+| repo | curb | CSharpier (warm) |
+|---|---|---|
+| serilog | **no process** | 0.29 s |
+| FluentValidation | **no process** | 0.19 s |
+| RestSharp | **no process** | 0.34 s |
+| logging-log4net | **no process** | 0.42 s |
+| AutoMapper | **no process** | 0.42 s |
+| Humanizer | **no process** | 0.46 s |
+| quartznet | **no process** | 0.32 s |
+| Newtonsoft.Json | **no process** | 0.22 s |
+| ServiceStack | **no process** | 1.15 s |
+| MassTransit | **no process** | 0.70 s |
+| efcore | **no process** | 3.12 s |
+| roslyn | **no process** | 5.12 s |
 
-When nothing changed, curb starts no process at all — MSBuild evaluates the stamp and exits. When
-files did change, curb uses `--cache` so only files whose formatted output differs from the cached
-result are parsed and written. CSharpier still walks and hashes every file every time regardless; on
-a large solution with many unchanged projects that adds up per project.
+On unchanged projects curb starts no process at all. CSharpier must still walk the entire directory
+tree on every build to update its cache, even when nothing changed.
 
-The "files changed" column is worst-case: all files in the project were modified. In practice a
-typical build touches far fewer files, and curb reformats only those.
+**Warm, files changed** — subsequent build where files were modified. curb uses `--cache` to skip
+files whose output has not changed; CSharpier uses its file hash cache. Numbers below are worst-case:
+all files in the project were treated as changed.
+
+| repo | curb (warm) | CSharpier (warm) |
+|---|---|---|
+| serilog | **0.03 s** | 0.29 s |
+| FluentValidation | **0.03 s** | 0.19 s |
+| RestSharp | **0.06 s** | 0.34 s |
+| logging-log4net | **0.05 s** | 0.42 s |
+| AutoMapper | **0.04 s** | 0.42 s |
+| Humanizer | **0.16 s** | 0.46 s |
+| quartznet | **0.06 s** | 0.32 s |
+| Newtonsoft.Json | **0.12 s** | 0.22 s |
+| ServiceStack | **0.22 s** | 1.15 s |
+| MassTransit | **0.20 s** | 0.70 s |
+| efcore | **0.49 s** | 3.12 s |
+| roslyn | **1.15 s** | 5.12 s |
+
+Even in the worst case — every file changed — curb beats CSharpier warm on every repository. In
+practice a typical build touches far fewer files, and curb reformats only those.
 
 curb is FAST cold, FASTER warm.
 
