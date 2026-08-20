@@ -1060,13 +1060,30 @@ internal static partial class Printers
 
 	/// <summary>The same question of a body, so every caller goes through one predicate.</summary>
 	/// <remarks>
+	/// <para>
 	/// <see cref="PrintBody"/> and <see cref="PrintStatementBody"/> used to spell this test out themselves,
 	/// which is the same condition written three times.
+	/// </para>
+	/// <para>
+	/// An empty pair answers false here whenever <c>csharp_empty_block_style</c> is set, whatever its
+	/// value: <see cref="CollapsesEmptyBraces"/> and <see cref="JoinsEmptyBracesToHeader"/> take over the
+	/// whole question for that case, including <c>multiline</c>'s opposite one — forcing the pair apart
+	/// even though preservation would otherwise have kept it joined.
+	/// </para>
 	/// </remarks>
-	internal static bool KeepsOneLine(SyntaxNode body, PrintContext context) =>
-		body is BlockSyntax block
+	internal static bool KeepsOneLine(SyntaxNode body, PrintContext context)
+	{
+		if (context.Options.EmptyBlockStyle is not null && IsEmptyBraces(body))
+			return false;
+
+		return body is BlockSyntax block
 			? KeepsOneLine(block.OpenBraceToken, block.CloseBraceToken, context)
 			: context.Options.PreserveSingleLineBlocks && context.AuthorJoined(body.SpanStart, body.Span.End);
+	}
+
+	/// <summary>An empty block whose closing brace carries no trivia a collapse would have to drop.</summary>
+	private static bool IsEmptyBraces(SyntaxNode body) =>
+		body is BlockSyntax { Statements.Count: 0 } block && !TokenPrinter.HasLeadingContent(block.CloseBraceToken);
 
 	/// <summary>
 	/// True when an empty brace pair should print as <c>{ }</c> rather than opened out.
@@ -1079,7 +1096,7 @@ internal static partial class Printers
 	/// that names a width. Without it the mode's default output is visibly poor.
 	/// </para>
 	/// <para>
-	/// It collapses the pair and <b>never moves it</b> — where the brace goes stays
+	/// By default it collapses the pair and <b>never moves it</b> — where the brace goes stays
 	/// <c>csharp_new_line_before_open_brace</c>'s decision. That distinction is measured, not tidiness:
 	/// collapsing onto the header as well put <c>), IAppDataFileSystem { }</c> on one line and
 	/// <c>dotnet format</c> wrote <c>), IAppDataFileSystem</c> then <c>{ }</c>, costing three corpus files.
@@ -1090,12 +1107,39 @@ internal static partial class Printers
 	/// unconditionally would *join* a pair the author expanded, which <c>dotnet format</c> never does —
 	/// 20-plus expectations assert exactly that.
 	/// </para>
+	/// <para>
+	/// <c>csharp_empty_block_style</c> overrides all of that once it is set: <c>together</c> and
+	/// <c>together_same_line</c> both collapse unconditionally — in either layout mode and whatever
+	/// <c>csharp_preserve_single_line_blocks</c> says, because this is an opt-in ReSharper opinion rather
+	/// than dotnet format's — and <c>multiline</c> refuses to collapse at all, even a pair the author or
+	/// preservation kept joined. <see cref="JoinsEmptyBracesToHeader"/> is what additionally moves the
+	/// pair for <c>together_same_line</c>.
+	/// </para>
 	/// </remarks>
-	internal static bool CollapsesEmptyBraces(SyntaxNode body, PrintContext context) =>
-		!context.Options.KeepExistingLinebreaks
-		&& context.Options.PreserveSingleLineBlocks
-		&& body is BlockSyntax { Statements.Count: 0 } block
-		&& !TokenPrinter.HasLeadingContent(block.CloseBraceToken);
+	internal static bool CollapsesEmptyBraces(SyntaxNode body, PrintContext context)
+	{
+		if (!IsEmptyBraces(body))
+			return false;
+
+		return context.Options.EmptyBlockStyle switch
+		{
+			EmptyBlockStyle.Multiline => false,
+			EmptyBlockStyle.Together or EmptyBlockStyle.TogetherSameLine => true,
+			_ => !context.Options.KeepExistingLinebreaks && context.Options.PreserveSingleLineBlocks,
+		};
+	}
+
+	/// <summary>
+	/// True when an empty brace pair should sit on its owner's line, overriding
+	/// <c>csharp_new_line_before_open_brace</c> for that one pair.
+	/// </summary>
+	/// <remarks>
+	/// <c>csharp_empty_block_style = together_same_line</c> only — <c>together</c> collapses the pair
+	/// through <see cref="CollapsesEmptyBraces"/> but leaves it wherever the brace option puts it, which
+	/// is the distinction ReSharper itself draws between the two values.
+	/// </remarks>
+	internal static bool JoinsEmptyBracesToHeader(SyntaxNode body, PrintContext context) =>
+		context.Options.EmptyBlockStyle == EmptyBlockStyle.TogetherSameLine && IsEmptyBraces(body);
 
 	/// <summary>
 	/// Emits a block body as an expression body, when the configuration asked and the block allows.
@@ -1374,7 +1418,7 @@ internal static partial class Printers
 		PrintContext context,
 		ushort ownerGroup = 0)
 	{
-		if (KeepsOneLine(body, context))
+		if (KeepsOneLine(body, context) || JoinsEmptyBracesToHeader(body, context))
 		{
 			var arena = context.Arena;
 
@@ -1417,9 +1461,14 @@ internal static partial class Printers
 	/// </remarks>
 	internal static void PrintStatementBody(SyntaxNode body, BraceStyle construct, PrintContext context)
 	{
-		var flat = KeepsOneLine(body, context) || CollapsesEmptyBraces(body, context);
+		var joinsHeader = JoinsEmptyBracesToHeader(body, context);
+		var flat = joinsHeader || KeepsOneLine(body, context) || CollapsesEmptyBraces(body, context);
 
-		BeforeOpenBrace(construct, context);
+		if (joinsHeader)
+			context.Arena.Synthetic(SyntheticText.Space);
+		else
+			BeforeOpenBrace(construct, context);
+
 		using (context.Arena.ForceFlatIf(flat))
 			Node.Print(body, context);
 	}

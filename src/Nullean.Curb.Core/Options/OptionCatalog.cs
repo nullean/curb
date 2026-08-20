@@ -93,6 +93,7 @@ public static class OptionCatalog
 			// said what it wants. Opt-in, because this is the one opinion that moves a token.
 			"csharp_trailing_comma_in_multiline_lists",
 			"csharp_trailing_comma_in_singleline_lists",
+			"csharp_empty_block_style",
 
 			// IDE0021-0027 and IDE0061, which dotnet format can only apply with a compilation.
 			"csharp_style_expression_bodied_methods",

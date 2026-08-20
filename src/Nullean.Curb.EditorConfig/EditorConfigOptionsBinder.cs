@@ -531,6 +531,10 @@ public static class EditorConfigOptionsBinder
 				+ "still answer to it, alongside csharp_place_simple_accessorholder_on_single_line");
 		}
 
+		// ReSharper's key, not dotnet format's — see FormatOptions.EmptyBlockStyle for how it differs
+		// from csharp_preserve_single_line_blocks, which this leaves untouched when absent.
+		options = options with { EmptyBlockStyle = EmptyBlockStyleOf(properties, diagnostics) };
+
 		if (TryBool(properties, "csharp_indent_case_contents", diagnostics, out var indentCaseContents))
 			options = options with { IndentCaseContents = indentCaseContents };
 
@@ -784,6 +788,38 @@ public static class EditorConfigOptionsBinder
 				default:
 					diagnostics?.Add(CurbDiagnostic.UnrecognisedValue(
 						prefix + key, raw, "chop_always or chop_if_long"));
+					return null;
+			}
+		}
+
+		return null;
+	}
+
+	/// <summary>
+	/// Reads <c>[resharper_]csharp_empty_block_style</c> / <c>[resharper_]empty_block_style</c>, under all
+	/// four spellings.
+	/// </summary>
+	private static EmptyBlockStyle? EmptyBlockStyleOf(
+		IReadOnlyDictionary<string, string> properties,
+		ICollection<CurbDiagnostic>? diagnostics)
+	{
+		foreach (var prefix in ReSharperPrefixes)
+		{
+			var key = prefix + "empty_block_style";
+			if (!properties.TryGetValue(key, out var raw))
+				continue;
+
+			switch (raw.Trim().ToLowerInvariant())
+			{
+				case "multiline":
+					return EmptyBlockStyle.Multiline;
+				case "together":
+					return EmptyBlockStyle.Together;
+				case "together_same_line":
+					return EmptyBlockStyle.TogetherSameLine;
+				default:
+					diagnostics?.Add(CurbDiagnostic.UnrecognisedValue(
+						key, raw, "multiline, together or together_same_line"));
 					return null;
 			}
 		}

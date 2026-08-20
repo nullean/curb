@@ -388,6 +388,16 @@ internal static class Program
             "csharp_space_after_semicolon_in_for_statement" => opts with { SpaceAfterSemicolonInForStatement = b },
 
             "csharp_preserve_single_line_blocks" => opts with { PreserveSingleLineBlocks = b },
+            "csharp_empty_block_style" => opts with
+            {
+                EmptyBlockStyle = value switch
+                {
+                    "multiline" => Nullean.Curb.EmptyBlockStyle.Multiline,
+                    "together" => Nullean.Curb.EmptyBlockStyle.Together,
+                    "together_same_line" => Nullean.Curb.EmptyBlockStyle.TogetherSameLine,
+                    _ => (Nullean.Curb.EmptyBlockStyle?)null,
+                }
+            },
             "csharp_preserve_single_line_statements" => opts with { PreserveSingleLineStatements = b },
             "csharp_keep_existing_linebreaks" => opts with { KeepExistingLinebreaksOption = b },
             "csharp_wrap_before_first_method_call" => opts with { WrapBeforeFirstMethodCall = b },
