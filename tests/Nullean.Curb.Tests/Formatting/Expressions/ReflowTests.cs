@@ -127,6 +127,63 @@ public class ReflowTests : FormattingTest
 		""",
 		editorConfig: "max_line_length = 30");
 
+	/// <summary>
+	/// A ternary breaks at its own <c>?</c> and <c>:</c>, one indent in from wherever it starts. Curb
+	/// used to break after the <c>=</c> as well, nesting those a level deeper than the assignment
+	/// they belong to. See <see href="https://github.com/nullean/curb/issues/34">issue #34</see>.
+	/// </summary>
+	[Test]
+	public Task A_ternary_initializer_indents_once_not_twice() => Formats(
+		"""
+		public class C
+		{
+		    public void M(bool condition)
+		    {
+		        var value = condition ? alpha : beta;
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M(bool condition)
+		    {
+		        var value = condition
+		            ? alpha
+		            : beta;
+		    }
+		}
+		""",
+		editorConfig: "max_line_length = 40");
+
+	[Test]
+	public Task A_ternary_reassignment_indents_once_not_twice() => Formats(
+		"""
+		public class C
+		{
+		    private object value;
+
+		    public void M(bool condition)
+		    {
+		        value = condition ? alpha : beta;
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    private object value;
+
+		    public void M(bool condition)
+		    {
+		        value = condition
+		            ? alpha
+		            : beta;
+		    }
+		}
+		""",
+		editorConfig: "max_line_length = 40");
+
 	[Test]
 	public Task Nested_calls_break_from_the_outside_in() => Formats(
 		"""
