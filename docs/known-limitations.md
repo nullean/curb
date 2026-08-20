@@ -37,9 +37,3 @@ In certain initializer patterns, {{product}}'s output indentation can change bet
 passes. An initializer anchors to the indentation of the line it starts on; when {{product}}'s own
 output moves that line, the next run anchors somewhere else. The same applies to comment alignment in
 some cases. It is the anchor mechanism being unstable under its own output on real code.
-
-## Per-file exception isolation
-
-A bug in the printer for one file currently aborts the entire run rather than reporting that file and
-continuing. The intended behaviour — a file that cannot be formatted is reported and left untouched —
-is not yet implemented.
