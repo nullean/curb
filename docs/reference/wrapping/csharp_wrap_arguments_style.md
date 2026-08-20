@@ -51,9 +51,13 @@ namespace N;
 
 public class Widget
 {
-    public void Register(string name, int value, bool active, string tag)
-    {
-    }
+    public void Register(
+        string name,
+        int value,
+        bool active,
+        string tag
+    )
+    { }
 
     public void Run()
     {
@@ -102,13 +106,22 @@ namespace N;
 
 public class Widget
 {
-    public void Register(string name, int value, bool active, string tag)
-    {
-    }
+    public void Register(
+        string name,
+        int value,
+        bool active,
+        string tag
+    )
+    { }
 
     public void Run()
     {
-        Register("curb", 42, true, "formatter");
+        Register(
+            "curb",
+            42,
+            true,
+            "formatter"
+        );
     }
 }
 ```
@@ -148,13 +161,20 @@ namespace N;
 
 public class Widget
 {
-    public void Register(string name, int value, bool active, string tag)
-    {
-    }
+    public void Register(
+        string name,
+        int value,
+        bool active,
+        string tag
+    )
+    { }
 
     public void Run()
     {
-        Register("curb", 42, true, "formatter");
+        Register(
+            "curb", 42, true,
+            "formatter"
+        );
     }
 }
 ```

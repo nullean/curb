@@ -413,9 +413,13 @@ internal static class Program
             "csharp_place_simple_enum_on_single_line" => opts with { PlaceSimpleEnumOnSingleLine = b },
             "csharp_place_simple_accessorholder_on_single_line" => opts with { PlaceSimpleAccessorholderOnSingleLine = b },
             "csharp_wrap_before_binary_opsign" => opts with { WrapBeforeBinaryOpsign = b },
-            "csharp_wrap_chained_binary_expressions" => opts with { WrapChainedBinaryExpressions = ParseWrapStyle(value) },
-            "csharp_wrap_parameters_style" => opts with { WrapParametersStyle = ParseWrapStyle(value) },
-            "csharp_wrap_arguments_style" => opts with { WrapArgumentsStyle = ParseWrapStyle(value) },
+            // chop_if_long and wrap_if_long only act once a line does not fit, and none of these three
+            // snippets overflows the default (off) width on its own, so the example would render the
+            // same before and after without one. chop_always forces a break regardless of width, so
+            // giving it one too does not change its own example.
+            "csharp_wrap_chained_binary_expressions" => opts with { WrapChainedBinaryExpressions = ParseWrapStyle(value), MaxLineLength = 40 },
+            "csharp_wrap_parameters_style" => opts with { WrapParametersStyle = ParseWrapStyle(value), MaxLineLength = 40 },
+            "csharp_wrap_arguments_style" => opts with { WrapArgumentsStyle = ParseWrapStyle(value), MaxLineLength = 40 },
             "csharp_wrap_object_and_collection_initializer_style" => opts with { WrapObjectAndCollectionInitializerStyle = ParseWrapStyle(value) },
             "csharp_wrap_before_declaration_rpar" => opts with { WrapBeforeDeclarationRpar = b },
             "csharp_wrap_before_invocation_rpar" => opts with { WrapBeforeInvocationRpar = b },

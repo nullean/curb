@@ -90,7 +90,12 @@ namespace N;
 
 public class Widget
 {
-    public void Register(string name, int value, bool active, string tag)
+    public void Register(
+        string name,
+        int value,
+        bool active,
+        string tag
+    )
     {
         Console.WriteLine(name);
     }
@@ -128,7 +133,10 @@ namespace N;
 
 public class Widget
 {
-    public void Register(string name, int value, bool active, string tag)
+    public void Register(
+        string name, int value,
+        bool active, string tag
+    )
     {
         Console.WriteLine(name);
     }
