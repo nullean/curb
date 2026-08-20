@@ -28,6 +28,20 @@ internal sealed class BreakPropagation
 	/// <summary>True if the group at <paramref name="index"/> must print broken.</summary>
 	public bool IsBroken(int index) => (_broken[index >> 6] & (1UL << (index & 63))) != 0;
 
+	/// <summary>
+	/// True if <c>[start, end)</c> contains an unconditional break, for a caller measuring a range
+	/// that is not itself a group — <see cref="Printing.DocPrinter.PrintFill"/>, which decides an
+	/// item's or a pair's flatness by calling <c>Fits</c> directly rather than through
+	/// <see cref="Printing.DocPrinter.ResolveGroupMode"/>&#8203;'s <see cref="IsBroken"/> guard, and
+	/// so needs the same check <see cref="Run"/> already has the numbers for.
+	/// </summary>
+	/// <remarks>
+	/// The same prefix sum <see cref="IsBroken"/> reads, subtracted between two arbitrary points
+	/// instead of at one group's boundary — <see cref="Run"/> already builds it over every index, not
+	/// just group ones, so this costs nothing beyond the one it already pays.
+	/// </remarks>
+	public bool HasHardBreak(int start, int end) => _hardPrefix[end] - _hardPrefix[start] > 0;
+
 	public void Run(DocArena arena)
 	{
 		var count = arena.Count;

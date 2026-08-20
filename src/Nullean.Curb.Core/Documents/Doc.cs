@@ -32,6 +32,12 @@ internal enum DocKind : byte
 	/// <summary>An ordered sequence of children. <c>B</c> = child count.</summary>
 	Concat,
 
+	/// <summary>
+	/// Alternating item/separator children, packed onto a line until the next pair no longer fits.
+	/// <c>B</c> = child count, always odd — an item, then a separator, ending on an item.
+	/// </summary>
+	Fill,
+
 	/// <summary>Print flat if it fits, otherwise broken. <c>GroupId</c> names it so an <see cref="IfBreak"/> can consult it.</summary>
 	Group,
 

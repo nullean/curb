@@ -59,33 +59,58 @@ internal static partial class Printers
 		var arena = context.Arena;
 		var before = context.Options.WrapBeforeBinaryOpsign;
 
-		using (arena.Group())
+		void PrintOperator(int operatorIndex)
 		{
-			// A count, not a fit measurement: chop_always is the same decision
-			// csharp_wrap_arguments_style's chop_always makes, forcing the break outright instead of
-			// leaving it to whether the chain fits.
-			if (context.Options.WrapChainedBinaryExpressions == WrapStyle.ChopAlways)
-				arena.BreakParent();
-
-			using (arena.IndentIf(!callerAlreadyIndented))
+			if (before)
 			{
+				arena.Line();
+				TokenPrinter.Print(operators[operatorIndex], context);
+				arena.Synthetic(SyntheticText.Space);
+			}
+			else
+			{
+				arena.Synthetic(SyntheticText.Space);
+				TokenPrinter.Print(operators[operatorIndex], context);
+				arena.Line();
+			}
+		}
+
+		using (arena.IndentIf(!callerAlreadyIndented))
+		{
+			// wrap_if_long packs operands onto a line until the next one would not fit, rather than
+			// the group's all-flat-or-all-broken choice the other two values make — see DocKind.Fill.
+			if (context.Options.WrapChainedBinaryExpressions == WrapStyle.WrapIfLong)
+			{
+				using var fill = arena.Fill();
+
+				using (fill.Item())
+					Node.Print(operands[0], context);
+
+				for (var i = 1; i < operands.Count; i++)
+				{
+					using (fill.Separator())
+						PrintOperator(i - 1);
+
+					using (fill.Item())
+						Node.Print(operands[i], context);
+				}
+
+				return true;
+			}
+
+			using (arena.Group())
+			{
+				// A count, not a fit measurement: chop_always is the same decision
+				// csharp_wrap_arguments_style's chop_always makes, forcing the break outright instead
+				// of leaving it to whether the chain fits.
+				if (context.Options.WrapChainedBinaryExpressions == WrapStyle.ChopAlways)
+					arena.BreakParent();
+
 				Node.Print(operands[0], context);
 
 				for (var i = 1; i < operands.Count; i++)
 				{
-					if (before)
-					{
-						arena.Line();
-						TokenPrinter.Print(operators[i - 1], context);
-						arena.Synthetic(SyntheticText.Space);
-					}
-					else
-					{
-						arena.Synthetic(SyntheticText.Space);
-						TokenPrinter.Print(operators[i - 1], context);
-						arena.Line();
-					}
-
+					PrintOperator(i - 1);
 					Node.Print(operands[i], context);
 				}
 			}

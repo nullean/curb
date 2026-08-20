@@ -125,6 +125,22 @@ internal sealed class DocArena
 
 	public DocScope ConditionalGroup(ushort groupId = 0) => Open(new Doc(DocKind.ConditionalGroup, groupId: groupId));
 
+	/// <summary>
+	/// Opens a <see cref="DocKind.Fill"/>. Write alternating <see cref="FillScope.Item"/> and
+	/// <see cref="FillScope.Separator"/> children, item first, ending on an item.
+	/// </summary>
+	/// <remarks>
+	/// Unlike <see cref="Group"/>, which is all-flat-or-all-broken, a fill measures each item and the
+	/// pair it forms with the one after it independently, so a list packs as many items onto a line as
+	/// fit and only breaks where the next one would not — <c>csharp_wrap_*_style = wrap_if_long</c>.
+	/// </remarks>
+	public FillScope Fill()
+	{
+		var index = _count;
+		Add(new Doc(DocKind.Fill));
+		return new FillScope(this, index);
+	}
+
 	/// <summary>Shifts the subtree by <paramref name="levels"/>, which may be negative.</summary>
 	public DocScope Indent(int levels = 1) => Open(new Doc(DocKind.Indent, b: levels));
 
@@ -202,7 +218,7 @@ internal sealed class DocArena
 		var doc = _docs[index];
 		var length = _count - index;
 
-		if (doc.Kind is DocKind.Concat or DocKind.ConditionalGroup)
+		if (doc.Kind is DocKind.Concat or DocKind.ConditionalGroup or DocKind.Fill)
 		{
 			// Count direct children by walking the subtree one child at a time.
 			var children = 0;
@@ -251,4 +267,22 @@ internal readonly struct IfBreakScope(DocArena arena, int index) : IDisposable
 	public DocScope Branch() => arena.Concat();
 
 	public void Dispose() => arena.CloseIfBreak(index);
+}
+
+/// <summary>
+/// Writes the alternating item/separator children of a <see cref="DocKind.Fill"/>.
+/// </summary>
+/// <remarks>
+/// <see cref="Item"/> and <see cref="Separator"/> are identical scopes — the printer tells them apart
+/// by position, not by kind — so the two names exist only to make a call site read as what it means.
+/// </remarks>
+internal readonly struct FillScope(DocArena arena, int index) : IDisposable
+{
+	/// <summary>One item: the content that gets packed onto a line.</summary>
+	public DocScope Item() => arena.Concat();
+
+	/// <summary>What sits between two items — typically a comma or operator plus a break opportunity.</summary>
+	public DocScope Separator() => arena.Concat();
+
+	public void Dispose() => arena.Close(index);
 }

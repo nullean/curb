@@ -11,7 +11,7 @@ public enum WrapStyle
 	/// <summary>Every element on its own line, fit or not.</summary>
 	ChopAlways,
 
-	/// <summary>Pack elements onto a line until the width runs out. Not implemented.</summary>
+	/// <summary>Pack elements onto a line until the next one would not fit.</summary>
 	WrapIfLong,
 }
 
@@ -760,9 +760,11 @@ public readonly record struct FormatOptions
 	/// whether or not the list fits. Null leaves width to decide, which is <c>chop_if_long</c>.
 	/// </summary>
 	/// <remarks>
-	/// The breaking direction again, and safe for the same reason the counts are: it asks nothing
-	/// about the layout being decided. <c>wrap_if_long</c> — the fill layout — is reported as
-	/// unimplemented rather than quietly treated as one of the others.
+	/// The breaking direction again, and <c>chop_always</c> is safe for the same reason the counts
+	/// are: it asks nothing about the layout being decided. <c>wrap_if_long</c> packs by measuring
+	/// width instead, which carries the same preservation-mode risk <see cref="WrapArgumentsStyle"/>
+	/// documents, so that one value alone is admissible only under <see cref="KeepExistingLinebreaks"/>
+	/// <c>= false</c> — the sole asymmetry within this one key.
 	/// </remarks>
 	public WrapStyle? WrapParametersStyle { get; init; }
 
@@ -788,9 +790,17 @@ public readonly record struct FormatOptions
 	/// the initializer fits.
 	/// </summary>
 	/// <remarks>
+	/// <para>
 	/// Deterministic mode only, for the same measured reason as <see cref="WrapArgumentsStyle"/>. The
 	/// count-based half of this family — <see cref="MaxInitializerElementsOnLine"/> — is admissible in
 	/// both modes, because a count is not a layout question.
+	/// </para>
+	/// <para>
+	/// <c>wrap_if_long</c> is not offered here, the one construct where it never can be: dotnet format
+	/// forces every member onto its own line once an initializer has opened out, unconditionally, so a
+	/// packed layout is never a fixed point of it — measured directly, not inferred. Parameters,
+	/// arguments and chained binary expressions carry no such rule from dotnet format.
+	/// </para>
 	/// </remarks>
 	public WrapStyle? WrapObjectAndCollectionInitializerStyle { get; init; }
 
@@ -970,8 +980,8 @@ public readonly record struct FormatOptions
 	/// <para>
 	/// <c>chop_if_long</c> breaks once the chain does not fit; <c>chop_always</c> breaks every
 	/// operand onto its own line regardless of width, the same distinction
-	/// <see cref="WrapArgumentsStyle"/> draws. <c>wrap_if_long</c> is the fill layout, packing
-	/// operands until the width runs out, and the document printer has no primitive for it.
+	/// <see cref="WrapArgumentsStyle"/> draws. <c>wrap_if_long</c> packs operands onto a line until
+	/// the next one would not fit instead — the document printer's fill layout.
 	/// </para>
 	/// <para>
 	/// Deterministic mode only, for the same reason as <see cref="WrapArgumentsStyle"/>: forcing a

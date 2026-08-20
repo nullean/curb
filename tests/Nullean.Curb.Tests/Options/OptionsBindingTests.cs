@@ -281,6 +281,96 @@ public class OptionsBindingTests
 		await Task.CompletedTask;
 	}
 
+	// ---- wrap_if_long: the fill layout -----------------------------------------------------------------
+
+	[Test]
+	public async Task Wrap_if_long_binds_under_deterministic_layout()
+	{
+		var options = Bind("""
+			root = true
+
+			[*.cs]
+			max_line_length = 120
+			csharp_wrap_parameters_style = wrap_if_long
+			csharp_wrap_arguments_style = wrap_if_long
+			csharp_wrap_chained_binary_expressions = wrap_if_long
+			""", out var diagnostics);
+
+		diagnostics.Should().BeEmpty();
+		options.WrapParametersStyle.Should().Be(WrapStyle.WrapIfLong);
+		options.WrapArgumentsStyle.Should().Be(WrapStyle.WrapIfLong);
+		options.WrapChainedBinaryExpressions.Should().Be(WrapStyle.WrapIfLong);
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task Wrap_if_long_needs_deterministic_layout_on_the_two_keys_already_restricted_there()
+	{
+		var options = Bind("""
+			root = true
+
+			[*.cs]
+			csharp_wrap_arguments_style = wrap_if_long
+			csharp_wrap_chained_binary_expressions = wrap_if_long
+			""", out var diagnostics);
+
+		diagnostics.Should().HaveCount(2).And.OnlyContain(d => d.Id == "CURB1005");
+		options.WrapArgumentsStyle.Should().BeNull();
+		options.WrapChainedBinaryExpressions.Should().BeNull();
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task Wrap_if_long_is_not_offered_for_initializers_at_all()
+	{
+		// Measured directly: dotnet format forces one member per line once an initializer opens out,
+		// unconditionally, so a packed layout is never a fixed point of it — unlike parameters,
+		// arguments and chained binary expressions, which carry no such rule from dotnet format. This
+		// is refused outright rather than merely gated to deterministic layout, in either mode.
+		var options = Bind("""
+			root = true
+
+			[*.cs]
+			max_line_length = 120
+			csharp_wrap_object_and_collection_initializer_style = wrap_if_long
+			""", out var diagnostics);
+
+		diagnostics.Should().ContainSingle().Which.Id.Should().Be("CURB1001");
+		diagnostics[0].Message.Should().Contain("chop_always or chop_if_long");
+		options.WrapObjectAndCollectionInitializerStyle.Should().BeNull("the value was refused, not applied");
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task Wrap_if_long_needs_deterministic_layout_on_parameters_too_even_though_chop_always_does_not()
+	{
+		// The one asymmetry within csharp_wrap_parameters_style itself: chop_always asks nothing about
+		// the layout being decided and is safe in preservation mode, but wrap_if_long forces a break by
+		// measuring width the same way chop_always does for arguments and initializers, so it alone
+		// needs the restriction those two keys apply to themselves as a whole.
+		var chopAlways = Bind("""
+			root = true
+
+			[*.cs]
+			csharp_wrap_parameters_style = chop_always
+			""", out var chopDiagnostics);
+
+		chopAlways.WrapParametersStyle.Should().Be(WrapStyle.ChopAlways);
+		chopDiagnostics.Should().BeEmpty();
+
+		var wrapIfLong = Bind("""
+			root = true
+
+			[*.cs]
+			csharp_wrap_parameters_style = wrap_if_long
+			""", out var wrapDiagnostics);
+
+		wrapDiagnostics.Should().ContainSingle().Which.Id.Should().Be("CURB1005");
+		wrapDiagnostics[0].Message.Should().Contain("csharp_keep_existing_linebreaks = false");
+		wrapIfLong.WrapParametersStyle.Should().BeNull("the key was dropped, not applied");
+		await Task.CompletedTask;
+	}
+
 	// ---- the mode resolves from the width -----------------------------------------------------------
 
 	/// <summary>

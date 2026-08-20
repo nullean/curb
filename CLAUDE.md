@@ -41,9 +41,8 @@ options. Native AOT on five RIDs, ~11 MB with ~10 ms startup.
 CI gates conformance on every push: byte-identical to `dotnet format whitespace` with reflow off (100%),
 99.9% with reflow on, zero failed or unparsable files across a 1,196-file corpus.
 
-Still open: redundant parentheses (IDE0047/0048), the `wrap_if_long` fill layout, the option-catalog
-generator that will produce `docs/options.md`, and replacing the hand-rolled CLI parser with
-`Nullean.Argh`.
+Still open: redundant parentheses (IDE0047/0048), the option-catalog generator that will produce
+`docs/options.md`, and replacing the hand-rolled CLI parser with `Nullean.Argh`.
 
 ## Public documentation
 
