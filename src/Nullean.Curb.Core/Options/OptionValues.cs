@@ -43,6 +43,13 @@ public static class OptionValues
 			_ => "   # the byte-order mark each file arrived with is kept",
 		},
 
+		"csharp_empty_block_style" => options.EmptyBlockStyle switch
+		{
+			EmptyBlockStyle.Multiline => "multiline",
+			EmptyBlockStyle.Together => "together",
+			EmptyBlockStyle.TogetherSameLine => "together_same_line",
+			_ => "   # csharp_preserve_single_line_blocks governs an empty pair instead",
+		},
 		"csharp_trailing_comma_in_multiline_lists" => Bool(options.TrailingCommaInMultilineLists),
 		"csharp_trailing_comma_in_singleline_lists" => Bool(options.TrailingCommaInSinglelineLists),
 		"csharp_style_expression_bodied_methods" => Expression(options.ExpressionBodiedMethods),
@@ -55,7 +62,7 @@ public static class OptionValues
 		"file_header_template" => options.FileHeaderTemplate ?? "   # no header is required",
 		"csharp_wrap_chained_binary_expressions" => options.WrapChainedBinaryExpressions is null
 			? "   # a chain that does not fit overflows the line rather than breaking"
-			: "chop_if_long",
+			: Wrap(options.WrapChainedBinaryExpressions),
 		"csharp_wrap_before_binary_opsign" => Bool(options.WrapBeforeBinaryOpsign),
 		"csharp_wrap_before_first_method_call" => options.WrapBeforeFirstMethodCall switch
 		{

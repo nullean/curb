@@ -64,6 +64,7 @@ Use the filter above to search by name. Each group below links to its own index.
 ## [Wrapping](wrapping/index.md)
 
 - [csharp_preserve_single_line_blocks](wrapping/csharp_preserve_single_line_blocks.md) — Allow a block the author wrote on one line to stay on one line.
+- [csharp_empty_block_style](wrapping/csharp_empty_block_style.md) — How an empty method, constructor, accessor or control-flow body is laid out. together_same_line keeps { } on the signature's line.
 - [csharp_preserve_single_line_statements](wrapping/csharp_preserve_single_line_statements.md) — Allow a control-flow body the author left on its header's line to stay there.
 - [csharp_keep_existing_linebreaks](wrapping/csharp_keep_existing_linebreaks.md) — Preservation mode. Defaults to true when max_line_length is off.
 - [csharp_wrap_before_first_method_call](wrapping/csharp_wrap_before_first_method_call.md) — When a chain breaks, break before the first call too, leaving the receiver on its own line.
@@ -75,7 +76,7 @@ Use the filter above to search by name. Each group below links to its own index.
 - [csharp_wrap_chained_method_calls](wrapping/csharp_wrap_chained_method_calls.md) — Break a chain of three or more calls onto its own line per call once it does not fit. Curb's default behaviour either way; setting the key only makes it explicit.
 - [csharp_place_simple_enum_on_single_line](wrapping/csharp_place_simple_enum_on_single_line.md) — Allow a short enum body to stay on one line.
 - [csharp_place_simple_accessorholder_on_single_line](wrapping/csharp_place_simple_accessorholder_on_single_line.md) — Allow { get; set; } to stay on the property's line.
-- [csharp_wrap_chained_binary_expressions](wrapping/csharp_wrap_chained_binary_expressions.md) — Break each operand of a long && or || chain onto its own line.
+- [csharp_wrap_chained_binary_expressions](wrapping/csharp_wrap_chained_binary_expressions.md) — Break each operand of a long && or || chain onto its own line. chop_always breaks regardless of width. Only honoured in deterministic mode (max_line_length set).
 - [csharp_wrap_before_binary_opsign](wrapping/csharp_wrap_before_binary_opsign.md) — When a binary chain breaks, start the new line with the operator.
 - [csharp_wrap_parameters_style](wrapping/csharp_wrap_parameters_style.md) — chop_always gives every parameter its own line regardless of width.
 - [csharp_wrap_arguments_style](wrapping/csharp_wrap_arguments_style.md) — chop_always gives every argument its own line. Only honoured in deterministic mode (max_line_length set).
@@ -137,4 +138,3 @@ Use the filter above to search by name. Each group below links to its own index.
 - [generated_code](suppression/generated_code.md) — Skip this file entirely. Curb never formats files marked as generated.
 - [dotnet_diagnostic.ide0055.severity](suppression/dotnet_diagnostic.ide0055.severity.md) — Set this to none to opt a file out of formatting.
 - [file_header_template](suppression/file_header_template.md) — Insert or correct a // comment header at the top of the file. Supports {fileName}. IDE0073.
-

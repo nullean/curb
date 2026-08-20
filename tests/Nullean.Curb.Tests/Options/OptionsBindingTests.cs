@@ -178,6 +178,41 @@ public class OptionsBindingTests
 	}
 
 	[Test]
+	public async Task A_binary_chop_style_that_needs_deterministic_layout_says_so()
+	{
+		// The same risk as csharp_wrap_object_and_collection_initializer_style above: forcing every
+		// operand onto its own line moves indentation preservation mode's rules would otherwise read
+		// from the source.
+		var options = Bind("""
+			root = true
+
+			[*.cs]
+			csharp_wrap_chained_binary_expressions = chop_always
+			""", out var diagnostics);
+
+		diagnostics.Should().ContainSingle().Which.Id.Should().Be("CURB1005");
+		diagnostics[0].Message.Should().Contain("csharp_keep_existing_linebreaks = false");
+		options.WrapChainedBinaryExpressions.Should().BeNull("the key was dropped, not applied");
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task The_binary_chop_style_binds_under_deterministic_layout()
+	{
+		var options = Bind("""
+			root = true
+
+			[*.cs]
+			max_line_length = 120
+			csharp_wrap_chained_binary_expressions = chop_always
+			""", out var diagnostics);
+
+		diagnostics.Should().BeEmpty();
+		options.WrapChainedBinaryExpressions.Should().Be(WrapStyle.ChopAlways);
+		await Task.CompletedTask;
+	}
+
+	[Test]
 	public async Task Chop_if_long_binds_for_chained_method_calls()
 	{
 		var options = Bind("""
@@ -405,6 +440,46 @@ public class OptionsBindingTests
 			""", out var diagnostics);
 
 		diagnostics.Should().ContainSingle().Which.Id.Should().Be("CURB1004");
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task Empty_block_style_binds_under_all_four_resharper_spellings()
+	{
+		foreach (var key in new[]
+		{
+			"resharper_csharp_empty_block_style",
+			"csharp_empty_block_style",
+			"resharper_empty_block_style",
+			"empty_block_style",
+		})
+		{
+			var options = Bind($"root = true\n\n[*.cs]\n{key} = together_same_line\n", out var diagnostics);
+
+			diagnostics.Should().BeEmpty(key);
+			options.EmptyBlockStyle.Should().Be(EmptyBlockStyle.TogetherSameLine, key);
+		}
+
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task An_unrecognised_empty_block_style_value_is_reported()
+	{
+		var options = Bind("root = true\n\n[*.cs]\ncsharp_empty_block_style = sometimes\n", out var diagnostics);
+
+		diagnostics.Should().ContainSingle().Which.Id.Should().Be("CURB1001");
+		options.EmptyBlockStyle.Should().BeNull();
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task Empty_block_style_is_unset_by_default()
+	{
+		var options = Bind("root = true\n\n[*.cs]\n", out var diagnostics);
+
+		diagnostics.Should().BeEmpty();
+		options.EmptyBlockStyle.Should().BeNull();
 		await Task.CompletedTask;
 	}
 

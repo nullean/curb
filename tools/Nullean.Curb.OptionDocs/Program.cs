@@ -392,6 +392,16 @@ internal static class Program
             "csharp_space_after_semicolon_in_for_statement" => opts with { SpaceAfterSemicolonInForStatement = b },
 
             "csharp_preserve_single_line_blocks" => opts with { PreserveSingleLineBlocks = b },
+            "csharp_empty_block_style" => opts with
+            {
+                EmptyBlockStyle = value switch
+                {
+                    "multiline" => Nullean.Curb.EmptyBlockStyle.Multiline,
+                    "together" => Nullean.Curb.EmptyBlockStyle.Together,
+                    "together_same_line" => Nullean.Curb.EmptyBlockStyle.TogetherSameLine,
+                    _ => (Nullean.Curb.EmptyBlockStyle?)null,
+                }
+            },
             "csharp_preserve_single_line_statements" => opts with { PreserveSingleLineStatements = b },
             "csharp_keep_existing_linebreaks" => opts with { KeepExistingLinebreaksOption = b },
             "csharp_wrap_before_first_method_call" => opts with { WrapBeforeFirstMethodCall = b },
@@ -403,7 +413,7 @@ internal static class Program
             "csharp_place_simple_enum_on_single_line" => opts with { PlaceSimpleEnumOnSingleLine = b },
             "csharp_place_simple_accessorholder_on_single_line" => opts with { PlaceSimpleAccessorholderOnSingleLine = b },
             "csharp_wrap_before_binary_opsign" => opts with { WrapBeforeBinaryOpsign = b },
-            "csharp_wrap_chained_binary_expressions" => opts with { WrapChainedBinaryExpressions = WrapStyle.ChopIfLong },
+            "csharp_wrap_chained_binary_expressions" => opts with { WrapChainedBinaryExpressions = value == "chop_always" ? WrapStyle.ChopAlways : WrapStyle.ChopIfLong },
             "csharp_wrap_parameters_style" => opts with { WrapParametersStyle = value == "chop_always" ? WrapStyle.ChopAlways : WrapStyle.ChopIfLong },
             "csharp_wrap_arguments_style" => opts with { WrapArgumentsStyle = value == "chop_always" ? WrapStyle.ChopAlways : WrapStyle.ChopIfLong },
             "csharp_wrap_object_and_collection_initializer_style" => opts with { WrapObjectAndCollectionInitializerStyle = value == "chop_always" ? WrapStyle.ChopAlways : WrapStyle.ChopIfLong },

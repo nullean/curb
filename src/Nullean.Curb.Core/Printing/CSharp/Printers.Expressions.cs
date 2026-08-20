@@ -41,7 +41,11 @@ internal static partial class Printers
 	/// A value that brings its own braces positions its own contents, so it takes a plain space
 	/// rather than a hanging indent — otherwise the whole construct sits one level too deep.
 	/// </remarks>
-	private static void OperandOnRight(SyntaxNode? right, PrintContext context, int operatorEnd = -1)
+	private static void OperandOnRight(
+		SyntaxNode? right,
+		PrintContext context,
+		int operatorEnd = -1,
+		bool suppressIndent = false)
 	{
 		var arena = context.Arena;
 
@@ -57,7 +61,7 @@ internal static partial class Printers
 		}
 
 		using (arena.Group())
-		using (arena.Indent())
+		using (arena.IndentIf(!suppressIndent))
 		{
 			// A Line is a space when flat; under `none` the break must not bring one back.
 			if (context.Options.SpaceAroundBinaryOperators == BinaryOperatorSpacing.BeforeAndAfter)
@@ -76,8 +80,25 @@ internal static partial class Printers
 			return;
 		}
 
-		if (TryPrintBinaryChain(node, context))
+		// Consumed here, unconditionally: this is the first printer every BinaryExpressionSyntax
+		// reaches, so a match can only mean ConditionHeader indented this exact node — or an
+		// enclosing link of the same chain relayed that below — and is waiting for this node to use
+		// that indent instead of adding its own. Cleared either way, so a chain nested behind a cast
+		// or a prefix operator's own parentheses — a different node — still gets its own.
+		var alreadyIndented = ReferenceEquals(context.IndentedCondition, node);
+		if (alreadyIndented)
+			context.IndentedCondition = null;
+
+		if (TryPrintBinaryChain(node, context, alreadyIndented))
 			return;
+
+		// Relayed one more link down: the rest of a uniform chain prints through node.Left at the
+		// same ambient indent, so its own continuation — reached once Left's BinaryExpression call
+		// gets here in turn — is still the condition's, not a nested construct's.
+		if (alreadyIndented
+			&& node.Left is BinaryExpressionSyntax left
+			&& left.OperatorToken.RawKind == node.OperatorToken.RawKind)
+			context.IndentedCondition = left;
 
 		Node.Print(node.Left, context);
 
@@ -105,7 +126,7 @@ internal static partial class Printers
 			return;
 		}
 
-		OperandOnRight(node.Right, context, node.OperatorToken.Span.End);
+		OperandOnRight(node.Right, context, node.OperatorToken.Span.End, alreadyIndented);
 	}
 
 	public static void AssignmentExpression(AssignmentExpressionSyntax node, PrintContext context)

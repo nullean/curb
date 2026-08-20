@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.IO.Abstractions;
+using System.Text;
 using Nullean.Curb.Cleanup;
 using Nullean.Curb.EditorConfig;
 using Nullean.Curb.Options;
@@ -24,6 +25,12 @@ internal static class CleanupRun
 {
 	/// <summary>The name the MSBuild integration gives the compiler's error log.</summary>
 	private const string LogName = "curb.sarif";
+
+	/// <summary>UTF-8 without a byte-order mark, and without the exception-throwing default.</summary>
+	private static readonly UTF8Encoding Utf8 = new(encoderShouldEmitUTF8Identifier: false);
+
+	/// <summary>UTF-8 with a byte-order mark, for <c>charset = utf-8-bom</c>.</summary>
+	private static readonly UTF8Encoding Utf8WithBom = new(encoderShouldEmitUTF8Identifier: true);
 
 	/// <param name="fileSystem">Abstracted so a run can be driven entirely in memory by a test.</param>
 	/// <param name="target">Where to look for logs when <paramref name="logs"/> is empty.</param>
@@ -132,7 +139,12 @@ internal static class CleanupRun
 					return worker;
 				}
 
-				var source = fileSystem.File.ReadAllText(path);
+				// Read bytes rather than text: ReadAllText silently swallows a byte-order mark and
+				// WriteAllText silently writes none, so `charset` was unobservable at both ends —
+				// the same bug FormattingRun.cs fixes for `curb format`.
+				var bytes = fileSystem.File.ReadAllBytes(path);
+				var hadBom = bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF;
+				var source = Utf8.GetString(hadBom ? bytes.AsSpan(3) : bytes);
 
 				// The file's own opt-outs, honoured exactly as the formatter honours them.
 				if (options[index].Excluded || CSharpSource.HasGeneratedHeader(source))
@@ -183,7 +195,15 @@ internal static class CleanupRun
 				var formatted = worker.Formatter.Format(result.Text, options[index], produceText: true, verifyRoundTrip: true);
 				var output = formatted.Success && formatted.Text is not null ? formatted.Text : result.Text;
 
-				fileSystem.File.WriteAllText(path, output);
+				var wantsBom = options[index].Charset switch
+				{
+					Charset.Utf8Bom => true,
+					Charset.Utf8 => false,
+					Charset.Preserve => hadBom,
+					_ => hadBom,
+				};
+
+				fileSystem.File.WriteAllText(path, output, wantsBom ? Utf8WithBom : Utf8);
 				return worker;
 			},
 			worker => worker.Formatter.Dispose());

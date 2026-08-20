@@ -295,33 +295,6 @@ public static class EditorConfigOptionsBinder
 
 		foreach (var prefix in ReSharperPrefixes)
 		{
-			if (!properties.TryGetValue(prefix + "wrap_chained_binary_expressions", out var binaryWrap))
-				continue;
-
-			var colon = binaryWrap.LastIndexOf(':');
-			switch ((colon >= 0 ? binaryWrap[..colon] : binaryWrap).Trim().ToLowerInvariant())
-			{
-				case "chop_if_long":
-					options = options with { WrapChainedBinaryExpressions = WrapStyle.ChopIfLong };
-					break;
-				case "wrap_if_long":
-					// The fill layout, which the document printer has no primitive for. Reported
-					// rather than silently treated as the other one.
-					diagnostics?.Add(CurbDiagnostic.UnrecognisedValue(
-						prefix + "wrap_chained_binary_expressions", binaryWrap,
-						"chop_if_long; wrap_if_long is not implemented"));
-					break;
-				default:
-					diagnostics?.Add(CurbDiagnostic.UnrecognisedValue(
-						prefix + "wrap_chained_binary_expressions", binaryWrap, "chop_if_long"));
-					break;
-			}
-
-			break;
-		}
-
-		foreach (var prefix in ReSharperPrefixes)
-		{
 			if (!properties.TryGetValue(prefix + "wrap_chained_method_calls", out var methodChainWrap))
 				continue;
 
@@ -359,7 +332,6 @@ public static class EditorConfigOptionsBinder
 			else
 				options = options with { MaxChainedMethodCallsOnLine = maxChainCalls };
 		}
-
 		if (TryPrefixedBool(properties, "wrap_before_first_method_call", diagnostics, out var wrapFirstCall))
 			options = options with { WrapBeforeFirstMethodCall = wrapFirstCall };
 
@@ -384,11 +356,11 @@ public static class EditorConfigOptionsBinder
 		if (TryPrefixedBool(properties, "place_simple_accessorholder_on_single_line", diagnostics, out var placeAccessors))
 			options = options with { PlaceSimpleAccessorholderOnSingleLine = placeAccessors };
 
-		// The parameter list's is admissible in either mode. The argument and initializer styles are not:
-		// forcing every one of those to break moves constructs whose indentation other rules read from
-		// the source, and the file then formats differently on its second pass — 140 corpus files for
-		// arguments against none for parameters. Deterministic layout has no rule that reads indentation
-		// from the source, which is exactly why they become available there.
+		// The parameter list's is admissible in either mode. The argument, initializer and chained-binary
+		// styles are not: forcing every one of those to break moves constructs whose indentation other
+		// rules read from the source, and the file then formats differently on its second pass — 140
+		// corpus files for arguments against none for parameters. Deterministic layout has no rule that
+		// reads indentation from the source, which is exactly why they become available there.
 		//
 		// wrap_chained_method_calls is bound above, restricted to chop_if_long — its chop_always stays
 		// out for the same reason as the two below, and it cost 156 files besides.
@@ -398,6 +370,7 @@ public static class EditorConfigOptionsBinder
 			WrapArgumentsStyle = DeterministicOnlyWrapStyle("wrap_arguments_style"),
 			WrapObjectAndCollectionInitializerStyle =
 				DeterministicOnlyWrapStyle("wrap_object_and_collection_initializer_style"),
+			WrapChainedBinaryExpressions = DeterministicOnlyWrapStyle("wrap_chained_binary_expressions"),
 		};
 
 		// Four of ReSharper's six. place_type_attribute_on_same_line and the accessorholder one are not
@@ -569,6 +542,10 @@ public static class EditorConfigOptionsBinder
 				"block, type, namespace, enum and switch bodies each take their own lines. Accessor lists "
 				+ "still answer to it, alongside csharp_place_simple_accessorholder_on_single_line");
 		}
+
+		// ReSharper's key, not dotnet format's — see FormatOptions.EmptyBlockStyle for how it differs
+		// from csharp_preserve_single_line_blocks, which this leaves untouched when absent.
+		options = options with { EmptyBlockStyle = EmptyBlockStyleOf(properties, diagnostics) };
 
 		if (TryBool(properties, "csharp_indent_case_contents", diagnostics, out var indentCaseContents))
 			options = options with { IndentCaseContents = indentCaseContents };
@@ -823,6 +800,38 @@ public static class EditorConfigOptionsBinder
 				default:
 					diagnostics?.Add(CurbDiagnostic.UnrecognisedValue(
 						prefix + key, raw, "chop_always or chop_if_long"));
+					return null;
+			}
+		}
+
+		return null;
+	}
+
+	/// <summary>
+	/// Reads <c>[resharper_]csharp_empty_block_style</c> / <c>[resharper_]empty_block_style</c>, under all
+	/// four spellings.
+	/// </summary>
+	private static EmptyBlockStyle? EmptyBlockStyleOf(
+		IReadOnlyDictionary<string, string> properties,
+		ICollection<CurbDiagnostic>? diagnostics)
+	{
+		foreach (var prefix in ReSharperPrefixes)
+		{
+			var key = prefix + "empty_block_style";
+			if (!properties.TryGetValue(key, out var raw))
+				continue;
+
+			switch (raw.Trim().ToLowerInvariant())
+			{
+				case "multiline":
+					return EmptyBlockStyle.Multiline;
+				case "together":
+					return EmptyBlockStyle.Together;
+				case "together_same_line":
+					return EmptyBlockStyle.TogetherSameLine;
+				default:
+					diagnostics?.Add(CurbDiagnostic.UnrecognisedValue(
+						key, raw, "multiline, together or together_same_line"));
 					return null;
 			}
 		}

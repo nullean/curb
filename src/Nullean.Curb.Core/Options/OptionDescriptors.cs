@@ -101,6 +101,7 @@ public sealed record OptionDescriptor(
 
 		// ---- Wrapping (26) ------------------------------------------------------------------
 		new("csharp_preserve_single_line_blocks", OptionGroup.Wrapping, ["true", "false"], "true", "Allow a block the author wrote on one line to stay on one line.", "single_line_block"),
+		new("csharp_empty_block_style", OptionGroup.Wrapping, ["multiline", "together", "together_same_line"], "(not set)", "How an empty method, constructor, accessor or control-flow body is laid out. together_same_line keeps { } on the signature's line.", "single_line_block"),
 		new("csharp_preserve_single_line_statements", OptionGroup.Wrapping, ["true", "false"], "true", "Allow a control-flow body the author left on its header's line to stay there.", "if_else"),
 		new("csharp_keep_existing_linebreaks", OptionGroup.Wrapping, ["true", "false"], "(derived from max_line_length)", "Preservation mode. Defaults to true when max_line_length is off.", "long_chain"),
 		new("csharp_wrap_before_first_method_call", OptionGroup.Wrapping, ["true", "false"], "(not set)", "When a chain breaks, break before the first call too, leaving the receiver on its own line.", "long_chain"),
@@ -112,7 +113,7 @@ public sealed record OptionDescriptor(
 		new("csharp_wrap_chained_method_calls", OptionGroup.Wrapping, ["chop_if_long"], "chop_if_long", "Break a chain of three or more calls onto its own line per call once it does not fit. Curb's default behaviour either way; setting the key only makes it explicit.", "long_chain"),
 		new("csharp_place_simple_enum_on_single_line", OptionGroup.Wrapping, ["true", "false"], "true", "Allow a short enum body to stay on one line.", "simple_enum"),
 		new("csharp_place_simple_accessorholder_on_single_line", OptionGroup.Wrapping, ["true", "false"], "true", "Allow { get; set; } to stay on the property's line.", "property"),
-		new("csharp_wrap_chained_binary_expressions", OptionGroup.Wrapping, ["chop_if_long"], "(not set)", "Break each operand of a long && or || chain onto its own line.", "binary_ops"),
+		new("csharp_wrap_chained_binary_expressions", OptionGroup.Wrapping, ["chop_always", "chop_if_long"], "(not set)", "Break each operand of a long && or || chain onto its own line. chop_always breaks regardless of width. Only honoured in deterministic mode (max_line_length set).", "binary_ops"),
 		new("csharp_wrap_before_binary_opsign", OptionGroup.Wrapping, ["true", "false"], "true", "When a binary chain breaks, start the new line with the operator.", "binary_ops"),
 		new("csharp_wrap_parameters_style", OptionGroup.Wrapping, ["chop_always", "chop_if_long"], "chop_if_long", "chop_always gives every parameter its own line regardless of width.", "method_decl"),
 		new("csharp_wrap_arguments_style", OptionGroup.Wrapping, ["chop_always", "chop_if_long"], "chop_if_long", "chop_always gives every argument its own line. Only honoured in deterministic mode (max_line_length set).", "call_args"),
