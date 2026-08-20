@@ -132,7 +132,6 @@ public class OptionsBindingTests
 			csharp_preferred_modifier_order = public, private, protected
 			csharp_max_initializer_elements_on_line = 5
 			csharp_place_simple_initializer_on_single_line = true
-			csharp_wrap_chained_method_calls = chop_always
 			""", out var diagnostics);
 
 		diagnostics.Should().BeEmpty("those belong to ReSharper, not to Curb");
@@ -210,6 +209,75 @@ public class OptionsBindingTests
 
 		diagnostics.Should().BeEmpty();
 		options.WrapChainedBinaryExpressions.Should().Be(WrapStyle.ChopAlways);
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task Chop_if_long_binds_for_chained_method_calls()
+	{
+		var options = Bind("""
+			root = true
+
+			[*.cs]
+			max_line_length = 120
+			csharp_wrap_chained_method_calls = chop_if_long
+			""", out var diagnostics);
+
+		diagnostics.Should().BeEmpty();
+		options.WrapChainedMethodCalls.Should().Be(WrapStyle.ChopIfLong);
+		await Task.CompletedTask;
+	}
+
+	/// <summary>
+	/// <c>chop_always</c> was tried for chained method calls and reverted: forcing every chain to break
+	/// regardless of width cost 156 corpus files their idempotency in preservation mode, and it has
+	/// never been measured under deterministic layout. Only <c>chop_if_long</c> is accepted.
+	/// </summary>
+	[Test]
+	public async Task Chop_always_is_not_accepted_for_chained_method_calls()
+	{
+		var options = Bind("""
+			root = true
+
+			[*.cs]
+			csharp_wrap_chained_method_calls = chop_always
+			""", out var diagnostics);
+
+		diagnostics.Should().ContainSingle().Which.Id.Should().Be("CURB1001");
+		diagnostics[0].Message.Should().Contain("chop_if_long");
+		options.WrapChainedMethodCalls.Should().BeNull("the value was refused, not applied");
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task Max_chained_method_calls_on_line_needs_deterministic_layout()
+	{
+		var options = Bind("""
+			root = true
+
+			[*.cs]
+			csharp_max_chained_method_calls_on_line = 2
+			""", out var diagnostics);
+
+		diagnostics.Should().ContainSingle().Which.Id.Should().Be("CURB1005");
+		diagnostics[0].Message.Should().Contain("csharp_keep_existing_linebreaks = false");
+		options.MaxChainedMethodCallsOnLine.Should().BeNull("the key was dropped, not applied");
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task Max_chained_method_calls_on_line_binds_under_deterministic_layout()
+	{
+		var options = Bind("""
+			root = true
+
+			[*.cs]
+			max_line_length = 120
+			csharp_max_chained_method_calls_on_line = 2
+			""", out var diagnostics);
+
+		diagnostics.Should().BeEmpty();
+		options.MaxChainedMethodCallsOnLine.Should().Be(2);
 		await Task.CompletedTask;
 	}
 

@@ -334,7 +334,6 @@ public class InvocationTests : FormattingTest
 		""");
 
 	[Test]
-	[Skip("member-chain breaking is not implemented — a long chain is not broken per call")]
 	public Task Long_member_chain_breaks_one_call_per_line() => Formats(
 		"""
 		public class C
@@ -350,8 +349,7 @@ public class InvocationTests : FormattingTest
 		{
 		    public void M()
 		    {
-		        instance
-		            .First()
+		        instance.First()
 		            .Second()
 		            .Third()
 		            .Fourth();

@@ -794,8 +794,33 @@ public readonly record struct FormatOptions
 	/// </remarks>
 	public WrapStyle? WrapObjectAndCollectionInitializerStyle { get; init; }
 
-	// wrap_chained_method_calls stays absent: 156 corpus files stopped settling in preservation mode,
-	// and unlike the two above it has not been measured under deterministic layout.
+	/// <summary>
+	/// <c>csharp_wrap_chained_method_calls</c>: <c>chop_if_long</c> confirms behaviour the chain
+	/// printer already has unconditionally — a chain of three or more calls that does not fit
+	/// breaks at the dots whether or not this is set. Setting it changes nothing about output; it
+	/// stops the key being reported as an unrecognised ReSharper passthrough and makes the choice
+	/// visible in <c>print-config</c>.
+	/// </summary>
+	/// <remarks>
+	/// <c>chop_always</c> is not accepted. That value was tried and reverted: forcing every chain to
+	/// break regardless of width cost 156 corpus files their idempotency in preservation mode, and it
+	/// has never been measured under deterministic layout. <see cref="MaxChainedMethodCallsOnLine"/>
+	/// is the safe way to force a break — narrower, and only once a chain is already long enough to
+	/// qualify as one.
+	/// </remarks>
+	public WrapStyle? WrapChainedMethodCalls { get; init; }
+
+	/// <summary>
+	/// <c>csharp_max_chained_method_calls_on_line</c>: chop a chain carrying more than this many
+	/// calls, independent of whether the joined result fits the width.
+	/// </summary>
+	/// <remarks>
+	/// Deterministic mode only. Unlike <see cref="MaxInitializerElementsOnLine"/> a chain has no
+	/// braces of its own to anchor a forced break, so this has not been measured against
+	/// preservation mode's rules that read indentation from the source — the same reason
+	/// <see cref="WrapChainedMethodCalls"/> stops short of <c>chop_always</c>.
+	/// </remarks>
+	public int? MaxChainedMethodCallsOnLine { get; init; }
 
 	/// <summary>
 	/// <c>csharp_place_method_attribute_on_same_line</c>. Covers constructors, operators, destructors and
