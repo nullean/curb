@@ -117,13 +117,40 @@ that distinguishes these four from the three accessor-shaped ones below), both t
 Curb has no option that ever produces the alternative). That took the count from 307 to roughly 198 of 842
 (819 checked, 23 excluded).
 
+Not every remaining disagreement turned out to need a key at all. Prompted by a direct challenge — was
+this actually finding Curb bugs, or just adding editorconfig until jb stopped complaining? — the empty
+`try { }` case was re-investigated with `dotnet format whitespace` as an independent, neutral check rather
+than trusting Curb's own test comments alone: it confirmed `dotnet format` treats an empty `try` exactly
+as laxly as it treats `catch`/`finally`, which #39 had already special-cased to always collapse — `try`
+itself had simply been left out by oversight. Fixed at the printer (`Printers.Statements.cs`,
+`PrintTryStatement`), not routed around with an injected key, which is the right fix whenever the
+disagreement turns out to be a genuine Curb gap rather than a legitimate difference of opinion: it also
+improved the whitespace side's own conformance for free. Two harness regex bugs were fixed in the same
+pass, both false-positive/false-negative shape detection caused by unhandled nested parentheses:
+`bracelessControlFlowBody`'s naive `[^)]*` stopped at a nested call's own closing paren (e.g. `is
+Point(1, 2)` inside an `if`), leaving braces unprotected; `parameterizedExpressionBody`'s unanchored
+`)\s*=>` matched a lambda argument's arrow nested inside a call on a block-bodied method's only statement,
+wrongly treating the method itself as expression-bodied. Both now use a one-level-balanced-parens pattern,
+and the expression-body regex is additionally anchored to the start of a line so a nested lambda can no
+longer be mistaken for a member's own arrow. Net effect of the `try` fix plus the two regex fixes: 198 →
+186 of 820 checked.
+
+Also confirmed, not fixed: `csharp_style_namespace_declarations = block_scoped` is a genuine no-op in Curb
+when the source is already file-scoped — `Printers.cs`'s `FileScopedNamespace` never reads
+`context.Options.NamespaceStyle` at all, so nothing implements the block_scoped direction (`IDE0161`'s
+converse). `NamespaceStyleTests.Block_scoped_is_accepted_and_changes_nothing` documents this by name and
+is expected to keep appearing in `jb`'s disagreement list until that direction is implemented — it is not
+a candidate for an injected key, since the disagreement is real.
+
 What's left splits into several more distinct categories, each its own investigation the size of one of the
 above: expression-body direction for the three accessor-shaped constructs (accessors, properties, indexers —
 found empirically that getting the direction right isn't enough on its own; the accessor body's own line-
-breaking still disagreed after four different keys were tried, so this needs more than one fix); an empty
-`try { }` collapsing onto its own keyword line the same way an empty block does elsewhere, but not
-responding to the same `csharp_empty_block_style` key that fixed the other empty-block cases; attribute
+breaking still disagreed after four different keys were tried, so this needs more than one fix); attribute
 lists with multiple attributes in one bracket section being split into one section each; redundant-
 parentheses-around-operators and qualified-name-shortening (semantic style preferences Curb never applies at
-all); and two wrapping-algorithm mismatches (query-clause continuation indentation, chain/binary-operator
-continuation position) where `jb`'s own algorithm disagrees with Curb's bespoke one.
+all, and never will — see `AGENTS.md`'s scope boundary: both require a resolved compilation, which Curb
+never loads); and two wrapping-algorithm mismatches (query-clause continuation indentation, chain/binary-
+operator continuation position) where `jb`'s own algorithm disagrees with Curb's bespoke one. Each of these
+was cross-checked against `dotnet format whitespace` where it has an opinion (attribute-section spacing and
+attribute-list splitting both independently match Curb, not `jb`) — that check is the discipline going
+forward: confirm which side is actually right before reaching for another injected key.

@@ -1309,12 +1309,27 @@ and private verifyExpectationsJb (arguments:ParseResults<Arguments>) =
     // else (a newline in between) means its own line.
     let emptyBlockJoinsPrecedingLine = Text.RegularExpressions.Regex(@"[^\s\r\n]\s?\{\s?\}")
 
-    // A parameter list `(...)` directly before `=>` is what a method, constructor, operator or local
-    // function's expression body looks like — the only four of Curb's seven csharp_style_expression_
-    // bodied_* constructs that have a parameter list at all, which is what makes this regex specific to
-    // them: an accessor's arrow follows a bare `get`/`set`/`init` (no parens), a property's follows the
-    // property name alone, and an indexer's follows `]` — none can match `)\s*=>`.
-    let parameterizedExpressionBody = Text.RegularExpressions.Regex(@"\)\s*=>\s*[^{\r\n]")
+    // One level of nested parens, balanced — `is Point(1, 2)` inside an if-condition, or a lambda
+    // parameter list inside a call, both appear in these test snippets and neither is rare enough to
+    // ignore. A plain `[^)]*` stops at the first `)`, which is the nested one, not the real close —
+    // found by a false negative it caused in bracelessControlFlowBody below.
+    let balancedParens = @"\((?:[^()]|\([^()]*\))*\)"
+
+    // A parameter list `(...)` directly before `=>`, at the start of a line (optionally after
+    // modifiers/a return type — CallerMemberName-style regexes cannot resolve a type name, so this
+    // accepts any word run), is what a method, constructor, operator or local function's expression
+    // body looks like — the only four of Curb's seven csharp_style_expression_bodied_* constructs that
+    // have a parameter list at all, which is what makes this regex specific to them: an accessor's
+    // arrow follows a bare `get`/`set`/`init` (no parens), a property's follows the property name
+    // alone, and an indexer's follows `]` — none can match `)\s*=>`. Anchored to the start of a line
+    // (RegexOptions.Multiline) rather than matching `)\s*=>` anywhere, so a lambda argument nested
+    // inside a call on a block-bodied method's only statement — `Call((int a, int b) => a + b);` — does
+    // not falsely read as the method's own expression body: the lambda's arrow does not start its own
+    // line, only the method signature would.
+    let parameterizedExpressionBody =
+        Text.RegularExpressions.Regex(
+            @"^[ \t]*(?:\w+[ \t]+)*\w+[ \t]*" + balancedParens + @"[ \t]*=>[ \t]*[^{\r\n]",
+            Text.RegularExpressions.RegexOptions.Multiline)
 
     // A comma directly before a closing brace/bracket/paren on the next line — the shape both trailing-
     // comma keys default to false (Curb only ever adds one; an already-present one, like an empty
@@ -1328,7 +1343,8 @@ and private verifyExpectationsJb (arguments:ParseResults<Arguments>) =
     // the other direction — found the hard way, on PreferBracesTests.Bodies_are_left_as_written_without_the_key
     // itself, after making the injection unconditional turned out to be too strong a claim).
     let bracelessControlFlowBody =
-        Text.RegularExpressions.Regex(@"\b(if\s*\([^)]*\)|else|for\s*\([^)]*\)|foreach\s*\([^)]*\)|while\s*\([^)]*\)|do)\s*\r?\n?\s*[^\s{]")
+        Text.RegularExpressions.Regex(
+            @"\b(if\s*" + balancedParens + @"|else|for\s*" + balancedParens + @"|foreach\s*" + balancedParens + @"|while\s*" + balancedParens + @"|do)\s*\r?\n?\s*[^\s{]")
 
     let caseSection (d: string) =
         let settings = caseSettings d
@@ -1358,6 +1374,16 @@ and private verifyExpectationsJb (arguments:ParseResults<Arguments>) =
             if blockScopedNamespace.IsMatch z
                && not (settings |> Array.exists (fun l -> l.Contains "csharp_style_namespace_declarations"))
             then [| "csharp_style_namespace_declarations = block_scoped" |] else [||]
+
+        // Only covers block_scoped -> file_scoped by construction: the case above only fires when Z is
+        // already block-scoped. The reverse (file_scoped source, block_scoped requested) is a genuine,
+        // confirmed Curb gap, not something this harness can inject its way around — Printers.cs's
+        // FileScopedNamespace never checks context.Options.NamespaceStyle at all, so a repository asking
+        // for block_scoped gets no conversion when the source is already file-scoped. IDE0161's other
+        // direction (IDE0160) has no printer implementation. NamespaceStyleTests.Block_scoped_is_accepted_
+        // and_changes_nothing documents this deliberately, by name, so it stays visible rather than
+        // reading as an oversight; that case is expected to remain in the "not a fixed point" list below
+        // until the reverse conversion is implemented — it is not a candidate for an injected key at all.
 
         // Curb only ever adds braces around an unbraced control-flow body, never removes existing ones
         // — PreferBracesTests documents why: Roslyn would take them off, but a declaration inside the
