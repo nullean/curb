@@ -131,16 +131,29 @@ internal static class TokenPrinter
 		// blank_lines_around_* family is; every formatter with an opinion on this agrees.
 		var lastWasDocComment = false;
 
+		// How many blank lines a #region/#endregion's "after" gap (csharp_blank_lines_inside_region or
+		// _around_region) just forced directly, rather than through pendingNewLines — which only ever
+		// produces at most one blank line (see FlushBlankLine), too coarse for an arbitrary forced
+		// count. Null once nothing is pending. Read (and cleared) by whatever comes next, rather than
+		// cleared eagerly at the top of the loop: two region markers back to back — an inner region
+		// opening right inside an outer one, say — would otherwise have the outer's "after" force and
+		// the inner's "before" force both fire and stack into two blank lines where jb (and every
+		// reasonable reading of the two settings) keeps exactly one; measured directly against jb to
+		// confirm before relying on it.
+		int? forcedGapPending = null;
+
 		for (var i = skip; i < leading.Count; i++)
 		{
 			var trivia = leading[i];
+
 			switch (trivia.Kind())
 			{
 				case SyntaxKind.WhitespaceTrivia:
 					break;
 
 				case SyntaxKind.EndOfLineTrivia:
-					pendingNewLines++;
+					if (forcedGapPending is null)
+						pendingNewLines++;
 					break;
 
 				case SyntaxKind.SingleLineCommentTrivia:
@@ -155,7 +168,19 @@ internal static class TokenPrinter
 					// Captured before the flush, which zeroes it — the old check read it afterwards
 					// and so was always true.
 					var priorNewLines = pendingNewLines;
-					FlushBlankLine(arena, ref pendingNewLines, emittedAnything);
+					if (forcedGapPending is int pendingBeforeComment)
+					{
+						// A region's forced "after" gap already settled the spacing in front of this
+						// comment — emitted here directly (FlushBlankLine only ever produces at most
+						// one) rather than also run alongside it, which is what stops the two from
+						// stacking.
+						context.BlankLines(pendingBeforeComment);
+						forcedGapPending = null;
+						priorNewLines = pendingBeforeComment;
+						pendingNewLines = 0;
+					}
+					else
+						FlushBlankLine(arena, ref pendingNewLines, emittedAnything);
 
 					// dotnet format aligns a comment sitting directly under a trailing comment to
 					// that comment's column, and normalises every other comment to the statement
@@ -190,7 +215,14 @@ internal static class TokenPrinter
 
 				case SyntaxKind.DisabledTextTrivia:
 					// Code inside a false #if branch is never reformatted; it is not even parsed.
-					FlushBlankLine(arena, ref pendingNewLines, emittedAnything);
+					if (forcedGapPending is int pendingBeforeDisabled)
+					{
+						context.BlankLines(pendingBeforeDisabled);
+						forcedGapPending = null;
+						pendingNewLines = 0;
+					}
+					else
+						FlushBlankLine(arena, ref pendingNewLines, emittedAnything);
 					arena.Trim();
 					arena.LiteralLine(DocFlags.OnlyIfNotAtLineStart);
 					EmitVerbatimBlock(trivia, context);
@@ -203,14 +235,60 @@ internal static class TokenPrinter
 					if (!trivia.IsDirective)
 						break;
 
-					// A directive must be the first non-whitespace on its line, so break first unless
-					// we are already at a line start. It is emitted but never counted against the
-					// width of the code around it.
-					FlushBlankLine(arena, ref pendingNewLines, emittedAnything);
+					// #region's own "before" gap is csharp_blank_lines_around_region, #endregion's is
+					// csharp_blank_lines_inside_region — forced to an exact count rather than through
+					// FlushBlankLine's usual at-most-one, and only when something real precedes it.
+					// Deliberately reads context.PreviousToken rather than the local emittedAnything:
+					// the content this needs to see is not always inside the same PrintLeadingTrivia
+					// call — "First();\n#region Setup" prints First() through the statement printer,
+					// then reaches #region as the very first leading trivia of the *next* statement's
+					// own call, where emittedAnything starts false regardless. PreviousToken tracks the
+					// true last token printed anywhere, which is what actually answers "is this the
+					// start of a run". A run still starts fresh right after an opening brace, though —
+					// jb does not add a blank line between `{` and a #region immediately inside it —
+					// so that one case is excluded even though a real token (the brace) precedes it.
+					// Every other directive keeps the ordinary at-most-one treatment.
+					var isRegionBoundary = trivia.IsKind(SyntaxKind.RegionDirectiveTrivia) || trivia.IsKind(SyntaxKind.EndRegionDirectiveTrivia);
+					var before = isRegionBoundary
+						? (trivia.IsKind(SyntaxKind.RegionDirectiveTrivia) ? context.Options.BlankLinesAroundRegion : context.Options.BlankLinesInsideRegion)
+						: 0;
+					// emittedAnything catches what PreviousToken cannot: a comment earlier in this same
+					// walk (`// grouped for readability` right above the #region, say) is real content
+					// jb still wants a blank line after, but a comment is trivia, not a token, so it
+					// never touches PreviousToken at all.
+					var hasRealPredecessor = emittedAnything || (context.PreviousToken.RawKind != 0
+						&& !context.PreviousToken.IsKind(SyntaxKind.OpenBraceToken));
+
+					if (isRegionBoundary && hasRealPredecessor)
+					{
+						arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
+						// A gap the previous region marker's "after" force already settled does not
+						// also get this marker's "before" force added on top of it — the larger of the
+						// two wins, not the sum, matching jb's own behaviour: an empty region still
+						// gets exactly one blank line between #region and #endregion (both sides want
+						// one, coalescing to one), and two markers back to back — an inner region
+						// opening right inside an outer one, say — also settle at one, not two.
+						var toEmit = forcedGapPending is int pendingBeforeRegion ? Math.Max(before, pendingBeforeRegion) : before;
+						context.BlankLines(toEmit);
+						forcedGapPending = null;
+					}
+					else if (forcedGapPending is int pendingBeforeDirective)
+					{
+						context.BlankLines(pendingBeforeDirective);
+						forcedGapPending = null;
+						pendingNewLines = 0;
+					}
+					else
+					{
+						// A directive must be the first non-whitespace on its line, so break first
+						// unless we are already at a line start. It is emitted but never counted
+						// against the width of the code around it.
+						FlushBlankLine(arena, ref pendingNewLines, emittedAnything);
+					}
 
 					// Regions are indented with the code they wrap; conditional-compilation
 					// directives are not, and sit at column 0.
-					if (trivia.IsKind(SyntaxKind.RegionDirectiveTrivia) || trivia.IsKind(SyntaxKind.EndRegionDirectiveTrivia))
+					if (isRegionBoundary)
 					{
 						arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
 					}
@@ -224,15 +302,41 @@ internal static class TokenPrinter
 					arena.HardLine();
 					emittedAnything = true;
 					lastWasDocComment = false;
+
+					// The "after" half of the same exact count — #region's is csharp_blank_lines_
+					// inside_region (the gap to its own content), #endregion's is csharp_blank_lines_
+					// around_region (the gap to whatever follows the region entirely) — forced directly
+					// the same way AfterUsingList forces the gap after a using list. Recorded rather
+					// than emitted outright: the next thing along consumes it (and, for another region
+					// marker immediately following, only tops it up to the larger of the two — see
+					// forcedGapPending above) instead of also adding its own gap on top.
+					if (isRegionBoundary)
+					{
+						forcedGapPending = trivia.IsKind(SyntaxKind.RegionDirectiveTrivia)
+							? context.Options.BlankLinesInsideRegion
+							: context.Options.BlankLinesAroundRegion;
+						pendingNewLines = 0;
+					}
 					break;
 			}
 		}
 
 		// Blank lines immediately before the token itself — except right after a documentation
-		// comment, which never gets one: see lastWasDocComment above.
-		if (lastWasDocComment)
-			pendingNewLines = Math.Min(pendingNewLines, 1);
-		FlushBlankLine(arena, ref pendingNewLines, emittedAnything);
+		// comment, which never gets one (see lastWasDocComment above), and except when the caller
+		// supplies its own trailing break, which per the trailingBreak parameter's own contract means
+		// this call is for a closing brace: a #region's "after" gap forcing a blank line directly in
+		// front of the very next `}` regressed RegionTests the same way an unguarded
+		// csharp_blank_lines_inside_type did earlier, so the region-specific force is dropped here in
+		// favour of the ordinary at-most-one treatment, same as every other blank line just before a
+		// closing brace.
+		if (forcedGapPending is int pendingBeforeToken && trailingBreak)
+			context.BlankLines(pendingBeforeToken);
+		else
+		{
+			if (lastWasDocComment)
+				pendingNewLines = Math.Min(pendingNewLines, 1);
+			FlushBlankLine(arena, ref pendingNewLines, emittedAnything);
+		}
 	}
 
 	/// <summary>Register holding the column of the most recent trailing comment.</summary>

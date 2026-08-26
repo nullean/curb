@@ -1062,6 +1062,31 @@ public readonly record struct FormatOptions
 	/// <summary><c>csharp_blank_lines_around_namespace</c>, around a namespace declaration.</summary>
 	public int BlankLinesAroundNamespace { get; init; }
 
+	/// <summary>
+	/// <c>csharp_blank_lines_inside_namespace</c>: below a block-scoped namespace's opening brace and
+	/// above its closing one — <see cref="BlankLinesInsideType"/>'s analogue for a namespace body, an
+	/// exact count for the same reason.
+	/// </summary>
+	public int BlankLinesInsideNamespace { get; init; }
+
+	/// <summary>
+	/// <c>csharp_blank_lines_around_region</c>: below a <c>#region</c> line and above its matching
+	/// <c>#endregion</c>'s own surrounding gap — i.e. before the <c>#region</c> and after the
+	/// <c>#endregion</c>, the same "around" relationship <see cref="BlankLinesAroundType"/> has to a
+	/// type. One by default: jb's own default inserts a blank line on both sides of a region, and
+	/// visually separating a region from the code around it reads the same as separating two types.
+	/// </summary>
+	public int BlankLinesAroundRegion { get; init; } = 1;
+
+	/// <summary>
+	/// <c>csharp_blank_lines_inside_region</c>: below the <c>#region</c> line and above the matching
+	/// <c>#endregion</c> — <see cref="BlankLinesInsideType"/>'s relationship to a type, applied to a
+	/// region. One by default, matching jb's own default: a region with its content flush against the
+	/// markers reads as cramped, unlike a type's opening brace, which is punctuation rather than a
+	/// label that benefits from being set off.
+	/// </summary>
+	public int BlankLinesInsideRegion { get; init; } = 1;
+
 	// The align_multiline_* family is absent, and this is the reason rather than a note that nobody
 	// got to it. csharp_align_multiline_argument was built and measured.
 	//

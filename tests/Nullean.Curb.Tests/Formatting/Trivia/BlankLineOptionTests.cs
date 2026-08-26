@@ -217,11 +217,74 @@ public class BlankLineOptionTests : FormattingTest
 		""",
 		editorConfig: "csharp_blank_lines_around_type = 0");
 
-	// csharp_blank_lines_after_using_list has no case here: it is bound into FormatOptions but
-	// MinimumBlankLinesFor (Printers.cs, ~line 2105) — the dispatch every other blank_lines_around_*
-	// option goes through — has no case for it, unlike blank_lines_around_namespace/type/invocable/
-	// property/field, which all do. A real gap, not a scoping decision: writing a case would bake "no
-	// effect" in as the expected behaviour. See checkOptionCoverage's exclusion list in Targets.fs.
+	[Test]
+	public Task Using_lists_have_their_own_setting() => Unchanged(
+		// The default is already one (see BlankLineTests), so proving the key is bound means proving
+		// it can be turned off — the same shape as Types_have_their_own_setting above.
+		"""
+		using System;
+		namespace N
+		{
+		}
+		""",
+		editorConfig: "csharp_blank_lines_after_using_list = 0");
+
+	[Test]
+	public Task A_block_scoped_namespace_can_be_given_air_under_its_opening_brace() => Formats(
+		// csharp_blank_lines_inside_namespace is BlankLinesInsideType's analogue for a block-scoped
+		// namespace body — see PrintNamespaceBody.
+		"""
+		namespace N
+		{
+		    public class C
+		    {
+		    }
+		}
+		""",
+		"""
+		namespace N
+		{
+
+		    public class C
+		    {
+		    }
+		}
+		""",
+		editorConfig: "csharp_blank_lines_inside_namespace = 1");
+
+	[Test]
+	public Task Regions_can_be_given_less_air_than_the_default() => Formats(
+		// csharp_blank_lines_around_region/inside_region both default to one and are forced exactly
+		// (see RegionTests); this proves both are bound by turning them off together.
+		"""
+		public class C
+		{
+		    #region Values
+
+		    public int Value;
+
+		    #endregion
+		}
+		public class D
+		{
+		}
+		""",
+		"""
+		public class C
+		{
+		    #region Values
+		    public int Value;
+		    #endregion
+		}
+
+		public class D
+		{
+		}
+		""",
+		editorConfig: """
+		csharp_blank_lines_around_region = 0
+		csharp_blank_lines_inside_region = 0
+		""");
 
 	[Test]
 	public Task Namespaces_have_their_own_setting() => Formats(

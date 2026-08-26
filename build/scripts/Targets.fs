@@ -961,13 +961,11 @@ let private checkOptionCoverage (dump: string) (cases: string[]) =
     // implemented, but IndexerDeclaration (Printers.Members.cs) never calls TryPrintExpressionBody the
     // way PropertyDeclaration and OperatorDeclaration do, so no source indexer is ever converted.
     //
-    // csharp_blank_lines_after_using_list, likewise: bound into FormatOptions, but MinimumBlankLinesFor
-    // (Printers.cs) — the dispatch every other blank_lines_around_* option goes through — has no case
-    // for it.
+    // csharp_blank_lines_after_using_list used to belong here too (bound into FormatOptions with no
+    // dispatch case reaching it) — fixed and given real coverage, see BlankLineOptionTests.
     let excluded =
         set [ "generated_code"; "dotnet_diagnostic.ide0055.severity"; "charset"
-              "trim_trailing_whitespace"; "csharp_style_expression_bodied_indexers"
-              "csharp_blank_lines_after_using_list" ]
+              "trim_trailing_whitespace"; "csharp_style_expression_bodied_indexers" ]
 
     let keyPattern = Text.RegularExpressions.Regex(@"^\s*([a-zA-Z0-9_.]+)\s*=", Text.RegularExpressions.RegexOptions.Multiline)
     let covered =

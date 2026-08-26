@@ -128,7 +128,14 @@ public class UsingOrderTests : FormattingTest
 		editorConfig: "dotnet_sort_system_directives_first = true");
 
 	[Test]
-	public Task A_region_around_the_usings_also_stops_it() => Unchanged(
+	public Task A_region_around_the_usings_also_stops_it() => Formats(
+		// A region wrapping the usings blocks reordering unconditionally — the same guard
+		// A_file_with_any_directive_is_left_entirely_alone documents for #if — so this no longer
+		// needs dotnet_sort_system_directives_first = true to prove the point: Zebra.Things staying
+		// ahead of System is true whether or not sorting was even asked for, which is exactly what
+		// "the region stops it" means. csharp_blank_lines_inside_region/around_region default to one
+		// and are forced rather than merely floored (see RegionTests), reaching both sides of the
+		// region regardless of what it wraps.
 		"""
 		#region Imports
 		using Zebra.Things;
@@ -137,7 +144,16 @@ public class UsingOrderTests : FormattingTest
 
 		public class C { }
 		""",
-		editorConfig: "dotnet_sort_system_directives_first = true");
+		"""
+		#region Imports
+
+		using Zebra.Things;
+		using System;
+
+		#endregion
+
+		public class C { }
+		""");
 
 	[Test]
 	public Task A_single_using_has_nothing_to_sort() => Unchanged(

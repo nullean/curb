@@ -70,8 +70,12 @@ internal static partial class Printers
 		}
 
 		// Trivia hanging off the end-of-file token is not a member, so no separator ran for it and
-		// the blank line above a trailing comment would be dropped. Treat it like an item.
-		if (previousEnd >= 0 && TokenPrinter.HasLeadingContent(node.EndOfFileToken))
+		// the blank line above a trailing comment would be dropped. Treat it like an item — except
+		// when it is a #region/#endregion, which TokenPrinter.PrintLeadingTrivia already gives its own
+		// exact-count treatment; this at-most-one preservation running first would otherwise stack
+		// with that force (both agreeing there should be a blank line here does not mean there should
+		// be two), the same class of bug PrintTypeBody's closing-brace gap hit earlier.
+		if (previousEnd >= 0 && TokenPrinter.HasLeadingContent(node.EndOfFileToken) && !NextStartsWithRegionBoundary(node.EndOfFileToken))
 		{
 			arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
 			if (context.BlankLinesBetween(previousEnd, EffectiveTriviaStart(node.EndOfFileToken)) > 0)
@@ -127,6 +131,24 @@ internal static partial class Printers
 			if (trivia.Kind() is SyntaxKind.WhitespaceTrivia or SyntaxKind.EndOfLineTrivia)
 				continue;
 			return trivia.IsDirective;
+		}
+
+		return false;
+	}
+
+	/// <summary>
+	/// True when a token's first leading trivia is specifically a <c>#region</c> or <c>#endregion</c>
+	/// — narrower than <see cref="NextStartsWithDirective(SyntaxToken)"/>, for the one call site that
+	/// needs to defer to TokenPrinter.PrintLeadingTrivia's own exact-count region handling rather than
+	/// its ordinary at-most-one directive treatment (see CompilationUnit's end-of-file trivia check).
+	/// </summary>
+	private static bool NextStartsWithRegionBoundary(SyntaxToken token)
+	{
+		foreach (var trivia in token.LeadingTrivia)
+		{
+			if (trivia.Kind() is SyntaxKind.WhitespaceTrivia or SyntaxKind.EndOfLineTrivia)
+				continue;
+			return trivia.IsKind(SyntaxKind.RegionDirectiveTrivia) || trivia.IsKind(SyntaxKind.EndRegionDirectiveTrivia);
 		}
 
 		return false;
@@ -392,11 +414,20 @@ internal static partial class Printers
 				// left in front of a trailing comment — it is just as often a `#endregion` directive,
 				// and stripping the blank line conventionally written above one regressed RegionTests.
 				// Same directive guard as Separate: a member wrapped in its own #region right after
-				// the previous one must not have a minimum forced in front of the #region marker.
-				context.BlankLines(first
-					? context.Options.BlankLinesInsideType
-					: context.DeclarationSeparation(previousEnd, EffectiveStart(member),
-						NextStartsWithDirective(member) ? 0 : MinimumBlankLinesFor(member, context)));
+				// the previous one must not have a minimum forced in front of the #region marker. A
+				// region boundary specifically is skipped outright rather than floored to zero — zero
+				// is still a floor under whatever the author already wrote, which double-counts against
+				// TokenPrinter.PrintLeadingTrivia's own exact-count force reached moments later inside
+				// PrintMember (the region force owns this gap entirely), the same bug the statement
+				// loop in Block hit.
+				var memberStartsWithRegion = !first && NextStartsWithRegionBoundary(member.GetFirstToken(includeZeroWidth: true));
+				if (!memberStartsWithRegion)
+				{
+					context.BlankLines(first
+						? context.Options.BlankLinesInsideType
+						: context.DeclarationSeparation(previousEnd, EffectiveStart(member),
+							NextStartsWithDirective(member) ? 0 : MinimumBlankLinesFor(member, context)));
+				}
 				first = false;
 				PrintMember(member, context);
 				previousEnd = member.Span.End;
@@ -404,9 +435,16 @@ internal static partial class Printers
 
 			if (TokenPrinter.HasLeadingContent(node.CloseBraceToken))
 			{
-				arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
-				context.BlankLines(context.DeclarationSeparation(
-					previousEnd, EffectiveTriviaStart(node.CloseBraceToken), context.Options.BlankLinesInsideType));
+				// Skipped when a region boundary is what the close brace's leading trivia actually
+				// starts with: TokenPrinter.PrintLeadingTrivia's own exact-count region handling takes
+				// over from there, and running this floor-and-cap computation first would stack with
+				// it — the same double-blank-line bug the end-of-file check hit, for the same reason.
+				if (!NextStartsWithRegionBoundary(node.CloseBraceToken))
+				{
+					arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
+					context.BlankLines(context.DeclarationSeparation(
+						previousEnd, EffectiveTriviaStart(node.CloseBraceToken), context.Options.BlankLinesInsideType));
+				}
 				TokenPrinter.PrintLeadingTrivia(node.CloseBraceToken, context, trailingBreak: false);
 			}
 		}
@@ -714,7 +752,14 @@ internal static partial class Printers
 				// started already indented and came out a level too deep. Reindent trims whatever
 				// was left and re-emits this block's own indent, whoever wrote the line ending.
 				arena.HardLine(DocFlags.Reindent);
-				context.BlankLines(context.CodeSeparation(previousEnd, start));
+				// Skipped when the statement's own leading trivia starts with a region boundary — the
+				// same double-count risk as the closing-brace gaps above, just one statement over:
+				// EffectiveStart(statement) measures to a #region/#endregion sitting in front of it,
+				// so this would otherwise run its own at-most-one blank line ahead of
+				// TokenPrinter.PrintLeadingTrivia's exact-count force, reached moments later inside
+				// Node.Print(statement, context).
+				if (!NextStartsWithRegionBoundary(statement.GetFirstToken(includeZeroWidth: true)))
+					context.BlankLines(context.CodeSeparation(previousEnd, start));
 				Node.Print(statement, context);
 				previousEnd = statement.Span.End;
 			}
@@ -722,11 +767,15 @@ internal static partial class Printers
 			// Trivia attached to the closing brace belongs with the statements it follows, not with
 			// the brace, and the blank line above it is preserved like any other separator. A whole
 			// `#if` block whose branch is disabled arrives here too, since none of it is parsed.
+			// Skipped when a region boundary follows — see the type-body closing brace above for why.
 			if (TokenPrinter.HasLeadingContent(node.CloseBraceToken))
 			{
-				arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
-				if (context.BlankLinesBetween(previousEnd, EffectiveTriviaStart(node.CloseBraceToken)) > 0)
-					arena.HardLine();
+				if (!NextStartsWithRegionBoundary(node.CloseBraceToken))
+				{
+					arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
+					if (context.BlankLinesBetween(previousEnd, EffectiveTriviaStart(node.CloseBraceToken)) > 0)
+						arena.HardLine();
+				}
 				TokenPrinter.PrintLeadingTrivia(node.CloseBraceToken, context, trailingBreak: false);
 			}
 		}
@@ -2338,9 +2387,16 @@ internal static partial class Printers
 		// csharp_blank_lines_around_type's default of 1) would otherwise force a blank line between
 		// the previous item and a #region/#endregion wrapped immediately around this one — landing
 		// inside the region rather than around it. Same reasoning as AfterUsingList above.
-		var minimum = next is MemberDeclarationSyntax member && !NextStartsWithDirective(next)
-			? MinimumBlankLinesFor(member, context) : 0;
-		context.BlankLines(context.DeclarationSeparation(previousEnd, EffectiveStart(next), minimum));
+		// A region boundary is skipped outright rather than floored to zero — zero is still a floor
+		// under whatever the author already wrote, which double-counts against the region force inside
+		// the trivia walk this leads into moments later (see PrintTypeBody's member loop for the same
+		// fix, and why).
+		if (!NextStartsWithRegionBoundary(next.GetFirstToken(includeZeroWidth: true)))
+		{
+			var minimum = next is MemberDeclarationSyntax member && !NextStartsWithDirective(next)
+				? MinimumBlankLinesFor(member, context) : 0;
+			context.BlankLines(context.DeclarationSeparation(previousEnd, EffectiveStart(next), minimum));
+		}
 
 		previousEnd = next.Span.End;
 	}

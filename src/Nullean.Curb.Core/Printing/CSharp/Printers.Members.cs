@@ -300,12 +300,16 @@ internal static partial class Printers
 		}
 
 		// The closing brace is gone; a comment written above it is not, and neither is the blank line
-		// the author left in front of it.
+		// the author left in front of it. Skipped when a region boundary follows — see the type
+		// body's closing brace in Printers.cs for why.
 		if (TokenPrinter.HasLeadingContent(node.CloseBraceToken))
 		{
-			arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
-			if (context.BlankLinesBetween(previousEnd, LeadingContentStart(node.CloseBraceToken)) > 0)
-				arena.HardLine();
+			if (!NextStartsWithRegionBoundary(node.CloseBraceToken))
+			{
+				arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
+				if (context.BlankLinesBetween(previousEnd, LeadingContentStart(node.CloseBraceToken)) > 0)
+					arena.HardLine();
+			}
 
 			TokenPrinter.PrintLeadingTrivia(node.CloseBraceToken, context, trailingBreak: false);
 		}
@@ -341,19 +345,32 @@ internal static partial class Printers
 				PrintUsings(node, moved, context, ref previousEnd);
 
 			PrintUsings(node, node.Usings, context, ref previousEnd);
+			var hadUsings = moved.Count > 0 || node.Usings.Count > 0;
 			var nextAfterUsings = node.Members.Count > 0
 				? NextStartsWithDirective(node.Members[0])
 				: NextStartsWithDirective(node.CloseBraceToken);
-			AfterUsingList(context, ref previousEnd, moved.Count > 0 || node.Usings.Count > 0, nextAfterUsings);
+			AfterUsingList(context, ref previousEnd, hadUsings, nextAfterUsings);
 
-			// The first member is separated from the brace above it, not from a member — see the type
-			// declaration for why the minimum does not apply there.
+			// The first member is separated from the brace above it by csharp_blank_lines_inside_
+			// namespace, forced exactly rather than floored — the same relationship
+			// BlankLinesInsideType has to a type body (see PrintTypeBody) — but only when nothing else
+			// already claimed that gap: a using list, when present, already had its own exact count
+			// forced above by AfterUsingList, so the member loop contributes nothing more on top of it
+			// for the first member in that case.
 			var first = true;
 			foreach (var member in node.Members)
 			{
 				arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
-				var minimum = !first && !NextStartsWithDirective(member) ? MinimumBlankLinesFor(member, context) : 0;
-				context.BlankLines(context.DeclarationSeparation(previousEnd, EffectiveStart(member), minimum));
+				if (first && !hadUsings)
+					context.BlankLines(context.Options.BlankLinesInsideNamespace);
+				else if (!first && !NextStartsWithRegionBoundary(member.GetFirstToken(includeZeroWidth: true)))
+				{
+					// Region boundary skipped outright, not floored to zero — see PrintTypeBody's
+					// member loop for why a floor still double-counts against the region force inside
+					// PrintMember's own leading-trivia walk.
+					var minimum = NextStartsWithDirective(member) ? 0 : MinimumBlankLinesFor(member, context);
+					context.BlankLines(context.DeclarationSeparation(previousEnd, EffectiveStart(member), minimum));
+				}
 				first = false;
 				PrintMember(member, context);
 				previousEnd = member.Span.End;
