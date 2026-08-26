@@ -18,6 +18,10 @@ Extra spaces in declaration statements. false normalises; ignore leaves them alo
 
 **Default:** `false`
 
+## Conformance
+
+No known case where Curb's output is not a fixed point of `dotnet format` — see [conformance](../../design-principles/conformance.md).
+
 ### `csharp_space_around_declaration_statements = false`
 
 ```ini

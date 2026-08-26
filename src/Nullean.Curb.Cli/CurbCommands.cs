@@ -148,6 +148,29 @@ internal sealed class CurbCommands
 		return 0;
 	}
 
+	/// <summary>Show which .editorconfig keys Curb implements.</summary>
+	/// <param name="listKeys">Print only the implemented keys, space separated, for scripting.</param>
+	public static int Options(bool listKeys = false)
+	{
+		// Driven by the catalog rather than a hand-written list, for the same reason `rules --cleanup-ids`
+		// is: a key that starts or stops being implemented should change this output without anyone
+		// remembering to edit a second copy of the list — the build's per-option conformance coverage
+		// check reads it this way rather than carrying its own.
+		var keys = OptionCatalog.ImplementedKeys.Order(StringComparer.Ordinal).ToArray();
+
+		if (listKeys)
+		{
+			Console.WriteLine(string.Join(' ', keys));
+			return 0;
+		}
+
+		Console.WriteLine($"# {keys.Length} key(s) implemented");
+		foreach (var key in keys)
+			Console.WriteLine($"  {key}");
+
+		return 0;
+	}
+
 	/// <summary>Dump the document IR for a file.</summary>
 	/// <param name="path">The C# file to dump.</param>
 	public int DocTree([Argument][Existing][FileExtensions(Extensions = "cs")] FileInfo path)

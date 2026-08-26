@@ -19,6 +19,10 @@ Spaces around binary and assignment operators.
 
 **Default:** `before_and_after`
 
+## Conformance
+
+No known case where Curb's output is not a fixed point of `dotnet format` — see [conformance](../../design-principles/conformance.md).
+
 ### `csharp_space_around_binary_operators = before_and_after`
 
 ```ini

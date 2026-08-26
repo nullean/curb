@@ -18,6 +18,10 @@ Separate groups of usings by first namespace segment with a blank line.
 
 **Default:** `false`
 
+## Conformance
+
+No known case where Curb's output is not a fixed point of `dotnet format` — see [conformance](../../design-principles/conformance.md).
+
 ### `dotnet_separate_import_directive_groups = true`
 
 ```ini

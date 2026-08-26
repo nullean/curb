@@ -17,6 +17,10 @@ Reorder modifiers to the specified preference. IDE0036. Applied without a compil
 
 **Default:** `(not set)`
 
+## Conformance
+
+No known case where Curb's output is not a fixed point of `dotnet format` — see [conformance](../../design-principles/conformance.md).
+
 *This option accepts a freeform value. No canned example is generated.*
 
 ```ini

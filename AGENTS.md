@@ -18,6 +18,8 @@ width-aware reflow. It ships as a native-AOT `dotnet tool`.
 ./build.sh cleanupsafety --corpus <path> # feed a corpus wrong verdicts; none may damage a file
 ./build.sh cleanupconformance            # clean a solution that builds; it must still build
 ./build.sh verifyexpectations            # expectations survive dotnet format
+./build.sh verifycleanupexpectations     # cleanup-rule cases are a fixed point of dotnet format style
+./build.sh verifyexpectationsjb          # measures the same against jb cleanupcode; reported, not gated yet
 ```
 
 Requires the .NET 10 SDK (pinned in `global.json`). Test projects are `OutputType=Exe` and run on
@@ -67,18 +69,29 @@ These are the difference between fast and slow. Enforce them in review:
 
 ## Adding a formatting option
 
-One option should be a small, isolated change. The generated completeness test fails if you skip
-the fixtures.
+One option should be a small, isolated change. `./build.sh verifyexpectations`'s coverage check
+(`checkOptionCoverage` in `build/scripts/Targets.fs`) fails if you skip the cases — it reads every
+dumped case's `.editorconfig` and requires each implemented key to appear in at least one, so a key
+that is catalogued but never exercised is a build failure, not a silent gap.
 
 1. `src/Nullean.Curb.Core/Options/OptionCatalog.cs` — one declaration (key, allowed values, default,
-   bit slot, doc summary, `Implemented = true`).
-2. The generator regenerates the accessor, parser, validator, diagnostics, `print-config` row and
-   `docs/options.md`. **Do not hand-edit generated output.**
+   bit slot, doc summary, `Implemented = true`). Also add an entry to `OptionDescriptor.All` in
+   `src/Nullean.Curb.Core/Options/OptionDescriptors.cs` — it drives the generated option reference.
+2. `./build.sh options` regenerates `docs/reference/**/*.md` from `OptionDescriptor.All`. **Do not
+   hand-edit generated output.**
 3. Add a helper in `Printing/CSharp/Spacing.cs` (or `BraceLines.cs` / `Indentation.cs`) that turns
    the option into a `Doc`.
 4. Swap the hard-coded `" "` / `Doc.Line` / `Doc.Indent(…)` in 1–3 printers for the helper.
-5. Add `tests/Nullean.Curb.Tests/Fixtures/options/<key>/<value>.test`, one per allowed value.
-   Generate expectations from `dotnet format` where possible — it is the reference implementation.
+5. Add cases to `tests/Nullean.Curb.Tests/Formatting/Options/<Key>Tests.cs`, one raw-string case per
+   allowed value, using the `FormattingTest` harness (`Formats`/`Unchanged`/`WithAndWithout`) — see
+   `tests/Nullean.Curb.Tests/Formatting/_Harness/FormattingTest.cs`. Every case is dumped through
+   `ExpectationDump` so `./build.sh verifyexpectations` can prove it survives `dotnet format`; generate
+   expectations from `dotnet format` where possible — it is the reference implementation for the
+   `csharp_*`/`dotnet_*`/core keys (ReSharper-derived wrapping and blank-line keys have no `dotnet format`
+   opinion to check against, so their expectations are hand-derived from Rider/ReSharper's own behaviour).
+   See [conformance](docs/design-principles/conformance.md) for what "survives" means precisely, and
+   [conformance divergences](docs/design-principles/conformance-divergences.md) for how to record a case
+   where Curb deliberately picks a different shape than `dotnet format`/`jb cleanupcode` would.
 
 Printers must never read options directly; they call a helper. That is what keeps an option's
 footprint to one place.
@@ -102,15 +115,20 @@ the diagnostic does not carry, it is not a cleanup rule — record why and stop.
    test still passes and the net quietly stops catching what it exists for.
 5. Add cases to `tests/Nullean.Curb.Tests/Cleanup/`, with the diagnostic supplied by hand. One per thing
    it fixes, and **one per thing it refuses** — a rule that fixes the right thing and also the wrong thing
-   passes half a suite.
+   passes half a suite. Every case that fixes something is automatically dumped through
+   `CleanupExpectationDump` and checked by `./build.sh verifycleanupexpectations` — the same fixed-point
+   discipline `verifyexpectations` holds the formatting side to, applied to `dotnet format style`. If the
+   fix is not a fixed point of it, that needs a `build/conformance-divergences.json` entry (tool
+   `dotnet-format-style`) with a reason, same as [conformance divergences](docs/design-principles/conformance-divergences.md).
 6. Run **both** corpus gates before claiming it is done, and record the numbers in
-   `docs/cleanup.md` rather than the intent. It claims every rule fires everywhere it could, so it feeds
-   deliberately wrong verdicts and requires that none of them damages a file. **It found four defects on
-   its first run that no unit test reached**, listed in that document. `cleanupconformance` is the other
+   `docs/workflow/cleanup.md` rather than the intent. It claims every rule fires everywhere it could, so it
+   feeds deliberately wrong verdicts and requires that none of them damages a file. **It found four defects
+   on its first run that no unit test reached**, listed in that document. `cleanupconformance` is the other
    half and the only one that compiles anything, so it is the only one that can catch a fix which compiles
    but is wrong — it caught an IDE0007/IDE0034 interaction producing CS8716. Nothing below these two rungs
-   green-lights a rule that changes tokens — the same discipline as
-   [docs/contribute/layout-decisions.md](docs/contribute/layout-decisions.md), for the same reason.
+   green-lights a rule that changes tokens — the same discipline `docs/contribute/layout-decisions.md`
+   holds formatting to, for the same reason (see the note below — that file does not exist in this
+   checkout and needs recovering or rewriting; do not treat the link below as live until it does).
 
 A refusal is a first-class outcome, not an error. Report it with its reason so "Curb declined" is
 distinguishable from "Curb is broken."
@@ -126,14 +144,14 @@ build, and it is why Core's only package reference is the exact-pinned parser.
 - **`curb cleanup`, in scope:** semantic code style rules — but only ones a build has already reported,
   and only where the fix is derivable from the diagnostic's position plus syntax. It *consumes a verdict*
   rather than deriving one. `--forward` hands the remainder to `dotnet format` and prints both timings.
-  See [docs/cleanup.md](docs/cleanup.md).
+  See [docs/workflow/cleanup.md](docs/workflow/cleanup.md).
 - **Out of scope, permanently:** any fix that deletes a declaration (IDE0051/0052) or renames a symbol
   (IDE1006/IDE0130), and any fix the diagnostic does not carry enough information to make (IDE0008 needs
   a type name). Report these and point the user at `dotnet format style`.
 
 **Never add `Microsoft.CodeAnalysis.Workspaces`, to any project, and never construct a
 `CSharpCompilation`.** Not to Core, not to Cleanup, not temporarily. The bare-folder and AOT stories rest
-on it, and `docs/cleanup.md` records why hosting the SDK's own analysers cannot be made version-safe.
+on it, and `docs/workflow/cleanup.md` records why hosting the SDK's own analysers cannot be made version-safe.
 
 `RuleCatalog` names all 116 IDE rules the SDK can report and who fixes each. A row claims `Cleanup` only
 once a fixer exists — never because one is planned — and `RuleCatalogTests` holds the two together, so a
@@ -182,11 +200,18 @@ Practical consequences when adding an option:
 - Measure both modes. `conformance` and `churn` take `--reflow`, `--preserve` and `--width`; with the
   corpus's own width, `--reflow` *is* the default path and `--preserve` is the opt-out.
 
-**Before adding any option that moves a line break, read
-[docs/contribute/layout-decisions.md](docs/contribute/layout-decisions.md).** In preservation mode a layout rule may read the
-tokens and layout the author owns, and never layout Curb itself decides. That one mistake has killed more
-features than every other cause combined; the note carries the measurements so they are not re-derived,
-and records which of them deterministic mode has since brought back.
+**Before adding any option that moves a line break, read `docs/contribute/layout-decisions.md`.** In
+preservation mode a layout rule may read the tokens and layout the author owns, and never layout Curb
+itself decides. That one mistake has killed more features than every other cause combined; the note
+carries the measurements so they are not re-derived, and records which of them deterministic mode has
+since brought back.
+
+> **Drift note:** `docs/contribute/layout-decisions.md` does not exist in this checkout (there is no
+> `docs/contribute/` directory) even though it is cited twice in this file as the authoritative record of
+> those measurements. Either it was lost in the docs reorganisation that produced `docs/design-principles/`
+> and `docs/workflow/`, or it was never written. Recover it from history or rewrite it from the measurements
+> still described in `docs/design-principles/reflow.md` before relying on the citations above — this file
+> does not attempt to reconstruct it.
 
 ## Style
 

@@ -318,13 +318,38 @@ jobs:
       # only that Curb agrees with itself, so one written from a wrong belief would pass forever — it
       # found exactly that on its first run, an option value Roslyn rejects outright.
       #
-      # A floor rather than zero: three disagree, and each is a judgement rather than a defect. Two
-      # are tests feeding a deliberately invalid value, where Curb keeps its default and Roslyn
-      # declines to apply the option at all. The last has no resolution: Curb leaves a
-      # `#pragma warning disable` region alone and dotnet format ignores pragmas entirely, so that
-      # region cannot be a fixed point either way.
+      # Zero tolerance for an undocumented disagreement, not a floor: every case that is not a fixed
+      # point of dotnet format has to be named in build/conformance-divergences.json with a reason, or
+      # this fails outright. Five are documented today — see that file — a ReSharper-only key in direct
+      # conflict with an IDE0055 key dotnet format enforces, two invalid-value fallback mismatches, a
+      # `#pragma warning disable` region dotnet format has no concept of suppression for at all, and an
+      # indentation quirk specific to combining indent_style = tab with tab_width and a forced wrap. A
+      # case that is a fixed point but merely a different shape than dotnet format's own choice is not
+      # gated at all — see docs/design-principles/conformance.md for why. This also gates that every
+      # implemented .editorconfig key has at least one case at all (checkOptionCoverage in Targets.fs) —
+      # an option catalogued as implemented with nothing exercising it is exactly how three real gaps
+      # were found and left unfixed but tracked: see build/scripts/Targets.fs's checkOptionCoverage
+      # exclusion list.
       - name: Expectations survive dotnet format
-        run: ./build.sh verifyexpectations -s true --minimum 99.5
+        run: ./build.sh verifyexpectations -s true
+
+      # Same discipline, for curb cleanup's semantic rules against dotnet format style. Each cleanup
+      # case that actually fixed something gets its own throwaway project — batching them into one would
+      # make two unrelated cases both naming `class Widget` in `namespace N` a compile error rather than
+      # the two independent snippets the source intended — and dotnet format style --verify-no-changes
+      # says whether Curb's fix is a fixed point.
+      - name: Cleanup expectations survive dotnet format style
+        run: ./build.sh verifycleanupexpectations -s true
+
+      # docs/reference/**/*.md is generated from OptionDescriptor.All rather than hand-maintained, so it
+      # can only drift by someone changing the descriptor and forgetting to regenerate — catch that here
+      # rather than in review, where a diff this size (one page per option) is easy to wave through
+      # unread.
+      - name: Option reference docs are up to date
+        run: |
+          ./build.sh options -s true
+          git diff --exit-code -- docs/reference \
+            || (echo "::error::docs/reference is out of date — run ./build.sh options and commit the result" && exit 1)
 
   # ── Managed build / test / pack / publish ───────────────────────────────────
   build:

@@ -210,6 +210,33 @@ public class AttributeTests : FormattingTest
 		""",
 		JoinAttributes);
 
+	[Test]
+	public Task Field_and_event_attributes_join_the_same_way() => Formats(
+		"""
+		public class C
+		{
+		    [Keyword]
+		    private readonly string _tag;
+
+		    [Keyword]
+		    public event Action Changed;
+		}
+		""",
+		"""
+		public class C
+		{
+		    [Keyword] private readonly string _tag;
+
+		    [Keyword] public event Action Changed;
+		}
+		""",
+		"""
+		[*.cs]
+		max_line_length = 120
+		csharp_place_field_attribute_on_same_line = if_owner_is_single_line
+		csharp_place_event_attribute_on_same_line = if_owner_is_single_line
+		""");
+
 	/// <summary>
 	/// The key does nothing in preservation mode, and says so rather than going quiet.
 	/// </summary>

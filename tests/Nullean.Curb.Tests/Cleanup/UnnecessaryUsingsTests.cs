@@ -24,8 +24,12 @@ public class UnnecessaryUsingsTests
 {
 	private const string Path = "/repo/Widget.cs";
 
-	private static CleanupResult Clean(string source, params CleanupDiagnostic[] diagnostics) =>
-		new CSharpCleaner().Clean(source, diagnostics);
+	private static CleanupResult Clean(string source, params CleanupDiagnostic[] diagnostics)
+	{
+		var result = new CSharpCleaner().Clean(source, diagnostics);
+		CleanupExpectationDump.Record(result, diagnostics.Select(d => d.RuleId));
+		return result;
+	}
 
 	/// <summary>Builds the diagnostic the compiler would report for a run, from one-based coordinates.</summary>
 	private static CleanupDiagnostic Ide0005(int startLine, int startColumn, int endLine, int endColumn) =>

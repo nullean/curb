@@ -86,14 +86,16 @@ public class CoreOptionTests : FormattingTest
 
 	[Test]
 	public Task Spaces_replace_tabs_in_the_source() => Formats(
+		// No editorConfig: space is already the default, so this documents default behaviour rather
+		// than the option — an explicit `indent_style = space` here would prove nothing beyond what
+		// leaving it unset already does.
 		"public class C\n{\n\tpublic int Value;\n}",
 		"""
 		public class C
 		{
 		    public int Value;
 		}
-		""",
-		editorConfig: "indent_style = space");
+		""");
 
 	// ---- end_of_line ---------------------------------------------------------------------------
 
@@ -144,6 +146,35 @@ public class CoreOptionTests : FormattingTest
 	public Task Trailing_whitespace_on_a_blank_line_is_removed() => FormatsExactly(
 		"public class C\n{\n    \n    public int Value;\n}\n",
 		"public class C\n{\n\n    public int Value;\n}\n");
+
+	// `trim_trailing_whitespace = false` has no case here: it is bound correctly (see
+	// OptionsBindingTests) but every scenario tried — a plain line, and inside the verbatim-preserved
+	// `csharp_space_around_declaration_statements = ignore` region, where trailing whitespace has
+	// nowhere else to come from — still has it stripped. DocPrinter.cs's DocKind.Trim case (~line 181)
+	// calls _output.TrimTrailingWhitespace() unconditionally, unlike the other three call sites in that
+	// file, which correctly gate on _trimTrailingWhitespace. Filed as a real gap rather than worked
+	// around: writing a case that asserts the current behaviour would bake the bug into a golden
+	// expectation, which is exactly what this suite's own convention says not to do. See
+	// build/conformance-divergences.json / checkOptionCoverage's exclusion list in Targets.fs.
+
+	// ---- tab_width -------------------------------------------------------------------------------
+
+	[Test]
+	public Task Tab_width_counts_toward_the_line_length() => Formats(
+		// Two tabs at the call site: 16 columns at tab_width = 8, past a width of 30 once the call
+		// itself is counted — the same source stays on one line at the default tab_width = 4, where
+		// two tabs are only 8 columns.
+		"""
+		public class C
+		{
+		public void M()
+		{
+		Call(alpha, beta);
+		}
+		}
+		""",
+		"public class C\n{\n\tpublic void M()\n\t{\n\t\tCall(\n\t\t\talpha,\n\t\t\tbeta\n\t\t);\n\t}\n}",
+		editorConfig: "indent_style = tab\nmax_line_length = 30\ntab_width = 8");
 
 	// ---- max_line_length -------------------------------------------------------------------------
 

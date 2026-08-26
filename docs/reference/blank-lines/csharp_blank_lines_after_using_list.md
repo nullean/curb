@@ -17,6 +17,10 @@ Blank lines below the last using directive.
 
 **Default:** `0`
 
+## Conformance
+
+No known case where Curb's output is not a fixed point of `dotnet format` — see [conformance](../../design-principles/conformance.md).
+
 ### `csharp_blank_lines_after_using_list = 1`
 
 ```ini

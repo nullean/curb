@@ -18,6 +18,10 @@ Put each member of an object initializer on its own line.
 
 **Default:** `false`
 
+## Conformance
+
+No known case where Curb's output is not a fixed point of `dotnet format` — see [conformance](../../design-principles/conformance.md).
+
 ### `csharp_new_line_before_members_in_object_initializers = true`
 
 ```ini

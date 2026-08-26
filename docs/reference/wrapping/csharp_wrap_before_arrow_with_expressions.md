@@ -18,6 +18,10 @@ When an expression body wraps, put => at the start of the new line.
 
 **Default:** `false`
 
+## Conformance
+
+No known case where Curb's output is not a fixed point of `dotnet format` — see [conformance](../../design-principles/conformance.md).
+
 ### `csharp_wrap_before_arrow_with_expressions = true`
 
 ```ini

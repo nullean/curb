@@ -19,6 +19,10 @@ Break each operand of a long && or || chain onto its own line. chop_always break
 
 **Default:** `(not set)`
 
+## Conformance
+
+No known case where Curb's output is not a fixed point of `dotnet format` — see [conformance](../../design-principles/conformance.md).
+
 ### `csharp_wrap_chained_binary_expressions = chop_always`
 
 ```ini

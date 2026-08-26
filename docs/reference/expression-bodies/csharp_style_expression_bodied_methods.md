@@ -19,6 +19,10 @@ Convert eligible block-bodied methods to expression bodies. IDE0022.
 
 **Default:** `false`
 
+## Conformance
+
+No known case where Curb's output is not a fixed point of `dotnet format` — see [conformance](../../design-principles/conformance.md).
+
 ### `csharp_style_expression_bodied_methods = false`
 
 ```ini

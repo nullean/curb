@@ -18,6 +18,10 @@ Add a trailing comma after the last element even when the list is on one line.
 
 **Default:** `false`
 
+## Conformance
+
+No known case where Curb's output is not a fixed point of `dotnet format` — see [conformance](../../design-principles/conformance.md).
+
 ### `csharp_trailing_comma_in_singleline_lists = true`
 
 ```ini

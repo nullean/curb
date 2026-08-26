@@ -1,0 +1,39 @@
+{
+  "divergences": [
+    {
+      "key": "csharp_empty_block_style",
+      "tool": "dotnet-format-whitespace",
+      "staysFixedPoint": false,
+      "reason": "csharp_empty_block_style is a ReSharper-only key dotnet format does not recognise at all, so on its own it is inert to dotnet format (verified: `together` alone survives). The divergence only appears combined with csharp_preserve_single_line_blocks = false, an IDE0055 key dotnet format does understand as 'expand every single-line block' — including the empty one Curb just recollapsed under the together opinion. The two options are in permanent, direct conflict whenever both are set this way; there is no shape Curb could choose that satisfies both at once.",
+      "exampleCase": "EmptyBlockStyleTests.Together_ignores_preserve_single_line_blocks_being_off"
+    },
+    {
+      "key": "csharp_indent_labels",
+      "tool": "dotnet-format-whitespace",
+      "staysFixedPoint": false,
+      "reason": "For an unrecognised value, Curb falls back to the option's documented default (one_less_than_current). Measured: dotnet format's own behaviour for the same unrecognised value does not match its documented default either (it indents the label level with its statement, the no_change shape), so the two fallbacks disagree. Curb's choice — the documented default — is the more defensible of the two; dotnet format's fallback for an invalid value is undocumented.",
+      "exampleCase": "IndentationTests.An_unrecognised_label_value_falls_back_to_the_default"
+    },
+    {
+      "key": "csharp_new_line_before_open_brace",
+      "tool": "dotnet-format-whitespace",
+      "staysFixedPoint": false,
+      "reason": "Same fallback-mismatch shape as csharp_indent_labels: Curb falls back to the documented default (all/Allman) for an unrecognised value. Measured: dotnet format leaves the source untouched for the same unrecognised value, i.e. it silently skips applying the setting rather than falling back to its own documented default.",
+      "exampleCase": "NewLineBeforeOpenBraceTests.An_unrecognised_value_falls_back_to_the_default"
+    },
+    {
+      "key": "#pragma warning disable (bare, or naming IDE0055)",
+      "tool": "dotnet-format-whitespace",
+      "staysFixedPoint": false,
+      "reason": "Not an .editorconfig key — a language-level suppression Curb honours by leaving the enclosed region unformatted, matching what IDE0055 itself would do (a suppressed analyser reports nothing, so there is nothing to fix). dotnet format whitespace is not diagnostic-driven — it is a plain Roslyn formatter pass with no concept of pragma suppression — so it always reformats the region regardless. This is a structural, permanent divergence for any suppressed region that is not already dotnet-format-clean; it is not tied to a specific option key.",
+      "exampleCase": "SuppressionTests.A_bare_disable_covers_every_rule_including_this_one"
+    },
+    {
+      "key": "tab_width",
+      "tool": "dotnet-format-whitespace",
+      "staysFixedPoint": false,
+      "reason": "Measured on a case combining indent_style = tab, tab_width = 8 and a width narrow enough to force parameter-list wrapping: dotnet format converts the outer two levels of tab indentation to four-space equivalents while leaving the wrapped argument lines as tabs, an inconsistent application of indent_style = tab that only shows up in this combination — not reproduced with indent_style = tab alone, or with reflow alone. Not fully root-caused (looks like a quirk in Roslyn's own formatter under this specific combination); recorded as observed rather than fully explained. tab_width has no dotnet format equivalent to check reflow width against outside this interaction, since dotnet format does not reflow at all.",
+      "exampleCase": "CoreOptionTests.Tab_width_counts_toward_the_line_length"
+    }
+  ]
+}

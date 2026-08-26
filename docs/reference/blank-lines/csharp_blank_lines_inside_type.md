@@ -17,6 +17,10 @@ Blank lines below the opening brace and above the closing brace of a type.
 
 **Default:** `0`
 
+## Conformance
+
+No known case where Curb's output is not a fixed point of `dotnet format` — see [conformance](../../design-principles/conformance.md).
+
 ### `csharp_blank_lines_inside_type = 1`
 
 ```ini

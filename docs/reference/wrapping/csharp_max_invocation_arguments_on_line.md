@@ -17,6 +17,10 @@ Chop an argument list carrying more than this many arguments.
 
 **Default:** `(not set)`
 
+## Conformance
+
+No known case where Curb's output is not a fixed point of `dotnet format` — see [conformance](../../design-principles/conformance.md).
+
 *This option accepts a freeform value. No canned example is generated.*
 
 ```ini

@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Json;
 using Nullean.Curb;
 using Nullean.Curb.Options;
 
@@ -94,6 +95,29 @@ internal static class Program
             "and inserting a file-header comment. IDE0073.",
     };
 
+    /// <summary>One documented case where an option's chosen shape is not a fixed point of a tool.</summary>
+    private sealed record Divergence(string Key, string Tool, string Reason, string ExampleCase);
+
+    /// <summary>
+    /// Reads build/conformance-divergences.json — the same file <c>verifyExpectations</c> and
+    /// <c>verifyExpectationsJb</c> check a discovered non-fixed-point against — and groups its entries by
+    /// option key, so each generated page can say what it says for itself rather than pointing at a
+    /// registry the reader has to go cross-reference by hand.
+    /// </summary>
+    private static ILookup<string, Divergence> LoadDivergences(string root)
+    {
+        var path = Path.Combine(root, "build", "conformance-divergences.json");
+        using var doc = JsonDocument.Parse(File.ReadAllText(path));
+        return doc.RootElement.GetProperty("divergences").EnumerateArray()
+            .Select(e => new Divergence(
+                e.GetProperty("key").GetString()!,
+                e.GetProperty("tool").GetString()!,
+                e.GetProperty("reason").GetString()!,
+                e.GetProperty("exampleCase").GetString()!))
+            .ToList()
+            .ToLookup(d => d.Key);
+    }
+
     internal static int Main(string[] args)
     {
         var root = RepoRoot();
@@ -104,6 +128,7 @@ internal static class Program
 
         var formatter = new CSharpFormatter();
         var defaultOptions = new FormatOptions();
+        var divergences = LoadDivergences(root);
 
         var grouped = OptionDescriptor.All
             .GroupBy(d => d.Group)
@@ -121,7 +146,7 @@ internal static class Program
                 ? s
                 : throw new InvalidOperationException($"Missing snippet '{descriptor.SnippetKey}' for key '{descriptor.Key}'");
 
-            var page = BuildPage(descriptor, snippet, formatter, defaultOptions);
+            var page = BuildPage(descriptor, snippet, formatter, defaultOptions, divergences[descriptor.Key]);
             var path = Path.Combine(dir, descriptor.Key + ".md");
             File.WriteAllText(path, page, Encoding.UTF8);
             Console.WriteLine($"  {Path.GetRelativePath(root, path)}");
@@ -183,7 +208,8 @@ internal static class Program
         OptionDescriptor descriptor,
         string snippet,
         CSharpFormatter formatter,
-        FormatOptions defaultOptions)
+        FormatOptions defaultOptions,
+        IEnumerable<Divergence> divergences)
     {
         var slug = GroupSlugs[descriptor.Group];
         var sb = new StringBuilder();
@@ -211,6 +237,31 @@ internal static class Program
         }
         sb.AppendLine();
         sb.AppendLine($"**Default:** `{descriptor.Default}`");
+        sb.AppendLine();
+
+        // Conformance: what build/conformance-divergences.json says about this key, or the default
+        // claim when it says nothing. See docs/design-principles/conformance.md for what "fixed point"
+        // means and why a shape merely differing from a tool's own choice is not itself a divergence.
+        sb.AppendLine("## Conformance");
+        sb.AppendLine();
+        var entries = divergences.ToList();
+        if (entries.Count == 0)
+        {
+            sb.AppendLine(
+                "No known case where Curb's output is not a fixed point of `dotnet format` — see " +
+                "[conformance](../../design-principles/conformance.md).");
+        }
+        else
+        {
+            sb.AppendLine(
+                "Curb's output is not always a fixed point of the tool(s) below for this key — see " +
+                "[conformance divergences](../../design-principles/conformance-divergences.md) for the full registry.");
+            sb.AppendLine();
+            foreach (var d in entries)
+            {
+                sb.AppendLine($"- **{d.Tool}**: {d.Reason} (`{d.ExampleCase}`)");
+            }
+        }
         sb.AppendLine();
 
         // Collect the iterable values (skip placeholder shapes like <integer>).

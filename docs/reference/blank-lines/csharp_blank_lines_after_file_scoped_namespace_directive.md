@@ -17,6 +17,10 @@ Blank lines after a file-scoped namespace declaration.
 
 **Default:** `1`
 
+## Conformance
+
+No known case where Curb's output is not a fixed point of `dotnet format` — see [conformance](../../design-principles/conformance.md).
+
 *This option accepts a freeform value. No canned example is generated.*
 
 ```ini

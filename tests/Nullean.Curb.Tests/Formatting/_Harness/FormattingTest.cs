@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
 using JetBrains.Annotations;
 using Nullean.Curb;
 
@@ -39,16 +40,20 @@ public abstract class FormattingTest
 		[LanguageInjection("csharp")][StringSyntax("C#")] string source,
 		[LanguageInjection("csharp")][StringSyntax("C#")] string expected,
 		[StringSyntax("ini")] string? editorConfig = null,
-		string? fileName = null)
+		string? fileName = null,
+		[CallerMemberName] string? caller = null,
+		[CallerFilePath] string? callerFile = null)
 	{
 		var options = TestOptions.Parse(editorConfig);
 		var actual = FormatOrFail(source, options, "source", fileName).TrimEnd('\n', '\r');
 		expected = expected.TrimEnd('\n', '\r');
 
-		ExpectationDump.Record(expected, editorConfig);
+		ExpectationDump.Record(source, expected, editorConfig, TestCase(callerFile, caller));
 
 		if (!string.Equals(actual, expected, StringComparison.Ordinal))
 			throw new FormattingAssertionException(FormattingDiff.Describe(expected, actual, source, editorConfig));
+
+		AssertCaseIsNotVacuous(source, expected, editorConfig, fileName);
 
 		// The expected output must be a fixed point. CSharpier's harness has no equivalent check,
 		// and every idempotency bug found so far grew a blank line or an indent level per run.
@@ -75,8 +80,10 @@ public abstract class FormattingTest
 	protected static Task Unchanged(
 		[LanguageInjection("csharp")][StringSyntax("C#")] string source,
 		[StringSyntax("ini")] string? editorConfig = null,
-		string? fileName = null) =>
-		Formats(source, source, editorConfig, fileName);
+		string? fileName = null,
+		[CallerMemberName] string? caller = null,
+		[CallerFilePath] string? callerFile = null) =>
+		Formats(source, source, editorConfig, fileName, caller, callerFile);
 
 	/// <summary>
 	/// Asserts what an opinion does when it is on and, just as importantly, that it does nothing
@@ -104,10 +111,12 @@ public abstract class FormattingTest
 		[LanguageInjection("csharp")][StringSyntax("C#")] string asDefault,
 		[LanguageInjection("csharp")][StringSyntax("C#")] string asOpinion,
 		[StringSyntax("ini")] string opinionConfig,
-		[StringSyntax("ini")] string? editorConfig = null)
+		[StringSyntax("ini")] string? editorConfig = null,
+		[CallerMemberName] string? caller = null,
+		[CallerFilePath] string? callerFile = null)
 	{
-		Formats(source, asDefault, editorConfig);
-		return Formats(source, asOpinion, JoinConfig(editorConfig, opinionConfig));
+		Formats(source, asDefault, editorConfig, caller: caller, callerFile: callerFile);
+		return Formats(source, asOpinion, JoinConfig(editorConfig, opinionConfig), caller: caller, callerFile: callerFile);
 	}
 
 	private static string JoinConfig(string? editorConfig, string extra) =>
@@ -122,6 +131,11 @@ public abstract class FormattingTest
 	/// Expected values are ordinary strings rather than raw literals so the trailing bytes are
 	/// visible at the call site.
 	/// </remarks>
+	/// <remarks>
+	/// Does not run <see cref="AssertCaseIsNotVacuous"/>: that check trims trailing newlines and line
+	/// endings before comparing, which is exactly the byte-level distinction this method exists to test —
+	/// applying it here would make every final-newline and line-ending case look vacuous by construction.
+	/// </remarks>
 	protected static Task FormatsExactly(
 		[LanguageInjection("csharp")][StringSyntax("C#")] string source,
 		string expected,
@@ -134,6 +148,72 @@ public abstract class FormattingTest
 			throw new FormattingAssertionException(FormattingDiff.Describe(expected, actual, source, editorConfig));
 
 		return Task.CompletedTask;
+	}
+
+	/// <summary>
+	/// Asserts that an option value Curb does not recognise falls back to the default, rather than being
+	/// guessed at.
+	/// </summary>
+	/// <remarks>
+	/// The one case where <paramref name="expected"/> equalling what bare defaults would produce is the
+	/// point, not a sign the case proves nothing — <see cref="AssertCaseIsNotVacuous"/> would reject it for
+	/// the wrong reason, so this bypasses that check rather than the case being rewritten to dodge it.
+	/// </remarks>
+	protected static Task FallsBackToDefault(
+		[LanguageInjection("csharp")][StringSyntax("C#")] string source,
+		[LanguageInjection("csharp")][StringSyntax("C#")] string expected,
+		[StringSyntax("ini")] string editorConfig,
+		string? fileName = null,
+		[CallerMemberName] string? caller = null,
+		[CallerFilePath] string? callerFile = null)
+	{
+		var options = TestOptions.Parse(editorConfig);
+		var actual = FormatOrFail(source, options, "source", fileName).TrimEnd('\n', '\r');
+		expected = expected.TrimEnd('\n', '\r');
+
+		ExpectationDump.Record(source, expected, editorConfig, TestCase(callerFile, caller));
+
+		if (!string.Equals(actual, expected, StringComparison.Ordinal))
+			throw new FormattingAssertionException(FormattingDiff.Describe(expected, actual, source, editorConfig));
+
+		return Task.CompletedTask;
+	}
+
+	/// <summary>
+	/// Asserts that <paramref name="editorConfig"/> is actually responsible for reaching
+	/// <paramref name="expected"/> from <paramref name="source"/>, rather than the case passing by
+	/// coincidence.
+	/// </summary>
+	/// <remarks>
+	/// Formatting <paramref name="source"/> under a bare <c>.editorconfig</c> — none of the settings this
+	/// case asks for — must <b>not</b> already land on <paramref name="expected"/>. If it does, the option
+	/// under test had nothing to do with reaching it: the case would pass just as well against a printer
+	/// that never read the option at all, which is indistinguishable from a case whose "badly formatted"
+	/// input was never actually bad, or a construct the option in question does not touch. Skipped when
+	/// there is no configuration to be responsible for anything (<paramref name="editorConfig"/> is empty)
+	/// or when the case is asserting a no-op (<paramref name="source"/> already equals
+	/// <paramref name="expected"/>) — that is what <see cref="Unchanged"/> is for. A case whose whole point
+	/// is that an unrecognised value falls back to the default uses <see cref="FallsBackToDefault"/>
+	/// instead, which does not run this check at all.
+	/// </remarks>
+	private static void AssertCaseIsNotVacuous(string source, string expected, string? editorConfig, string? fileName)
+	{
+		if (string.IsNullOrEmpty(editorConfig))
+			return;
+		if (string.Equals(source, expected, StringComparison.Ordinal))
+			return;
+
+		var baseline = FormatOrFail(source, TestOptions.Parse(null), "source under bare defaults", fileName)
+			.TrimEnd('\n', '\r');
+
+		if (string.Equals(baseline, expected, StringComparison.Ordinal))
+		{
+			throw new FormattingAssertionException(
+				"this case proves nothing about the option under test — formatting `source` with a bare "
+				+ ".editorconfig (none of this case's settings) already produces `expected`:"
+				+ Environment.NewLine
+				+ FormattingDiff.Describe(expected, baseline, source, editorConfig));
+		}
 	}
 
 	/// <summary>Asserts that Curb refuses to format the input, rather than formatting it wrongly.</summary>
@@ -154,6 +234,19 @@ public abstract class FormattingTest
 
 		return Task.CompletedTask;
 	}
+
+	/// <summary>
+	/// Names the test case as <c>ClassName.MethodName</c>, for attributing a dumped
+	/// <see cref="ExpectationDump"/> case back to the test that produced it.
+	/// </summary>
+	/// <remarks>
+	/// The class name is read from the caller's file rather than <c>GetType()</c> — these are static
+	/// methods with no instance to reflect on — which relies on this project's one-class-per-file
+	/// convention. <c>./build.sh verifyexpectations</c> uses the result to match a discovered
+	/// disagreement against <c>build/conformance-divergences.json</c>.
+	/// </remarks>
+	private static string TestCase(string? callerFile, string? caller) =>
+		$"{(callerFile is null ? "?" : Path.GetFileNameWithoutExtension(callerFile))}.{caller ?? "?"}";
 
 	/// <summary>
 	/// Runs the formatter with every safety net engaged, including the round-trip token comparer
@@ -191,7 +284,7 @@ internal static class ExpectationDump
 	private static readonly string? Root = Environment.GetEnvironmentVariable("CURB_EXPECTATION_DUMP");
 	private static int Next;
 
-	public static void Record(string expected, string? editorConfig)
+	public static void Record(string source, string expected, string? editorConfig, string testCase)
 	{
 		if (string.IsNullOrEmpty(Root))
 			return;
@@ -207,6 +300,16 @@ internal static class ExpectationDump
 			"root = true\n[*.cs]\n" + (editorConfig ?? "") + "\n");
 
 		File.WriteAllText(Path.Combine(directory, "Expected.cs"), expected + "\n");
+
+		// The raw, badly formatted input the case started from. Kept alongside Expected.cs so
+		// ./build.sh verifyexpectations can ask what the reference tool makes of it on its own (X) and
+		// compare that to what Curb chose (Z) — the two are allowed to differ, but the difference has to
+		// be a documented, deliberate one rather than a silent one.
+		File.WriteAllText(Path.Combine(directory, "Source.cs"), source + "\n");
+
+		// ClassName.MethodName, so a discovered X != Z disagreement can be matched against
+		// build/conformance-divergences.json without guessing which test a numbered directory came from.
+		File.WriteAllText(Path.Combine(directory, "TestCase.txt"), testCase);
 	}
 }
 

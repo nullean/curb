@@ -18,6 +18,10 @@ Space just inside the parentheses of a parameter list.
 
 **Default:** `false`
 
+## Conformance
+
+No known case where Curb's output is not a fixed point of `dotnet format` — see [conformance](../../design-principles/conformance.md).
+
 ### `csharp_space_between_method_declaration_parameter_list_parentheses = true`
 
 ```ini

@@ -18,6 +18,10 @@ Ensure the file ends with a newline.
 
 **Default:** `true`
 
+## Conformance
+
+No known case where Curb's output is not a fixed point of `dotnet format` — see [conformance](../../design-principles/conformance.md).
+
 ### `insert_final_newline = true`
 
 ```ini

@@ -18,6 +18,10 @@ Put System.* usings before all others.
 
 **Default:** `false`
 
+## Conformance
+
+No known case where Curb's output is not a fixed point of `dotnet format` — see [conformance](../../design-principles/conformance.md).
+
 ### `dotnet_sort_system_directives_first = true`
 
 ```ini

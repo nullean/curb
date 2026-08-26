@@ -18,6 +18,10 @@ Put a broken argument list's ) on its own line.
 
 **Default:** `(not set)`
 
+## Conformance
+
+No known case where Curb's output is not a fixed point of `dotnet format` — see [conformance](../../design-principles/conformance.md).
+
 ### `csharp_wrap_before_invocation_rpar = true`
 
 ```ini

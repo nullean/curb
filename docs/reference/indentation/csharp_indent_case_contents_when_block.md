@@ -18,6 +18,10 @@ Indent a braced case body. csharp_indent_case_contents governs other statements.
 
 **Default:** `true`
 
+## Conformance
+
+No known case where Curb's output is not a fixed point of `dotnet format` — see [conformance](../../design-principles/conformance.md).
+
 ### `csharp_indent_case_contents_when_block = true`
 
 ```ini

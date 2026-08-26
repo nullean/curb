@@ -21,6 +21,10 @@ Set this to none to opt a file out of formatting.
 
 **Default:** `warning`
 
+## Conformance
+
+No known case where Curb's output is not a fixed point of `dotnet format` — see [conformance](../../design-principles/conformance.md).
+
 ### `dotnet_diagnostic.ide0055.severity = none`
 
 ```ini

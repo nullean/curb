@@ -24,6 +24,7 @@ toc:
     children:
       - file: index.md
       - file: conformance.md
+      - file: conformance-divergences.md
       - file: performance.md
       - file: reflow.md
       - file: safety.md

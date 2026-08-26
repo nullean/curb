@@ -18,6 +18,10 @@ Remove trailing whitespace from each line.
 
 **Default:** `true`
 
+## Conformance
+
+No known case where Curb's output is not a fixed point of `dotnet format` — see [conformance](../../design-principles/conformance.md).
+
 ### `trim_trailing_whitespace = true`
 
 ```ini

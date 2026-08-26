@@ -202,6 +202,33 @@ public class BlankLineOptionTests : FormattingTest
 		editorConfig: "csharp_blank_lines_inside_type = 1");
 
 	[Test]
+	public Task Types_have_their_own_setting() => Formats(
+		"""
+		public class A
+		{
+		}
+		public class B
+		{
+		}
+		""",
+		"""
+		public class A
+		{
+		}
+
+		public class B
+		{
+		}
+		""",
+		editorConfig: "csharp_blank_lines_around_type = 1");
+
+	// csharp_blank_lines_after_using_list has no case here: it is bound into FormatOptions but
+	// MinimumBlankLinesFor (Printers.cs, ~line 2105) — the dispatch every other blank_lines_around_*
+	// option goes through — has no case for it, unlike blank_lines_around_namespace/type/invocable/
+	// property/field, which all do. A real gap, not a scoping decision: writing a case would bake "no
+	// effect" in as the expected behaviour. See checkOptionCoverage's exclusion list in Targets.fs.
+
+	[Test]
 	public Task Namespaces_have_their_own_setting() => Formats(
 		"""
 		using System;

@@ -122,8 +122,12 @@ public class NewLineBeforeOpenBraceTests : FormattingTest
 
 	[Test]
 	public Task Types_covers_struct_interface_record_and_enum() => Formats(
+		// The method inside S is what makes this case distinguishable from the default `all`: types
+		// alone must brace the four type declarations but leave M's brace exactly where it was.
 		"""
 		public struct S {
+		    void M() {
+		    }
 		}
 		public interface I {
 		}
@@ -136,6 +140,8 @@ public class NewLineBeforeOpenBraceTests : FormattingTest
 		"""
 		public struct S
 		{
+		    void M() {
+		    }
 		}
 		public interface I
 		{
@@ -152,9 +158,13 @@ public class NewLineBeforeOpenBraceTests : FormattingTest
 
 	[Test]
 	public Task Types_covers_a_block_namespace() => Formats(
+		// M's brace staying joined is what proves `types` governs the namespace and class braces
+		// specifically, rather than this being the default `all` behaviour under a different name.
 		"""
 		namespace N {
 		    public class C {
+		        void M() {
+		        }
 		    }
 		}
 		""",
@@ -163,6 +173,8 @@ public class NewLineBeforeOpenBraceTests : FormattingTest
 		{
 		    public class C
 		    {
+		        void M() {
+		        }
 		    }
 		}
 		""",
@@ -383,12 +395,16 @@ public class NewLineBeforeOpenBraceTests : FormattingTest
 		// fixed-point property makes authoritative: `methods` alone moves a local function's brace and
 		// `local_functions` alone moves nothing. This asserted the documented behaviour and cost a
 		// fixed point for anyone setting `methods` — the same resolution as indexers and events.
+		// The lambda staying joined is what proves `types,methods` is doing the work here rather than
+		// this being indistinguishable from the default `all`.
 		"""
 		public class C
 		{
 		    public void M() {
 		        void Inner() {
 		        }
+		        Action<int> a = x => {
+		        };
 		    }
 		}
 		""",
@@ -400,6 +416,8 @@ public class NewLineBeforeOpenBraceTests : FormattingTest
 		        void Inner()
 		        {
 		        }
+		        Action<int> a = x => {
+		        };
 		    }
 		}
 		""",
@@ -569,6 +587,9 @@ public class NewLineBeforeOpenBraceTests : FormattingTest
 
 	[Test]
 	public Task Accessors_with_bodies_brace_on_their_own_line() => Formats(
+		// No width needed here, unlike the auto-property cases above: an accessor with a statement body
+		// is never "on one line" to begin with, so it is not the soft-break case the class remarks
+		// describe — default `all` alone puts its brace on its own line.
 		"""
 		public class C
 		{
@@ -591,8 +612,7 @@ public class NewLineBeforeOpenBraceTests : FormattingTest
 		        }
 		    }
 		}
-		""",
-		editorConfig: "max_line_length = 30");
+		""");
 
 	[Test]
 	public Task Accessors_excluded_keeps_the_body_brace_up() => Formats(

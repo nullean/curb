@@ -18,6 +18,10 @@ Space after a comma.
 
 **Default:** `true`
 
+## Conformance
+
+No known case where Curb's output is not a fixed point of `dotnet format` — see [conformance](../../design-principles/conformance.md).
+
 ### `csharp_space_after_comma = true`
 
 ```ini

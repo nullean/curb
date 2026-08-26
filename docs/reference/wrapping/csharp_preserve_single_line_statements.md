@@ -18,6 +18,10 @@ Allow a control-flow body the author left on its header's line to stay there.
 
 **Default:** `true`
 
+## Conformance
+
+No known case where Curb's output is not a fixed point of `dotnet format` — see [conformance](../../design-principles/conformance.md).
+
 ### `csharp_preserve_single_line_statements = true`
 
 ```ini

@@ -18,6 +18,10 @@ Add a trailing comma after the last element of a list that breaks across lines.
 
 **Default:** `false`
 
+## Conformance
+
+No known case where Curb's output is not a fixed point of `dotnet format` — see [conformance](../../design-principles/conformance.md).
+
 ### `csharp_trailing_comma_in_multiline_lists = true`
 
 ```ini

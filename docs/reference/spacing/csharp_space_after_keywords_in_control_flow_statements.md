@@ -18,6 +18,10 @@ Space between a control-flow keyword and its opening parenthesis.
 
 **Default:** `true`
 
+## Conformance
+
+No known case where Curb's output is not a fixed point of `dotnet format` — see [conformance](../../design-principles/conformance.md).
+
 ### `csharp_space_after_keywords_in_control_flow_statements = true`
 
 ```ini

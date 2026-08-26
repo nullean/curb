@@ -18,6 +18,10 @@ Where a property's attribute section goes.
 
 **Default:** `own_line`
 
+## Conformance
+
+No known case where Curb's output is not a fixed point of `dotnet format` — see [conformance](../../design-principles/conformance.md).
+
 ### `csharp_place_property_attribute_on_same_line = own_line`
 
 ```ini

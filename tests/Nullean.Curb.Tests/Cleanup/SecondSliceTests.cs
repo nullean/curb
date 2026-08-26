@@ -16,8 +16,12 @@ public class SecondSliceTests
 {
 	private const string Path = "/repo/Widget.cs";
 
-	private static CleanupResult Clean(string source, params CleanupDiagnostic[] diagnostics) =>
-		new CSharpCleaner().Clean(source, diagnostics);
+	private static CleanupResult Clean(string source, params CleanupDiagnostic[] diagnostics)
+	{
+		var result = new CSharpCleaner().Clean(source, diagnostics);
+		CleanupExpectationDump.Record(result, diagnostics.Select(d => d.RuleId));
+		return result;
+	}
 
 	private static CleanupDiagnostic At(string ruleId, string source, string at)
 	{

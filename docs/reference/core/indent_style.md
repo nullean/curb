@@ -18,6 +18,10 @@ Indent with spaces or tabs.
 
 **Default:** `space`
 
+## Conformance
+
+No known case where Curb's output is not a fixed point of `dotnet format` — see [conformance](../../design-principles/conformance.md).
+
 ### `indent_style = space`
 
 ```ini

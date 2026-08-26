@@ -18,6 +18,10 @@ Preservation mode. Defaults to true when max_line_length is off.
 
 **Default:** `(derived from max_line_length)`
 
+## Conformance
+
+No known case where Curb's output is not a fixed point of `dotnet format` — see [conformance](../../design-principles/conformance.md).
+
 ### `csharp_keep_existing_linebreaks = true`
 
 ```ini

@@ -19,6 +19,10 @@ Line ending to write. auto matches whatever the source uses.
 
 **Default:** `auto`
 
+## Conformance
+
+No known case where Curb's output is not a fixed point of `dotnet format` — see [conformance](../../design-principles/conformance.md).
+
 ### `end_of_line = lf`
 
 ```ini

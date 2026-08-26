@@ -18,6 +18,10 @@ Space inside empty square brackets [].
 
 **Default:** `false`
 
+## Conformance
+
+No known case where Curb's output is not a fixed point of `dotnet format` — see [conformance](../../design-principles/conformance.md).
+
 ### `csharp_space_between_empty_square_brackets = true`
 
 ```ini

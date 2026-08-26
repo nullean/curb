@@ -160,6 +160,32 @@ public class ExpressionBodyTests : FormattingTest
 		""",
 		editorConfig: "csharp_style_expression_bodied_local_functions = true");
 
+	[Test]
+	public Task An_operator_converts_on_its_own_key() => Formats(
+		"""
+		public struct Point
+		{
+		    public static Point operator +(Point a, Point b)
+		    {
+		        return new Point(a.X + b.X, a.Y + b.Y);
+		    }
+		}
+		""",
+		"""
+		public struct Point
+		{
+		    public static Point operator +(Point a, Point b) => new Point(a.X + b.X, a.Y + b.Y);
+		}
+		""",
+		editorConfig: "csharp_style_expression_bodied_operators = true");
+
+	// csharp_style_expression_bodied_indexers has no case here: it is registered as implemented in
+	// OptionCatalog and bound into FormatOptions, but IndexerDeclaration (Printers.Members.cs) never
+	// calls TryPrintExpressionBody the way PropertyDeclaration and OperatorDeclaration do — it only
+	// keeps an expression body the source already had, never converts a get-only accessor block into
+	// one. A real gap, not a scoping decision: writing a case here would bake the missing conversion in
+	// as the expected behaviour. See checkOptionCoverage's exclusion list in Targets.fs.
+
 	// ---- accessors and whole properties -------------------------------------------------------------
 
 	[Test]
