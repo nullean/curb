@@ -362,7 +362,14 @@ internal static partial class Printers
 			{
 				arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
 				if (first && !hadUsings)
-					context.BlankLines(context.Options.BlankLinesInsideNamespace);
+				{
+					// Same RemoveBlankLinesNearBracesInDeclarations gate as PrintTypeBody's first
+					// member: forced exactly by default, or floored (with BlankLinesInsideNamespace
+					// as the floor) when the caller asked to preserve whatever the author wrote.
+					context.BlankLines(context.Options.RemoveBlankLinesNearBracesInDeclarations
+						? context.Options.BlankLinesInsideNamespace
+						: context.DeclarationSeparation(previousEnd, EffectiveStart(member), context.Options.BlankLinesInsideNamespace));
+				}
 				else if (!first && !NextStartsWithRegionBoundary(member.GetFirstToken(includeZeroWidth: true)))
 				{
 					// Region boundary skipped outright, not floored to zero — see PrintTypeBody's

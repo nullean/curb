@@ -471,8 +471,15 @@ internal static partial class Printers
 				var memberStartsWithRegion = !first && NextStartsWithRegionBoundary(member.GetFirstToken(includeZeroWidth: true));
 				if (!memberStartsWithRegion)
 				{
+					// csharp_remove_blank_lines_near_braces_in_declarations gates whether the first
+					// member's gap is forced exactly (the default) or falls back to the same floor-and-
+					// cap preservation every later member already uses, with BlankLinesInsideType as the
+					// floor instead of an exact count — the same shape the closing brace below always
+					// used, for the same reason (a region marker can legitimately sit there).
 					context.BlankLines(first
-						? context.Options.BlankLinesInsideType
+						? context.Options.RemoveBlankLinesNearBracesInDeclarations
+							? context.Options.BlankLinesInsideType
+							: context.DeclarationSeparation(previousEnd, EffectiveStart(member), context.Options.BlankLinesInsideType)
 						: context.DeclarationSeparation(previousEnd, EffectiveStart(member),
 							NextStartsWithDirective(member) ? 0 : MinimumBlankLinesFor(member, context)));
 				}
@@ -815,13 +822,26 @@ internal static partial class Printers
 				if (!NextStartsWithRegionBoundary(statementFirstToken)
 					&& !(context.Options.BlankLinesBeforeSingleLineComment > 0 && NextStartsWithSingleLineComment(statementFirstToken)))
 				{
-					// The statement-level minimum is skipped, not merely floored to it, when a comment
-					// sits in front — see NextStartsWithComment for why forcing one in there is unsafe
-					// regardless of what the comment turns out to be.
-					var minimum = NextStartsWithComment(statementFirstToken)
-						? 0
-						: StatementSeparationMinimum(previousStatement, statement, context);
-					context.BlankLines(context.CodeSeparation(previousEnd, start, minimum));
+					// csharp_remove_blank_lines_near_braces_in_code: the very first statement's gap is
+					// forced to exactly zero by default, the same relationship BlankLinesInsideType has
+					// to a type body's first member — overriding StatementSeparationMinimum entirely
+					// rather than layering under it, since a blank line an author left directly under
+					// `{` is exactly the "accidental, not deliberate" case the option exists to strip.
+					// Forcing zero is safe regardless of what follows, comment included: only a forced
+					// *positive* minimum can disrupt a comment's own alignment (see NextStartsWithComment
+					// below), and zero never adds anything for that alignment check to disagree about.
+					if (previousStatement is null && context.Options.RemoveBlankLinesNearBracesInCode)
+						context.BlankLines(0);
+					else
+					{
+						// The statement-level minimum is skipped, not merely floored to it, when a comment
+						// sits in front — see NextStartsWithComment for why forcing one in there is unsafe
+						// regardless of what the comment turns out to be.
+						var minimum = NextStartsWithComment(statementFirstToken)
+							? 0
+							: StatementSeparationMinimum(previousStatement, statement, context);
+						context.BlankLines(context.CodeSeparation(previousEnd, start, minimum));
+					}
 				}
 				Node.Print(statement, context);
 				previousEnd = statement.Span.End;

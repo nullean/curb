@@ -500,6 +500,60 @@ public class BlankLineOptionTests : FormattingTest
 		""",
 		editorConfig: "csharp_blank_lines_around_namespace = 1");
 
+	// ---- removing blank lines directly under an opening brace ---------------------------------------
+
+	[Test]
+	public Task A_blank_line_under_a_block_s_opening_brace_is_removed_by_default() => Formats(
+		// csharp_remove_blank_lines_near_braces_in_code defaults to true, matching jb: a blank line an
+		// author left directly under `{` reads as accidental rather than deliberate.
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+
+		        Call();
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        Call();
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_block_can_keep_its_blank_line_under_the_opening_brace() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+
+		        Call();
+		    }
+		}
+		""",
+		editorConfig: "csharp_remove_blank_lines_near_braces_in_code = false");
+
+	[Test]
+	public Task A_type_can_keep_its_blank_line_under_the_opening_brace() => Unchanged(
+		"""
+		public class C
+		{
+
+		    public void M()
+		    {
+		        Call();
+		    }
+		}
+		""",
+		editorConfig: "csharp_remove_blank_lines_near_braces_in_declarations = false");
+
 	// ---- what is deliberately not offered ------------------------------------------------------------
 
 	[Test]

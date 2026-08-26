@@ -1142,6 +1142,26 @@ public readonly record struct FormatOptions
 	/// </summary>
 	public int BlankLinesBeforeSingleLineComment { get; init; }
 
+	/// <summary>
+	/// <c>csharp_remove_blank_lines_near_braces_in_declarations</c>: whether the exact-zero force
+	/// <see cref="BlankLinesInsideType"/>/<see cref="BlankLinesInsideNamespace"/> apply by default
+	/// actually runs. True by default, matching jb — set false to fall back to floor-and-cap
+	/// preservation of whatever the author wrote there instead (the same shape every other member in
+	/// the family uses), rather than stripping it unconditionally.
+	/// </summary>
+	public bool RemoveBlankLinesNearBracesInDeclarations { get; init; } = true;
+
+	/// <summary>
+	/// <c>csharp_remove_blank_lines_near_braces_in_code</c>: the same, for the gap between a block's
+	/// opening brace and its first statement. True by default, matching jb — measured as a genuine
+	/// default-behaviour gap, not merely a jb opinion: a blank line directly under an opening brace
+	/// reads as accidental rather than deliberate, the identical reasoning that already changed
+	/// <see cref="BlankLinesInsideType"/>'s own default this same family of changes. Curb previously
+	/// preserved it here (while already stripping the symmetric gap before the closing brace), an
+	/// inconsistency this closes.
+	/// </summary>
+	public bool RemoveBlankLinesNearBracesInCode { get; init; } = true;
+
 	// csharp_blank_lines_after_start_comment and csharp_blank_lines_between_using_groups are not
 	// implemented. The first measured as *not* controlled by the key at all in a direct jb check — a
 	// file-leading comment got a blank line forced after it regardless of the key's value, strongly
@@ -1210,12 +1230,6 @@ public readonly record struct FormatOptions
 	/// is what <c>dotnet format</c> writes there and Curb follows it.
 	/// </summary>
 	public int BlankLinesAfterFileScopedNamespace { get; init; } = 1;
-
-	// csharp_remove_blank_lines_near_braces_in_declarations and _in_code are deliberately absent.
-	// Curb already drops a bare blank line above a closing brace, and keeps the one above a *comment*
-	// that sits there, because that blank belongs to the comment rather than to the brace. ReSharper's
-	// key does not draw that distinction, so honouring it either way would mean changing behaviour
-	// that is already right in one of the two cases. Left alone rather than half-mapped.
 
 	/// <summary>
 	/// True when some option needs a whole member measured as one unit, so the printer has to group it.

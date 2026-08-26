@@ -124,6 +124,8 @@ public static class OptionValues
 		"csharp_blank_lines_before_case" => Lines(options.BlankLinesBeforeCase),
 		"csharp_blank_lines_after_case" => Lines(options.BlankLinesAfterCase),
 		"csharp_blank_lines_before_single_line_comment" => Lines(options.BlankLinesBeforeSingleLineComment),
+		"csharp_remove_blank_lines_near_braces_in_declarations" => Bool(options.RemoveBlankLinesNearBracesInDeclarations),
+		"csharp_remove_blank_lines_near_braces_in_code" => Bool(options.RemoveBlankLinesNearBracesInCode),
 		"csharp_max_initializer_elements_on_line" => Count(options.MaxInitializerElementsOnLine),
 		"csharp_max_chained_method_calls_on_line" => Count(options.MaxChainedMethodCallsOnLine),
 		"csharp_max_array_initializer_elements_on_line" => Count(options.MaxArrayInitializerElementsOnLine),
