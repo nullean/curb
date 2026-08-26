@@ -80,6 +80,8 @@ public static class OptionValues
 			: "chop_if_long",
 		"csharp_place_simple_enum_on_single_line" => Bool(options.PlaceSimpleEnumOnSingleLine),
 		"csharp_place_simple_accessorholder_on_single_line" => Bool(options.PlaceSimpleAccessorholderOnSingleLine),
+		"csharp_place_simple_declaration_blocks_on_single_line" => Bool(options.PlaceSimpleDeclarationBlocksOnSingleLine),
+		"csharp_place_simple_blocks_on_single_line" => Bool(options.PlaceSimpleBlocksOnSingleLine),
 		"csharp_wrap_parameters_style" => Wrap(options.WrapParametersStyle),
 		"csharp_wrap_arguments_style" => options.KeepExistingLinebreaks
 			? "chop_if_long   # chop_always needs a max_line_length"

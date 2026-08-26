@@ -137,6 +137,10 @@ internal static class Node
 				Printers.ConstructorDeclaration((ConstructorDeclarationSyntax)node, context);
 				break;
 
+			case SyntaxKind.DestructorDeclaration:
+				Printers.DestructorDeclaration((DestructorDeclarationSyntax)node, context);
+				break;
+
 			case SyntaxKind.AttributeList:
 				Printers.AttributeList((AttributeListSyntax)node, context);
 				break;

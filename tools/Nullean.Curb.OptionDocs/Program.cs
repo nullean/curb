@@ -465,6 +465,8 @@ internal static class Program
             "csharp_wrap_after_dot_in_method_calls" => opts with { WrapAfterDotInMethodCalls = b },
             "csharp_place_simple_enum_on_single_line" => opts with { PlaceSimpleEnumOnSingleLine = b },
             "csharp_place_simple_accessorholder_on_single_line" => opts with { PlaceSimpleAccessorholderOnSingleLine = b },
+            "csharp_place_simple_declaration_blocks_on_single_line" => opts with { PlaceSimpleDeclarationBlocksOnSingleLine = b },
+            "csharp_place_simple_blocks_on_single_line" => opts with { PlaceSimpleBlocksOnSingleLine = b },
             "csharp_wrap_before_binary_opsign" => opts with { WrapBeforeBinaryOpsign = b },
             // chop_if_long and wrap_if_long only act once a line does not fit, and none of these three
             // snippets overflows the default (off) width on its own, so the example would render the

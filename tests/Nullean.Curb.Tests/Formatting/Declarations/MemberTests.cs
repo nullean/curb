@@ -239,6 +239,30 @@ public class MemberTests : FormattingTest
 		}
 		""");
 
+	[Test]
+	public Task A_destructor_is_actually_reformatted() => Formats(
+		// Destructors went entirely unprinted until this test existed — Unchanged above passed either
+		// way, since UnhandledNode's verbatim fallback reproduces already-correct input identically to
+		// a real printer. This one needs genuine reformatting to tell the two apart.
+		"""
+		public class C
+		{
+		~C(  )
+		    {
+		Cleanup();
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    ~C()
+		    {
+		        Cleanup();
+		    }
+		}
+		""");
+
 	// ---- indexers, operators, events, delegates -----------------------------------------------
 
 	[Test]

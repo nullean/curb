@@ -237,6 +237,23 @@ public static class Snippets
 
             """,
 
+        ["lambda_block"] = """
+            namespace N;
+
+            public class Widget
+            {
+                public void Run()
+                {
+                    Action<int> log = x =>
+                    {
+                        Console.WriteLine(x);
+                    };
+                    log(1);
+                }
+            }
+
+            """,
+
         ["unary"] = """
             namespace N;
 
