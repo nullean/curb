@@ -340,6 +340,29 @@ public class BlankLineOptionTests : FormattingTest
 		editorConfig: "csharp_blank_lines_after_block_statements = 0");
 
 	[Test]
+	public Task A_comment_aligned_under_a_trailing_one_is_not_pushed_apart_by_the_air_after_it() => Unchanged(
+		// csharp_blank_lines_after_block_statements defaults to one, and forced a blank line directly
+		// in front of the aligned comment before this test existed — invisible to
+		// TokenPrinter.AlignsUnderTrailingComment's own trivia walk on the run that forced it (the
+		// walk only starts counting once it begins, after the blank line already went out through a
+		// separate call), but real literal source text by the very next run, which then read the two
+		// comments as belonging to separate runs and dropped the alignment — an idempotency bug the
+		// corpus caught, not a hand-written case, since it needs a real author-aligned comment.
+		"""
+		public class C
+		{
+		    public void M(bool branch)
+		    {
+		        if (branch)
+		            Call1(); // detached
+		                     // ref file
+		        if (branch)
+		            Call2();
+		    }
+		}
+		""");
+
+	[Test]
 	public Task Control_transfer_statements_have_their_own_setting() => Formats(
 		// Both default to zero, so proving they are bound means proving they can add air rather than
 		// take it away. Unreachable() is never actually reached — that is exactly why the "after" key
