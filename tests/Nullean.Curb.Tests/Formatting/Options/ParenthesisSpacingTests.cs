@@ -128,9 +128,7 @@ public class ParenthesisSpacingTests : FormattingTest
 		        }
 		        while ( a );
 
-		        try
-		        {
-		        }
+		        try { }
 		        catch ( Exception e ) when ( a ) { }
 		    }
 		}

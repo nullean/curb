@@ -401,7 +401,9 @@ internal static partial class Printers
 		var arena = context.Arena;
 
 		TokenPrinter.Print(node.TryKeyword, context);
-		PrintStatementBody(node.Block, BraceStyle.ControlBlocks, context);
+		// Same reasoning as catch and finally, below: dotnet format is lazy about an empty try block
+		// too, in both directions, so an unconditional `{ }` is the cleaner default here as well.
+		PrintStatementBody(node.Block, BraceStyle.ControlBlocks, context, alwaysJoinsEmpty: true);
 
 		foreach (var catchClause in node.Catches)
 		{

@@ -301,16 +301,15 @@ public class PreserveSingleLineTests : FormattingTest
 		    }
 		}
 		""",
-		// The brace and the keyword share a line, but the statement does not fit on one — what the
-		// option preserves is a single-line statement, not a single-line join.
+		// An empty try always collapses regardless of this option — Curb's one unconditional opinion,
+		// see StatementTests' "an empty try, catch or finally is always { }". What this case actually
+		// asserts is that catch still takes its own line rather than joining try's now-collapsed brace.
 		"""
 		public class C
 		{
 		    public void M()
 		    {
-		        try
-		        {
-		        }
+		        try { }
 		        catch (Exception e) { }
 		    }
 		}

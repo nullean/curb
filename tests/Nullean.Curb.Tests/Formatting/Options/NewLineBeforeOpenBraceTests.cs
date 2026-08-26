@@ -299,6 +299,9 @@ public class NewLineBeforeOpenBraceTests : FormattingTest
 
 	[Test]
 	public Task Control_blocks_excluded_pulls_try_catch_finally_braces_up() => Formats(
+		// A statement in each body, not left empty — an empty try/catch/finally always collapses to
+		// `{ }` regardless of this option (see StatementTests' "an empty try, catch or finally is
+		// always { }"), so an empty-bodied case here would prove nothing about the option under test.
 		"""
 		public class C
 		{
@@ -306,12 +309,15 @@ public class NewLineBeforeOpenBraceTests : FormattingTest
 		    {
 		        try
 		        {
+		            Call();
 		        }
 		        catch (Exception e)
 		        {
+		            Handle(e);
 		        }
 		        finally
 		        {
+		            Cleanup();
 		        }
 		    }
 		}
@@ -322,9 +328,14 @@ public class NewLineBeforeOpenBraceTests : FormattingTest
 		    public void M()
 		    {
 		        try {
+		            Call();
 		        }
-		        catch (Exception e) { }
-		        finally { }
+		        catch (Exception e) {
+		            Handle(e);
+		        }
+		        finally {
+		            Cleanup();
+		        }
 		    }
 		}
 		""",
