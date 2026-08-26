@@ -77,7 +77,7 @@ internal sealed class DocPrinter
 		_indenter = new Indenter(options.UseTabs, options.IndentSize, options.TabWidth);
 		_tabWidth = Math.Max(1, options.TabWidth);
 		_useTabs = options.UseTabs;
-		_endOfLine = options.ResolveEndOfLine(source.Span);
+		_endOfLine = options.ResolveEndOfLine();
 		_width = options.MaxLineLength;
 		_trimTrailingWhitespace = options.TrimTrailingWhitespace;
 		_column = 0;

@@ -115,6 +115,12 @@ public class CoreOptionTests : FormattingTest
 		"public class C\n{\n}\n",
 		editorConfig: "end_of_line = lf");
 
+	[Test]
+	public Task Unset_end_of_line_matches_the_platform() => FormatsExactly(
+		"public class C\n{\n}",
+		$"public class C{Environment.NewLine}{{{Environment.NewLine}}}{Environment.NewLine}",
+		editorConfig: "end_of_line = auto");
+
 	// ---- insert_final_newline ------------------------------------------------------------------
 
 	[Test]

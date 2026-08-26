@@ -113,6 +113,27 @@ reading source: the key is the file's content, so every file is still read, just
 {{product}} has no ambient cache under a user profile directory. The caller names the path or there is no
 cache — one nobody named is one nobody can find, clear, or reason about.
 
+## Cross-platform line endings
+
+Leave `end_of_line` unset. Its default, `auto`, resolves to `Environment.NewLine` on whatever platform
+is running {{product}} — the same default Roslyn itself falls back to when `end_of_line` is unset, so
+this is what keeps {{product}} agreeing with the IDE out of the box.
+
+That matters on a CI matrix with no `.gitattributes`: `git core.autocrlf` defaults to `true` on Windows
+and `input`/`false` elsewhere, so a Windows checkout expands committed LF line endings to CRLF before
+{{product}} ever runs, while a Linux or macOS checkout leaves them as LF. With `end_of_line` unset,
+{{product}}'s own output tracks that same split automatically — CRLF on the Windows runner, LF
+everywhere else — so `curb check` agrees with what git already put on disk on every platform, with no
+`.editorconfig` entry at all.
+
+Setting `end_of_line` explicitly fights that. Forcing `lf` (or `crlf`) only matches an `autocrlf`-expanded
+checkout by coincidence, and once it doesn't, `check` fails permanently on the platform where it
+disagrees — there is no source-preserving fallback once a value is named. If a repository genuinely
+needs one line ending on disk regardless of platform, that is a job for `.gitattributes`
+(`* text eol=lf`), which controls what git itself checks out before {{product}} runs. Once that pins the
+checked-out bytes, pairing it with the matching explicit `end_of_line` in `.editorconfig` is safe — the
+two agree instead of fighting.
+
 ## Making it faster
 
 The package bundles a framework-dependent build of the CLI rather than five native binaries, because
