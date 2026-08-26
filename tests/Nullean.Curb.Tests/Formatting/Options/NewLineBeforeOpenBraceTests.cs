@@ -430,6 +430,7 @@ public class NewLineBeforeOpenBraceTests : FormattingTest
 		        void Inner()
 		        {
 		        }
+
 		        Action<int> a = x => {
 		        };
 		    }

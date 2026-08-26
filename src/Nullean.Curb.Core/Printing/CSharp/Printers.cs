@@ -2291,20 +2291,33 @@ internal static partial class Printers
 	{
 		var options = context.Options;
 
-		// RendersOnOneLine only means something for a block statement — whether its header and body
-		// collapsed onto one line together. A control-transfer statement like `return;` is inherently
-		// one line on its own, always; asking the same question of it would trivially answer true for
-		// every one and silence the option entirely, which is what an earlier version of this method
-		// did before BlankLineOptionTests' own explicit-value case caught it.
+		// RendersOnOneLine only means something for a block statement or a local function — whether the
+		// construct's header and body collapsed onto one line together. A control-transfer statement
+		// like `return;` is inherently one line on its own, always; asking the same question of it
+		// would trivially answer true for every one and silence the option entirely, which is what an
+		// earlier version of this method did before BlankLineOptionTests' own explicit-value case
+		// caught it.
+		//
+		// A local function answers to its own key rather than the block-statement one — it is a
+		// declaration embedded in a statement position, not a control-flow construct, and jb gives it
+		// the same both-sides treatment a member gets rather than Block's asymmetric before/after
+		// pair. HasBlockBody's default case (true) covers it the same way it already covers switch/try:
+		// a local function's own body is always a `{ }` block, so PreserveSingleLineBlocks — not just
+		// PreserveSingleLineStatements — has to be on too for one collapsed onto its header to count as
+		// rendering on one line. One rule covering both directions, so two adjacent local functions
+		// still take the larger of "after the first" and "before the second" rather than stacking two
+		// forced gaps.
 		var after = previous switch
 		{
 			null => 0,
+			LocalFunctionStatementSyntax => RendersOnOneLine(previous, context) ? 0 : options.BlankLinesAroundLocalMethod,
 			_ when IsBlockStatement(previous) => RendersOnOneLine(previous, context) ? 0 : options.BlankLinesAfterBlockStatements,
 			_ when IsControlTransferStatement(previous) => options.BlankLinesAfterControlTransferStatements,
 			_ => 0,
 		};
 		var before = next switch
 		{
+			LocalFunctionStatementSyntax => RendersOnOneLine(next, context) ? 0 : options.BlankLinesAroundLocalMethod,
 			_ when IsBlockStatement(next) => RendersOnOneLine(next, context) ? 0 : options.BlankLinesBeforeBlockStatements,
 			_ when IsControlTransferStatement(next) => options.BlankLinesBeforeControlTransferStatements,
 			_ => 0,
