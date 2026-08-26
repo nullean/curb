@@ -605,6 +605,20 @@ internal static partial class Printers
 			return;
 		}
 
+		// An expression body that itself ends with a block-bodied callback — `builder =>
+		// builder.Add(x => { … })` — already positions its own contents once that block opens.
+		// Wrapping it in a breakable group as well would let the block's hardline propagate outward
+		// and break the group unconditionally, pushing the whole expression to its own indented line
+		// for no reason: the block was always going to supply the next line. EndsWithBlockBodiedCallback
+		// rather than EndsWithOwnBlock: a `with` or object initializer at the tail can still print
+		// flat, and without this group it would lose the only break a long chain ahead of it has.
+		if (expression is not null && EndsWithBlockBodiedCallback(expression))
+		{
+			arena.Synthetic(SyntheticText.Space);
+			Node.Print(expression, context);
+			return;
+		}
+
 		using (arena.Group())
 		using (arena.Indent())
 		{
