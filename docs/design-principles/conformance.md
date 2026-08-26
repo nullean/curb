@@ -92,13 +92,22 @@ just the same count. Many separate project/compilation contexts, not `jb`'s clea
 certainly the source of both problems.
 
 What still blocks gating is scale, not reliability. `dotnet format whitespace` disagrees with Curb on 5 of
-842 cases, each root-caused to a real, documented incompatibility. `jb` disagrees on roughly 307 of 842 —
+842 cases, each root-caused to a real, documented incompatibility. `jb` started at roughly 307 of 842 —
 `dotnet format` mostly declines to decide and so rarely fights Curb's choices, where `jb` is a full
-opinionated formatter with its own stance on almost everything (a brace Curb keeps around a single embedded
-statement is one observed example). Gating "every non-fixed-point named individually" the way
-`verifyExpectations` does would mean triaging roughly 307 cases into registry entries in one sitting — the
-same reason the whitespace side's `X != Z` shape-divergence check is reported in aggregate rather than
-itemised. The likely fix is the same one used there: find the handful of root causes behind the 307 cases
-(the empty-block-collapse default was one; there are probably a handful more) and gate on those being
-documented, the way the whitespace side gates on 5 categories rather than hundreds of cases. That
-categorisation is future work.
+opinionated formatter with its own stance on almost everything. Gating "every non-fixed-point named
+individually" the way `verifyExpectations` does would mean triaging hundreds of cases into registry entries
+in one sitting — the same reason the whitespace side's `X != Z` shape-divergence check is reported in
+aggregate rather than itemised. The fix is the one used there: find the root causes behind the disagreeing
+cases and gate on those being documented, the way the whitespace side gates on 5 categories rather than
+hundreds of cases.
+
+That categorisation is under way, not finished. Five root causes found and fixed so far, each an injected
+`.editorconfig` key `verifyExpectationsJb` adds into a case's own section when its shape needs it (or, for
+two of the five, unconditionally — see the code comments in `Targets.fs` for which and why):
+`csharp_empty_block_style` (both spellings), `csharp_style_namespace_declarations`, `csharp_prefer_braces`,
+and `dotnet_style_require_accessibility_modifiers`. That took the count from 307 to roughly 235. What is
+left splits into several more distinct categories — expression-body direction per construct (the same shape
+of fix as the four already done, across seven `csharp_style_expression_bodied_*` keys instead of one),
+trailing-comma removal, redundant-parentheses-around-operators and qualified-name-shortening (semantic style
+preferences Curb never applies), query-clause continuation indentation, and chain/binary-operator
+continuation position — each its own investigation the size of the four already landed.

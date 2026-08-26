@@ -1224,20 +1224,46 @@ and private verifyExpectationsJb (arguments:ParseResults<Arguments>) =
     // cases reuse `namespace N; class Widget` — deliberately minimal, readable boilerplate that was
     // never meant to be unique across the whole suite. A namespace rename rather than a class rename:
     // the namespace name essentially never reappears in a snippet's body the way a type name might
-    // (constructors, casts, ...), so it is the smaller, safer edit. Cases with no namespace at all get
-    // one inserted after any leading usings — a new file-scoped namespace, not a wrapping block one,
-    // specifically so nothing already in the file needs reindenting under it.
+    // (constructors, casts, ...), so it is the smaller, safer edit.
     let namespaceDecl = Text.RegularExpressions.Regex(@"namespace\s+([\w.]+)(\s*;|\s*\r?\n[ \t]*\{)")
     let leadingUsings = Text.RegularExpressions.Regex(@"\A(\s*using[^\n]*\n)*")
+    let typeDecl = Text.RegularExpressions.Regex(@"\b(class|struct|interface|enum|record)\s+\w")
 
+    // A case with no type declaration at all — an EdgeCaseTests/NamespaceAndUsingTests case testing
+    // using-directive behaviour in isolation, most of them — has nothing that could collide with another
+    // case either, so it is left alone rather than given a synthetic namespace. Found by measuring: an
+    // inserted namespace turned out to change where jb wanted a blank line or how it ordered the
+    // directives relative to it, a disagreement caused entirely by this harness's own insertion and not
+    // by anything the case is testing.
+    //
+    // A case with no type declaration but real statement content is a top-level-statements file (or a
+    // file-based program's #: directives plus statements) — excluded from the shared project entirely,
+    // not just left unrewritten: only one file per compilation may have top-level statements, so a
+    // second such case would be a compile error regardless of namespace handling.
+    let hasTopLevelStatements (source: string) =
+        if typeDecl.IsMatch source then
+            false
+        else
+            source.Split('\n')
+            |> Array.exists (fun l ->
+                let t = l.TrimStart()
+                t.Length > 0
+                && not (t.StartsWith "using ")
+                && not (t.StartsWith "global using")
+                && not (t.StartsWith "#:"))
+
+    // A new file-scoped namespace rather than a wrapping block one, specifically so nothing already in
+    // the file needs reindenting under it.
     let rewriteNamespace (d: string) (source: string) =
         let ns = caseNamespace d
         let m = namespaceDecl.Match source
         if m.Success then
             source.Substring(0, m.Index) + "namespace " + ns + m.Groups[2].Value + source.Substring(m.Index + m.Length)
-        else
+        elif typeDecl.IsMatch source then
             let lead = leadingUsings.Match(source).Length
             source.Substring(0, lead) + sprintf "namespace %s;\n\n" ns + source.Substring(lead)
+        else
+            source
 
     // The settings lines out of a case's own dumped .editorconfig ("root = true\n[*.cs]\n<settings>"),
     // with every "[...]" header line dropped rather than just the first — some cases pass editorConfig
@@ -1250,6 +1276,13 @@ and private verifyExpectationsJb (arguments:ParseResults<Arguments>) =
             let t = l.Trim()
             t.Length > 0 && not (t.StartsWith("[")) && t <> "root = true")
 
+    let excluded, cases = cases |> Array.partition (fun d -> hasTopLevelStatements (read "Expected.cs" d))
+    if excluded.Length > 0 then
+        printfn "excluding %d top-level-statement case(s) from the shared project (not checked against jb):" excluded.Length
+        for d in excluded do
+            let path = Path.Combine(d, "TestCase.txt")
+            printfn "  %s" (if File.Exists path then (File.ReadAllText path).Trim() else caseId d)
+
     let project = Path.Combine(dump, "project")
     Directory.CreateDirectory project |> ignore
 
@@ -1261,24 +1294,74 @@ and private verifyExpectationsJb (arguments:ParseResults<Arguments>) =
             d, rewritten)
         |> Map.ofArray
 
-    // Curb collapses an empty block to `{ }` under deterministic/reflow layout unconditionally — it is
-    // not governed by csharp_empty_block_style, which stays a no-op until a repository sets it (see
-    // OptionCatalog's remarks). jb has no unconditional default of its own: it only collapses an empty
-    // block when csharp_empty_block_style names together/together_same_line explicitly, even with
-    // csharp_preserve_single_line_blocks = true set (measured directly).
-    //
-    // Only added when Z (before.[d]) actually contains a collapsed `{ }` or `{}` — not for every case
-    // that merely fails to mention the key. An earlier version added it unconditionally, on the theory
-    // that it is harmless when nothing empty is present; measured wrong, on a case with no width and no
-    // deterministic layout at all: Curb correctly leaves an already-multi-line empty block alone there
-    // (this is a preservation-mode Unchanged case), and the blanket key told jb to collapse it anyway —
-    // a disagreement caused by this harness asking for something Curb never chose, not a real one.
+    // A block-scoped namespace, similarly. csharp_style_namespace_declarations defaults to "(as
+    // written)" in Curb — it converts nothing unless asked — but jb's own default prefers file-scoped
+    // and converts a block-scoped namespace on sight, even with nothing else about the case in play
+    // (found in NamespaceAndUsingTests' block-namespace cases). Conditional on before.[d] actually
+    // having a block-scoped namespace for the same reason as the empty-block key: a case whose
+    // namespace was already file-scoped needs no help agreeing, and forcing block_scoped on it would
+    // manufacture a new disagreement in the other direction.
+    let blockScopedNamespace = Text.RegularExpressions.Regex(@"namespace\s+[\w.]+\s*\r?\n[ \t]*\{")
+
+    // Distinguishes empty-block-style's two collapsed spellings: "together" keeps the pair on its own
+    // line (`)\n{ }`), "together_same_line" joins it to whatever precedes it (`Empty() { }`) — a single
+    // non-whitespace character with at most one space between it and `{` means the same line; anything
+    // else (a newline in between) means its own line.
+    let emptyBlockJoinsPrecedingLine = Text.RegularExpressions.Regex(@"[^\s\r\n]\s?\{\s?\}")
+
     let caseSection (d: string) =
         let settings = caseSettings d
-        let hasCollapsedEmptyBlock = before.[d].Contains "{ }" || before.[d].Contains "{}"
-        let extra =
-            if not hasCollapsedEmptyBlock || settings |> Array.exists (fun l -> l.Contains "csharp_empty_block_style")
-            then [||] else [| "csharp_empty_block_style = together" |]
+        let z = before.[d]
+
+        // Curb collapses an empty block to `{ }` under deterministic/reflow layout unconditionally — it
+        // is not governed by csharp_empty_block_style, which stays a no-op until a repository sets it
+        // (see OptionCatalog's remarks). jb has no unconditional default of its own: it only collapses
+        // an empty block when csharp_empty_block_style names together/together_same_line explicitly,
+        // even with csharp_preserve_single_line_blocks = true set (measured directly).
+        //
+        // Only added when Z actually contains a collapsed `{ }` or `{}` — not for every case that
+        // merely fails to mention the key. An earlier version added it unconditionally, on the theory
+        // that it is harmless when nothing empty is present; measured wrong, on a case with no width
+        // and no deterministic layout at all: Curb correctly leaves an already-multi-line empty block
+        // alone there (a preservation-mode Unchanged case), and the blanket key told jb to collapse it
+        // anyway — a disagreement caused by this harness asking for something Curb never chose.
+        let emptyBlock =
+            if (z.Contains "{ }" || z.Contains "{}")
+               && not (settings |> Array.exists (fun l -> l.Contains "csharp_empty_block_style"))
+            then
+                let spelling = if emptyBlockJoinsPrecedingLine.IsMatch z then "together_same_line" else "together"
+                [| sprintf "csharp_empty_block_style = %s" spelling |]
+            else [||]
+
+        let blockNamespace =
+            if blockScopedNamespace.IsMatch z
+               && not (settings |> Array.exists (fun l -> l.Contains "csharp_style_namespace_declarations"))
+            then [| "csharp_style_namespace_declarations = block_scoped" |] else [||]
+
+        // Curb only ever adds braces around an unbraced control-flow body, never removes existing ones
+        // — PreferBracesTests documents why: Roslyn would take them off, but a declaration inside the
+        // block stops being scoped to it, a change in meaning rather than layout, so Curb refuses even
+        // with csharp_prefer_braces = false. jb defaults to stripping braces around a single embedded
+        // statement, aggressively — it did so through four levels of nested if-statements in one case.
+        // Unlike the two keys above, unconditional rather than detected: telling jb to always require
+        // braces can never conflict with anything Curb produces, since Curb never removes one either.
+        let preferBraces =
+            if settings |> Array.exists (fun l -> l.Contains "csharp_prefer_braces")
+            then [||] else [| "csharp_prefer_braces = true" |]
+
+        // dotnet_style_require_accessibility_modifiers is dotnet_style_*, one of the "not formatting —
+        // dotnet format style's territory" keys OptionCatalog.IsOtherCodeStyleKey names: curb format
+        // never adds or removes an accessibility modifier, that is IDE0040 and curb cleanup's job. jb
+        // defaults to adding an implicit `private` to every member missing one — measured across a
+        // large share of cases, since almost none of them bother writing it on a test-only method.
+        // never (confirmed not to touch a modifier a case already wrote explicitly, only ones it would
+        // otherwise add) says the same thing curb format already means by never touching this at all,
+        // so it is unconditional like csharp_prefer_braces — nothing to detect per case.
+        let requireAccessibility =
+            if settings |> Array.exists (fun l -> l.Contains "dotnet_style_require_accessibility_modifiers")
+            then [||] else [| "dotnet_style_require_accessibility_modifiers = never" |]
+
+        let extra = Array.concat [ emptyBlock; blockNamespace; preferBraces; requireAccessibility ]
         sprintf "[%s]\n%s" (caseFile d) (Array.append settings extra |> String.concat "\n")
 
     File.WriteAllText(
@@ -1338,18 +1421,29 @@ and private verifyExpectationsJb (arguments:ParseResults<Arguments>) =
     printfn "%d of %d expectations are a fixed point of jb cleanupcode" (cases.Length - notFixedPoint.Length) cases.Length
 
     // Still reported rather than gated with gateOnNonFixedPoints, but for a different reason now: the
-    // non-determinism this single-project rewrite set out to test is fixed — two runs against this same
-    // dump landed on the exact same 307-case set, name for name, not just the same count (the old
+    // non-determinism this single-project rewrite set out to test is fixed — repeat runs against the
+    // same dump land on the same case set, name for name, not just the same count (the old
     // one-project-per-case shape moved between 330, 377 and 404 with no code change). What blocks gating
-    // now is scale: dotnet format whitespace disagrees with Curb on 5 of 842 cases, all root-caused to a
-    // handful of real, documentable incompatibilities. jb disagrees on ~307 of 842 — dotnet format mostly
-    // declines to decide and so rarely fights Curb's choices, where jb is a full opinionated formatter
-    // with its own stance on almost everything (a brace Curb keeps around a single embedded statement is
-    // one observed example). Gating "every non-fixed-point named individually" the way verifyExpectations
-    // does would mean triaging ~307 cases into registry entries in one sitting, which was rejected for
-    // exactly this reason on the whitespace side's X != Z check — the fix there was categorising root
-    // causes rather than cases; the same is likely true here, but doing that triage is future work, not
-    // this one.
+    // now is scale, and it is shrinking by category rather than by case: started at 307 of 842 (the
+    // count the determinism check above was measured against), now ~235 after five categorised root
+    // causes were found and fixed by injecting a key into every case whose shape needs it — the same
+    // move whitespace's own X != Z check made, categorising causes rather than triaging cases one at a
+    // time. Landed so far: csharp_empty_block_style (both spellings — jb only collapses an empty block
+    // when told to, and needs together vs together_same_line to match which line it is on),
+    // csharp_style_namespace_declarations (jb defaults to file-scoped, converting a block-scoped
+    // namespace on sight), csharp_prefer_braces (jb strips braces around a single embedded statement by
+    // default; safe to force on unconditionally since Curb never removes an existing brace either — see
+    // PreferBracesTests), and dotnet_style_require_accessibility_modifiers (jb adds an implicit
+    // `private` to bare members by default; curb format never touches this dimension at all, so `never`
+    // is unconditionally safe too — see OptionCatalog.IsOtherCodeStyleKey). What is left splits into
+    // several more real, distinct categories rather than one: expression-body direction disagrees per
+    // construct (jb expands an already-expression-bodied method back to a block, but collapses an
+    // already-block accessor/indexer to an expression body — the opposite direction, needing per-case
+    // shape detection across seven csharp_style_expression_bodied_* keys the way the two keys above
+    // needed it), trailing-comma removal before a closing brace, redundant-parentheses-around-operators
+    // and qualified-name-shortening (both semantic style preferences Curb never applies), query-clause
+    // continuation indentation, and chain/binary-operator continuation position. None of these were
+    // chased down this pass — each is its own investigation the size of the four above.
     if notFixedPoint.Length > 0 then
         printfn ""
         printfn "NOT a fixed point of jb cleanupcode (reported only — see the comment on this target for why):"
