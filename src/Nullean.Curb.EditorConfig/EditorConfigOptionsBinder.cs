@@ -397,11 +397,17 @@ public static class EditorConfigOptionsBinder
 		if (TryPrefixedLines(properties, "blank_lines_around_invocable", diagnostics, out var aroundInvocable))
 			options = options with { BlankLinesAroundInvocable = aroundInvocable };
 
+		if (TryPrefixedLines(properties, "blank_lines_around_local_method", diagnostics, out var aroundLocalMethod))
+			options = options with { BlankLinesAroundLocalMethod = aroundLocalMethod };
+
 		if (TryPrefixedLines(properties, "blank_lines_around_type", diagnostics, out var aroundType))
 			options = options with { BlankLinesAroundType = aroundType };
 
 		if (TryPrefixedLines(properties, "blank_lines_around_property", diagnostics, out var aroundProperty))
 			options = options with { BlankLinesAroundProperty = aroundProperty };
+
+		if (TryPrefixedLines(properties, "blank_lines_around_accessor", diagnostics, out var aroundAccessor))
+			options = options with { BlankLinesAroundAccessor = aroundAccessor };
 
 		if (TryPrefixedLines(properties, "blank_lines_around_field", diagnostics, out var aroundField))
 			options = options with { BlankLinesAroundField = aroundField };

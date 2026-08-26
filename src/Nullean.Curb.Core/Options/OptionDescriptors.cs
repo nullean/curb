@@ -130,12 +130,14 @@ public sealed record OptionDescriptor(
 		new("csharp_place_property_attribute_on_same_line", OptionGroup.Wrapping, ["own_line", "if_owner_is_single_line"], "own_line", "Where a property's attribute section goes.", "attributed_method"),
 		new("csharp_place_event_attribute_on_same_line", OptionGroup.Wrapping, ["own_line", "if_owner_is_single_line"], "own_line", "Where an event's attribute section goes.", "attributed_method"),
 
-		// ---- BlankLines (22) ----------------------------------------------------------------
+		// ---- BlankLines (24) ----------------------------------------------------------------
 		new("csharp_keep_blank_lines_in_declarations", OptionGroup.BlankLines, ["<integer>"], "1", "Maximum consecutive blank lines between members.", "members"),
 		new("csharp_keep_blank_lines_in_code", OptionGroup.BlankLines, ["<integer>"], "1", "Maximum consecutive blank lines between statements.", "members"),
 		new("csharp_blank_lines_around_invocable", OptionGroup.BlankLines, ["<integer>"], "0", "Blank lines before and after each method or constructor. 0 means leave the author's.", "members"),
+		new("csharp_blank_lines_around_local_method", OptionGroup.BlankLines, ["<integer>"], "1", "Blank lines before and after each local function.", "members"),
 		new("csharp_blank_lines_around_type", OptionGroup.BlankLines, ["<integer>"], "1", "Blank lines before and after each type declaration.", "members"),
 		new("csharp_blank_lines_around_property", OptionGroup.BlankLines, ["<integer>"], "0", "Blank lines before and after each property, indexer or event.", "members"),
+		new("csharp_blank_lines_around_accessor", OptionGroup.BlankLines, ["<integer>"], "0", "Blank lines between two accessors of the same property, indexer or event.", "members"),
 		new("csharp_blank_lines_around_field", OptionGroup.BlankLines, ["<integer>"], "0", "Blank lines before and after each field.", "members"),
 		new("csharp_blank_lines_inside_type", OptionGroup.BlankLines, ["<integer>"], "0", "Blank lines below the opening brace and above the closing brace of a type, forced exactly rather than floored.", "members"),
 		new("csharp_blank_lines_around_namespace", OptionGroup.BlankLines, ["<integer>"], "0", "Blank lines before and after a namespace declaration.", "members"),
