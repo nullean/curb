@@ -448,6 +448,35 @@ public class BlankLineOptionTests : FormattingTest
 		""");
 
 	[Test]
+	public Task A_single_line_comment_can_be_given_air_in_front() => Formats(
+		// Defaults to zero, matching jb. `//` specifically — a doc comment or /* */ block is not what
+		// the key is documented to reach.
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        Call1();
+		        // a comment
+		        Call2();
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        Call1();
+
+		        // a comment
+		        Call2();
+		    }
+		}
+		""",
+		editorConfig: "csharp_blank_lines_before_single_line_comment = 1");
+
+	[Test]
 	public Task Namespaces_have_their_own_setting() => Formats(
 		// Two adjacent namespaces rather than a using directive above one: csharp_blank_lines_after_
 		// using_list now defaults to one of its own (see BlankLineTests), which would otherwise force

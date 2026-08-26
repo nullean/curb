@@ -1134,6 +1134,25 @@ public readonly record struct FormatOptions
 	/// </summary>
 	public int BlankLinesAfterCase { get; init; }
 
+	/// <summary>
+	/// <c>csharp_blank_lines_before_single_line_comment</c>: above a <c>//</c> comment that follows
+	/// real content, not a doc comment or <c>/* */</c> block. Zero by default, matching jb. A floor
+	/// under whatever the author wrote, capped at <see cref="KeepBlankLinesInCode"/> like the rest of
+	/// this family — not an exact count, since a comment has no closing counterpart to stack against.
+	/// </summary>
+	public int BlankLinesBeforeSingleLineComment { get; init; }
+
+	// csharp_blank_lines_after_start_comment and csharp_blank_lines_between_using_groups are not
+	// implemented. The first measured as *not* controlled by the key at all in a direct jb check — a
+	// file-leading comment got a blank line forced after it regardless of the key's value, strongly
+	// suggesting a different, undocumented mechanism is actually responsible, and guessing at one
+	// risked shipping a wrong implementation rather than an honest gap. The second is already covered
+	// in spirit: dotnet_separate_import_directive_groups (already implemented) inserts exactly the one
+	// blank line jb's own default produces between using groups; making the count itself configurable
+	// would mean threading a new option through UsingOrganiser's already-established, well-tested
+	// group-sorting logic for a need — more than one blank line between using groups — that has not
+	// come up.
+
 	// The align_multiline_* family is absent, and this is the reason rather than a note that nobody
 	// got to it. csharp_align_multiline_argument was built and measured.
 	//
