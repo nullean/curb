@@ -423,6 +423,18 @@ public static class EditorConfigOptionsBinder
 		if (TryPrefixedLines(properties, "blank_lines_after_file_scoped_namespace_directive", diagnostics, out var afterFileScoped))
 			options = options with { BlankLinesAfterFileScopedNamespace = afterFileScoped };
 
+		if (TryPrefixedLines(properties, "blank_lines_before_block_statements", diagnostics, out var beforeBlockStatements))
+			options = options with { BlankLinesBeforeBlockStatements = beforeBlockStatements };
+
+		if (TryPrefixedLines(properties, "blank_lines_after_block_statements", diagnostics, out var afterBlockStatements))
+			options = options with { BlankLinesAfterBlockStatements = afterBlockStatements };
+
+		if (TryPrefixedLines(properties, "blank_lines_before_control_transfer_statements", diagnostics, out var beforeControlTransfer))
+			options = options with { BlankLinesBeforeControlTransferStatements = beforeControlTransfer };
+
+		if (TryPrefixedLines(properties, "blank_lines_after_control_transfer_statements", diagnostics, out var afterControlTransfer))
+			options = options with { BlankLinesAfterControlTransferStatements = afterControlTransfer };
+
 		if (TryPrefixedCount(properties, "max_initializer_elements_on_line", diagnostics, out var maxElements))
 			options = options with { MaxInitializerElementsOnLine = maxElements };
 

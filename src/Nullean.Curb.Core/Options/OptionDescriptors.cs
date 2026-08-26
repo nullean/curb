@@ -130,7 +130,7 @@ public sealed record OptionDescriptor(
 		new("csharp_place_property_attribute_on_same_line", OptionGroup.Wrapping, ["own_line", "if_owner_is_single_line"], "own_line", "Where a property's attribute section goes.", "attributed_method"),
 		new("csharp_place_event_attribute_on_same_line", OptionGroup.Wrapping, ["own_line", "if_owner_is_single_line"], "own_line", "Where an event's attribute section goes.", "attributed_method"),
 
-		// ---- BlankLines (13) ----------------------------------------------------------------
+		// ---- BlankLines (17) ----------------------------------------------------------------
 		new("csharp_keep_blank_lines_in_declarations", OptionGroup.BlankLines, ["<integer>"], "1", "Maximum consecutive blank lines between members.", "members"),
 		new("csharp_keep_blank_lines_in_code", OptionGroup.BlankLines, ["<integer>"], "1", "Maximum consecutive blank lines between statements.", "members"),
 		new("csharp_blank_lines_around_invocable", OptionGroup.BlankLines, ["<integer>"], "0", "Blank lines before and after each method or constructor. 0 means leave the author's.", "members"),
@@ -144,6 +144,10 @@ public sealed record OptionDescriptor(
 		new("csharp_blank_lines_inside_region", OptionGroup.BlankLines, ["<integer>"], "1", "Blank lines below a #region and above its matching #endregion, forced exactly rather than floored.", "members"),
 		new("csharp_blank_lines_after_using_list", OptionGroup.BlankLines, ["<integer>"], "1", "Blank lines below the last using directive, forced exactly rather than floored.", "usings"),
 		new("csharp_blank_lines_after_file_scoped_namespace_directive", OptionGroup.BlankLines, ["<integer>"], "1", "Blank lines after a file-scoped namespace declaration.", "usings"),
+		new("csharp_blank_lines_before_block_statements", OptionGroup.BlankLines, ["<integer>"], "0", "Blank lines above an if/while/for/foreach/do/switch/using/lock/try statement.", "members"),
+		new("csharp_blank_lines_after_block_statements", OptionGroup.BlankLines, ["<integer>"], "1", "Blank lines below one of those statements.", "members"),
+		new("csharp_blank_lines_before_control_transfer_statements", OptionGroup.BlankLines, ["<integer>"], "0", "Blank lines above a return/throw/break/continue/goto/yield statement.", "members"),
+		new("csharp_blank_lines_after_control_transfer_statements", OptionGroup.BlankLines, ["<integer>"], "0", "Blank lines below one of those statements.", "members"),
 
 		// ---- ExpressionBodies (7) -----------------------------------------------------------
 		new("csharp_style_expression_bodied_methods", OptionGroup.ExpressionBodies, ["false", "true", "when_on_single_line"], "false", "Convert eligible block-bodied methods to expression bodies. IDE0022.", "expression_body"),
