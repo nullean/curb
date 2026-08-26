@@ -1090,6 +1090,35 @@ public readonly record struct FormatOptions
 	/// </summary>
 	public int BlankLinesInsideRegion { get; init; } = 1;
 
+	/// <summary>
+	/// <c>csharp_blank_lines_before_block_statements</c>: above an <c>if</c>/<c>while</c>/<c>for</c>/
+	/// <c>foreach</c>/<c>do</c>/<c>switch</c>/<c>using</c>/<c>lock</c>/<c>try</c> statement. Zero by
+	/// default, matching jb: unlike the gap after one, nothing about a block statement's own opening
+	/// line asks to be set off from whatever ordinary code precedes it.
+	/// </summary>
+	public int BlankLinesBeforeBlockStatements { get; init; }
+
+	/// <summary>
+	/// <c>csharp_blank_lines_after_block_statements</c>, the same after one. One by default, matching
+	/// jb: a block statement reads as a distinct unit of control flow, and separating it from whatever
+	/// follows is closer to how most C# actually gets written than leaving the two flush.
+	/// </summary>
+	public int BlankLinesAfterBlockStatements { get; init; } = 1;
+
+	/// <summary>
+	/// <c>csharp_blank_lines_before_control_transfer_statements</c>: above a <c>return</c>/
+	/// <c>throw</c>/<c>break</c>/<c>continue</c>/<c>goto</c>/<c>yield</c> statement. Zero by default,
+	/// matching jb.
+	/// </summary>
+	public int BlankLinesBeforeControlTransferStatements { get; init; }
+
+	/// <summary>
+	/// <c>csharp_blank_lines_after_control_transfer_statements</c>, the same after one. Zero by
+	/// default, matching jb — what follows a control transfer in the same block is unreachable code
+	/// more often than not, not something worth visually separating from.
+	/// </summary>
+	public int BlankLinesAfterControlTransferStatements { get; init; }
+
 	// The align_multiline_* family is absent, and this is the reason rather than a note that nobody
 	// got to it. csharp_align_multiline_argument was built and measured.
 	//

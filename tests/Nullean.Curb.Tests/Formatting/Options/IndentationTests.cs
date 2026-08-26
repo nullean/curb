@@ -394,6 +394,7 @@ public class IndentationTests : FormattingTest
 		            case 1:
 		                break;
 		            }
+
 		        if (a)
 		            {
 		            Call();

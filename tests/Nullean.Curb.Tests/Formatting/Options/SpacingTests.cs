@@ -112,21 +112,27 @@ public class SpacingTests : FormattingTest
 		        if(a)
 		        {
 		        }
+
 		        while(a)
 		        {
 		        }
+
 		        foreach(var i in items)
 		        {
 		        }
+
 		        for(var i = 0; i < 10; i++)
 		        {
 		        }
+
 		        switch(a)
 		        {
 		        }
+
 		        lock(gate)
 		        {
 		        }
+
 		        using(var s = Open())
 		        {
 		        }

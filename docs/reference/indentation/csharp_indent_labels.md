@@ -61,6 +61,7 @@ public class Widget
     {
         if (skip)
             goto end;
+
         Console.WriteLine("working");
     end:
         Console.WriteLine("done");
@@ -89,6 +90,7 @@ public class Widget
     {
         if (skip)
             goto end;
+
         Console.WriteLine("working");
     end:
         Console.WriteLine("done");
@@ -107,6 +109,7 @@ public class Widget
     {
         if (skip)
             goto end;
+
         Console.WriteLine("working");
 end:
         Console.WriteLine("done");
@@ -135,6 +138,7 @@ public class Widget
     {
         if (skip)
             goto end;
+
         Console.WriteLine("working");
     end:
         Console.WriteLine("done");
@@ -153,6 +157,7 @@ public class Widget
     {
         if (skip)
             goto end;
+
         Console.WriteLine("working");
         end:
         Console.WriteLine("done");

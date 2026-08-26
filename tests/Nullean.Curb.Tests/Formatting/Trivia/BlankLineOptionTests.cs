@@ -287,6 +287,117 @@ public class BlankLineOptionTests : FormattingTest
 		""");
 
 	[Test]
+	public Task Block_statements_can_be_given_air_in_front_too() => Formats(
+		// csharp_blank_lines_before_block_statements defaults to zero; this proves it is bound by
+		// asking for air before a plain if with nothing else demanding one.
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        Call();
+		        if (a)
+		        {
+		            Call2();
+		        }
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        Call();
+
+		        if (a)
+		        {
+		            Call2();
+		        }
+		    }
+		}
+		""",
+		editorConfig: "csharp_blank_lines_before_block_statements = 1");
+
+	[Test]
+	public Task Block_statements_have_their_own_setting() => Unchanged(
+		// The default is already one (see ExperimentalBlankLineTests' IDE2003 case), so proving the
+		// key is bound means proving it can be turned off — the same shape as Types_have_their_own_
+		// setting above.
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        if (a)
+		        {
+		            Call2();
+		        }
+		        Call3();
+		    }
+		}
+		""",
+		editorConfig: "csharp_blank_lines_after_block_statements = 0");
+
+	[Test]
+	public Task A_comment_aligned_under_a_trailing_one_is_not_pushed_apart_by_the_air_after_it() => Unchanged(
+		// csharp_blank_lines_after_block_statements defaults to one, and forced a blank line directly
+		// in front of the aligned comment before this test existed — invisible to
+		// TokenPrinter.AlignsUnderTrailingComment's own trivia walk on the run that forced it (the
+		// walk only starts counting once it begins, after the blank line already went out through a
+		// separate call), but real literal source text by the very next run, which then read the two
+		// comments as belonging to separate runs and dropped the alignment — an idempotency bug the
+		// corpus caught, not a hand-written case, since it needs a real author-aligned comment.
+		"""
+		public class C
+		{
+		    public void M(bool branch)
+		    {
+		        if (branch)
+		            Call1(); // detached
+		                     // ref file
+		        if (branch)
+		            Call2();
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Control_transfer_statements_have_their_own_setting() => Formats(
+		// Both default to zero, so proving they are bound means proving they can add air rather than
+		// take it away. Unreachable() is never actually reached — that is exactly why the "after" key
+		// defaults to zero — but the option does not know that, and correctness here is about the
+		// option being wired up, not about the code making sense.
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        Call();
+		        return;
+		        Unreachable();
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        Call();
+
+		        return;
+
+		        Unreachable();
+		    }
+		}
+		""",
+		editorConfig: """
+		csharp_blank_lines_before_control_transfer_statements = 1
+		csharp_blank_lines_after_control_transfer_statements = 1
+		""");
+
+	[Test]
 	public Task Namespaces_have_their_own_setting() => Formats(
 		// Two adjacent namespaces rather than a using directive above one: csharp_blank_lines_after_
 		// using_list now defaults to one of its own (see BlankLineTests), which would otherwise force
