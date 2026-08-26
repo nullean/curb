@@ -2245,6 +2245,11 @@ internal static partial class Printers
 			ImplicitObjectCreationExpressionSyntax { Initializer: null } implicitCreation =>
 				LastArgumentEndsWithOwnBlock(implicitCreation.ArgumentList),
 
+			// An expression-bodied lambda whose body itself ends with a block — `builder =>
+			// builder.Add(x => { … })` — hugs exactly like a block-bodied one once that block opens.
+			AnonymousFunctionExpressionSyntax { Block: null, ExpressionBody: { } body } =>
+				EndsWithOwnBlock(body),
+
 			_ => BringsOwnBlock(expression),
 		};
 

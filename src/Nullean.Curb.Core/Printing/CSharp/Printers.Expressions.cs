@@ -605,6 +605,18 @@ internal static partial class Printers
 			return;
 		}
 
+		// An expression body that itself ends with a block — `builder => builder.Add(x => { … })` —
+		// already positions its own contents once that block opens. Wrapping it in a breakable group
+		// as well would let the block's hardline propagate outward and break the group unconditionally,
+		// pushing the whole expression to its own indented line for no reason: the block was always
+		// going to supply the next line.
+		if (expression is not null && EndsWithOwnBlock(expression))
+		{
+			arena.Synthetic(SyntheticText.Space);
+			Node.Print(expression, context);
+			return;
+		}
+
 		using (arena.Group())
 		using (arena.Indent())
 		{
