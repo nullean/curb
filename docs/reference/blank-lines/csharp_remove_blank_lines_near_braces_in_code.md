@@ -36,29 +36,14 @@ namespace N;
 
 public class Widget
 {
+
     private int _x;
-
-    private string _name = "";
-
-
-    public int X
-    {
-        get { return _x; }
-        set { _x = value; }
-    }
 
     public void Run()
     {
+
         int a = 1;
-
-
-        int b = 2;
-        Console.WriteLine(a + b);
-    }
-
-    public void Stop()
-    {
-        Console.WriteLine("stop");
+        Console.WriteLine(a);
     }
 }
 ```
@@ -72,21 +57,10 @@ public class Widget
 {
     private int _x;
 
-    private string _name = "";
-
-    public int X { get { return _x; } set { _x = value; } }
-
     public void Run()
     {
         int a = 1;
-
-        int b = 2;
-        Console.WriteLine(a + b);
-    }
-
-    public void Stop()
-    {
-        Console.WriteLine("stop");
+        Console.WriteLine(a);
     }
 }
 ```
@@ -110,21 +84,10 @@ public class Widget
 {
     private int _x;
 
-    private string _name = "";
-
-    public int X { get { return _x; } set { _x = value; } }
-
     public void Run()
     {
         int a = 1;
-
-        int b = 2;
-        Console.WriteLine(a + b);
-    }
-
-    public void Stop()
-    {
-        Console.WriteLine("stop");
+        Console.WriteLine(a);
     }
 }
 ```
@@ -138,21 +101,11 @@ public class Widget
 {
     private int _x;
 
-    private string _name = "";
-
-    public int X { get { return _x; } set { _x = value; } }
-
     public void Run()
     {
+
         int a = 1;
-
-        int b = 2;
-        Console.WriteLine(a + b);
-    }
-
-    public void Stop()
-    {
-        Console.WriteLine("stop");
+        Console.WriteLine(a);
     }
 }
 ```

@@ -148,25 +148,45 @@ internal static partial class Printers
 	public static void ConditionalExpression(ConditionalExpressionSyntax node, PrintContext context)
 	{
 		var arena = context.Arena;
+		var spaced = context.Options.SpaceAroundTernaryOperator;
 		Node.Print(node.Condition, context);
 
 		using (arena.Group())
 		using (arena.Indent())
 		{
-			arena.Line();
+			// A SoftLine renders as nothing when flat and a newline when broken — the same wrap point
+			// a Line gives, minus the space a Line renders flat. Wrapping is unaffected either way;
+			// only which the flat form reads as changes.
+			if (spaced)
+				arena.Line();
+			else
+				arena.SoftLine();
 			TokenPrinter.Print(node.QuestionToken, context);
-			arena.Synthetic(SyntheticText.Space);
+			if (spaced)
+				arena.Synthetic(SyntheticText.Space);
 			Node.Print(node.WhenTrue, context);
-			arena.Line();
+			if (spaced)
+				arena.Line();
+			else
+				arena.SoftLine();
 			TokenPrinter.Print(node.ColonToken, context);
-			arena.Synthetic(SyntheticText.Space);
+			if (spaced)
+				arena.Synthetic(SyntheticText.Space);
 			Node.Print(node.WhenFalse, context);
 		}
 	}
 
+	/// <summary>Operators csharp_space_after_unary_operator does not reach even when on — measured
+	/// directly against jb: bitwise complement and prefix increment/decrement stay glued to their
+	/// operand regardless.</summary>
+	private static readonly SyntaxKind[] UnspacedPrefixOperators =
+		[SyntaxKind.TildeToken, SyntaxKind.PlusPlusToken, SyntaxKind.MinusMinusToken];
+
 	public static void PrefixUnaryExpression(PrefixUnaryExpressionSyntax node, PrintContext context)
 	{
 		TokenPrinter.Print(node.OperatorToken, context);
+		if (context.Options.SpaceAfterUnaryOperator && Array.IndexOf(UnspacedPrefixOperators, node.OperatorToken.Kind()) < 0)
+			context.Arena.Synthetic(SyntheticText.Space);
 		Node.Print(node.Operand, context);
 	}
 
