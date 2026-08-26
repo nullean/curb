@@ -180,7 +180,31 @@ internal static class TokenPrinter
 						pendingNewLines = 0;
 					}
 					else
-						FlushBlankLine(arena, ref pendingNewLines, emittedAnything);
+					{
+						// csharp_blank_lines_before_single_line_comment is a floor under whatever the
+						// author wrote, the same shape as Block's before_block_statements — not an
+						// exact force, so it only ever raises pendingNewLines to what FlushBlankLine's
+						// own at-most-one check already reads (2 EndOfLineTrivia = one blank line), not
+						// past it. `//` specifically, matching the key's own name: a `/* */` or doc
+						// comment is not what it is documented to reach.
+						//
+						// Reads context.PreviousToken rather than emittedAnything, the same fix (and for
+						// the same reason) as the region force above: "Call1();\n// a comment" prints
+						// Call1() through the statement printer, so this comment is the very first thing
+						// in *this* PrintLeadingTrivia call, where emittedAnything starts false
+						// regardless of the real content immediately before it.
+						var commentHasRealPredecessor = context.PreviousToken.RawKind != 0
+							&& !context.PreviousToken.IsKind(SyntaxKind.OpenBraceToken);
+						if (trivia.IsKind(SyntaxKind.SingleLineCommentTrivia)
+							&& commentHasRealPredecessor
+							&& context.Options.BlankLinesBeforeSingleLineComment > 0)
+						{
+							pendingNewLines = Math.Max(pendingNewLines, 2);
+							FlushBlankLine(arena, ref pendingNewLines, emittedAnything: true);
+						}
+						else
+							FlushBlankLine(arena, ref pendingNewLines, emittedAnything);
+					}
 
 					// dotnet format aligns a comment sitting directly under a trailing comment to
 					// that comment's column, and normalises every other comment to the statement

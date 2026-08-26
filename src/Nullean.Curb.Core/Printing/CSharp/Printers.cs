@@ -155,6 +155,25 @@ internal static partial class Printers
 	}
 
 	/// <summary>
+	/// True when a token's first leading trivia is a <c>//</c> comment. Used the same way as
+	/// <see cref="NextStartsWithRegionBoundary"/>: a caller about to compute its own blank-line count
+	/// ahead of a statement steps aside when csharp_blank_lines_before_single_line_comment is set and
+	/// this is what it is about to hand off to, so TokenPrinter.PrintLeadingTrivia's own force for it
+	/// does not stack with a separate floor already applied here.
+	/// </summary>
+	private static bool NextStartsWithSingleLineComment(SyntaxToken token)
+	{
+		foreach (var trivia in token.LeadingTrivia)
+		{
+			if (trivia.Kind() is SyntaxKind.WhitespaceTrivia or SyntaxKind.EndOfLineTrivia)
+				continue;
+			return trivia.IsKind(SyntaxKind.SingleLineCommentTrivia);
+		}
+
+		return false;
+	}
+
+	/// <summary>
 	/// Emits a using block, sorted if the file's <c>.editorconfig</c> asked for it.
 	/// </summary>
 	/// <remarks>
@@ -759,8 +778,13 @@ internal static partial class Printers
 				// EffectiveStart(statement) measures to a #region/#endregion sitting in front of it,
 				// so this would otherwise run its own at-most-one blank line ahead of
 				// TokenPrinter.PrintLeadingTrivia's exact-count force, reached moments later inside
-				// Node.Print(statement, context).
-				if (!NextStartsWithRegionBoundary(statement.GetFirstToken(includeZeroWidth: true)))
+				// Node.Print(statement, context). Also skipped, for the identical reason, when it
+				// starts with a `//` comment and csharp_blank_lines_before_single_line_comment is
+				// set — this floor (up to keep_blank_lines_in_code) would otherwise run ahead of
+				// TokenPrinter's own floor for the same gap and the two would stack.
+				var statementFirstToken = statement.GetFirstToken(includeZeroWidth: true);
+				if (!NextStartsWithRegionBoundary(statementFirstToken)
+					&& !(context.Options.BlankLinesBeforeSingleLineComment > 0 && NextStartsWithSingleLineComment(statementFirstToken)))
 				{
 					context.BlankLines(context.CodeSeparation(previousEnd, start,
 						StatementSeparationMinimum(previousStatement, statement, context)));
