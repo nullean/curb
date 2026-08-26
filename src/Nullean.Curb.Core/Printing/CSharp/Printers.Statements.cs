@@ -574,21 +574,46 @@ internal static partial class Printers
 		var arena = context.Arena;
 		TokenPrinter.Print(node.OpenBraceToken, context);
 
+		// The gap before a section's first label (csharp_blank_lines_before_case) and the gap after
+		// its labels, before its first statement (csharp_blank_lines_after_case) are two independent
+		// positions, not two rules over the same gap the way Block's before/after_block_statements
+		// are — a section's content and its own label never overlap the way one statement's "after"
+		// and the next one's "before" can, so there is no minimum to take the larger of here.
+		//
+		// csharp_blank_lines_around_block_case_section and _around_multiline_case_section are not
+		// implemented — ReSharper's own two further refinements over before/after_case, applying only
+		// when a section's own body is a `{ }` block or spans more than one statement respectively.
+		// Both default to zero (measured directly against jb, same as before/after_case), so nothing
+		// here is a default-behaviour gap; picked up only if a real need for the finer distinction
+		// shows up, not spun up speculatively.
+		var previousSectionEnd = node.OpenBraceToken.Span.End;
+		var firstSection = true;
 		foreach (var section in node.Sections)
 		{
 			using (arena.Indent(context.Options.IndentSwitchLabels ? 1 : 0))
 			{
 				var labelEnd = 0;
+				var firstLabel = true;
 				foreach (var label in section.Labels)
 				{
-					arena.HardLine();
+					if (firstLabel && !firstSection)
+					{
+						arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
+						context.BlankLines(context.CodeSeparation(
+							previousSectionEnd, EffectiveStart(label), context.Options.BlankLinesBeforeCase));
+					}
+					else
+						arena.HardLine();
+
 					Node.Print(label, context);
 					labelEnd = label.Span.End;
+					firstLabel = false;
 				}
 
 				// A braced body answers to csharp_indent_case_contents_when_block and everything else
 				// to csharp_indent_case_contents, so the two are decided per statement rather than
 				// once for the section — a section may hold both.
+				var firstStatement = true;
 				foreach (var statement in section.Statements)
 				{
 					// `case 1: break;` — a statement on its label's line stays there.
@@ -599,6 +624,7 @@ internal static partial class Printers
 						using (arena.ForceFlat())
 							Node.Print(statement, context);
 						labelEnd = statement.Span.End;
+						firstStatement = false;
 						continue;
 					}
 
@@ -614,13 +640,20 @@ internal static partial class Printers
 						// section dropped every blank line between its statements — and dropping one
 						// between a trailing comment and the comment below it then let the
 						// align-under-a-trailing-comment rule fire on the *next* run, which is how
-						// most of roslyn's remaining unsettled files began.
-						context.BlankLines(context.CodeSeparation(labelEnd, EffectiveStart(statement)));
+						// most of roslyn's remaining unsettled files began. csharp_blank_lines_after_
+						// case only reaches the first statement in the section — the label-to-content
+						// gap, not statement-to-statement within it.
+						var minimum = firstStatement ? context.Options.BlankLinesAfterCase : 0;
+						context.BlankLines(context.CodeSeparation(labelEnd, EffectiveStart(statement), minimum));
 						Node.Print(statement, context);
 					}
 
 					labelEnd = statement.Span.End;
+					firstStatement = false;
 				}
+
+				previousSectionEnd = labelEnd;
+				firstSection = false;
 			}
 		}
 

@@ -435,6 +435,12 @@ public static class EditorConfigOptionsBinder
 		if (TryPrefixedLines(properties, "blank_lines_after_control_transfer_statements", diagnostics, out var afterControlTransfer))
 			options = options with { BlankLinesAfterControlTransferStatements = afterControlTransfer };
 
+		if (TryPrefixedLines(properties, "blank_lines_before_case", diagnostics, out var beforeCase))
+			options = options with { BlankLinesBeforeCase = beforeCase };
+
+		if (TryPrefixedLines(properties, "blank_lines_after_case", diagnostics, out var afterCase))
+			options = options with { BlankLinesAfterCase = afterCase };
+
 		if (TryPrefixedCount(properties, "max_initializer_elements_on_line", diagnostics, out var maxElements))
 			options = options with { MaxInitializerElementsOnLine = maxElements };
 

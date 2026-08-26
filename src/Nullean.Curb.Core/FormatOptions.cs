@@ -1116,6 +1116,21 @@ public readonly record struct FormatOptions
 	/// </summary>
 	public int BlankLinesAfterControlTransferStatements { get; init; }
 
+	/// <summary>
+	/// <c>csharp_blank_lines_before_case</c>: above a <c>switch</c> section's first label — the gap
+	/// between two sections, not between stacked labels of the same section. Zero by default,
+	/// matching jb.
+	/// </summary>
+	public int BlankLinesBeforeCase { get; init; }
+
+	/// <summary>
+	/// <c>csharp_blank_lines_after_case</c>: below a section's labels, above its first statement. Zero
+	/// by default, matching jb; only reaches the label-to-content gap, not statement-to-statement
+	/// separation within the section, which stays ordinary <see cref="KeepBlankLinesInCode"/>
+	/// preservation.
+	/// </summary>
+	public int BlankLinesAfterCase { get; init; }
+
 	// The align_multiline_* family is absent, and this is the reason rather than a note that nobody
 	// got to it. csharp_align_multiline_argument was built and measured.
 	//
