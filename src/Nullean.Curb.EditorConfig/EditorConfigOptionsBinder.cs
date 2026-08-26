@@ -444,6 +444,12 @@ public static class EditorConfigOptionsBinder
 		if (TryPrefixedLines(properties, "blank_lines_before_single_line_comment", diagnostics, out var beforeSingleLineComment))
 			options = options with { BlankLinesBeforeSingleLineComment = beforeSingleLineComment };
 
+		if (TryBool(properties, "csharp_remove_blank_lines_near_braces_in_declarations", diagnostics, out var removeNearBracesDeclarations))
+			options = options with { RemoveBlankLinesNearBracesInDeclarations = removeNearBracesDeclarations };
+
+		if (TryBool(properties, "csharp_remove_blank_lines_near_braces_in_code", diagnostics, out var removeNearBracesCode))
+			options = options with { RemoveBlankLinesNearBracesInCode = removeNearBracesCode };
+
 		if (TryPrefixedCount(properties, "max_initializer_elements_on_line", diagnostics, out var maxElements))
 			options = options with { MaxInitializerElementsOnLine = maxElements };
 

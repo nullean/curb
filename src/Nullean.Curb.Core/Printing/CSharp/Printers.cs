@@ -442,8 +442,15 @@ internal static partial class Printers
 				var memberStartsWithRegion = !first && NextStartsWithRegionBoundary(member.GetFirstToken(includeZeroWidth: true));
 				if (!memberStartsWithRegion)
 				{
+					// csharp_remove_blank_lines_near_braces_in_declarations gates whether the first
+					// member's gap is forced exactly (the default) or falls back to the same floor-and-
+					// cap preservation every later member already uses, with BlankLinesInsideType as the
+					// floor instead of an exact count — the same shape the closing brace below always
+					// used, for the same reason (a region marker can legitimately sit there).
 					context.BlankLines(first
-						? context.Options.BlankLinesInsideType
+						? context.Options.RemoveBlankLinesNearBracesInDeclarations
+							? context.Options.BlankLinesInsideType
+							: context.DeclarationSeparation(previousEnd, EffectiveStart(member), context.Options.BlankLinesInsideType)
 						: context.DeclarationSeparation(previousEnd, EffectiveStart(member),
 							NextStartsWithDirective(member) ? 0 : MinimumBlankLinesFor(member, context)));
 				}
@@ -786,8 +793,16 @@ internal static partial class Printers
 				if (!NextStartsWithRegionBoundary(statementFirstToken)
 					&& !(context.Options.BlankLinesBeforeSingleLineComment > 0 && NextStartsWithSingleLineComment(statementFirstToken)))
 				{
-					context.BlankLines(context.CodeSeparation(previousEnd, start,
-						StatementSeparationMinimum(previousStatement, statement, context)));
+					// csharp_remove_blank_lines_near_braces_in_code: the very first statement's gap is
+					// forced to exactly zero by default, the same relationship BlankLinesInsideType has
+					// to a type body's first member — overriding StatementSeparationMinimum entirely
+					// rather than layering under it, since a blank line an author left directly under
+					// `{` is exactly the "accidental, not deliberate" case the option exists to strip.
+					// Later statements, and this one when the option is off, keep the ordinary floor.
+					context.BlankLines(previousStatement is null && context.Options.RemoveBlankLinesNearBracesInCode
+						? 0
+						: context.CodeSeparation(previousEnd, start,
+							StatementSeparationMinimum(previousStatement, statement, context)));
 				}
 				Node.Print(statement, context);
 				previousEnd = statement.Span.End;

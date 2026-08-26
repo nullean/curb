@@ -130,7 +130,7 @@ public sealed record OptionDescriptor(
 		new("csharp_place_property_attribute_on_same_line", OptionGroup.Wrapping, ["own_line", "if_owner_is_single_line"], "own_line", "Where a property's attribute section goes.", "attributed_method"),
 		new("csharp_place_event_attribute_on_same_line", OptionGroup.Wrapping, ["own_line", "if_owner_is_single_line"], "own_line", "Where an event's attribute section goes.", "attributed_method"),
 
-		// ---- BlankLines (20) ----------------------------------------------------------------
+		// ---- BlankLines (22) ----------------------------------------------------------------
 		new("csharp_keep_blank_lines_in_declarations", OptionGroup.BlankLines, ["<integer>"], "1", "Maximum consecutive blank lines between members.", "members"),
 		new("csharp_keep_blank_lines_in_code", OptionGroup.BlankLines, ["<integer>"], "1", "Maximum consecutive blank lines between statements.", "members"),
 		new("csharp_blank_lines_around_invocable", OptionGroup.BlankLines, ["<integer>"], "0", "Blank lines before and after each method or constructor. 0 means leave the author's.", "members"),
@@ -151,6 +151,8 @@ public sealed record OptionDescriptor(
 		new("csharp_blank_lines_before_case", OptionGroup.BlankLines, ["<integer>"], "0", "Blank lines above a switch section's first label.", "members"),
 		new("csharp_blank_lines_after_case", OptionGroup.BlankLines, ["<integer>"], "0", "Blank lines below a section's labels, above its first statement.", "members"),
 		new("csharp_blank_lines_before_single_line_comment", OptionGroup.BlankLines, ["<integer>"], "0", "Blank lines above a // comment that follows real content.", "members"),
+		new("csharp_remove_blank_lines_near_braces_in_declarations", OptionGroup.BlankLines, ["true", "false"], "true", "Force no blank line directly under a type/namespace's opening brace or above its closing one.", "members"),
+		new("csharp_remove_blank_lines_near_braces_in_code", OptionGroup.BlankLines, ["true", "false"], "true", "The same, for a block's opening and closing braces.", "members"),
 
 		// ---- ExpressionBodies (7) -----------------------------------------------------------
 		new("csharp_style_expression_bodied_methods", OptionGroup.ExpressionBodies, ["false", "true", "when_on_single_line"], "false", "Convert eligible block-bodied methods to expression bodies. IDE0022.", "expression_body"),
