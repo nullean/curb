@@ -202,7 +202,11 @@ public class BlankLineOptionTests : FormattingTest
 		editorConfig: "csharp_blank_lines_inside_type = 1");
 
 	[Test]
-	public Task Types_have_their_own_setting() => Formats(
+	public Task Types_have_their_own_setting() => Unchanged(
+		// The default is already one, so proving the key is bound means proving it can be turned off
+		// rather than on: without the key, a bare 0-gap source gets the default's forced blank line
+		// (see A_type_can_be_given_air_under_its_opening_brace's sibling tests for that default), but
+		// with it set to 0 there is no minimum to raise the author's own (also zero) count to.
 		"""
 		public class A
 		{
@@ -211,16 +215,7 @@ public class BlankLineOptionTests : FormattingTest
 		{
 		}
 		""",
-		"""
-		public class A
-		{
-		}
-
-		public class B
-		{
-		}
-		""",
-		editorConfig: "csharp_blank_lines_around_type = 1");
+		editorConfig: "csharp_blank_lines_around_type = 0");
 
 	// csharp_blank_lines_after_using_list has no case here: it is bound into FormatOptions but
 	// MinimumBlankLinesFor (Printers.cs, ~line 2105) — the dispatch every other blank_lines_around_*
@@ -230,16 +225,23 @@ public class BlankLineOptionTests : FormattingTest
 
 	[Test]
 	public Task Namespaces_have_their_own_setting() => Formats(
+		// Two adjacent namespaces rather than a using directive above one: csharp_blank_lines_after_
+		// using_list now defaults to one of its own (see BlankLineTests), which would otherwise force
+		// the same blank line and leave this case proving nothing about the option under test.
 		"""
-		using System;
 		namespace N
+		{
+		}
+		namespace M
 		{
 		}
 		""",
 		"""
-		using System;
-
 		namespace N
+		{
+		}
+
+		namespace M
 		{
 		}
 		""",

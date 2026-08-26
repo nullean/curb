@@ -143,12 +143,15 @@ public class NewLineBeforeOpenBraceTests : FormattingTest
 		    void M() {
 		    }
 		}
+
 		public interface I
 		{
 		}
+
 		public record R
 		{
 		}
+
 		public enum E
 		{
 		    A,

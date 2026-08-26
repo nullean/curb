@@ -61,11 +61,21 @@ public class BlankLineTests : FormattingTest
 		""");
 
 	[Test]
-	public Task A_blank_line_after_an_opening_brace_is_kept() => Unchanged(
+	public Task A_blank_line_after_an_opening_brace_is_dropped() => Formats(
+		// csharp_blank_lines_inside_type defaults to zero and is forced rather than merely floored
+		// (see BlankLineOptionTests), so — unlike most of this family — the author's blank line here
+		// does not survive by default; a blank line directly under an opening brace reads as
+		// accidental rather than as deliberate spacing.
 		"""
 		public class C
 		{
 
+		    public int Value;
+		}
+		""",
+		"""
+		public class C
+		{
 		    public int Value;
 		}
 		""");

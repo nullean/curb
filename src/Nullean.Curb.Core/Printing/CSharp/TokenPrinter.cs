@@ -124,6 +124,13 @@ internal static class TokenPrinter
 		// True while emitting a run of comments that began aligned under a trailing comment.
 		var alignedRun = false;
 
+		// True immediately after a documentation comment, false again once anything else follows —
+		// used at the final flush below to keep a doc comment glued to whatever it documents. Unlike
+		// an ordinary comment, a blank line here reads as the comment having come loose from its
+		// target rather than as deliberate spacing, so this is not gated by an option the way the
+		// blank_lines_around_* family is; every formatter with an opinion on this agrees.
+		var lastWasDocComment = false;
+
 		for (var i = skip; i < leading.Count; i++)
 		{
 			var trivia = leading[i];
@@ -177,6 +184,8 @@ internal static class TokenPrinter
 					if (trailingBreak)
 						arena.HardLine();
 					emittedAnything = true;
+					lastWasDocComment = trivia.IsKind(SyntaxKind.SingleLineDocumentationCommentTrivia)
+						|| trivia.IsKind(SyntaxKind.MultiLineDocumentationCommentTrivia);
 					break;
 
 				case SyntaxKind.DisabledTextTrivia:
@@ -187,6 +196,7 @@ internal static class TokenPrinter
 					EmitVerbatimBlock(trivia, context);
 					emittedAnything = true;
 					pendingNewLines = 0;
+					lastWasDocComment = false;
 					break;
 
 				default:
@@ -213,11 +223,15 @@ internal static class TokenPrinter
 					pendingNewLines = EmitTriviaText(trivia, context, DocFlags.IsDirective);
 					arena.HardLine();
 					emittedAnything = true;
+					lastWasDocComment = false;
 					break;
 			}
 		}
 
-		// Blank lines immediately before the token itself.
+		// Blank lines immediately before the token itself — except right after a documentation
+		// comment, which never gets one: see lastWasDocComment above.
+		if (lastWasDocComment)
+			pendingNewLines = Math.Min(pendingNewLines, 1);
 		FlushBlankLine(arena, ref pendingNewLines, emittedAnything);
 	}
 

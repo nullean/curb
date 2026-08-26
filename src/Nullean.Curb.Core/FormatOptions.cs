@@ -1001,9 +1001,11 @@ public readonly record struct FormatOptions
 	//
 	// ReSharper's family, and free ground in a way almost nothing else is: `dotnet format` adds no
 	// blank line, removes none and collapses none, measured in both directions. So whatever Curb does
-	// here it may keep doing, and every one of these is a fixed point whatever it is set to.
-	//
-	// The defaults reproduce what Curb did before they existed, so nobody's repository moves.
+	// here it may keep doing, and every one of these is a fixed point whatever it is set to — but a
+	// fixed point of dotnet format is not the same claim as a good default, since dotnet format barely
+	// has an opinion here to disagree with. Most of these still reproduce what Curb did before they
+	// existed, so nobody's repository moves on adopting a version that has them; two exceptions are
+	// noted where they are, changed because the old default did not match ordinary C# convention.
 
 	/// <summary>
 	/// <c>csharp_keep_blank_lines_in_declarations</c>: how many consecutive blank lines survive
@@ -1020,8 +1022,13 @@ public readonly record struct FormatOptions
 	/// </summary>
 	public int BlankLinesAroundInvocable { get; init; }
 
-	/// <summary><c>csharp_blank_lines_around_type</c>, the same for a type declaration.</summary>
-	public int BlankLinesAroundType { get; init; }
+	/// <summary>
+	/// <c>csharp_blank_lines_around_type</c>, the same for a type declaration. One by default, not
+	/// zero like its invocable/property/field siblings — visually separating adjacent type
+	/// declarations is close to universal C# convention, unlike the member-level settings, where
+	/// leaving the author's spacing alone is the more defensible default.
+	/// </summary>
+	public int BlankLinesAroundType { get; init; } = 1;
 
 	/// <summary><c>csharp_blank_lines_around_property</c>, the same for a property, indexer or event.</summary>
 	public int BlankLinesAroundProperty { get; init; }
@@ -1029,8 +1036,13 @@ public readonly record struct FormatOptions
 	/// <summary><c>csharp_blank_lines_around_field</c>, the same for a field.</summary>
 	public int BlankLinesAroundField { get; init; }
 
-	/// <summary><c>csharp_blank_lines_after_using_list</c>: below the last using directive.</summary>
-	public int BlankLinesAfterUsingList { get; init; }
+	/// <summary>
+	/// <c>csharp_blank_lines_after_using_list</c>: below the last using directive. One by default —
+	/// every <c>dotnet new</c> template separates the using block from what follows it, and forced
+	/// exactly rather than merely floored, the same shape as <see cref="BlankLinesInsideType"/> (see
+	/// <c>Printers.AfterUsingList</c>).
+	/// </summary>
+	public int BlankLinesAfterUsingList { get; init; } = 1;
 
 	/// <summary>
 	/// <c>csharp_blank_lines_inside_type</c>: below a type's opening brace and above its closing one.
@@ -1038,6 +1050,12 @@ public readonly record struct FormatOptions
 	/// <remarks>
 	/// The space the <c>around</c> settings deliberately do not touch. Asking for air around fields
 	/// should not open a gap under every <c>{</c>; this is the setting that does that on purpose.
+	/// <para>
+	/// Unlike the <c>around</c>/<c>keep_blank_lines</c> family, this one is an exact count, not a
+	/// floor layered under <see cref="KeepBlankLinesInDeclarations"/> — the same as ReSharper's own
+	/// documented behaviour for it. Zero, the default, means what it says: no blank line survives
+	/// directly under an opening brace, whatever the author wrote there.
+	/// </para>
 	/// </remarks>
 	public int BlankLinesInsideType { get; init; }
 

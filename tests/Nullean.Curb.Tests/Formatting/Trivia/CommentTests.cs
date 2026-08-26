@@ -156,9 +156,16 @@ public class CommentTests : FormattingTest
 		""");
 
 	[Test]
-	public Task Comment_at_the_end_of_a_file_without_a_blank_line() => Unchanged(
+	public Task A_missing_blank_line_after_the_using_list_is_added_even_before_a_comment() => Formats(
+		// csharp_blank_lines_after_using_list defaults to one and is forced rather than merely floored
+		// (see BlankLineTests), so this reaches a trailing comment the same as it would real code.
 		"""
 		using System;
+		// trailing thought
+		""",
+		"""
+		using System;
+
 		// trailing thought
 		""");
 

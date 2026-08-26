@@ -144,8 +144,8 @@ public class CoreOptionTests : FormattingTest
 
 	[Test]
 	public Task Trailing_whitespace_on_a_blank_line_is_removed() => FormatsExactly(
-		"public class C\n{\n    \n    public int Value;\n}\n",
-		"public class C\n{\n\n    public int Value;\n}\n");
+		"public class C\n{\n    public void M()\n    {\n        Call();\n    \n        Call();\n    }\n}\n",
+		"public class C\n{\n    public void M()\n    {\n        Call();\n\n        Call();\n    }\n}\n");
 
 	// `trim_trailing_whitespace = false` has no case here: it is bound correctly (see
 	// OptionsBindingTests) but every scenario tried — a plain line, and inside the verbatim-preserved

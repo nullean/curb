@@ -101,9 +101,9 @@ Use the filter above to search by name. Each group below links to its own index.
 - [csharp_blank_lines_around_type](blank-lines/csharp_blank_lines_around_type.md) — Blank lines before and after each type declaration.
 - [csharp_blank_lines_around_property](blank-lines/csharp_blank_lines_around_property.md) — Blank lines before and after each property, indexer or event.
 - [csharp_blank_lines_around_field](blank-lines/csharp_blank_lines_around_field.md) — Blank lines before and after each field.
-- [csharp_blank_lines_inside_type](blank-lines/csharp_blank_lines_inside_type.md) — Blank lines below the opening brace and above the closing brace of a type.
+- [csharp_blank_lines_inside_type](blank-lines/csharp_blank_lines_inside_type.md) — Blank lines below the opening brace and above the closing brace of a type, forced exactly rather than floored.
 - [csharp_blank_lines_around_namespace](blank-lines/csharp_blank_lines_around_namespace.md) — Blank lines before and after a namespace declaration.
-- [csharp_blank_lines_after_using_list](blank-lines/csharp_blank_lines_after_using_list.md) — Blank lines below the last using directive.
+- [csharp_blank_lines_after_using_list](blank-lines/csharp_blank_lines_after_using_list.md) — Blank lines below the last using directive, forced exactly rather than floored.
 - [csharp_blank_lines_after_file_scoped_namespace_directive](blank-lines/csharp_blank_lines_after_file_scoped_namespace_directive.md) — Blank lines after a file-scoped namespace declaration.
 
 ## [Expression Bodies](expression-bodies/index.md)

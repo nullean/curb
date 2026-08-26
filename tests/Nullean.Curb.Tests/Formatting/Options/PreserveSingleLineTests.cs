@@ -59,10 +59,17 @@ public class PreserveSingleLineTests : FormattingTest
 		""");
 
 	[Test]
-	public Task A_type_a_namespace_and_an_enum_can_all_be_preserved() => Unchanged(
+	public Task A_type_a_namespace_and_an_enum_can_all_be_preserved() => Formats(
 		"""
 		namespace N { }
 		public class C { }
+		public enum E { A }
+		""",
+		"""
+		namespace N { }
+
+		public class C { }
+
 		public enum E { A }
 		""");
 
@@ -209,6 +216,7 @@ public class PreserveSingleLineTests : FormattingTest
 		public class C
 		{
 		}
+
 		public enum E
 		{
 		    A

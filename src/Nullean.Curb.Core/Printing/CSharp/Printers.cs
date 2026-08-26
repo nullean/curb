@@ -41,6 +41,10 @@ internal static partial class Printers
 		var moveInside = MovesUsingsInside(node, context);
 		if (!moveInside)
 			PrintUsings(node, node.Usings, context, ref previousEnd);
+		var nextAfterUsings = node.AttributeLists.Count > 0 ? NextStartsWithDirective(node.AttributeLists[0])
+			: node.Members.Count > 0 ? NextStartsWithDirective(node.Members[0])
+			: NextStartsWithDirective(node.EndOfFileToken);
+		AfterUsingList(context, ref previousEnd, !moveInside && node.Usings.Count > 0, nextAfterUsings);
 
 		foreach (var attributeList in node.AttributeLists)
 		{
@@ -75,6 +79,57 @@ internal static partial class Printers
 		}
 
 		TokenPrinter.PrintIfPresent(node.EndOfFileToken, context);
+	}
+
+	/// <summary>
+	/// Blank lines below the last using directive of a container, forced to an exact count rather than
+	/// merely floored — same shape as <c>csharp_blank_lines_inside_type</c> (see <c>PrintTypeBody</c>)
+	/// and the existing <c>csharp_blank_lines_after_file_scoped_namespace_directive</c> precedent just
+	/// above <see cref="FileScopedNamespace"/>.
+	/// </summary>
+	/// <remarks>
+	/// Called once per container, after every <see cref="PrintUsings"/> call for it has returned — a
+	/// container can print two batches (usings moved in from the compilation unit, then its own), and
+	/// only the second call's caller knows the whole using block is finished. <paramref name="hadUsings"/>
+	/// covers both batches so the gap is forced exactly once when either contributed a directive.
+	/// <paramref name="previousEnd"/> resets to the same negative sentinel <see cref="Separate"/> and
+	/// <see cref="PrintContext.BlankLinesBetween"/> already treat as "nothing precedes this", so the
+	/// immediately following separator adds nothing on top.
+	/// <para>
+	/// Skipped when <paramref name="nextStartsWithDirective"/> — the same reasoning
+	/// <c>PrintTypeBody</c> ended up with for the closing-brace gap: a using block wrapped in its own
+	/// <c>#region</c> is common, and forcing a blank line between the last <c>using</c> and
+	/// <c>#endregion</c> regressed <c>UsingOrderTests.A_region_around_the_usings_also_stops_it</c>. The
+	/// caller computes this rather than handing over a node, because what follows a using list is not
+	/// always one — a file of nothing but conditionally-compiled usings ends at
+	/// <c>CompilationUnitSyntax.EndOfFileToken</c> instead, which is a token, not a node.
+	/// </para>
+	/// </remarks>
+	private static void AfterUsingList(PrintContext context, ref int previousEnd, bool hadUsings, bool nextStartsWithDirective = false)
+	{
+		if (!hadUsings || nextStartsWithDirective)
+			return;
+
+		context.Arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
+		context.BlankLines(context.Options.BlankLinesAfterUsingList);
+		previousEnd = -1;
+	}
+
+	/// <summary>True when the first non-trivial thing about to print is a directive, such as <c>#endregion</c>.</summary>
+	private static bool NextStartsWithDirective(SyntaxNode? next) =>
+		next is not null && NextStartsWithDirective(next.GetFirstToken(includeZeroWidth: true));
+
+	/// <summary>True when a token's own leading trivia starts with a directive, ignoring whitespace.</summary>
+	private static bool NextStartsWithDirective(SyntaxToken token)
+	{
+		foreach (var trivia in token.LeadingTrivia)
+		{
+			if (trivia.Kind() is SyntaxKind.WhitespaceTrivia or SyntaxKind.EndOfLineTrivia)
+				continue;
+			return trivia.IsDirective;
+		}
+
+		return false;
 	}
 
 	/// <summary>
@@ -241,6 +296,8 @@ internal static partial class Printers
 		// members — so every such file was refused by the content verifier rather than formatted. None
 		// of the 1,196 corpus files puts a using there, which is why it went unnoticed.
 		PrintUsings(node, node.Usings, context, ref previousEnd);
+		AfterUsingList(context, ref previousEnd, moved.Count > 0 || node.Usings.Count > 0,
+			node.Members.Count > 0 && NextStartsWithDirective(node.Members[0]));
 
 		foreach (var member in node.Members)
 		{
@@ -324,13 +381,22 @@ internal static partial class Printers
 			{
 				arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
 
-				// The minimum parts members from each other; the first one is parted from the brace
-				// above it by csharp_blank_lines_inside_type instead, so asking for air around fields
-				// does not open a gap under every `{`.
-				context.BlankLines(context.DeclarationSeparation(
-					previousEnd,
-					EffectiveStart(member),
-					first ? context.Options.BlankLinesInsideType : MinimumBlankLinesFor(member, context)));
+				// The minimum parts members from each other, raising and capping whatever the author
+				// wrote; the first one is parted from the brace above it by csharp_blank_lines_inside_type
+				// instead, which is not layered under that same cap-and-preserve treatment — it names an
+				// exact count for this one gap (both floor and ceiling), the way ReSharper's own
+				// blank_lines_inside_type is documented to work, so the default of 0 actually means zero
+				// rather than "leave up to one, whatever the author had." Only this one gap, deliberately:
+				// the symmetric-looking gap before the closing brace below stays on the ordinary floor-
+				// and-cap treatment, because what sits there is not only ever a blank line the author
+				// left in front of a trailing comment — it is just as often a `#endregion` directive,
+				// and stripping the blank line conventionally written above one regressed RegionTests.
+				// Same directive guard as Separate: a member wrapped in its own #region right after
+				// the previous one must not have a minimum forced in front of the #region marker.
+				context.BlankLines(first
+					? context.Options.BlankLinesInsideType
+					: context.DeclarationSeparation(previousEnd, EffectiveStart(member),
+						NextStartsWithDirective(member) ? 0 : MinimumBlankLinesFor(member, context)));
 				first = false;
 				PrintMember(member, context);
 				previousEnd = member.Span.End;
@@ -2266,7 +2332,14 @@ internal static partial class Printers
 		// Through the same configuration as every other separator, so a compilation unit's members —
 		// externs, usings, assembly attributes and the namespace itself — obey the caps and minimums
 		// rather than being the one place that still hard-codes a single blank line.
-		var minimum = next is MemberDeclarationSyntax member ? MinimumBlankLinesFor(member, context) : 0;
+		//
+		// Suppressed when next starts with a directive: EffectiveStart measures to a member's first
+		// comment or directive, not the member's own keyword, so a positive minimum (e.g.
+		// csharp_blank_lines_around_type's default of 1) would otherwise force a blank line between
+		// the previous item and a #region/#endregion wrapped immediately around this one — landing
+		// inside the region rather than around it. Same reasoning as AfterUsingList above.
+		var minimum = next is MemberDeclarationSyntax member && !NextStartsWithDirective(next)
+			? MinimumBlankLinesFor(member, context) : 0;
 		context.BlankLines(context.DeclarationSeparation(previousEnd, EffectiveStart(next), minimum));
 
 		previousEnd = next.Span.End;

@@ -272,6 +272,7 @@ public class SpacingTests : FormattingTest
 		public struct S:IThing
 		{
 		}
+
 		public interface I:IOther
 		{
 		}

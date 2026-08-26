@@ -134,12 +134,12 @@ public sealed record OptionDescriptor(
 		new("csharp_keep_blank_lines_in_declarations", OptionGroup.BlankLines, ["<integer>"], "1", "Maximum consecutive blank lines between members.", "members"),
 		new("csharp_keep_blank_lines_in_code", OptionGroup.BlankLines, ["<integer>"], "1", "Maximum consecutive blank lines between statements.", "members"),
 		new("csharp_blank_lines_around_invocable", OptionGroup.BlankLines, ["<integer>"], "0", "Blank lines before and after each method or constructor. 0 means leave the author's.", "members"),
-		new("csharp_blank_lines_around_type", OptionGroup.BlankLines, ["<integer>"], "0", "Blank lines before and after each type declaration.", "members"),
+		new("csharp_blank_lines_around_type", OptionGroup.BlankLines, ["<integer>"], "1", "Blank lines before and after each type declaration.", "members"),
 		new("csharp_blank_lines_around_property", OptionGroup.BlankLines, ["<integer>"], "0", "Blank lines before and after each property, indexer or event.", "members"),
 		new("csharp_blank_lines_around_field", OptionGroup.BlankLines, ["<integer>"], "0", "Blank lines before and after each field.", "members"),
-		new("csharp_blank_lines_inside_type", OptionGroup.BlankLines, ["<integer>"], "0", "Blank lines below the opening brace and above the closing brace of a type.", "members"),
+		new("csharp_blank_lines_inside_type", OptionGroup.BlankLines, ["<integer>"], "0", "Blank lines below the opening brace and above the closing brace of a type, forced exactly rather than floored.", "members"),
 		new("csharp_blank_lines_around_namespace", OptionGroup.BlankLines, ["<integer>"], "0", "Blank lines before and after a namespace declaration.", "members"),
-		new("csharp_blank_lines_after_using_list", OptionGroup.BlankLines, ["<integer>"], "0", "Blank lines below the last using directive.", "usings"),
+		new("csharp_blank_lines_after_using_list", OptionGroup.BlankLines, ["<integer>"], "1", "Blank lines below the last using directive, forced exactly rather than floored.", "usings"),
 		new("csharp_blank_lines_after_file_scoped_namespace_directive", OptionGroup.BlankLines, ["<integer>"], "1", "Blank lines after a file-scoped namespace declaration.", "usings"),
 
 		// ---- ExpressionBodies (7) -----------------------------------------------------------

@@ -341,6 +341,10 @@ internal static partial class Printers
 				PrintUsings(node, moved, context, ref previousEnd);
 
 			PrintUsings(node, node.Usings, context, ref previousEnd);
+			var nextAfterUsings = node.Members.Count > 0
+				? NextStartsWithDirective(node.Members[0])
+				: NextStartsWithDirective(node.CloseBraceToken);
+			AfterUsingList(context, ref previousEnd, moved.Count > 0 || node.Usings.Count > 0, nextAfterUsings);
 
 			// The first member is separated from the brace above it, not from a member — see the type
 			// declaration for why the minimum does not apply there.
@@ -348,8 +352,8 @@ internal static partial class Printers
 			foreach (var member in node.Members)
 			{
 				arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
-				context.BlankLines(context.DeclarationSeparation(
-					previousEnd, EffectiveStart(member), first ? 0 : MinimumBlankLinesFor(member, context)));
+				var minimum = !first && !NextStartsWithDirective(member) ? MinimumBlankLinesFor(member, context) : 0;
+				context.BlankLines(context.DeclarationSeparation(previousEnd, EffectiveStart(member), minimum));
 				first = false;
 				PrintMember(member, context);
 				previousEnd = member.Span.End;
