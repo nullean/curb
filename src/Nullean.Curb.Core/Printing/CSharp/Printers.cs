@@ -155,6 +155,33 @@ internal static partial class Printers
 	}
 
 	/// <summary>
+	/// True when a token's own leading trivia starts, ignoring whitespace, with a <c>//</c> or
+	/// <c>/* */</c> comment.
+	/// </summary>
+	/// <remarks>
+	/// Guards <see cref="Block"/>'s statement loop against forcing a minimum blank line ahead of a
+	/// comment that TokenPrinter.PrintLeadingTrivia's own trivia walk might align under a preceding
+	/// trailing comment: that alignment decision reads its own <c>priorNewLines</c> count from the
+	/// literal trivia in front of the comment, which a blank line this loop forced in *before* the
+	/// walk ever starts is invisible to. Forcing one there anyway is how a statement-level blank-line
+	/// minimum broke <c>AlignsUnderTrailingComment</c> — not on the first run, where the walk's own
+	/// count still read zero, but on the second, once that forced blank line became literal source
+	/// text the walk had to count too. Caught by the real corpus, not this suite's own unit tests: the
+	/// exact author-aligned-comment shape it needs to exercise is not one a hand-written case reached.
+	/// </remarks>
+	private static bool NextStartsWithComment(SyntaxToken token)
+	{
+		foreach (var trivia in token.LeadingTrivia)
+		{
+			if (trivia.Kind() is SyntaxKind.WhitespaceTrivia or SyntaxKind.EndOfLineTrivia)
+				continue;
+			return trivia.IsKind(SyntaxKind.SingleLineCommentTrivia) || trivia.IsKind(SyntaxKind.MultiLineCommentTrivia);
+		}
+
+		return false;
+	}
+
+	/// <summary>
 	/// Emits a using block, sorted if the file's <c>.editorconfig</c> asked for it.
 	/// </summary>
 	/// <remarks>
@@ -760,10 +787,16 @@ internal static partial class Printers
 				// so this would otherwise run its own at-most-one blank line ahead of
 				// TokenPrinter.PrintLeadingTrivia's exact-count force, reached moments later inside
 				// Node.Print(statement, context).
-				if (!NextStartsWithRegionBoundary(statement.GetFirstToken(includeZeroWidth: true)))
+				var statementFirstToken = statement.GetFirstToken(includeZeroWidth: true);
+				if (!NextStartsWithRegionBoundary(statementFirstToken))
 				{
-					context.BlankLines(context.CodeSeparation(previousEnd, start,
-						StatementSeparationMinimum(previousStatement, statement, context)));
+					// The statement-level minimum is skipped, not merely floored to it, when a comment
+					// sits in front — see NextStartsWithComment for why forcing one in there is unsafe
+					// regardless of what the comment turns out to be.
+					var minimum = NextStartsWithComment(statementFirstToken)
+						? 0
+						: StatementSeparationMinimum(previousStatement, statement, context);
+					context.BlankLines(context.CodeSeparation(previousEnd, start, minimum));
 				}
 				Node.Print(statement, context);
 				previousEnd = statement.Span.End;
