@@ -1424,6 +1424,16 @@ and private verifyExpectationsJb (arguments:ParseResults<Arguments>) =
             if settings |> Array.exists (fun l -> l.Contains "csharp_space_between_attribute_sections")
             then [||] else [| "csharp_space_between_attribute_sections = false" |]
 
+        // Curb always aligns a broken query expression's clauses under `from` (Printers.Query.cs's
+        // QueryAnchor) — unconditional, not gated by any option, so telling jb to match is always safe.
+        // jb's default is a flat continuation indent instead, ignoring the alignment entirely; found via
+        // the user pointing at ReSharper's own editorconfig schema page for this rather than guessing —
+        // `resharper_csharp_align_linq_query` is the ReSharper-native key (not a plain `csharp_` one,
+        // unlike most of the keys here) and setting it to `true` reproduces Curb's shape exactly.
+        let alignLinqQuery =
+            if settings |> Array.exists (fun l -> l.Contains "resharper_csharp_align_linq_query")
+            then [||] else [| "resharper_csharp_align_linq_query = true" |]
+
         // dotnet_style_require_accessibility_modifiers is dotnet_style_*, one of the "not formatting —
         // dotnet format style's territory" keys OptionCatalog.IsOtherCodeStyleKey names: curb format
         // never adds or removes an accessibility modifier, that is IDE0040 and curb cleanup's job. jb
@@ -1435,6 +1445,16 @@ and private verifyExpectationsJb (arguments:ParseResults<Arguments>) =
         let requireAccessibility =
             if settings |> Array.exists (fun l -> l.Contains "dotnet_style_require_accessibility_modifiers")
             then [||] else [| "dotnet_style_require_accessibility_modifiers = never" |]
+
+        // NOT safe unconditionally, unlike requireAccessibility above — tried and measured wrong.
+        // csharp_style_var_* is dotnet format style's territory (curb format never rewrites a declared
+        // type to `var` or back), and jb's default profile does apply "prefer var" regardless of a bare
+        // `.editorconfig` (confirmed: `int x = 1;` came back `var x = 1;` in isolation). But most of the
+        // corpus's own fixtures already use `var` idiomatically, so forcing `csharp_style_var_* = false`
+        // everywhere told jb to convert THOSE back to explicit types instead — a much larger regression
+        // (635 -> 589 of 820) than the handful of explicit-type cases it was meant to protect. Reverted.
+        // A real fix here needs to be conditional on Z's own declarations the way preferBraces is on Z's
+        // own braces, not a blanket default — not done this pass.
 
         // jb defaults to expanding an already-expression-bodied method, constructor, operator or local
         // function back into a block — the opposite direction from accessors/properties/indexers below,
@@ -1467,7 +1487,7 @@ and private verifyExpectationsJb (arguments:ParseResults<Arguments>) =
         let extra =
             Array.concat
                 [ emptyBlock; blockNamespace; preferBraces; requireAccessibility
-                  parameterizedExpressionBodyKeys; trailingComma; attributeSectionSpacing ]
+                  parameterizedExpressionBodyKeys; trailingComma; attributeSectionSpacing; alignLinqQuery ]
         sprintf "[%s]\n%s" (caseFile d) (Array.append settings extra |> String.concat "\n")
 
     File.WriteAllText(
