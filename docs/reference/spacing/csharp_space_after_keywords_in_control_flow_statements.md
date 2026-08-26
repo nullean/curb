@@ -66,8 +66,10 @@ public class Widget
             if (i % 2 == 0)
                 total++;
         }
+
         while (total > 100)
             total /= 2;
+
         return total;
     }
 }
@@ -98,8 +100,10 @@ public class Widget
             if (i % 2 == 0)
                 total++;
         }
+
         while (total > 100)
             total /= 2;
+
         return total;
     }
 }
@@ -120,8 +124,10 @@ public class Widget
             if(i % 2 == 0)
                 total++;
         }
+
         while(total > 100)
             total /= 2;
+
         return total;
     }
 }

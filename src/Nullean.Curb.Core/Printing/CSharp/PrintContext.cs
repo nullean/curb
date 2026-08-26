@@ -316,11 +316,16 @@ internal sealed class PrintContext(DocArena arena, SourceText text, FormatOption
 		return Math.Min(Math.Max(written, minimum), Options.KeepBlankLinesInDeclarations);
 	}
 
-	/// <summary>The same between statements, capped by <c>csharp_keep_blank_lines_in_code</c>.</summary>
-	public int CodeSeparation(int endOfPrevious, int startOfNext)
+	/// <summary>
+	/// The same between statements, capped by <c>csharp_keep_blank_lines_in_code</c>, and — unlike
+	/// <see cref="DeclarationSeparation"/> — also floored to 0 by default: block and control-transfer
+	/// statements are the only two shapes of statement Curb has a positional opinion about, via
+	/// <paramref name="minimum"/>.
+	/// </summary>
+	public int CodeSeparation(int endOfPrevious, int startOfNext, int minimum = 0)
 	{
 		var written = BlankLinesBetween(endOfPrevious, startOfNext);
-		return Math.Min(written, Options.KeepBlankLinesInCode);
+		return Math.Min(Math.Max(written, minimum), Options.KeepBlankLinesInCode);
 	}
 
 	/// <summary>Emits <paramref name="count"/> blank lines.</summary>
