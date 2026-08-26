@@ -49,6 +49,10 @@ internal sealed class CurbCommands
 	/// <param name="noVerify">Skip re-parsing output to prove the token stream is unchanged.</param>
 	/// <param name="expandUnhandled">Benchmark-only cost model: pretend every syntax kind has a dedicated printer.</param>
 	/// <param name="coverage">Report which syntax kinds are still emitted verbatim.</param>
+	/// <param name="unformattedListFile">
+	/// Write the paths that would change to this file, one per line. What the MSBuild integration reads
+	/// back to attach CURB0001 to each unformatted file instead of to the project.
+	/// </param>
 	public int Check(
 		[Argument] string path = ".",
 		List<FileInfo>? files = null,
@@ -56,7 +60,8 @@ internal sealed class CurbCommands
 		string? cache = null,
 		bool noVerify = false,
 		bool expandUnhandled = false,
-		bool coverage = false
+		bool coverage = false,
+		FileInfo? unformattedListFile = null
 	) =>
 		FormattingRun.Execute(
 			_fileSystem,
@@ -66,7 +71,8 @@ internal sealed class CurbCommands
 			verify: !noVerify,
 			coverageReport: coverage,
 			explicitFiles: ResolveExplicitFiles(files, msbuildListFile),
-			cachePath: cache
+			cachePath: cache,
+			unformattedListPath: unformattedListFile?.FullName
 		).ExitCode;
 
 	/// <summary>

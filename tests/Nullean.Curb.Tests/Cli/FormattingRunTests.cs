@@ -89,6 +89,23 @@ public class FormattingRunTests
 	}
 
 	[Test]
+	public async Task An_explicit_file_list_skips_files_that_are_not_cs()
+	{
+		// The MSBuild integration hands over @(Compile) unfiltered. A shared Directory.Build.props
+		// reaches every project underneath it, so this list can contain an .fsproj's own .fs files.
+		var fs = Repo();
+		fs.AddFile($"{Root}/Mine.cs", new MockFileData("class Mine {    }"));
+		fs.AddFile($"{Root}/Theirs.fs", new MockFileData("module Theirs"));
+
+		var summary = FormattingRun.Execute(fs, Root, write: true, explicitFiles: [$"{Root}/Mine.cs", $"{Root}/Theirs.fs"]);
+
+		summary.Files.Should().Be(1);
+		summary.Unparsable.Should().Be(0, "the .fs file should never reach the parser");
+		fs.File.ReadAllText($"{Root}/Theirs.fs").Should().Be("module Theirs", "it is not C# and must be left alone");
+		await Task.CompletedTask;
+	}
+
+	[Test]
 	public async Task A_byte_order_mark_survives_a_format_that_was_told_to_keep_it()
 	{
 		var fs = Repo("root = true\n\n[*.cs]\nindent_style = space\ncharset = utf-8-bom\n");

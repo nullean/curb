@@ -51,9 +51,19 @@ internal static partial class Printers
 
 		// Where the operand starts, not whether it spans lines — see EqualsValueClause for why the
 		// difference decides whether formatting twice settles.
+		//
+		// A ternary breaks at its own ? and :, one indent in from wherever it starts, so it needs no
+		// hanging indent here either — the same reasoning EqualsValueClause's BreaksWithoutHelp
+		// applies to a declarator's initializer, for the plain-assignment case (issue #34). Scoped to
+		// the ternary alone rather than reusing that whole list: precedence keeps every other member
+		// of it out of reach of an operator's right operand without parentheses (`a && b.Foo()`'s
+		// right side is real and would need its own measurement), but `a ? b : c` binds looser than
+		// every binary operator, so an unparenthesized ternary can only ever land here as an
+		// assignment's RHS.
 		if (right is ExpressionSyntax expression
 			&& (BringsOwnBlock(expression)
-				|| (operatorEnd >= 0 && context.AuthorJoined(operatorEnd, expression.SpanStart))))
+				|| (operatorEnd >= 0 && context.AuthorJoined(operatorEnd, expression.SpanStart))
+				|| (!context.Options.KeepExistingLinebreaks && expression is ConditionalExpressionSyntax)))
 		{
 			Spacing.BeforeOperator(context);
 			Node.Print(right, context);
@@ -612,6 +622,20 @@ internal static partial class Printers
 				Node.Print(expression, context);
 			}
 
+			return;
+		}
+
+		// An expression body that itself ends with a block-bodied callback — `builder =>
+		// builder.Add(x => { … })` — already positions its own contents once that block opens.
+		// Wrapping it in a breakable group as well would let the block's hardline propagate outward
+		// and break the group unconditionally, pushing the whole expression to its own indented line
+		// for no reason: the block was always going to supply the next line. EndsWithBlockBodiedCallback
+		// rather than EndsWithOwnBlock: a `with` or object initializer at the tail can still print
+		// flat, and without this group it would lose the only break a long chain ahead of it has.
+		if (expression is not null && EndsWithBlockBodiedCallback(expression))
+		{
+			arena.Synthetic(SyntheticText.Space);
+			Node.Print(expression, context);
 			return;
 		}
 

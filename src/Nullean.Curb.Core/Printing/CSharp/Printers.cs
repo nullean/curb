@@ -2608,12 +2608,48 @@ internal static partial class Printers
 			ImplicitObjectCreationExpressionSyntax { Initializer: null } implicitCreation =>
 				LastArgumentEndsWithOwnBlock(implicitCreation.ArgumentList),
 
+			// An expression-bodied lambda whose tail is itself a callback ending in a block — `builder
+			// => builder.Add(x => { … })` — hugs exactly like a block-bodied one once that block opens.
+			// Delegates to the stricter EndsWithBlockBodiedCallback rather than recursing back through
+			// this switch's BringsOwnBlock fallback: a `with` or object initializer at the tail can
+			// still print flat, and unlike an actual block its own group cannot supply the break a long
+			// preceding member chain needs once the outer one is skipped.
+			AnonymousFunctionExpressionSyntax { Block: null } lambda =>
+				EndsWithBlockBodiedCallback(lambda),
+
 			_ => BringsOwnBlock(expression),
 		};
 
 	private static bool LastArgumentEndsWithOwnBlock(BaseArgumentListSyntax? arguments) =>
 		arguments is { Arguments.Count: > 0 }
 		&& EndsWithOwnBlock(arguments.Arguments[^1].Expression);
+
+	/// <summary>
+	/// True when an expression, followed strictly through calls and creations, resolves to a
+	/// genuinely block-bodied lambda or anonymous method — the one tail shape guaranteed to hardline
+	/// regardless of how long everything ahead of it is. Deliberately narrower than
+	/// <see cref="EndsWithOwnBlock"/>: a `with` expression or object initializer can still print flat,
+	/// so treating it the same way here would let a caller skip a breakable group that a long chain
+	/// in front of it still needs.
+	/// </summary>
+	internal static bool EndsWithBlockBodiedCallback(ExpressionSyntax expression) =>
+		expression switch
+		{
+			InvocationExpressionSyntax invocation =>
+				LastArgumentEndsWithBlockBodiedCallback(invocation.ArgumentList),
+			ObjectCreationExpressionSyntax { Initializer: null, ArgumentList: { } arguments } =>
+				LastArgumentEndsWithBlockBodiedCallback(arguments),
+			ImplicitObjectCreationExpressionSyntax { Initializer: null } implicitCreation =>
+				LastArgumentEndsWithBlockBodiedCallback(implicitCreation.ArgumentList),
+			AnonymousFunctionExpressionSyntax { Block: null, ExpressionBody: { } body } =>
+				EndsWithBlockBodiedCallback(body),
+			AnonymousFunctionExpressionSyntax function => function.Block is not null,
+			_ => false,
+		};
+
+	private static bool LastArgumentEndsWithBlockBodiedCallback(BaseArgumentListSyntax? arguments) =>
+		arguments is { Arguments.Count: > 0 }
+		&& EndsWithBlockBodiedCallback(arguments.Arguments[^1].Expression);
 
 	/// <summary>Emits the separator between two top-level items, preserving at most one blank line.</summary>
 	private static void Separate(PrintContext context, ref int previousEnd, SyntaxNode next)

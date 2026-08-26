@@ -50,6 +50,12 @@ internal static class FormattingRun
 	/// Where to remember which files were already formatted, so a run triggered by one changed file does
 	/// not re-parse the rest. Absent means no cache: the caller names the path or there is not one.
 	/// </param>
+	/// <param name="unformattedListPath">
+	/// Where to write the paths of files that would change, one per line, sorted. What the MSBuild
+	/// integration reads back after a failed <c>check</c>, so it can attach the CURB0001 diagnostic to
+	/// each file that actually needs reformatting instead of to the project. Ignored when <paramref
+	/// name="write"/> is <see langword="true"/>: a format run leaves nothing unformatted to list.
+	/// </param>
 	public static FormattingRunSummary Execute(
 		IFileSystem fileSystem,
 		string target,
@@ -58,7 +64,8 @@ internal static class FormattingRun
 		bool? verify = null,
 		bool coverageReport = false,
 		string[]? explicitFiles = null,
-		string? cachePath = null)
+		string? cachePath = null,
+		string? unformattedListPath = null)
 	{
 		// On by default for both commands: the printer tracks whether it actually put a token
 		// boundary at risk, so on code that does not, the second parse never happens.
@@ -80,7 +87,11 @@ internal static class FormattingRun
 
 		string[] files;
 		if (explicitFiles is not null)
-			files = explicitFiles;
+			// The MSBuild integration hands over a project's whole compile set unfiltered — see this
+			// parameter's own doc comment — and a shared Directory.Build.props reaches every project
+			// that imports it, C# or not. @(Compile) for an .fsproj is real .fs paths, not an empty
+			// group, so nothing upstream of here already excludes them.
+			files = [.. explicitFiles.Where(IsFormattable)];
 		else
 		{
 			var root = fileSystem.Path.GetFullPath(target);
@@ -124,6 +135,7 @@ internal static class FormattingRun
 		var reparsed = 0;
 		var unhandled = new Dictionary<int, int>();
 		var messages = new System.Collections.Concurrent.ConcurrentBag<string>();
+		var unformatted = write || unformattedListPath is null ? null : new System.Collections.Concurrent.ConcurrentBag<string>();
 
 		var allocatedBefore = GC.GetTotalAllocatedBytes(precise: true);
 		var stopwatch = Stopwatch.StartNew();
@@ -246,6 +258,8 @@ internal static class FormattingRun
 										item.Path,
 										result.Text ?? source,
 										wantsBom ? Utf8WithBom : Utf8);
+								else
+									unformatted?.Add(item.Path);
 								Interlocked.Increment(ref changed);
 							}
 							else
@@ -302,6 +316,12 @@ internal static class FormattingRun
 		// somebody formats the file, and the cache is what makes those repeats cost one file.
 		cache?.Save();
 
+		// Sorted for the same reason the messages below are: a ConcurrentBag's order is whichever
+		// worker finished last, and the MSBuild target that reads this back turns each line into a
+		// diagnostic — a build log that reorders itself between runs is worse than an unsorted one.
+		if (unformattedListPath is not null)
+			fileSystem.File.WriteAllLines(unformattedListPath, (unformatted ?? []).OrderBy(p => p, StringComparer.Ordinal));
+
 		// Sorted, because a ConcurrentBag hands them back in whatever order the threads finished, so
 		// two runs over the same tree reported a different arbitrary twenty. Diagnosing a large
 		// repository against a moving sample is worse than useless.
@@ -351,8 +371,15 @@ internal static class FormattingRun
 		return new FormattingRunSummary(files.Length, changed, cached, skipped, failed, unparsable, reparsed, coverage, exitCode);
 	}
 
+	/// <summary>
+	/// C# source outside a build-output folder. The directory walk already narrows to this with its
+	/// own <c>"*.cs"</c> glob before the bin/obj half of this ever runs; the extension half exists for
+	/// <paramref name="path"/>s an explicit file list handed over unfiltered, which is what a
+	/// non-C# project reaching Curb through a shared build import looks like from here.
+	/// </summary>
 	private static bool IsFormattable(string path) =>
-		!path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal)
+		path.EndsWith(".cs", StringComparison.OrdinalIgnoreCase)
+		&& !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal)
 		&& !path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.Ordinal);
 }
 

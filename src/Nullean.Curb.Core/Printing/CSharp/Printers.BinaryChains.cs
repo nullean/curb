@@ -48,12 +48,18 @@ internal static partial class Printers
 		if (node.Parent is BinaryExpressionSyntax parent && parent.OperatorToken.RawKind == node.OperatorToken.RawKind)
 			return false;
 
-		// Two operands read fine on one line and have a break opportunity from the group anyway.
 		var operands = new List<ExpressionSyntax>();
 		var operators = new List<SyntaxToken>();
 		Flatten(node, operands, operators);
 
-		if (operands.Count < 3)
+		// A two-operand chain used to fall through to the ordinary per-operator path instead, on the
+		// reasoning that it reads fine on one line and the group there already offers a break. It
+		// does, but that path never reads csharp_wrap_before_binary_opsign — it only ever reproduces
+		// whichever side the author already broke on, which left a two-operand chain unable to have
+		// its operator normalised at all once csharp_wrap_chained_binary_expressions asked for it
+		// (issue #46). A genuine BinaryExpressionSyntax always flattens to at least two operands, so
+		// this is defensive rather than a real exclusion.
+		if (operands.Count < 2)
 			return false;
 
 		var arena = context.Arena;

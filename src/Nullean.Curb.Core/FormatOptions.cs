@@ -129,7 +129,10 @@ public enum AttributePlacement
 /// <summary>Line ending to emit.</summary>
 public enum EndOfLine : byte
 {
-	/// <summary>Match whatever the source uses, defaulting to LF.</summary>
+	/// <summary>
+	/// The platform's own line ending (<see cref="System.Environment.NewLine"/>) — Roslyn's own default
+	/// when <c>end_of_line</c> is unset, so this is what keeps Curb agreeing with the IDE out of the box.
+	/// </summary>
 	Auto = 0,
 	Lf = 1,
 	CrLf = 2,
@@ -1361,18 +1364,15 @@ public readonly record struct FormatOptions
 	/// </remarks>
 	public bool ReflowDisabled => MaxLineLength == Off;
 
-	/// <summary>Resolves <see cref="EndOfLine.Auto"/> by sniffing the source.</summary>
-	internal string ResolveEndOfLine(ReadOnlySpan<char> source)
-	{
-		switch (EndOfLine)
+	/// <summary>
+	/// Resolves <see cref="EndOfLine.Auto"/> to <see cref="System.Environment.NewLine"/> — the same
+	/// fallback Roslyn's own <c>FormattingOptions2.NewLine</c> uses when <c>end_of_line</c> is unset.
+	/// </summary>
+	internal string ResolveEndOfLine() =>
+		EndOfLine switch
 		{
-			case EndOfLine.Lf:
-				return "\n";
-			case EndOfLine.CrLf:
-				return "\r\n";
-			default:
-				var newLine = source.IndexOf('\n');
-				return newLine > 0 && source[newLine - 1] == '\r' ? "\r\n" : "\n";
-		}
-	}
+			EndOfLine.Lf => "\n",
+			EndOfLine.CrLf => "\r\n",
+			_ => Environment.NewLine,
+		};
 }

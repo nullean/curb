@@ -140,7 +140,11 @@ internal static partial class Printers
 			or ConditionalAccessExpressionSyntax
 			or BinaryExpressionSyntax
 			or ObjectCreationExpressionSyntax
-			or ImplicitObjectCreationExpressionSyntax;
+			or ImplicitObjectCreationExpressionSyntax
+			// A ternary breaks at its own ? and :, one indent in from wherever it starts. Breaking
+			// after the = as well nests those a level deeper than the assignment they belong to —
+			// issue #34.
+			or ConditionalExpressionSyntax;
 
 	/// <summary>True for values whose own layout supplies the indentation of their contents.</summary>
 	internal static bool BringsOwnBlock(ExpressionSyntax? value) =>

@@ -271,6 +271,29 @@ public class UsingOrderTests : FormattingTest
 		""",
 		editorConfig: "dotnet_sort_system_directives_first = true");
 
+	// ---- underscore-prefixed segments --------------------------------------------------------------
+
+	[Test]
+	public Task An_underscore_prefixed_segment_sorts_before_a_capitalised_one() => Formats(
+		"""
+		using Elastic.ApiExplorer.Infrastructure;
+		using Elastic.ApiExplorer._Partials.Layout;
+		using Elastic.ApiExplorer.Landing;
+
+		public class C { }
+		""",
+		// dotnet format sorts case-insensitively by lower-casing first, which puts '_' (0x5F) below
+		// 'i' (0x69). Case-folding to upper case instead — what plain OrdinalIgnoreCase does — leaves
+		// '_' above every letter and reorders this the other way.
+		"""
+		using Elastic.ApiExplorer._Partials.Layout;
+		using Elastic.ApiExplorer.Infrastructure;
+		using Elastic.ApiExplorer.Landing;
+
+		public class C { }
+		""",
+		editorConfig: "dotnet_sort_system_directives_first = true");
+
 	// ---- block namespaces -------------------------------------------------------------------------
 
 	[Test]

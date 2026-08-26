@@ -516,7 +516,7 @@ public class ClosingParenthesisTests : FormattingTest
 
 	[Test]
 	public Task A_two_operand_chain_is_left_alone() => Unchanged(
-		// Two reads fine on one line, and the group around it already offers a break.
+		// Two operands read fine on one line; chop_if_long only breaks once it doesn't fit.
 		"""
 		public class C
 		{
@@ -527,6 +527,65 @@ public class ClosingParenthesisTests : FormattingTest
 		}
 		""",
 		editorConfig: Narrow + "\ncsharp_wrap_chained_binary_expressions = chop_if_long");
+
+	/// <summary>
+	/// A two-operand chain goes through this printer too now, not just three or more — it used to
+	/// fall through to the ordinary per-operator path, which never reads
+	/// <c>csharp_wrap_before_binary_opsign</c> and only ever reproduces whichever side the author
+	/// already broke on. That left a two-operand chain unable to have its operator normalised at all
+	/// once <c>csharp_wrap_chained_binary_expressions</c> asked for it — regardless of whether the
+	/// break was already there (from <c>dotnet format style</c>, say) or one this run introduced.
+	/// See <see href="https://github.com/nullean/curb/issues/46">issue #46</see>.
+	/// </summary>
+	[Test]
+	public Task A_two_operand_chain_still_normalises_the_operator_side() => Formats(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        var ok = alphaConditionLong &&
+		            betaConditionLong;
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        var ok = alphaConditionLong
+		            && betaConditionLong;
+		    }
+		}
+		""",
+		editorConfig: "max_line_length = 20\ncsharp_wrap_chained_binary_expressions = chop_if_long");
+
+	[Test]
+	public Task A_two_operand_chain_can_keep_the_operator_trailing_instead() => Formats(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        var ok = alphaConditionLong
+		            && betaConditionLong;
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        var ok = alphaConditionLong &&
+		            betaConditionLong;
+		    }
+		}
+		""",
+		editorConfig: "max_line_length = 20"
+			+ "\ncsharp_wrap_chained_binary_expressions = chop_if_long"
+			+ "\ncsharp_wrap_before_binary_opsign = false");
 
 	[Test]
 	public Task A_right_associative_chain_keeps_every_operator() => Formats(
