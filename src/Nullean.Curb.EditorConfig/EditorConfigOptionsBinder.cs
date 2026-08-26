@@ -197,6 +197,12 @@ public static class EditorConfigOptionsBinder
 		if (TryBool(properties, "csharp_space_after_dot", diagnostics, out var spaceAfterDot))
 			options = options with { SpaceAfterDot = spaceAfterDot };
 
+		if (TryBool(properties, "csharp_space_after_unary_operator", diagnostics, out var spaceAfterUnary))
+			options = options with { SpaceAfterUnaryOperator = spaceAfterUnary };
+
+		if (TryBool(properties, "csharp_space_around_ternary_operator", diagnostics, out var spaceAroundTernary))
+			options = options with { SpaceAroundTernaryOperator = spaceAroundTernary };
+
 		if (TryBool(properties, "csharp_space_before_semicolon_in_for_statement", diagnostics, out var spaceBeforeSemicolon))
 			options = options with { SpaceBeforeSemicolonInForStatement = spaceBeforeSemicolon };
 

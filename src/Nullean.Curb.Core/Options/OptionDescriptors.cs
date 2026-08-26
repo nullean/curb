@@ -75,7 +75,7 @@ public sealed record OptionDescriptor(
 		new("csharp_indent_braces", OptionGroup.Indentation, ["true", "false"], "false", "Indent the brace tokens themselves an extra level.", "basic_method"),
 		new("csharp_indent_case_contents_when_block", OptionGroup.Indentation, ["true", "false"], "true", "Indent a braced case body. csharp_indent_case_contents governs other statements.", "switch_stmt"),
 
-		// ---- Spacing (22) -------------------------------------------------------------------
+		// ---- Spacing (24) -------------------------------------------------------------------
 		new("csharp_space_after_cast", OptionGroup.Spacing, ["true", "false"], "false", "Space between a cast and its operand.", "cast"),
 		new("csharp_space_after_keywords_in_control_flow_statements", OptionGroup.Spacing, ["true", "false"], "true", "Space between a control-flow keyword and its opening parenthesis.", "if_else"),
 		new("csharp_space_before_colon_in_inheritance_clause", OptionGroup.Spacing, ["true", "false"], "true", "Space before the colon in a base list.", "class_with_method"),
@@ -98,6 +98,8 @@ public sealed record OptionDescriptor(
 		new("csharp_space_after_dot", OptionGroup.Spacing, ["true", "false"], "false", "Space after a dot.", "long_chain"),
 		new("csharp_space_before_semicolon_in_for_statement", OptionGroup.Spacing, ["true", "false"], "false", "Space before a semicolon in a for statement.", "for_loop"),
 		new("csharp_space_after_semicolon_in_for_statement", OptionGroup.Spacing, ["true", "false"], "true", "Space after a semicolon in a for statement.", "for_loop"),
+		new("csharp_space_after_unary_operator", OptionGroup.Spacing, ["true", "false"], "false", "Space after unary minus/plus, logical not, and the unsafe pointer prefix operators. Not bitwise complement or prefix increment/decrement.", "unary"),
+		new("csharp_space_around_ternary_operator", OptionGroup.Spacing, ["true", "false"], "true", "Space around the ?/: of a ternary conditional expression.", "ternary"),
 
 		// ---- Wrapping (26) ------------------------------------------------------------------
 		new("csharp_preserve_single_line_blocks", OptionGroup.Wrapping, ["true", "false"], "true", "Allow a block the author wrote on one line to stay on one line.", "single_line_block"),
@@ -153,8 +155,8 @@ public sealed record OptionDescriptor(
 		new("csharp_blank_lines_before_case", OptionGroup.BlankLines, ["<integer>"], "0", "Blank lines above a switch section's first label.", "members"),
 		new("csharp_blank_lines_after_case", OptionGroup.BlankLines, ["<integer>"], "0", "Blank lines below a section's labels, above its first statement.", "members"),
 		new("csharp_blank_lines_before_single_line_comment", OptionGroup.BlankLines, ["<integer>"], "0", "Blank lines above a // comment that follows real content.", "members"),
-		new("csharp_remove_blank_lines_near_braces_in_declarations", OptionGroup.BlankLines, ["true", "false"], "true", "Force no blank line directly under a type/namespace's opening brace or above its closing one.", "members"),
-		new("csharp_remove_blank_lines_near_braces_in_code", OptionGroup.BlankLines, ["true", "false"], "true", "The same, for a block's opening and closing braces.", "members"),
+		new("csharp_remove_blank_lines_near_braces_in_declarations", OptionGroup.BlankLines, ["true", "false"], "true", "Force no blank line directly under a type/namespace's opening brace or above its closing one.", "near_braces"),
+		new("csharp_remove_blank_lines_near_braces_in_code", OptionGroup.BlankLines, ["true", "false"], "true", "The same, for a block's opening and closing braces.", "near_braces"),
 
 		// ---- ExpressionBodies (7) -----------------------------------------------------------
 		new("csharp_style_expression_bodied_methods", OptionGroup.ExpressionBodies, ["false", "true", "when_on_single_line"], "false", "Convert eligible block-bodied methods to expression bodies. IDE0022.", "expression_body"),
