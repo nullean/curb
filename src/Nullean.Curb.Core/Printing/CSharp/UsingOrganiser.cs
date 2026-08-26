@@ -168,7 +168,7 @@ internal static class UsingOrganiser
 				return system;
 		}
 
-		// Case-insensitive, with ordinal only to break a tie. Ordinal alone sorts every upper-case
+		// Case-insensitive, with ordinal only to break a tie. Plain ordinal sorts every upper-case
 		// letter before every lower-case one, which puts `Microsoft.CodeAnalysis.CSharp.CodeStyle`
 		// ahead of `Microsoft.CodeAnalysis.CodeStyle` — 'S' below 'o'. Verified against the tool
 		// rather than against Roslyn's source: `dotnet format` on a project with
@@ -176,7 +176,12 @@ internal static class UsingOrganiser
 		//
 		// It is the largest single source of churn Curb had on the roslyn repository, whose 17,000
 		// files are sorted the other way by Roslyn's own tooling.
-		var name = string.Compare(Name(left), Name(right), StringComparison.OrdinalIgnoreCase);
+		//
+		// The fold has to be lower-case, not `StringComparison.OrdinalIgnoreCase` — that folds to
+		// upper case internally, which leaves '_' (0x5F) above every letter and sorts
+		// `Foo._Partials` after `Foo.Infrastructure`. dotnet format puts it before, matching what
+		// lower-casing first gets: '_' (0x5F) sits below 'i' (0x69).
+		var name = string.CompareOrdinal(Name(left).ToLowerInvariant(), Name(right).ToLowerInvariant());
 		return name != 0 ? name : string.CompareOrdinal(Name(left), Name(right));
 	}
 

@@ -98,7 +98,7 @@ The first-run churn is ground `dotnet format` doesn't cover:
 - Chain breaking
 - Comment alignment
 - Reflow to `max_line_length` (only if set — see below)
-- BOM handling (see [known limitations](../known-limitations.md) for the current caveat)
+- BOM handling
 
 ## Reducing churn on adoption
 

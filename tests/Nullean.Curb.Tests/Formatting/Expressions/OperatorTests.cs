@@ -269,7 +269,6 @@ public class OperatorTests : FormattingTest
 		""");
 
 	[Test]
-	[Skip("an argument list holding a block-bodied lambda breaks; the lambda should stay on the call line")]
 	public Task Lambda_with_a_block_body() => Unchanged(
 		"""
 		public class C
@@ -280,6 +279,21 @@ public class OperatorTests : FormattingTest
 		        {
 		            return x.Value;
 		        });
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Expression_bodied_lambda_wrapping_a_block_bodied_one() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        Configure(builder => builder.Add(x =>
+		        {
+		            return x.Value;
+		        }));
 		    }
 		}
 		""");

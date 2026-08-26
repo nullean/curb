@@ -11,7 +11,7 @@ Use the filter above to search by name. Each group below links to its own index.
 - [indent_style](core/indent_style.md) — Indent with spaces or tabs.
 - [indent_size](core/indent_size.md) — Columns per indent level.
 - [tab_width](core/tab_width.md) — Columns a tab occupies when measuring line width.
-- [end_of_line](core/end_of_line.md) — Line ending to write. auto matches whatever the source uses.
+- [end_of_line](core/end_of_line.md) — Line ending to write. auto matches the platform's own (Environment.NewLine), the same default Roslyn uses.
 - [insert_final_newline](core/insert_final_newline.md) — Ensure the file ends with a newline.
 - [trim_trailing_whitespace](core/trim_trailing_whitespace.md) — Remove trailing whitespace from each line.
 - [charset](core/charset.md) — Byte-order mark handling. preserve keeps whatever the file arrived with.

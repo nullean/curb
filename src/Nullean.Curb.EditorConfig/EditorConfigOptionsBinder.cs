@@ -103,6 +103,10 @@ public static class EditorConfigOptionsBinder
 				case "crlf":
 					options = options with { EndOfLine = EndOfLine.CrLf };
 					break;
+				case "auto":
+					// The struct default. Named explicitly here so writing it out is not an error —
+					// it is what print-config and the catalog already advertise as a legal value.
+					break;
 				case "cr":
 					// EditorConfig allows it; nothing has emitted lone CR line endings for decades and
 					// supporting it would mean a third code path through every break.
