@@ -1309,6 +1309,26 @@ and private verifyExpectationsJb (arguments:ParseResults<Arguments>) =
     // else (a newline in between) means its own line.
     let emptyBlockJoinsPrecedingLine = Text.RegularExpressions.Regex(@"[^\s\r\n]\s?\{\s?\}")
 
+    // The three shapes an accessor's body can take, used together to decide whether it is safe to tell
+    // jb to leave a genuinely-multi-line accessor block alone (see accessorExpressionBodyDirection
+    // below). `get`/`set`/`init` is unambiguous here — none of the three is a common identifier, and a
+    // real one appearing as a local name would need to be followed by one of these exact punctuation
+    // shapes to match at all.
+    let accessorBlockMultiline = Text.RegularExpressions.Regex(@"\b(get|set|init)\s*\r?\n\s*\{")
+    let accessorBlockSingleLine = Text.RegularExpressions.Regex(@"\b(get|set|init)\s*\{[^\r\n{}]*\}")
+    let accessorArrow = Text.RegularExpressions.Regex(@"\b(get|set|init)\s*=>")
+
+    // Any non-empty single-line brace block anywhere in the case — not just on an accessor. Used as a
+    // whole-file guard on accessorExpressionBodyDirection: a case that preserves some OTHER construct on
+    // one line (PreserveSingleLineTests' whole point) is exactly the shape that made an earlier, narrower
+    // version of this fix regress `PreserveSingleLineTests.A_one_line_body_with_a_statement_stays_there`
+    // — telling jb `csharp_preserve_single_line_blocks = false` to stop it collapsing a genuinely
+    // multi-line accessor also stops it honouring a block Curb deliberately kept on one line elsewhere,
+    // and jb expanded that one instead. Safer to skip the whole case when any inline block exists at all
+    // than to try to scope the keys to just the accessor construct — Curb's own preserve options are not
+    // scoped that finely either, so there is no key that would let jb agree in one place but not another.
+    let anyInlineBlock = Text.RegularExpressions.Regex(@"\{[^\r\n{}]+\}")
+
     // One level of nested parens, balanced — `is Point(1, 2)` inside an if-condition, or a lambda
     // parameter list inside a call, both appear in these test snippets and neither is rare enough to
     // ignore. A plain `[^)]*` stops at the first `)`, which is the nested one, not the real close —
@@ -1416,6 +1436,38 @@ and private verifyExpectationsJb (arguments:ParseResults<Arguments>) =
                || settings |> Array.exists (fun l -> l.Contains "csharp_prefer_braces")
             then [||] else [| "csharp_prefer_braces = true" |]
 
+        // jb defaults to collapsing an already-multi-line accessor, property or indexer body — both
+        // toward an expression body (`get => _x;`) and, once that is suppressed, toward a single-line
+        // block (`get { return _x; }`) instead — the opposite direction from methods/constructors/
+        // operators/local_functions above, confirmed by testing each key in isolation:
+        // csharp_style_expression_bodied_{accessors,properties,indexers} = false alone only stops the
+        // arrow, not the single-line collapse; csharp_preserve_single_line_{blocks,statements} = false
+        // is what stops that second step. Both are needed together.
+        //
+        // Only injected when Z's own accessor shape is unambiguously multi-line — no accessor already
+        // collapsed to a single line or an arrow anywhere in the case (accessorBlockSingleLine,
+        // accessorArrow), and no OTHER construct in the file relies on single-line preservation either
+        // (anyInlineBlock) — seeing preferBraces's mistake, keeping this scoped to when nothing in Z
+        // could be broken by turning both preserve options off case-wide.
+        let accessorExpressionBodyDirection =
+            if accessorBlockMultiline.IsMatch z
+               && not (accessorBlockSingleLine.IsMatch z)
+               && not (accessorArrow.IsMatch z)
+               && not (anyInlineBlock.IsMatch z)
+               && not (settings |> Array.exists (fun l ->
+                    l.Contains "csharp_style_expression_bodied_accessors"
+                    || l.Contains "csharp_style_expression_bodied_properties"
+                    || l.Contains "csharp_style_expression_bodied_indexers"
+                    || l.Contains "csharp_preserve_single_line_blocks"
+                    || l.Contains "csharp_preserve_single_line_statements"))
+            then
+                [| "csharp_style_expression_bodied_accessors = false"
+                   "csharp_style_expression_bodied_properties = false"
+                   "csharp_style_expression_bodied_indexers = false"
+                   "csharp_preserve_single_line_blocks = false"
+                   "csharp_preserve_single_line_statements = false" |]
+            else [||]
+
         // Not a Curb-implemented key at all — Curb has no option that ever puts a space between two
         // attribute sections it glues together (AttributeTests.A_space_between_sections_on_a_parameter_is_removed
         // confirms it always normalises one away), so there is no case where telling jb to match that
@@ -1487,7 +1539,8 @@ and private verifyExpectationsJb (arguments:ParseResults<Arguments>) =
         let extra =
             Array.concat
                 [ emptyBlock; blockNamespace; preferBraces; requireAccessibility
-                  parameterizedExpressionBodyKeys; trailingComma; attributeSectionSpacing; alignLinqQuery ]
+                  parameterizedExpressionBodyKeys; trailingComma; attributeSectionSpacing; alignLinqQuery
+                  accessorExpressionBodyDirection ]
         sprintf "[%s]\n%s" (caseFile d) (Array.append settings extra |> String.concat "\n")
 
     File.WriteAllText(
