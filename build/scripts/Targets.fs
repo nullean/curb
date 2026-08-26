@@ -1317,18 +1317,32 @@ and private verifyExpectationsJb (arguments:ParseResults<Arguments>) =
 
     // A parameter list `(...)` directly before `=>`, at the start of a line (optionally after
     // modifiers/a return type — CallerMemberName-style regexes cannot resolve a type name, so this
-    // accepts any word run), is what a method, constructor, operator or local function's expression
-    // body looks like — the only four of Curb's seven csharp_style_expression_bodied_* constructs that
-    // have a parameter list at all, which is what makes this regex specific to them: an accessor's
-    // arrow follows a bare `get`/`set`/`init` (no parens), a property's follows the property name
-    // alone, and an indexer's follows `]` — none can match `)\s*=>`. Anchored to the start of a line
-    // (RegexOptions.Multiline) rather than matching `)\s*=>` anywhere, so a lambda argument nested
-    // inside a call on a block-bodied method's only statement — `Call((int a, int b) => a + b);` — does
-    // not falsely read as the method's own expression body: the lambda's arrow does not start its own
-    // line, only the method signature would.
+    // accepts any run of words, plus at most one parenthesized group for a tuple return type like
+    // `public (int First, int Second) M() => (1, 2);`), is what a method, constructor, operator or
+    // local function's expression body looks like — the only four of Curb's seven
+    // csharp_style_expression_bodied_* constructs that have a parameter list at all, which is what
+    // makes this regex specific to them: an accessor's arrow follows a bare `get`/`set`/`init` (no
+    // parens), a property's follows the property name alone, and an indexer's follows `]` — none can
+    // match `)\s*=>`. Anchored to the start of a line (RegexOptions.Multiline) rather than matching
+    // `)\s*=>` anywhere, so a lambda argument nested inside a call on a block-bodied method's only
+    // statement — `Call((int a, int b) => a + b);` — does not falsely read as the method's own
+    // expression body: balancedParens can only match "Call"'s own parenthesis by consuming everything
+    // through its final closing paren as one unit (there is no valid shorter stopping point once the
+    // nested lambda's own parens forced a nested match), which leaves nothing for the required `=>` to
+    // follow — so this line can never satisfy the pattern.
+    //
+    // The word-token run is separated by a *required* space (`[ \t]+`, not `[ \t]*`), and the tuple-
+    // return-type group may occur at most once rather than inside a repeated alternation with the word
+    // tokens — both are what keep this linear. An earlier version allowed `\w+` and a parenthesized
+    // group to repeat interchangeably with only optional spacing between them, the classic
+    // `(\w+)*`-style catastrophic-backtracking shape: on a long non-matching line (any ordinary method
+    // body with no arrow at all) the engine explored exponentially many ways to partition the same run
+    // of word characters before concluding there was no match — observed hanging the harness at 100%
+    // CPU for minutes on the real dump. Measured this version against a 300+ character deliberately
+    // non-matching stress input at 0ms before trusting it.
     let parameterizedExpressionBody =
         Text.RegularExpressions.Regex(
-            @"^[ \t]*(?:\w+[ \t]+)*\w+[ \t]*" + balancedParens + @"[ \t]*=>[ \t]*[^{\r\n]",
+            @"^[ \t]*(?:\w+[ \t]+)*(?:" + balancedParens + @"[ \t]+(?:\w+[ \t]+)*)?\w+[ \t]*" + balancedParens + @"[ \t]*=>[ \t]*[^{\r\n]",
             Text.RegularExpressions.RegexOptions.Multiline)
 
     // A comma directly before a closing brace/bracket/paren on the next line — the shape both trailing-

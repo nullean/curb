@@ -132,8 +132,18 @@ Point(1, 2)` inside an `if`), leaving braces unprotected; `parameterizedExpressi
 `)\s*=>` matched a lambda argument's arrow nested inside a call on a block-bodied method's only statement,
 wrongly treating the method itself as expression-bodied. Both now use a one-level-balanced-parens pattern,
 and the expression-body regex is additionally anchored to the start of a line so a nested lambda can no
-longer be mistaken for a member's own arrow. Net effect of the `try` fix plus the two regex fixes: 198 →
-186 of 820 checked.
+longer be mistaken for a member's own arrow.
+
+That anchored version still missed a tuple return type (`public (int First, int Second) M() => (1, 2);`),
+since a parenthesized return type isn't a plain word run — fixed by allowing the prefix at most one
+parenthesized group in addition to its word tokens. The first attempt at that generalisation allowed the
+word tokens and the parenthesized group to repeat interchangeably with only optional spacing between
+them — the classic `(\w+)*`-style catastrophic-backtracking shape — and measurably hung the harness at
+100% CPU for minutes on the real dump before it was caught and reworked to keep the word-token run
+separated by a *required* space and the parenthesized group limited to a single, non-repeated occurrence,
+which is what keeps the match linear; verified against a 300+ character deliberately non-matching stress
+input at 0ms before trusting it again. Net effect of the `try` fix plus all three regex fixes: 198 → 185
+of 820 checked.
 
 Also confirmed, not fixed: `csharp_style_namespace_declarations = block_scoped` is a genuine no-op in Curb
 when the source is already file-scoped — `Printers.cs`'s `FileScopedNamespace` never reads
