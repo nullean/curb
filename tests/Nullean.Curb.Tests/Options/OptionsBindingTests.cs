@@ -600,6 +600,23 @@ public class OptionsBindingTests
 	}
 
 	[Test]
+	public async Task Auto_end_of_line_is_accepted_and_stays_the_default()
+	{
+		var options = Bind("root = true\n\n[*.cs]\nend_of_line = auto\n", out var diagnostics);
+
+		diagnostics.Should().BeEmpty("auto is the documented default, not an unrecognised value");
+		options.EndOfLine.Should().Be(EndOfLine.Auto);
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task Auto_end_of_line_resolves_to_the_platform_default()
+	{
+		new FormatOptions().ResolveEndOfLine().Should().Be(Environment.NewLine, "that is Roslyn's own default when end_of_line is unset");
+		await Task.CompletedTask;
+	}
+
+	[Test]
 	public async Task Every_implemented_option_can_be_printed()
 	{
 		// print-config is driven by ImplementedKeys, so an option onboarded without teaching
