@@ -101,13 +101,29 @@ aggregate rather than itemised. The fix is the one used there: find the root cau
 cases and gate on those being documented, the way the whitespace side gates on 5 categories rather than
 hundreds of cases.
 
-That categorisation is under way, not finished. Five root causes found and fixed so far, each an injected
-`.editorconfig` key `verifyExpectationsJb` adds into a case's own section when its shape needs it (or, for
-two of the five, unconditionally — see the code comments in `Targets.fs` for which and why):
+That categorisation is under way, not finished. Two harness bugs (unconditional namespace insertion into
+files with no type declaration; two top-level-statement files merged into the same compilation, which C#
+only allows one of, regardless of namespace handling — now detected and excluded) and eight root causes
+found and fixed so far, each an injected `.editorconfig` key added into a case's own section when its shape
+needs it, or — where Curb's own behaviour makes the other direction impossible — unconditionally. See the
+code comments next to `caseSection` in `Targets.fs` for which is which and why, including one case
+(`csharp_prefer_braces`) where "unconditional" turned out to be wrong and had to be made conditional after
+it broke `PreferBracesTests`' own default-behaviour cases in the other direction:
 `csharp_empty_block_style` (both spellings), `csharp_style_namespace_declarations`, `csharp_prefer_braces`,
-and `dotnet_style_require_accessibility_modifiers`. That took the count from 307 to roughly 235. What is
-left splits into several more distinct categories — expression-body direction per construct (the same shape
-of fix as the four already done, across seven `csharp_style_expression_bodied_*` keys instead of one),
-trailing-comma removal, redundant-parentheses-around-operators and qualified-name-shortening (semantic style
-preferences Curb never applies), query-clause continuation indentation, and chain/binary-operator
-continuation position — each its own investigation the size of the four already landed.
+`dotnet_style_require_accessibility_modifiers`, `csharp_style_expression_bodied_{methods,constructors,
+operators,local_functions}` (as one group, detected by a parameter list directly before `=>` — the feature
+that distinguishes these four from the three accessor-shaped ones below), both trailing-comma keys, and
+`csharp_space_between_attribute_sections` (not a Curb-implemented key at all, but safe unconditionally since
+Curb has no option that ever produces the alternative). That took the count from 307 to roughly 198 of 842
+(819 checked, 23 excluded).
+
+What's left splits into several more distinct categories, each its own investigation the size of one of the
+above: expression-body direction for the three accessor-shaped constructs (accessors, properties, indexers —
+found empirically that getting the direction right isn't enough on its own; the accessor body's own line-
+breaking still disagreed after four different keys were tried, so this needs more than one fix); an empty
+`try { }` collapsing onto its own keyword line the same way an empty block does elsewhere, but not
+responding to the same `csharp_empty_block_style` key that fixed the other empty-block cases; attribute
+lists with multiple attributes in one bracket section being split into one section each; redundant-
+parentheses-around-operators and qualified-name-shortening (semantic style preferences Curb never applies at
+all); and two wrapping-algorithm mismatches (query-clause continuation indentation, chain/binary-operator
+continuation position) where `jb`'s own algorithm disagrees with Curb's bespoke one.

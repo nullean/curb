@@ -1309,6 +1309,27 @@ and private verifyExpectationsJb (arguments:ParseResults<Arguments>) =
     // else (a newline in between) means its own line.
     let emptyBlockJoinsPrecedingLine = Text.RegularExpressions.Regex(@"[^\s\r\n]\s?\{\s?\}")
 
+    // A parameter list `(...)` directly before `=>` is what a method, constructor, operator or local
+    // function's expression body looks like — the only four of Curb's seven csharp_style_expression_
+    // bodied_* constructs that have a parameter list at all, which is what makes this regex specific to
+    // them: an accessor's arrow follows a bare `get`/`set`/`init` (no parens), a property's follows the
+    // property name alone, and an indexer's follows `]` — none can match `)\s*=>`.
+    let parameterizedExpressionBody = Text.RegularExpressions.Regex(@"\)\s*=>\s*[^{\r\n]")
+
+    // A comma directly before a closing brace/bracket/paren on the next line — the shape both trailing-
+    // comma keys default to false (Curb only ever adds one; an already-present one, like an empty
+    // block's braces, survives because Curb does not remove what it did not add).
+    let trailingCommaBeforeClose = Text.RegularExpressions.Regex(@",\s*\r?\n\s*[\}\]\)]")
+
+    // A control-flow keyword whose body is not immediately a `{` — an unbraced single statement, which
+    // is exactly the shape PreferBracesTests' own default cases assert Curb leaves alone. Distinguishes
+    // "this case has braces jb would strip" (safe to tell it to require them) from "this case is
+    // specifically testing that Curb does not add braces" (telling jb to require them would be wrong in
+    // the other direction — found the hard way, on PreferBracesTests.Bodies_are_left_as_written_without_the_key
+    // itself, after making the injection unconditional turned out to be too strong a claim).
+    let bracelessControlFlowBody =
+        Text.RegularExpressions.Regex(@"\b(if\s*\([^)]*\)|else|for\s*\([^)]*\)|foreach\s*\([^)]*\)|while\s*\([^)]*\)|do)\s*\r?\n?\s*[^\s{]")
+
     let caseSection (d: string) =
         let settings = caseSettings d
         let z = before.[d]
@@ -1343,11 +1364,25 @@ and private verifyExpectationsJb (arguments:ParseResults<Arguments>) =
         // block stops being scoped to it, a change in meaning rather than layout, so Curb refuses even
         // with csharp_prefer_braces = false. jb defaults to stripping braces around a single embedded
         // statement, aggressively — it did so through four levels of nested if-statements in one case.
-        // Unlike the two keys above, unconditional rather than detected: telling jb to always require
-        // braces can never conflict with anything Curb produces, since Curb never removes one either.
+        //
+        // Conditional, not unconditional: an earlier version reasoned this was always safe, since Curb
+        // never removes a brace either way — true, but incomplete. Curb's default also does not add a
+        // missing one, and PreferBracesTests' own cases assert exactly that default; forcing `true`
+        // unconditionally told jb to add braces to those cases' deliberately braceless bodies, a new
+        // disagreement in the other direction. Only injected when Z has no braceless control-flow body
+        // of its own to protect.
         let preferBraces =
-            if settings |> Array.exists (fun l -> l.Contains "csharp_prefer_braces")
+            if bracelessControlFlowBody.IsMatch z
+               || settings |> Array.exists (fun l -> l.Contains "csharp_prefer_braces")
             then [||] else [| "csharp_prefer_braces = true" |]
+
+        // Not a Curb-implemented key at all — Curb has no option that ever puts a space between two
+        // attribute sections it glues together (AttributeTests.A_space_between_sections_on_a_parameter_is_removed
+        // confirms it always normalises one away), so there is no case where telling jb to match that
+        // could conflict with an alternate Curb behaviour. jb defaults to spacing them apart.
+        let attributeSectionSpacing =
+            if settings |> Array.exists (fun l -> l.Contains "csharp_space_between_attribute_sections")
+            then [||] else [| "csharp_space_between_attribute_sections = false" |]
 
         // dotnet_style_require_accessibility_modifiers is dotnet_style_*, one of the "not formatting —
         // dotnet format style's territory" keys OptionCatalog.IsOtherCodeStyleKey names: curb format
@@ -1361,7 +1396,38 @@ and private verifyExpectationsJb (arguments:ParseResults<Arguments>) =
             if settings |> Array.exists (fun l -> l.Contains "dotnet_style_require_accessibility_modifiers")
             then [||] else [| "dotnet_style_require_accessibility_modifiers = never" |]
 
-        let extra = Array.concat [ emptyBlock; blockNamespace; preferBraces; requireAccessibility ]
+        // jb defaults to expanding an already-expression-bodied method, constructor, operator or local
+        // function back into a block — the opposite direction from accessors/properties/indexers below,
+        // which is exactly why this is its own detection rather than sharing one with them. Curb's own
+        // default is "as written" for all seven csharp_style_expression_bodied_* keys (see
+        // ExpressionBodyTests.Bodies_are_left_as_written_without_the_key), so telling jb to prefer
+        // keeping what parameterizedExpressionBody already found present is what "as written" means for
+        // it too.
+        let parameterizedExpressionBodyKeys =
+            if parameterizedExpressionBody.IsMatch z then
+                [ "methods"; "constructors"; "operators"; "local_functions" ]
+                |> List.filter (fun kind -> not (settings |> Array.exists (fun l -> l.Contains (sprintf "csharp_style_expression_bodied_%s" kind))))
+                |> List.map (sprintf "csharp_style_expression_bodied_%s = true")
+                |> List.toArray
+            else [||]
+
+        // Both trailing-comma keys default to false — Curb only ever adds a trailing comma when asked,
+        // never removes an existing one — so an already-comma'd list only needs jb told to leave it
+        // alone when Z actually has one, the same conditional shape as the empty-block and namespace
+        // keys above. jb removed it from every enum, switch-expression-arm list and object initializer
+        // sampled, regardless of whether the list was single-line or broken across several.
+        let trailingComma =
+            if trailingCommaBeforeClose.IsMatch z then
+                [ "multiline_lists"; "singleline_lists" ]
+                |> List.filter (fun kind -> not (settings |> Array.exists (fun l -> l.Contains (sprintf "csharp_trailing_comma_in_%s" kind))))
+                |> List.map (sprintf "csharp_trailing_comma_in_%s = true")
+                |> List.toArray
+            else [||]
+
+        let extra =
+            Array.concat
+                [ emptyBlock; blockNamespace; preferBraces; requireAccessibility
+                  parameterizedExpressionBodyKeys; trailingComma; attributeSectionSpacing ]
         sprintf "[%s]\n%s" (caseFile d) (Array.append settings extra |> String.concat "\n")
 
     File.WriteAllText(
