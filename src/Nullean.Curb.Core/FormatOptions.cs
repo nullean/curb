@@ -1329,6 +1329,20 @@ public readonly record struct FormatOptions
 	public bool RewritesTrailingCommas => TrailingCommaInMultilineLists || TrailingCommaInSinglelineLists;
 
 	/// <summary>
+	/// True when either "place simple X on single line" active-collapse key asked for anything —
+	/// <see cref="PlaceSimpleDeclarationBlocksOnSingleLine"/> or <see cref="PlaceSimpleBlocksOnSingleLine"/>.
+	/// </summary>
+	/// <remarks>
+	/// Both default to false, and <c>Printers.PrintBody</c> gates its whole eligibility check
+	/// (<c>IsCollapsibleSimpleBody</c>'s three trivia scans, then the fit-measured <c>Group</c> a
+	/// collapse needs) behind this single flag rather than re-deriving "which of the two keys applies
+	/// to this construct" per call — the same shape <see cref="MeasuresWholeMembers"/> and
+	/// <see cref="RewritesTrailingCommas"/> already use to keep a family's cost off every file that
+	/// has not asked for it.
+	/// </remarks>
+	public bool CollapsesSimpleBlocks => PlaceSimpleDeclarationBlocksOnSingleLine || PlaceSimpleBlocksOnSingleLine;
+
+	/// <summary>
 	/// The file asked not to be formatted at all.
 	/// </summary>
 	/// <remarks>

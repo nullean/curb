@@ -1610,13 +1610,23 @@ internal static partial class Printers
 		// only one already on one. jb answers the "declaration" (method/constructor/operator/destructor/
 		// local function/accessor) and "lambda/anonymous method" families to two independent keys —
 		// measured directly, each responds only to its own — so the two stay separate options here too.
-		var placesSimpleOnSingleLine = construct is BraceStyle.Lambdas or BraceStyle.AnonymousMethods
-			? context.Options.PlaceSimpleBlocksOnSingleLine
-			: context.Options.PlaceSimpleDeclarationBlocksOnSingleLine;
-		if (placesSimpleOnSingleLine && body is BlockSyntax simpleBlock && IsCollapsibleSimpleBody(simpleBlock))
+		//
+		// CollapsesSimpleBlocks is the single, cheap guard: neither key's eligibility check (three
+		// trivia scans in IsCollapsibleSimpleBody, then a fit-measured Group in
+		// PrintCollapsibleSimpleBody) runs at all for a file that has not asked for either — every
+		// call to PrintBody in the file takes this branch's one boolean read and moves straight to the
+		// ordinary path below, the same "skip the whole family, not just this call's slice of it" shape
+		// MeasuresWholeMembers and RewritesTrailingCommas already use.
+		if (context.Options.CollapsesSimpleBlocks)
 		{
-			PrintCollapsibleSimpleBody(simpleBlock, context);
-			return;
+			var placesSimpleOnSingleLine = construct is BraceStyle.Lambdas or BraceStyle.AnonymousMethods
+				? context.Options.PlaceSimpleBlocksOnSingleLine
+				: context.Options.PlaceSimpleDeclarationBlocksOnSingleLine;
+			if (placesSimpleOnSingleLine && body is BlockSyntax simpleBlock && IsCollapsibleSimpleBody(simpleBlock))
+			{
+				PrintCollapsibleSimpleBody(simpleBlock, context);
+				return;
+			}
 		}
 
 		// The brace still goes wherever csharp_new_line_before_open_brace puts it; only the pair collapses.

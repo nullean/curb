@@ -1,3 +1,5 @@
+using AwesomeAssertions;
+
 namespace Nullean.Curb.Tests.Formatting.Options;
 
 /// <summary>
@@ -15,6 +17,23 @@ public class PlaceSimpleDeclarationBlocksTests : FormattingTest
 {
 	private const string DeclarationBlocks = "csharp_place_simple_declaration_blocks_on_single_line = true";
 	private const string Blocks = "csharp_place_simple_blocks_on_single_line = true";
+
+	// ---- the shared capability flag PrintBody gates its whole eligibility check behind ---------------
+
+	[Test]
+	public async Task Neither_key_set_reports_nothing_to_collapse()
+	{
+		TestOptions.Parse(null).CollapsesSimpleBlocks.Should().BeFalse();
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task Either_key_alone_reports_something_to_collapse()
+	{
+		TestOptions.Parse(DeclarationBlocks).CollapsesSimpleBlocks.Should().BeTrue();
+		TestOptions.Parse(Blocks).CollapsesSimpleBlocks.Should().BeTrue();
+		await Task.CompletedTask;
+	}
 
 	// ---- off by default ----------------------------------------------------------------------------
 
