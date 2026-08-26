@@ -243,8 +243,20 @@ internal static partial class Printers
 
 					// Expanding moves the accessors off the declaration's line but keeps ones the
 					// author wrote together together: `{ get; set; }` becomes three lines, not four.
+					//
+					// csharp_blank_lines_around_accessor overrides that joining rather than layering
+					// under it: a blank line cannot exist mid-line, so asking for one between two
+					// accessors implies un-joining them, the same way jb itself does. Left out of the
+					// join/flatten path entirely rather than gated behind `expand` — zero by default,
+					// so every other file takes the branch below exactly as before this option existed.
 					if (i == 0)
 						Edge();
+					else if (context.Options.BlankLinesAroundAccessor > 0)
+					{
+						arena.HardLine();
+						context.BlankLines(context.DeclarationSeparation(
+							previousEnd, EffectiveStart(accessor), context.Options.BlankLinesAroundAccessor));
+					}
 					else if (expand && context.AuthorJoined(previousEnd, accessor.SpanStart))
 						arena.Synthetic(SyntheticText.Space);
 					else

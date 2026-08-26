@@ -1023,6 +1023,18 @@ public readonly record struct FormatOptions
 	public int BlankLinesAroundInvocable { get; init; }
 
 	/// <summary>
+	/// <c>csharp_blank_lines_around_local_method</c>: the same, for a local function — a declaration
+	/// sitting in statement position inside a method body, not a control-flow construct, so it takes
+	/// its own key rather than <see cref="BlankLinesBeforeBlockStatements"/>/
+	/// <see cref="BlankLinesAfterBlockStatements"/>. One by default, matching jb: measured directly,
+	/// setting the key to zero is what turns off the blank line jb otherwise forces on both sides of
+	/// one by default — unlike <see cref="BlankLinesAroundInvocable"/>'s own default of zero, a local
+	/// function is closer in practice to a nested block that happens to have a name, and reads better
+	/// visually separated from the statements around it.
+	/// </summary>
+	public int BlankLinesAroundLocalMethod { get; init; } = 1;
+
+	/// <summary>
 	/// <c>csharp_blank_lines_around_type</c>, the same for a type declaration. One by default, not
 	/// zero like its invocable/property/field siblings — visually separating adjacent type
 	/// declarations is close to universal C# convention, unlike the member-level settings, where
@@ -1032,6 +1044,21 @@ public readonly record struct FormatOptions
 
 	/// <summary><c>csharp_blank_lines_around_property</c>, the same for a property, indexer or event.</summary>
 	public int BlankLinesAroundProperty { get; init; }
+
+	/// <summary>
+	/// <c>csharp_blank_lines_around_accessor</c>: between two accessors of the same property, indexer
+	/// or event, such as <c>get</c> and <c>set</c>. Zero by default — jb does not force separation
+	/// there either, measured directly. Above zero, un-joins two accessors the author wrote together
+	/// (<c>{ get; set; }</c>) rather than layering under that join, since a blank line cannot exist
+	/// mid-line; see <c>Printers.AccessorList</c>.
+	/// </summary>
+	public int BlankLinesAroundAccessor { get; init; }
+
+	// csharp_blank_lines_around_auto_property is deliberately absent. Measured directly against jb at
+	// several values (0, 1, 2, with csharp_keep_blank_lines_in_declarations raised to make sure a low
+	// cap was not hiding it) and it changed nothing, on both an auto-property-to-auto-property gap and
+	// an auto-property-to-ordinary-property one — the same "not actually wired to anything observable"
+	// finding as csharp_blank_lines_after_start_comment below. Left an honest gap rather than guessed.
 
 	/// <summary><c>csharp_blank_lines_around_field</c>, the same for a field.</summary>
 	public int BlankLinesAroundField { get; init; }
@@ -1221,6 +1248,14 @@ public readonly record struct FormatOptions
 	// files grew a blank line per run. Everything else here is safe because a blank-line count cannot
 	// change what a blank-line count is; this one asks a question whose answer the formatter itself
 	// changes.
+	//
+	// csharp_blank_lines_before/after_multiline_statements are the same trap from the other direction
+	// — "is this statement multiple lines" is exactly as reflow-dependent as "is this member one line"
+	// — and measured jb itself hitting it directly: two adjacent block-bodied properties (an unrelated
+	// construct, not a statement, but the same "does this span more than one line" question) picked up
+	// a blank line neither csharp_blank_lines_around_property nor any single key this session found
+	// explained, with csharp_blank_lines_around_property = 0 explicitly in place. Left out for the
+	// identical reason as the family above rather than risk shipping the same non-idempotency.
 
 	/// <summary>
 	/// <c>csharp_blank_lines_after_file_scoped_namespace_directive</c>. One by default, because that

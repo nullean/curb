@@ -531,6 +531,118 @@ public class BlankLineOptionTests : FormattingTest
 		""",
 		editorConfig: "csharp_remove_blank_lines_near_braces_in_declarations = false");
 
+	// ---- local functions and accessors ---------------------------------------------------------------
+
+	[Test]
+	public Task A_local_function_is_separated_from_its_neighbours_by_default() => Formats(
+		// csharp_blank_lines_around_local_method defaults to one, matching jb — a local function reads
+		// as a declaration sitting in statement position, closer to a nested member than to an
+		// ordinary statement, so both sides get air the way a block statement's own before/after keys
+		// do not by default.
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        int Local(int x)
+		        {
+		            return x + 1;
+		        }
+		        Local(1);
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        int Local(int x)
+		        {
+		            return x + 1;
+		        }
+
+		        Local(1);
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Local_functions_have_their_own_setting() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        int Local(int x)
+		        {
+		            return x + 1;
+		        }
+		        Local(1);
+		    }
+		}
+		""",
+		editorConfig: "csharp_blank_lines_around_local_method = 0");
+
+	[Test]
+	public Task A_single_line_local_function_is_not_separated() => Unchanged(
+		// RendersOnOneLine gates this the same way it already gates a single-line block statement:
+		// asking for the collapsed form and then forcing a blank line under it would contradict the
+		// author's own request to keep it compact.
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        void Inner() { }
+		        Inner();
+		    }
+		}
+		""",
+		editorConfig: "csharp_preserve_single_line_statements = true\ncsharp_preserve_single_line_blocks = true");
+
+	[Test]
+	public Task Accessors_have_their_own_setting() => Formats(
+		// Zero by default, matching jb: neither an auto-property's `{ get; set; }` nor a block-bodied
+		// pair gets a forced gap without asking. Above zero un-joins two accessors the author wrote
+		// together, since a blank line cannot exist mid-line.
+		"""
+		public class C
+		{
+		    public int C
+		    {
+		        get
+		        {
+		            return _c;
+		        }
+		        set
+		        {
+		            _c = value;
+		        }
+		    }
+		    private int _c;
+		}
+		""",
+		"""
+		public class C
+		{
+		    public int C
+		    {
+		        get
+		        {
+		            return _c;
+		        }
+
+		        set
+		        {
+		            _c = value;
+		        }
+		    }
+		    private int _c;
+		}
+		""",
+		editorConfig: "csharp_blank_lines_around_accessor = 1\ncsharp_style_expression_bodied_accessors = false");
+
 	// ---- what is deliberately not offered ------------------------------------------------------------
 
 	[Test]
