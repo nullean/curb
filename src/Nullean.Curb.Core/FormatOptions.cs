@@ -1228,12 +1228,6 @@ public readonly record struct FormatOptions
 	/// </summary>
 	public int BlankLinesAfterFileScopedNamespace { get; init; } = 1;
 
-	// csharp_remove_blank_lines_near_braces_in_declarations and _in_code are deliberately absent.
-	// Curb already drops a bare blank line above a closing brace, and keeps the one above a *comment*
-	// that sits there, because that blank belongs to the comment rather than to the brace. ReSharper's
-	// key does not draw that distinction, so honouring it either way would mean changing behaviour
-	// that is already right in one of the two cases. Left alone rather than half-mapped.
-
 	/// <summary>
 	/// True when some option needs a whole member measured as one unit, so the printer has to group it.
 	/// </summary>
