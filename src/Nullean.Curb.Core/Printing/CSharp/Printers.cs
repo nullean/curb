@@ -731,6 +731,7 @@ internal static partial class Printers
 		using (arena.Indent(context.Options.IndentBlockContents ? 1 : 0))
 		{
 			var previousEnd = node.OpenBraceToken.Span.End;
+			StatementSyntax? previousStatement = null;
 			foreach (var statement in node.Statements)
 			{
 				var start = EffectiveStart(statement);
@@ -744,6 +745,7 @@ internal static partial class Printers
 					arena.Synthetic(SyntheticText.Space);
 					Node.Print(statement, context);
 					previousEnd = statement.Span.End;
+					previousStatement = statement;
 					continue;
 				}
 
@@ -759,9 +761,13 @@ internal static partial class Printers
 				// TokenPrinter.PrintLeadingTrivia's exact-count force, reached moments later inside
 				// Node.Print(statement, context).
 				if (!NextStartsWithRegionBoundary(statement.GetFirstToken(includeZeroWidth: true)))
-					context.BlankLines(context.CodeSeparation(previousEnd, start));
+				{
+					context.BlankLines(context.CodeSeparation(previousEnd, start,
+						StatementSeparationMinimum(previousStatement, statement, context)));
+				}
 				Node.Print(statement, context);
 				previousEnd = statement.Span.End;
+				previousStatement = statement;
 			}
 
 			// Trivia attached to the closing brace belongs with the statements it follows, not with
@@ -2234,6 +2240,106 @@ internal static partial class Printers
 			_ => 0,
 		};
 	}
+
+	/// <summary>
+	/// The minimum blank lines <see cref="Block"/>'s statement loop must raise the gap between two
+	/// statements to — the larger of what the previous statement's own "after" rule asks for and what
+	/// the next one's "before" rule asks for, since both opinions can apply to the same gap at once
+	/// (a block statement immediately followed by a control-transfer one, say) and only one blank line
+	/// is ever wanted regardless of how many rules would have asked for it.
+	/// </summary>
+	private static int StatementSeparationMinimum(StatementSyntax? previous, StatementSyntax next, PrintContext context)
+	{
+		var options = context.Options;
+
+		// RendersOnOneLine only means something for a block statement — whether its header and body
+		// collapsed onto one line together. A control-transfer statement like `return;` is inherently
+		// one line on its own, always; asking the same question of it would trivially answer true for
+		// every one and silence the option entirely, which is what an earlier version of this method
+		// did before BlankLineOptionTests' own explicit-value case caught it.
+		var after = previous switch
+		{
+			null => 0,
+			_ when IsBlockStatement(previous) => RendersOnOneLine(previous, context) ? 0 : options.BlankLinesAfterBlockStatements,
+			_ when IsControlTransferStatement(previous) => options.BlankLinesAfterControlTransferStatements,
+			_ => 0,
+		};
+		var before = next switch
+		{
+			_ when IsBlockStatement(next) => RendersOnOneLine(next, context) ? 0 : options.BlankLinesBeforeBlockStatements,
+			_ when IsControlTransferStatement(next) => options.BlankLinesBeforeControlTransferStatements,
+			_ => 0,
+		};
+		return Math.Max(after, before);
+	}
+
+	/// <summary>
+	/// True when preservation keeps a statement on the single line the author wrote it on — jb's own
+	/// blank_lines_before/after_block_statements measurably does not reach a preserved single-line
+	/// compound statement the way it reaches one that spans multiple lines: <c>if (a) { return; }</c>
+	/// stays flush against whatever follows, and only expanding it (dropping preservation, or the
+	/// author writing it that way originally) brings the blank-line rule into play.
+	/// </summary>
+	/// <remarks>
+	/// The two preserve options are independent axes, not alternatives to OR together — an earlier
+	/// version did exactly that and it was a real idempotency bug: PreserveSingleLineStatements decides
+	/// whether the body joins the header line at all (<c>A_braced_body_moves_off_the_header_but_keeps_
+	/// its_braces_collapsed</c> in PreserveSingleLineTests documents this precisely — with it off, the
+	/// whole statement spans multiple lines even though PreserveSingleLineBlocks, on by default, would
+	/// otherwise have kept the braces themselves collapsed), so it is required unconditionally; when the
+	/// body is itself a block, PreserveSingleLineBlocks is required on top of that, since the braces
+	/// only stay collapsed when it is. Getting this wrong meant a case with only
+	/// csharp_preserve_single_line_statements = false set (blocks left at its true default) wrongly
+	/// read as "still renders on one line" via the OR, skipped forcing the blank line on the first
+	/// pass, and then forced it on the second once the now-multi-line source no longer looked joined —
+	/// caught by the suite's own idempotency check, not by manual diffing.
+	/// </remarks>
+	private static bool RendersOnOneLine(StatementSyntax statement, PrintContext context)
+	{
+		if (!context.Options.PreserveSingleLineStatements)
+			return false;
+		if (HasBlockBody(statement) && !context.Options.PreserveSingleLineBlocks)
+			return false;
+
+		return context.AuthorJoined(statement.SpanStart, statement.Span.End);
+	}
+
+	/// <summary>True when a block/control-transfer statement's own governed body is a <c>{ }</c> block.</summary>
+	private static bool HasBlockBody(StatementSyntax statement) =>
+		statement switch
+		{
+			IfStatementSyntax s => s.Statement is BlockSyntax,
+			WhileStatementSyntax s => s.Statement is BlockSyntax,
+			ForStatementSyntax s => s.Statement is BlockSyntax,
+			CommonForEachStatementSyntax s => s.Statement is BlockSyntax,
+			DoStatementSyntax s => s.Statement is BlockSyntax,
+			LockStatementSyntax s => s.Statement is BlockSyntax,
+			UsingStatementSyntax s => s.Statement is BlockSyntax,
+			FixedStatementSyntax s => s.Statement is BlockSyntax,
+			// switch/try/checked/unsafe have no braceless form at all — always block-shaped — and every
+			// other statement kind (including the control-transfer ones) has no nested body to ask
+			// about, so PreserveSingleLineBlocks is simply irrelevant to it either way.
+			_ => true,
+		};
+
+	/// <summary>
+	/// The compound control-flow statements <c>csharp_blank_lines_before/after_block_statements</c>
+	/// govern — every statement kind whose own body is a nested block or embedded statement, as
+	/// opposed to a single simple statement.
+	/// </summary>
+	private static bool IsBlockStatement(StatementSyntax statement) =>
+		statement is IfStatementSyntax or WhileStatementSyntax or ForStatementSyntax
+			or CommonForEachStatementSyntax or DoStatementSyntax or SwitchStatementSyntax
+			or UsingStatementSyntax or LockStatementSyntax or TryStatementSyntax
+			or FixedStatementSyntax or CheckedStatementSyntax or UnsafeStatementSyntax;
+
+	/// <summary>
+	/// The statements <c>csharp_blank_lines_before/after_control_transfer_statements</c> govern —
+	/// every statement kind that unconditionally leaves the block it sits in.
+	/// </summary>
+	private static bool IsControlTransferStatement(StatementSyntax statement) =>
+		statement is ReturnStatementSyntax or ThrowStatementSyntax or BreakStatementSyntax
+			or ContinueStatementSyntax or GotoStatementSyntax or YieldStatementSyntax;
 
 	/// <summary>
 	/// True when a token is followed by a line comment, which has already ended the line.
