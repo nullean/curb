@@ -140,6 +140,8 @@ public static class OptionCatalog
 			"csharp_blank_lines_after_block_statements",
 			"csharp_blank_lines_before_control_transfer_statements",
 			"csharp_blank_lines_after_control_transfer_statements",
+			"csharp_blank_lines_before_case",
+			"csharp_blank_lines_after_case",
 			"csharp_max_initializer_elements_on_line",
 			"csharp_max_chained_method_calls_on_line",
 			"csharp_max_array_initializer_elements_on_line",

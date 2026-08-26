@@ -121,6 +121,8 @@ public static class OptionValues
 		"csharp_blank_lines_after_block_statements" => Lines(options.BlankLinesAfterBlockStatements),
 		"csharp_blank_lines_before_control_transfer_statements" => Lines(options.BlankLinesBeforeControlTransferStatements),
 		"csharp_blank_lines_after_control_transfer_statements" => Lines(options.BlankLinesAfterControlTransferStatements),
+		"csharp_blank_lines_before_case" => Lines(options.BlankLinesBeforeCase),
+		"csharp_blank_lines_after_case" => Lines(options.BlankLinesAfterCase),
 		"csharp_max_initializer_elements_on_line" => Count(options.MaxInitializerElementsOnLine),
 		"csharp_max_chained_method_calls_on_line" => Count(options.MaxChainedMethodCallsOnLine),
 		"csharp_max_array_initializer_elements_on_line" => Count(options.MaxArrayInitializerElementsOnLine),

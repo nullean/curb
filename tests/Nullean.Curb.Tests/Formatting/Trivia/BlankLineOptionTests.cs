@@ -375,6 +375,56 @@ public class BlankLineOptionTests : FormattingTest
 		""");
 
 	[Test]
+	public Task Switch_sections_have_their_own_setting() => Formats(
+		// csharp_blank_lines_before_case is the gap between sections (never between stacked labels of
+		// the same one); csharp_blank_lines_after_case is the gap from a section's labels to its first
+		// statement only, not statement-to-statement separation within the section (Second() staying
+		// flush against First() below proves that half).
+		"""
+		public class C
+		{
+		    public void M(int x)
+		    {
+		        switch (x)
+		        {
+		            case 1:
+		                First();
+		                Second();
+		                break;
+		            case 2:
+		                Third();
+		                break;
+		        }
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M(int x)
+		    {
+		        switch (x)
+		        {
+		            case 1:
+
+		                First();
+		                Second();
+		                break;
+
+		            case 2:
+
+		                Third();
+		                break;
+		        }
+		    }
+		}
+		""",
+		editorConfig: """
+		csharp_blank_lines_before_case = 1
+		csharp_blank_lines_after_case = 1
+		""");
+
+	[Test]
 	public Task Namespaces_have_their_own_setting() => Formats(
 		// Two adjacent namespaces rather than a using directive above one: csharp_blank_lines_after_
 		// using_list now defaults to one of its own (see BlankLineTests), which would otherwise force
