@@ -439,6 +439,8 @@ internal static class Program
             "csharp_space_between_square_brackets" => opts with { SpaceBetweenSquareBrackets = b },
             "csharp_space_before_dot" => opts with { SpaceBeforeDot = b },
             "csharp_space_after_dot" => opts with { SpaceAfterDot = b },
+            "csharp_space_after_unary_operator" => opts with { SpaceAfterUnaryOperator = b },
+            "csharp_space_around_ternary_operator" => opts with { SpaceAroundTernaryOperator = b },
             "csharp_space_before_semicolon_in_for_statement" => opts with { SpaceBeforeSemicolonInForStatement = b },
             "csharp_space_after_semicolon_in_for_statement" => opts with { SpaceAfterSemicolonInForStatement = b },
 
@@ -515,6 +517,9 @@ internal static class Program
 
             "csharp_trailing_comma_in_multiline_lists" => opts with { TrailingCommaInMultilineLists = b },
             "csharp_trailing_comma_in_singleline_lists" => opts with { TrailingCommaInSinglelineLists = b },
+
+            "csharp_remove_blank_lines_near_braces_in_declarations" => opts with { RemoveBlankLinesNearBracesInDeclarations = b },
+            "csharp_remove_blank_lines_near_braces_in_code" => opts with { RemoveBlankLinesNearBracesInCode = b },
 
             "generated_code" => opts with { Excluded = b },
             "dotnet_diagnostic.ide0055.severity" => value == "none" ? opts with { Excluded = true } : opts,

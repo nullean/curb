@@ -34,6 +34,34 @@
       "staysFixedPoint": false,
       "reason": "Measured on a case combining indent_style = tab, tab_width = 8 and a width narrow enough to force parameter-list wrapping: dotnet format converts the outer two levels of tab indentation to four-space equivalents while leaving the wrapped argument lines as tabs, an inconsistent application of indent_style = tab that only shows up in this combination — not reproduced with indent_style = tab alone, or with reflow alone. Not fully root-caused (looks like a quirk in Roslyn's own formatter under this specific combination); recorded as observed rather than fully explained. tab_width has no dotnet format equivalent to check reflow width against outside this interaction, since dotnet format does not reflow at all.",
       "exampleCase": "CoreOptionTests.Tab_width_counts_toward_the_line_length"
+    },
+    {
+      "key": "csharp_space_after_unary_operator",
+      "tool": "dotnet-format-whitespace",
+      "staysFixedPoint": false,
+      "reason": "csharp_space_after_unary_operator is a ReSharper generalized key (space_after_unary_operator) dotnet format does not recognise at all. Measured: dotnet format whitespace always normalises `- x`/`+ x`/`! x` back to `-x`/`+x`/`!x` regardless of any .editorconfig setting, since it has its own fixed, unconfigurable opinion here. Setting the key to true is a permanent, structural divergence from dotnet format for any file containing a unary expression — there is no shape Curb could pick that satisfies both dotnet format's fixed opinion and the key's own request at once.",
+      "exampleCase": "SpacingTests.Unary_minus_plus_and_not_take_a_space_when_asked"
+    },
+    {
+      "key": "csharp_space_after_unary_operator",
+      "tool": "dotnet-format-whitespace",
+      "staysFixedPoint": false,
+      "reason": "Same permanent divergence as SpacingTests.Unary_minus_plus_and_not_take_a_space_when_asked, exercised for the two unsafe pointer prefix operators (pointer indirection `*p`, address-of `&x`) rather than unary minus/plus/not — dotnet format normalises `* p`/`& x` back to `*p`/`&x` just as unconditionally.",
+      "exampleCase": "SpacingTests.The_unsafe_pointer_prefix_operators_take_a_space_too"
+    },
+    {
+      "key": "csharp_space_around_ternary_operator",
+      "tool": "dotnet-format-whitespace",
+      "staysFixedPoint": false,
+      "reason": "csharp_space_around_ternary_operator is a ReSharper generalized key (space_around_ternary_operator) dotnet format does not recognise at all. Measured: dotnet format whitespace always normalises `x > 0?x:0` back to `x > 0 ? x : 0` regardless of any .editorconfig setting — spacing around a ternary's ?/: is not configurable there. Setting the key to false is a permanent, structural divergence from dotnet format for any file containing a ternary expression.",
+      "exampleCase": "SpacingTests.The_ternary_operator_can_lose_its_surrounding_space"
+    },
+    {
+      "key": "csharp_space_around_ternary_operator",
+      "tool": "dotnet-format-whitespace",
+      "staysFixedPoint": false,
+      "reason": "Same permanent divergence as SpacingTests.The_ternary_operator_can_lose_its_surrounding_space, exercised on a ternary long enough to wrap under max_line_length — the wrap point itself (a SoftLine) is unaffected by the option, only the flat spacing dotnet format keeps re-adding is.",
+      "exampleCase": "SpacingTests.A_wrapped_ternary_still_breaks_without_the_space"
     }
   ]
 }

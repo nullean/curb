@@ -203,6 +203,12 @@ public static class OptionCatalog
 			"csharp_space_after_dot",
 			"csharp_space_before_semicolon_in_for_statement",
 			"csharp_space_after_semicolon_in_for_statement",
+
+			// ReSharper's generalized space_after_unary_operator/space_around_ternary_operator, not
+			// part of IDE0055's 39 — the same "Curb invents no formatting keys, Rider already reads
+			// these" reasoning as the trailing-comma/empty-block keys above.
+			"csharp_space_after_unary_operator",
+			"csharp_space_around_ternary_operator",
 		]).ToFrozenSet(StringComparer.Ordinal);
 
 	/// <summary>True for a key Curb knows about, whether or not it is implemented yet.</summary>

@@ -237,6 +237,35 @@ public static class Snippets
 
             """,
 
+        ["unary"] = """
+            namespace N;
+
+            public class Widget
+            {
+                public int Negate(int x)
+                {
+                    int a = -x;
+                    bool b = !(x > 0);
+                    int c = ~x;
+                    return a + c;
+                }
+            }
+
+            """,
+
+        ["ternary"] = """
+            namespace N;
+
+            public class Widget
+            {
+                public int Clamp(int x)
+                {
+                    return x > 0 ? x : 0;
+                }
+            }
+
+            """,
+
         ["for_loop"] = """
             namespace N;
 
@@ -438,6 +467,24 @@ public static class Snippets
                 public void Stop()
                 {
                     Console.WriteLine("stop");
+                }
+            }
+
+            """,
+
+        ["near_braces"] = """
+            namespace N;
+
+            public class Widget
+            {
+
+                private int _x;
+
+                public void Run()
+                {
+
+                    int a = 1;
+                    Console.WriteLine(a);
                 }
             }
 
