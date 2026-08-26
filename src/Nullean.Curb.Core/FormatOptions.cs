@@ -987,6 +987,31 @@ public readonly record struct FormatOptions
 	public bool PlaceSimpleAccessorholderOnSingleLine { get; init; } = true;
 
 	/// <summary>
+	/// <c>csharp_place_simple_declaration_blocks_on_single_line</c>, from ReSharper's generalized
+	/// <c>place_simple_declaration_blocks_on_single_line</c> property. Unlike
+	/// <see cref="PlaceSimpleEnumOnSingleLine"/>/<see cref="PlaceSimpleAccessorholderOnSingleLine"/>
+	/// above, this is not a preservation flag — it actively collapses a method, constructor, operator,
+	/// destructor, local function or accessor body onto one line even when the author wrote it on
+	/// several, provided the body is exactly one statement with no comment inside it (dropping or
+	/// misplacing a comment on collapse is worse than not collapsing) and the result fits the line —
+	/// measured directly against jb, including that a too-long single statement is left expanded
+	/// rather than forced to overflow. False by default: this is a genuine opinion about shape, not a
+	/// preservation default like its two siblings above, and jb itself does nothing with a bare
+	/// <c>.editorconfig</c> either. See <c>Printers.PrintBody</c>.
+	/// </summary>
+	public bool PlaceSimpleDeclarationBlocksOnSingleLine { get; init; }
+
+	/// <summary>
+	/// <c>csharp_place_simple_blocks_on_single_line</c>, from ReSharper's generalized
+	/// <c>place_simple_blocks_on_single_line</c> property. The same active-collapse behaviour as
+	/// <see cref="PlaceSimpleDeclarationBlocksOnSingleLine"/>, for a lambda or anonymous method's block
+	/// body instead — the two are independent in jb (each responds to only its own key), so they stay
+	/// two options here too rather than one covering both construct families. False by default, for
+	/// the same reason.
+	/// </summary>
+	public bool PlaceSimpleBlocksOnSingleLine { get; init; }
+
+	/// <summary>
 	/// <c>csharp_wrap_chained_binary_expressions</c>: give each operand of a long <c>&amp;&amp;</c>
 	/// or <c>||</c> chain a line of its own. Null leaves such a chain unbroken.
 	/// </summary>

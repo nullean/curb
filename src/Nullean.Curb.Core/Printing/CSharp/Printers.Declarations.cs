@@ -380,6 +380,38 @@ internal static partial class Printers
 		TokenPrinter.PrintIfPresent(node.SemicolonToken, context);
 	}
 
+	/// <summary>
+	/// <c>~Widget() { ... }</c>. No key converts between block and expression body here — dotnet
+	/// format's own expression-bodied family (IDE0021-0027/IDE0061) has no destructor case at all — so
+	/// whichever the author wrote is what prints, the same "as written" shape the seven keyed
+	/// constructs fall back to when their own option is unset.
+	/// </summary>
+	public static void DestructorDeclaration(DestructorDeclarationSyntax node, PrintContext context)
+	{
+		var arena = context.Arena;
+
+		PrintAttributeLists(node.AttributeLists, context);
+		PrintModifiers(node.Modifiers, context);
+		TokenPrinter.Print(node.TildeToken, context);
+		TokenPrinter.Print(node.Identifier, context);
+		Spacing.BeforeDeclarationParens(context);
+		Node.Print(node.ParameterList, context);
+
+		if (node.Body is not null)
+		{
+			PrintBody(node.Body, BraceStyle.Methods, context, context.ParameterListGroup);
+			return;
+		}
+
+		if (node.ExpressionBody is not null)
+		{
+			arena.Synthetic(SyntheticText.Space);
+			Node.Print(node.ExpressionBody, context);
+		}
+
+		TokenPrinter.PrintIfPresent(node.SemicolonToken, context);
+	}
+
 	public static void AttributeList(AttributeListSyntax node, PrintContext context)
 	{
 		TokenPrinter.Print(node.OpenBracketToken, context);

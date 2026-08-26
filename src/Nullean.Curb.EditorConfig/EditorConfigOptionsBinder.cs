@@ -362,6 +362,12 @@ public static class EditorConfigOptionsBinder
 		if (TryPrefixedBool(properties, "place_simple_accessorholder_on_single_line", diagnostics, out var placeAccessors))
 			options = options with { PlaceSimpleAccessorholderOnSingleLine = placeAccessors };
 
+		if (TryPrefixedBool(properties, "place_simple_declaration_blocks_on_single_line", diagnostics, out var placeDeclBlocks))
+			options = options with { PlaceSimpleDeclarationBlocksOnSingleLine = placeDeclBlocks };
+
+		if (TryPrefixedBool(properties, "place_simple_blocks_on_single_line", diagnostics, out var placeBlocks))
+			options = options with { PlaceSimpleBlocksOnSingleLine = placeBlocks };
+
 		// The parameter list's is admissible in either mode. The argument, initializer and chained-binary
 		// styles are not: forcing every one of those to break moves constructs whose indentation other
 		// rules read from the source, and the file then formats differently on its second pass — 140

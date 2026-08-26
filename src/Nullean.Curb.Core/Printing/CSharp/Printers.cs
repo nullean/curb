@@ -1605,10 +1605,70 @@ internal static partial class Printers
 			return;
 		}
 
+		// csharp_place_simple_declaration_blocks_on_single_line / csharp_place_simple_blocks_on_single_line:
+		// unlike KeepsOneLine above, this collapses a body the author wrote across several lines, not
+		// only one already on one. jb answers the "declaration" (method/constructor/operator/destructor/
+		// local function/accessor) and "lambda/anonymous method" families to two independent keys —
+		// measured directly, each responds only to its own — so the two stay separate options here too.
+		var placesSimpleOnSingleLine = construct is BraceStyle.Lambdas or BraceStyle.AnonymousMethods
+			? context.Options.PlaceSimpleBlocksOnSingleLine
+			: context.Options.PlaceSimpleDeclarationBlocksOnSingleLine;
+		if (placesSimpleOnSingleLine && body is BlockSyntax simpleBlock && IsCollapsibleSimpleBody(simpleBlock))
+		{
+			PrintCollapsibleSimpleBody(simpleBlock, context);
+			return;
+		}
+
 		// The brace still goes wherever csharp_new_line_before_open_brace puts it; only the pair collapses.
 		BeforeOpenBrace(construct, context);
 		using (context.Arena.ForceFlatIf(CollapsesEmptyBraces(body, context)))
 			Node.Print(body, context);
+	}
+
+	/// <summary>
+	/// True for a block whose one statement <see cref="PrintBody"/>'s single-line collapse could join
+	/// onto the brace line without dropping or misplacing anything — exactly one statement, and no
+	/// comment or directive anywhere between the braces that collapsing would otherwise have to eat.
+	/// </summary>
+	private static bool IsCollapsibleSimpleBody(BlockSyntax block) =>
+		block.Statements.Count == 1
+		&& !TokenPrinter.HasAnyContent(block.OpenBraceToken)
+		&& !TokenPrinter.HasLeadingContent(block.Statements[0].GetFirstToken())
+		&& !TokenPrinter.HasLeadingContent(block.CloseBraceToken);
+
+	/// <summary>
+	/// Emits <paramref name="block"/>'s single statement flat on the brace line when it fits, falling
+	/// back to the ordinary multi-line shape — <see cref="Block"/>'s own, not reproduced here — when it
+	/// does not. The width decision is the printer's own fit check, the same one <c>AccessorList</c>
+	/// already relies on for its own collapse, not a source-authored line count: a statement too long
+	/// to join stays expanded rather than overflowing the line, matching jb's own measured behaviour.
+	/// </summary>
+	private static void PrintCollapsibleSimpleBody(BlockSyntax block, PrintContext context)
+	{
+		var arena = context.Arena;
+
+		// One group covers the header-to-brace gap too, not only the body: collapsing overrides
+		// csharp_new_line_before_open_brace the same way csharp_preserve_single_line_blocks already
+		// does for an author-joined body — jb glues the whole declaration onto one line, brace
+		// included, rather than respecting a configured Allman placement only to then collapse what
+		// follows it. BeforeOpenBrace is deliberately not called here: its own HardLine, even sitting
+		// unchosen inside an IfBreak branch, would poison this group's own fits algorithm and force it
+		// to always "break" — arena.Line() is the primitive built to be measured, not forced. The
+		// broken fallback this produces is Allman-shaped regardless of the configured brace style, a
+		// known simplification for the rare "too long to collapse" case under a K&R configuration.
+		using (arena.Group())
+		{
+			arena.Line();
+			TokenPrinter.Print(block.OpenBraceToken, context);
+			using (arena.Indent())
+			{
+				arena.Line();
+				Node.Print(block.Statements[0], context);
+			}
+			using (arena.IndentIf(context.Options.IndentBraces))
+				arena.Line();
+			TokenPrinter.Print(block.CloseBraceToken, context);
+		}
 	}
 
 	/// <summary>
@@ -2310,14 +2370,14 @@ internal static partial class Printers
 		var after = previous switch
 		{
 			null => 0,
-			LocalFunctionStatementSyntax => RendersOnOneLine(previous, context) ? 0 : options.BlankLinesAroundLocalMethod,
+			LocalFunctionStatementSyntax => LocalFunctionRendersOnOneLine(previous, context) ? 0 : options.BlankLinesAroundLocalMethod,
 			_ when IsBlockStatement(previous) => RendersOnOneLine(previous, context) ? 0 : options.BlankLinesAfterBlockStatements,
 			_ when IsControlTransferStatement(previous) => options.BlankLinesAfterControlTransferStatements,
 			_ => 0,
 		};
 		var before = next switch
 		{
-			LocalFunctionStatementSyntax => RendersOnOneLine(next, context) ? 0 : options.BlankLinesAroundLocalMethod,
+			LocalFunctionStatementSyntax => LocalFunctionRendersOnOneLine(next, context) ? 0 : options.BlankLinesAroundLocalMethod,
 			_ when IsBlockStatement(next) => RendersOnOneLine(next, context) ? 0 : options.BlankLinesBeforeBlockStatements,
 			_ when IsControlTransferStatement(next) => options.BlankLinesBeforeControlTransferStatements,
 			_ => 0,
@@ -2355,6 +2415,26 @@ internal static partial class Printers
 
 		return context.AuthorJoined(statement.SpanStart, statement.Span.End);
 	}
+
+	/// <summary>
+	/// The same question as <see cref="RendersOnOneLine"/>, extended for a local function specifically:
+	/// besides the ordinary "author already wrote it joined" answer, a local function also renders on
+	/// one line when csharp_place_simple_declaration_blocks_on_single_line is about to collapse it
+	/// regardless of how the author wrote it — <see cref="PrintBody"/>'s own eligibility check
+	/// (<see cref="IsCollapsibleSimpleBody"/>) decides that independently of source layout, so asking
+	/// it here rather than only <see cref="RendersOnOneLine"/> is what keeps this blank-line decision
+	/// and the body's own printing agreeing about whether the local function is one line or several.
+	/// Without it, a local function collapsed by that option still got the blank line its un-collapsed,
+	/// multi-line source would have asked for — a real disagreement with jb, caught by comparing
+	/// against it directly rather than by an idempotency failure (both passes agreed, just on the
+	/// wrong shape, since the printed output already carried the blank line the source itself asked
+	/// the next pass's floor-and-cap treatment to keep).
+	/// </summary>
+	private static bool LocalFunctionRendersOnOneLine(StatementSyntax statement, PrintContext context) =>
+		RendersOnOneLine(statement, context)
+		|| (context.Options.PlaceSimpleDeclarationBlocksOnSingleLine
+			&& statement is LocalFunctionStatementSyntax { Body: BlockSyntax block }
+			&& IsCollapsibleSimpleBody(block));
 
 	/// <summary>True when a block/control-transfer statement's own governed body is a <c>{ }</c> block.</summary>
 	private static bool HasBlockBody(StatementSyntax statement) =>

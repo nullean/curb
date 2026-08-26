@@ -112,6 +112,8 @@ public static class OptionCatalog
 			"csharp_wrap_after_dot_in_method_calls",
 			"csharp_place_simple_enum_on_single_line",
 			"csharp_place_simple_accessorholder_on_single_line",
+			"csharp_place_simple_declaration_blocks_on_single_line",
+			"csharp_place_simple_blocks_on_single_line",
 			"csharp_wrap_chained_binary_expressions",
 			"csharp_wrap_chained_method_calls",
 			"csharp_wrap_before_binary_opsign",
