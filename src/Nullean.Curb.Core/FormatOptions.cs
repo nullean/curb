@@ -297,6 +297,25 @@ public readonly record struct FormatOptions
 	/// <summary><c>csharp_space_after_dot</c>, default false.</summary>
 	public bool SpaceAfterDot { get; init; }
 
+	/// <summary>
+	/// <c>csharp_space_after_unary_operator</c>, from ReSharper's generalized
+	/// <c>space_after_unary_operator</c> property. False by default, matching jb and ordinary C#
+	/// convention — <c>-x</c>, not <c>- x</c>. Measured directly which operators it actually reaches:
+	/// unary minus/plus, logical not, and the two unsafe prefix operators (pointer indirection
+	/// <c>*p</c>, address-of <c>&amp;x</c>) — not bitwise complement (<c>~x</c>) and not prefix
+	/// increment/decrement (<c>++x</c>/<c>--x</c>), both of which jb leaves alone even with the key on;
+	/// see <c>Printers.PrefixUnaryExpression</c>.
+	/// </summary>
+	public bool SpaceAfterUnaryOperator { get; init; }
+
+	/// <summary>
+	/// <c>csharp_space_around_ternary_operator</c>, from ReSharper's generalized
+	/// <c>space_around_ternary_operator</c> property. True by default — dotnet format's own convention,
+	/// which Curb already followed unconditionally before this option existed, so false is the one
+	/// direction that needed wiring; see <c>Printers.ConditionalExpression</c>.
+	/// </summary>
+	public bool SpaceAroundTernaryOperator { get; init; } = true;
+
 	/// <summary><c>csharp_space_before_semicolon_in_for_statement</c>, default false.</summary>
 	public bool SpaceBeforeSemicolonInForStatement { get; init; }
 

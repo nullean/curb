@@ -522,6 +522,129 @@ public class SpacingTests : FormattingTest
 		""",
 		editorConfig: "csharp_space_after_semicolon_in_for_statement = false");
 
+	// ---- csharp_space_after_unary_operator --------------------------------------------------------
+
+	[Test]
+	public Task Unary_minus_plus_and_not_take_a_space_when_asked() => Formats(
+		"""
+		public class C
+		{
+		    public void M(int x)
+		    {
+		        int a = -x;
+		        int b = +x;
+		        bool c = !true;
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M(int x)
+		    {
+		        int a = - x;
+		        int b = + x;
+		        bool c = ! true;
+		    }
+		}
+		""",
+		editorConfig: "csharp_space_after_unary_operator = true");
+
+	[Test]
+	public Task Bitwise_complement_and_prefix_increment_decrement_are_not_reached() => Unchanged(
+		// Measured directly against jb: ~x, ++x and --x stay glued to their operand even with the key
+		// on — only unary minus/plus, logical not, and the unsafe pointer prefix operators respond.
+		"""
+		public class C
+		{
+		    public void M(int x)
+		    {
+		        int a = ~x;
+		        ++x;
+		        --x;
+		    }
+		}
+		""",
+		editorConfig: "csharp_space_after_unary_operator = true");
+
+	[Test]
+	public Task The_unsafe_pointer_prefix_operators_take_a_space_too() => Formats(
+		"""
+		public class C
+		{
+		    public unsafe void M(int x, int* p)
+		    {
+		        int q = *p;
+		        int* r = &x;
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public unsafe void M(int x, int* p)
+		    {
+		        int q = * p;
+		        int* r = & x;
+		    }
+		}
+		""",
+		editorConfig: "csharp_space_after_unary_operator = true");
+
+	// ---- csharp_space_around_ternary_operator -----------------------------------------------------
+
+	[Test]
+	public Task The_ternary_operator_can_lose_its_surrounding_space() => Formats(
+		"""
+		public class C
+		{
+		    public int M(int x)
+		    {
+		        return x > 0 ? x : 0;
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public int M(int x)
+		    {
+		        return x > 0?x:0;
+		    }
+		}
+		""",
+		editorConfig: "csharp_space_around_ternary_operator = false");
+
+	[Test]
+	public Task A_wrapped_ternary_still_breaks_without_the_space() => Formats(
+		// The gap in front of ? and : is a wrap point (arena.SoftLine), not a plain space — turning
+		// the option off changes what the flat form reads as, not whether a long ternary can still
+		// break under max_line_length.
+		"""
+		public class C
+		{
+		    public int M(int aVeryLongParameterName, int anotherVeryLongParameterOne)
+		    {
+		        return aVeryLongParameterName > 0 ? aVeryLongParameterName : anotherVeryLongParameterOne;
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public int M(
+		        int aVeryLongParameterName,
+		        int anotherVeryLongParameterOne
+		    )
+		    {
+		        return aVeryLongParameterName > 0
+		            ?aVeryLongParameterName
+		            :anotherVeryLongParameterOne;
+		    }
+		}
+		""",
+		editorConfig: "csharp_space_around_ternary_operator = false\nmax_line_length = 60");
+
 	// ---- the batch together ----------------------------------------------------------------------
 
 	[Test]

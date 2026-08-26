@@ -209,6 +209,8 @@ public static class OptionValues
 		"csharp_space_before_comma" => Bool(options.SpaceBeforeComma),
 		"csharp_space_after_dot" => Bool(options.SpaceAfterDot),
 		"csharp_space_before_dot" => Bool(options.SpaceBeforeDot),
+		"csharp_space_after_unary_operator" => Bool(options.SpaceAfterUnaryOperator),
+		"csharp_space_around_ternary_operator" => Bool(options.SpaceAroundTernaryOperator),
 		"csharp_space_after_semicolon_in_for_statement" => Bool(options.SpaceAfterSemicolonInForStatement),
 		"csharp_space_before_semicolon_in_for_statement" => Bool(options.SpaceBeforeSemicolonInForStatement),
 
