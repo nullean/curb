@@ -284,9 +284,17 @@ internal sealed class PrintContext(DocArena arena, SourceText text, FormatOption
 		Options.KeepExistingLinebreaks && OnSameLine(start, end);
 
 	/// <summary>Blank lines between two positions, capped at one — runs of blank lines collapse.</summary>
+	/// <remarks>
+	/// A negative <paramref name="endOfPrevious"/> is the sentinel a caller uses for "nothing precedes
+	/// this, an earlier step already forced its own exact separation" — <c>Printers.Separate</c> already
+	/// special-cased it locally; guarding it here too means every other caller of
+	/// <see cref="DeclarationSeparation"/>/<see cref="CodeSeparation"/> gets the same safety without
+	/// having to know about the convention, rather than crashing on
+	/// <c>SourceText.Lines.GetLineFromPosition(-1)</c>.
+	/// </remarks>
 	public int BlankLinesBetween(int endOfPrevious, int startOfNext)
 	{
-		if (startOfNext <= endOfPrevious)
+		if (endOfPrevious < 0 || startOfNext <= endOfPrevious)
 			return 0;
 		var previousLine = Text.Lines.GetLineFromPosition(endOfPrevious).LineNumber;
 		var nextLine = Text.Lines.GetLineFromPosition(startOfNext).LineNumber;

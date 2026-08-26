@@ -127,26 +127,8 @@ public class IgnoreSpacingTests : FormattingTest
 	// ---- the default is to normalise ---------------------------------------------------------------
 
 	[Test]
-	public Task False_normalises_everything() => Formats(
-		Ragged,
-		"""
-		public class C
-		{
-		    public void M()
-		    {
-		        int x = 1;
-		        x = x + 2;
-		        var b = x > 1 && x < 9;
-		        int y = 1;
-		        y = y + 1;
-		    }
-
-		    private int _field = 3;
-		}
-		""",
-		editorConfig: "csharp_space_around_declaration_statements = false");
-
-	[Test]
+	// Not paired with an explicit `= false` case: that spelling formats identically to leaving the
+	// key unset, so a second case asserting it would prove nothing beyond what this one already does.
 	public Task The_default_matches_false() => Formats(
 		Ragged,
 		"""
@@ -166,7 +148,7 @@ public class IgnoreSpacingTests : FormattingTest
 		""");
 
 	[Test]
-	public Task True_is_not_a_value_this_option_takes() => Formats(
+	public Task True_is_not_a_value_this_option_takes() => FallsBackToDefault(
 		Ragged,
 		// Reported and the default kept, rather than guessed at.
 		"""

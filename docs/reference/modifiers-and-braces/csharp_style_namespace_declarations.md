@@ -18,6 +18,10 @@ Convert block namespaces to file-scoped. IDE0161. Applied without a compilation.
 
 **Default:** `(as written)`
 
+## Conformance
+
+No known case where Curb's output is not a fixed point of `dotnet format` — see [conformance](../../design-principles/conformance.md).
+
 ### `csharp_style_namespace_declarations = block_scoped`
 
 ```ini

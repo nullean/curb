@@ -19,6 +19,12 @@ How an empty method, constructor, accessor or control-flow body is laid out. tog
 
 **Default:** `(not set)`
 
+## Conformance
+
+Curb's output is not always a fixed point of the tool(s) below for this key — see [conformance divergences](../../design-principles/conformance-divergences.md) for the full registry.
+
+- **dotnet-format-whitespace**: csharp_empty_block_style is a ReSharper-only key dotnet format does not recognise at all, so on its own it is inert to dotnet format (verified: `together` alone survives). The divergence only appears combined with csharp_preserve_single_line_blocks = false, an IDE0055 key dotnet format does understand as 'expand every single-line block' — including the empty one Curb just recollapsed under the together opinion. The two options are in permanent, direct conflict whenever both are set this way; there is no shape Curb could choose that satisfies both at once. (`EmptyBlockStyleTests.Together_ignores_preserve_single_line_blocks_being_off`)
+
 ### `csharp_empty_block_style = multiline`
 
 ```ini

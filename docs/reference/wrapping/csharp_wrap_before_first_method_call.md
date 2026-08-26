@@ -18,6 +18,10 @@ When a chain breaks, break before the first call too, leaving the receiver on it
 
 **Default:** `(not set)`
 
+## Conformance
+
+No known case where Curb's output is not a fixed point of `dotnet format` — see [conformance](../../design-principles/conformance.md).
+
 ### `csharp_wrap_before_first_method_call = true`
 
 ```ini

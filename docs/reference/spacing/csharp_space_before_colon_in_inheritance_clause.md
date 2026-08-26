@@ -18,6 +18,10 @@ Space before the colon in a base list.
 
 **Default:** `true`
 
+## Conformance
+
+No known case where Curb's output is not a fixed point of `dotnet format` — see [conformance](../../design-principles/conformance.md).
+
 ### `csharp_space_before_colon_in_inheritance_clause = true`
 
 ```ini

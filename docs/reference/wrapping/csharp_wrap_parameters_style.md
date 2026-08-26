@@ -19,6 +19,10 @@ chop_always gives every parameter its own line regardless of width; wrap_if_long
 
 **Default:** `chop_if_long`
 
+## Conformance
+
+No known case where Curb's output is not a fixed point of `dotnet format` — see [conformance](../../design-principles/conformance.md).
+
 ### `csharp_wrap_parameters_style = chop_always`
 
 ```ini

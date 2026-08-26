@@ -18,6 +18,10 @@ Where a method's attribute section goes. if_owner_is_single_line joins it when t
 
 **Default:** `own_line`
 
+## Conformance
+
+No known case where Curb's output is not a fixed point of `dotnet format` — see [conformance](../../design-principles/conformance.md).
+
 ### `csharp_place_method_attribute_on_same_line = own_line`
 
 ```ini

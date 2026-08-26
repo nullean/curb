@@ -59,10 +59,17 @@ public class PreserveSingleLineTests : FormattingTest
 		""");
 
 	[Test]
-	public Task A_type_a_namespace_and_an_enum_can_all_be_preserved() => Unchanged(
+	public Task A_type_a_namespace_and_an_enum_can_all_be_preserved() => Formats(
 		"""
 		namespace N { }
 		public class C { }
+		public enum E { A }
+		""",
+		"""
+		namespace N { }
+
+		public class C { }
+
 		public enum E { A }
 		""");
 
@@ -209,6 +216,7 @@ public class PreserveSingleLineTests : FormattingTest
 		public class C
 		{
 		}
+
 		public enum E
 		{
 		    A
@@ -301,16 +309,15 @@ public class PreserveSingleLineTests : FormattingTest
 		    }
 		}
 		""",
-		// The brace and the keyword share a line, but the statement does not fit on one — what the
-		// option preserves is a single-line statement, not a single-line join.
+		// An empty try always collapses regardless of this option — Curb's one unconditional opinion,
+		// see StatementTests' "an empty try, catch or finally is always { }". What this case actually
+		// asserts is that catch still takes its own line rather than joining try's now-collapsed brace.
 		"""
 		public class C
 		{
 		    public void M()
 		    {
-		        try
-		        {
-		        }
+		        try { }
 		        catch (Exception e) { }
 		    }
 		}

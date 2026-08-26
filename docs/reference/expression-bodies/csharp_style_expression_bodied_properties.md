@@ -19,6 +19,10 @@ Convert an eligible single-getter property to an expression body. IDE0025.
 
 **Default:** `false`
 
+## Conformance
+
+No known case where Curb's output is not a fixed point of `dotnet format` — see [conformance](../../design-principles/conformance.md).
+
 ### `csharp_style_expression_bodied_properties = false`
 
 ```ini

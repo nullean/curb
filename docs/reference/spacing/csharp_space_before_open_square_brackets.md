@@ -18,6 +18,10 @@ Space before an opening square bracket.
 
 **Default:** `false`
 
+## Conformance
+
+No known case where Curb's output is not a fixed point of `dotnet format` — see [conformance](../../design-principles/conformance.md).
+
 ### `csharp_space_before_open_square_brackets = true`
 
 ```ini

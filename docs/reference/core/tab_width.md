@@ -17,6 +17,12 @@ Columns a tab occupies when measuring line width.
 
 **Default:** `4`
 
+## Conformance
+
+Curb's output is not always a fixed point of the tool(s) below for this key — see [conformance divergences](../../design-principles/conformance-divergences.md) for the full registry.
+
+- **dotnet-format-whitespace**: Measured on a case combining indent_style = tab, tab_width = 8 and a width narrow enough to force parameter-list wrapping: dotnet format converts the outer two levels of tab indentation to four-space equivalents while leaving the wrapped argument lines as tabs, an inconsistent application of indent_style = tab that only shows up in this combination — not reproduced with indent_style = tab alone, or with reflow alone. Not fully root-caused (looks like a quirk in Roslyn's own formatter under this specific combination); recorded as observed rather than fully explained. tab_width has no dotnet format equivalent to check reflow width against outside this interaction, since dotnet format does not reflow at all. (`CoreOptionTests.Tab_width_counts_toward_the_line_length`)
+
 *This option accepts a freeform value. No canned example is generated.*
 
 ```ini

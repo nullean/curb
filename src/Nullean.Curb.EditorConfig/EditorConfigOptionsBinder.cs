@@ -412,6 +412,15 @@ public static class EditorConfigOptionsBinder
 		if (TryPrefixedLines(properties, "blank_lines_around_namespace", diagnostics, out var aroundNamespace))
 			options = options with { BlankLinesAroundNamespace = aroundNamespace };
 
+		if (TryPrefixedLines(properties, "blank_lines_inside_namespace", diagnostics, out var insideNamespace))
+			options = options with { BlankLinesInsideNamespace = insideNamespace };
+
+		if (TryPrefixedLines(properties, "blank_lines_around_region", diagnostics, out var aroundRegion))
+			options = options with { BlankLinesAroundRegion = aroundRegion };
+
+		if (TryPrefixedLines(properties, "blank_lines_inside_region", diagnostics, out var insideRegion))
+			options = options with { BlankLinesInsideRegion = insideRegion };
+
 		if (TryPrefixedLines(properties, "blank_lines_after_using_list", diagnostics, out var afterUsings))
 			options = options with { BlankLinesAfterUsingList = afterUsings };
 

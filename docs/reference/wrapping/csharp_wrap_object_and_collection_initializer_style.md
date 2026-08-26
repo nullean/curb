@@ -18,6 +18,10 @@ chop_always gives every initializer element its own line. Only honoured in deter
 
 **Default:** `chop_if_long`
 
+## Conformance
+
+No known case where Curb's output is not a fixed point of `dotnet format` — see [conformance](../../design-principles/conformance.md).
+
 ### `csharp_wrap_object_and_collection_initializer_style = chop_always`
 
 ```ini

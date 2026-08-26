@@ -19,6 +19,10 @@ Add braces to unbraced control-flow bodies. IDE0011. Applied without a compilati
 
 **Default:** `false`
 
+## Conformance
+
+No known case where Curb's output is not a fixed point of `dotnet format` — see [conformance](../../design-principles/conformance.md).
+
 ### `csharp_prefer_braces = false`
 
 ```ini

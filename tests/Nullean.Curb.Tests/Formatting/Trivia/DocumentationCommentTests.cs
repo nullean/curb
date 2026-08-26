@@ -115,12 +115,22 @@ public class DocumentationCommentTests : FormattingTest
 		""");
 
 	[Test]
-	public Task A_blank_line_between_a_documentation_comment_and_its_member_is_kept() => Unchanged(
+	public Task A_blank_line_between_a_documentation_comment_and_its_member_is_stripped() => Formats(
+		// A doc comment separated from what it documents reads as detached rather than as deliberate
+		// spacing, unlike an ordinary comment — no option gates this, every formatter with an opinion
+		// on it agrees.
 		"""
 		public class C
 		{
 		    /// <summary>The value.</summary>
 
+		    public int Value;
+		}
+		""",
+		"""
+		public class C
+		{
+		    /// <summary>The value.</summary>
 		    public int Value;
 		}
 		""");

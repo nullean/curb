@@ -41,6 +41,10 @@ internal static partial class Printers
 		var moveInside = MovesUsingsInside(node, context);
 		if (!moveInside)
 			PrintUsings(node, node.Usings, context, ref previousEnd);
+		var nextAfterUsings = node.AttributeLists.Count > 0 ? NextStartsWithDirective(node.AttributeLists[0])
+			: node.Members.Count > 0 ? NextStartsWithDirective(node.Members[0])
+			: NextStartsWithDirective(node.EndOfFileToken);
+		AfterUsingList(context, ref previousEnd, !moveInside && node.Usings.Count > 0, nextAfterUsings);
 
 		foreach (var attributeList in node.AttributeLists)
 		{
@@ -66,8 +70,12 @@ internal static partial class Printers
 		}
 
 		// Trivia hanging off the end-of-file token is not a member, so no separator ran for it and
-		// the blank line above a trailing comment would be dropped. Treat it like an item.
-		if (previousEnd >= 0 && TokenPrinter.HasLeadingContent(node.EndOfFileToken))
+		// the blank line above a trailing comment would be dropped. Treat it like an item — except
+		// when it is a #region/#endregion, which TokenPrinter.PrintLeadingTrivia already gives its own
+		// exact-count treatment; this at-most-one preservation running first would otherwise stack
+		// with that force (both agreeing there should be a blank line here does not mean there should
+		// be two), the same class of bug PrintTypeBody's closing-brace gap hit earlier.
+		if (previousEnd >= 0 && TokenPrinter.HasLeadingContent(node.EndOfFileToken) && !NextStartsWithRegionBoundary(node.EndOfFileToken))
 		{
 			arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
 			if (context.BlankLinesBetween(previousEnd, EffectiveTriviaStart(node.EndOfFileToken)) > 0)
@@ -75,6 +83,75 @@ internal static partial class Printers
 		}
 
 		TokenPrinter.PrintIfPresent(node.EndOfFileToken, context);
+	}
+
+	/// <summary>
+	/// Blank lines below the last using directive of a container, forced to an exact count rather than
+	/// merely floored — same shape as <c>csharp_blank_lines_inside_type</c> (see <c>PrintTypeBody</c>)
+	/// and the existing <c>csharp_blank_lines_after_file_scoped_namespace_directive</c> precedent just
+	/// above <see cref="FileScopedNamespace"/>.
+	/// </summary>
+	/// <remarks>
+	/// Called once per container, after every <see cref="PrintUsings"/> call for it has returned — a
+	/// container can print two batches (usings moved in from the compilation unit, then its own), and
+	/// only the second call's caller knows the whole using block is finished. <paramref name="hadUsings"/>
+	/// covers both batches so the gap is forced exactly once when either contributed a directive.
+	/// <paramref name="previousEnd"/> resets to the same negative sentinel <see cref="Separate"/> and
+	/// <see cref="PrintContext.BlankLinesBetween"/> already treat as "nothing precedes this", so the
+	/// immediately following separator adds nothing on top.
+	/// <para>
+	/// Skipped when <paramref name="nextStartsWithDirective"/> — the same reasoning
+	/// <c>PrintTypeBody</c> ended up with for the closing-brace gap: a using block wrapped in its own
+	/// <c>#region</c> is common, and forcing a blank line between the last <c>using</c> and
+	/// <c>#endregion</c> regressed <c>UsingOrderTests.A_region_around_the_usings_also_stops_it</c>. The
+	/// caller computes this rather than handing over a node, because what follows a using list is not
+	/// always one — a file of nothing but conditionally-compiled usings ends at
+	/// <c>CompilationUnitSyntax.EndOfFileToken</c> instead, which is a token, not a node.
+	/// </para>
+	/// </remarks>
+	private static void AfterUsingList(PrintContext context, ref int previousEnd, bool hadUsings, bool nextStartsWithDirective = false)
+	{
+		if (!hadUsings || nextStartsWithDirective)
+			return;
+
+		context.Arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
+		context.BlankLines(context.Options.BlankLinesAfterUsingList);
+		previousEnd = -1;
+	}
+
+	/// <summary>True when the first non-trivial thing about to print is a directive, such as <c>#endregion</c>.</summary>
+	private static bool NextStartsWithDirective(SyntaxNode? next) =>
+		next is not null && NextStartsWithDirective(next.GetFirstToken(includeZeroWidth: true));
+
+	/// <summary>True when a token's own leading trivia starts with a directive, ignoring whitespace.</summary>
+	private static bool NextStartsWithDirective(SyntaxToken token)
+	{
+		foreach (var trivia in token.LeadingTrivia)
+		{
+			if (trivia.Kind() is SyntaxKind.WhitespaceTrivia or SyntaxKind.EndOfLineTrivia)
+				continue;
+			return trivia.IsDirective;
+		}
+
+		return false;
+	}
+
+	/// <summary>
+	/// True when a token's first leading trivia is specifically a <c>#region</c> or <c>#endregion</c>
+	/// — narrower than <see cref="NextStartsWithDirective(SyntaxToken)"/>, for the one call site that
+	/// needs to defer to TokenPrinter.PrintLeadingTrivia's own exact-count region handling rather than
+	/// its ordinary at-most-one directive treatment (see CompilationUnit's end-of-file trivia check).
+	/// </summary>
+	private static bool NextStartsWithRegionBoundary(SyntaxToken token)
+	{
+		foreach (var trivia in token.LeadingTrivia)
+		{
+			if (trivia.Kind() is SyntaxKind.WhitespaceTrivia or SyntaxKind.EndOfLineTrivia)
+				continue;
+			return trivia.IsKind(SyntaxKind.RegionDirectiveTrivia) || trivia.IsKind(SyntaxKind.EndRegionDirectiveTrivia);
+		}
+
+		return false;
 	}
 
 	/// <summary>
@@ -241,6 +318,8 @@ internal static partial class Printers
 		// members — so every such file was refused by the content verifier rather than formatted. None
 		// of the 1,196 corpus files puts a using there, which is why it went unnoticed.
 		PrintUsings(node, node.Usings, context, ref previousEnd);
+		AfterUsingList(context, ref previousEnd, moved.Count > 0 || node.Usings.Count > 0,
+			node.Members.Count > 0 && NextStartsWithDirective(node.Members[0]));
 
 		foreach (var member in node.Members)
 		{
@@ -324,13 +403,31 @@ internal static partial class Printers
 			{
 				arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
 
-				// The minimum parts members from each other; the first one is parted from the brace
-				// above it by csharp_blank_lines_inside_type instead, so asking for air around fields
-				// does not open a gap under every `{`.
-				context.BlankLines(context.DeclarationSeparation(
-					previousEnd,
-					EffectiveStart(member),
-					first ? context.Options.BlankLinesInsideType : MinimumBlankLinesFor(member, context)));
+				// The minimum parts members from each other, raising and capping whatever the author
+				// wrote; the first one is parted from the brace above it by csharp_blank_lines_inside_type
+				// instead, which is not layered under that same cap-and-preserve treatment — it names an
+				// exact count for this one gap (both floor and ceiling), the way ReSharper's own
+				// blank_lines_inside_type is documented to work, so the default of 0 actually means zero
+				// rather than "leave up to one, whatever the author had." Only this one gap, deliberately:
+				// the symmetric-looking gap before the closing brace below stays on the ordinary floor-
+				// and-cap treatment, because what sits there is not only ever a blank line the author
+				// left in front of a trailing comment — it is just as often a `#endregion` directive,
+				// and stripping the blank line conventionally written above one regressed RegionTests.
+				// Same directive guard as Separate: a member wrapped in its own #region right after
+				// the previous one must not have a minimum forced in front of the #region marker. A
+				// region boundary specifically is skipped outright rather than floored to zero — zero
+				// is still a floor under whatever the author already wrote, which double-counts against
+				// TokenPrinter.PrintLeadingTrivia's own exact-count force reached moments later inside
+				// PrintMember (the region force owns this gap entirely), the same bug the statement
+				// loop in Block hit.
+				var memberStartsWithRegion = !first && NextStartsWithRegionBoundary(member.GetFirstToken(includeZeroWidth: true));
+				if (!memberStartsWithRegion)
+				{
+					context.BlankLines(first
+						? context.Options.BlankLinesInsideType
+						: context.DeclarationSeparation(previousEnd, EffectiveStart(member),
+							NextStartsWithDirective(member) ? 0 : MinimumBlankLinesFor(member, context)));
+				}
 				first = false;
 				PrintMember(member, context);
 				previousEnd = member.Span.End;
@@ -338,9 +435,16 @@ internal static partial class Printers
 
 			if (TokenPrinter.HasLeadingContent(node.CloseBraceToken))
 			{
-				arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
-				context.BlankLines(context.DeclarationSeparation(
-					previousEnd, EffectiveTriviaStart(node.CloseBraceToken), context.Options.BlankLinesInsideType));
+				// Skipped when a region boundary is what the close brace's leading trivia actually
+				// starts with: TokenPrinter.PrintLeadingTrivia's own exact-count region handling takes
+				// over from there, and running this floor-and-cap computation first would stack with
+				// it — the same double-blank-line bug the end-of-file check hit, for the same reason.
+				if (!NextStartsWithRegionBoundary(node.CloseBraceToken))
+				{
+					arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
+					context.BlankLines(context.DeclarationSeparation(
+						previousEnd, EffectiveTriviaStart(node.CloseBraceToken), context.Options.BlankLinesInsideType));
+				}
 				TokenPrinter.PrintLeadingTrivia(node.CloseBraceToken, context, trailingBreak: false);
 			}
 		}
@@ -648,7 +752,14 @@ internal static partial class Printers
 				// started already indented and came out a level too deep. Reindent trims whatever
 				// was left and re-emits this block's own indent, whoever wrote the line ending.
 				arena.HardLine(DocFlags.Reindent);
-				context.BlankLines(context.CodeSeparation(previousEnd, start));
+				// Skipped when the statement's own leading trivia starts with a region boundary — the
+				// same double-count risk as the closing-brace gaps above, just one statement over:
+				// EffectiveStart(statement) measures to a #region/#endregion sitting in front of it,
+				// so this would otherwise run its own at-most-one blank line ahead of
+				// TokenPrinter.PrintLeadingTrivia's exact-count force, reached moments later inside
+				// Node.Print(statement, context).
+				if (!NextStartsWithRegionBoundary(statement.GetFirstToken(includeZeroWidth: true)))
+					context.BlankLines(context.CodeSeparation(previousEnd, start));
 				Node.Print(statement, context);
 				previousEnd = statement.Span.End;
 			}
@@ -656,11 +767,15 @@ internal static partial class Printers
 			// Trivia attached to the closing brace belongs with the statements it follows, not with
 			// the brace, and the blank line above it is preserved like any other separator. A whole
 			// `#if` block whose branch is disabled arrives here too, since none of it is parsed.
+			// Skipped when a region boundary follows — see the type-body closing brace above for why.
 			if (TokenPrinter.HasLeadingContent(node.CloseBraceToken))
 			{
-				arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
-				if (context.BlankLinesBetween(previousEnd, EffectiveTriviaStart(node.CloseBraceToken)) > 0)
-					arena.HardLine();
+				if (!NextStartsWithRegionBoundary(node.CloseBraceToken))
+				{
+					arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
+					if (context.BlankLinesBetween(previousEnd, EffectiveTriviaStart(node.CloseBraceToken)) > 0)
+						arena.HardLine();
+				}
 				TokenPrinter.PrintLeadingTrivia(node.CloseBraceToken, context, trailingBreak: false);
 			}
 		}
@@ -1465,14 +1580,14 @@ internal static partial class Printers
 	/// <param name="construct">Which csharp_new_line_before_open_brace flag governs its brace.</param>
 	/// <param name="context">Per-file printing state.</param>
 	/// <param name="alwaysJoinsEmpty">
-	/// True for a <c>catch</c> or <c>finally</c> block: an empty one always prints as <c>{ }</c> glued
-	/// to whatever precedes it (the keyword, or its declaration/filter), whatever the source had and
-	/// whatever <c>csharp_preserve_single_line_blocks</c> says. Curb's own opinion, not dotnet format's
-	/// — dotnet format is lazy about this pair in both directions, so there is nothing of its to match
-	/// either way, and an unconditional <c>{ }</c> is the cleaner default. A non-empty body is
-	/// unaffected: it follows the same rule as any other braced construct. Ignored when the body is
-	/// not empty, and when <c>csharp_empty_block_style</c> is set — an explicit opinion beats an
-	/// implicit one.
+	/// True for a <c>try</c>, <c>catch</c> or <c>finally</c> block: an empty one always prints as
+	/// <c>{ }</c> glued to whatever precedes it (the keyword, or a catch's declaration/filter), whatever
+	/// the source had and whatever <c>csharp_preserve_single_line_blocks</c> says. Curb's own opinion,
+	/// not dotnet format's — dotnet format is lazy about all three in every direction, so there is
+	/// nothing of its to match either way, and an unconditional <c>{ }</c> is the cleaner default. A
+	/// non-empty body is unaffected: it follows the same rule as any other braced construct. Ignored
+	/// when the body is not empty, and when <c>csharp_empty_block_style</c> is set — an explicit opinion
+	/// beats an implicit one.
 	/// </param>
 	internal static void PrintStatementBody(
 		SyntaxNode body,
@@ -2302,8 +2417,22 @@ internal static partial class Printers
 		// Through the same configuration as every other separator, so a compilation unit's members —
 		// externs, usings, assembly attributes and the namespace itself — obey the caps and minimums
 		// rather than being the one place that still hard-codes a single blank line.
-		var minimum = next is MemberDeclarationSyntax member ? MinimumBlankLinesFor(member, context) : 0;
-		context.BlankLines(context.DeclarationSeparation(previousEnd, EffectiveStart(next), minimum));
+		//
+		// Suppressed when next starts with a directive: EffectiveStart measures to a member's first
+		// comment or directive, not the member's own keyword, so a positive minimum (e.g.
+		// csharp_blank_lines_around_type's default of 1) would otherwise force a blank line between
+		// the previous item and a #region/#endregion wrapped immediately around this one — landing
+		// inside the region rather than around it. Same reasoning as AfterUsingList above.
+		// A region boundary is skipped outright rather than floored to zero — zero is still a floor
+		// under whatever the author already wrote, which double-counts against the region force inside
+		// the trivia walk this leads into moments later (see PrintTypeBody's member loop for the same
+		// fix, and why).
+		if (!NextStartsWithRegionBoundary(next.GetFirstToken(includeZeroWidth: true)))
+		{
+			var minimum = next is MemberDeclarationSyntax member && !NextStartsWithDirective(next)
+				? MinimumBlankLinesFor(member, context) : 0;
+			context.BlankLines(context.DeclarationSeparation(previousEnd, EffectiveStart(next), minimum));
+		}
 
 		previousEnd = next.Span.End;
 	}

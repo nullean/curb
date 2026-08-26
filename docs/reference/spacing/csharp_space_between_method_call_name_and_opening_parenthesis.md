@@ -18,6 +18,10 @@ Space between the method name and its opening parenthesis at a call site.
 
 **Default:** `false`
 
+## Conformance
+
+No known case where Curb's output is not a fixed point of `dotnet format` — see [conformance](../../design-principles/conformance.md).
+
 ### `csharp_space_between_method_call_name_and_opening_parenthesis = true`
 
 ```ini

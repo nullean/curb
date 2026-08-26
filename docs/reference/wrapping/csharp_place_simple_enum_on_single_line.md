@@ -18,6 +18,10 @@ Allow a short enum body to stay on one line.
 
 **Default:** `true`
 
+## Conformance
+
+No known case where Curb's output is not a fixed point of `dotnet format` — see [conformance](../../design-principles/conformance.md).
+
 ### `csharp_place_simple_enum_on_single_line = true`
 
 ```ini

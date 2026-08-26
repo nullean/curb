@@ -20,3 +20,8 @@
 # Formatter fixtures are byte-exact golden files: never normalise them.
 *.test -text
 *.verified.* -text
+
+# Generated from OptionDescriptor.All by running Curb with end_of_line = crlf, so its crlf example is
+# real \r\n bytes — the one page in docs/reference the blanket `*.md text eol=lf` above would otherwise
+# silently launder back to LF on every commit, making the crlf example demonstrate nothing.
+docs/reference/core/end_of_line.md -text

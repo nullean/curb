@@ -20,6 +20,10 @@ Space just inside parentheses for specific constructs.
 
 **Default:** `false`
 
+## Conformance
+
+No known case where Curb's output is not a fixed point of `dotnet format` — see [conformance](../../design-principles/conformance.md).
+
 ### `csharp_space_between_parentheses = false`
 
 ```ini

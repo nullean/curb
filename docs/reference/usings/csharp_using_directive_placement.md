@@ -18,6 +18,10 @@ Move using directives inside or outside the namespace. IDE0065.
 
 **Default:** `(as written)`
 
+## Conformance
+
+No known case where Curb's output is not a fixed point of `dotnet format` — see [conformance](../../design-principles/conformance.md).
+
 ### `csharp_using_directive_placement = inside_namespace`
 
 ```ini

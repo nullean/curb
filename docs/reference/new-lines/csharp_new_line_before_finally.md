@@ -18,6 +18,10 @@ Put finally on its own line.
 
 **Default:** `true`
 
+## Conformance
+
+No known case where Curb's output is not a fixed point of `dotnet format` — see [conformance](../../design-principles/conformance.md).
+
 ### `csharp_new_line_before_finally = true`
 
 ```ini

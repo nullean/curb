@@ -18,6 +18,10 @@ Put a base list on its own line, colon first.
 
 **Default:** `false`
 
+## Conformance
+
+No known case where Curb's output is not a fixed point of `dotnet format` — see [conformance](../../design-principles/conformance.md).
+
 ### `csharp_wrap_before_extends_colon = true`
 
 ```ini

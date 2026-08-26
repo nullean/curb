@@ -21,6 +21,11 @@
       "version": "0.16.0",
       "commands": ["assembly-differ"],
       "rollForward": false
+    },
+    "jetbrains.resharper.globaltools": {
+      "version": "2026.2.1",
+      "commands": ["jb"],
+      "rollForward": false
     }
   }
 }

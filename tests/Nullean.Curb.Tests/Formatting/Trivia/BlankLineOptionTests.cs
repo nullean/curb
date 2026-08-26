@@ -202,17 +202,109 @@ public class BlankLineOptionTests : FormattingTest
 		editorConfig: "csharp_blank_lines_inside_type = 1");
 
 	[Test]
-	public Task Namespaces_have_their_own_setting() => Formats(
+	public Task Types_have_their_own_setting() => Unchanged(
+		// The default is already one, so proving the key is bound means proving it can be turned off
+		// rather than on: without the key, a bare 0-gap source gets the default's forced blank line
+		// (see A_type_can_be_given_air_under_its_opening_brace's sibling tests for that default), but
+		// with it set to 0 there is no minimum to raise the author's own (also zero) count to.
+		"""
+		public class A
+		{
+		}
+		public class B
+		{
+		}
+		""",
+		editorConfig: "csharp_blank_lines_around_type = 0");
+
+	[Test]
+	public Task Using_lists_have_their_own_setting() => Unchanged(
+		// The default is already one (see BlankLineTests), so proving the key is bound means proving
+		// it can be turned off — the same shape as Types_have_their_own_setting above.
 		"""
 		using System;
 		namespace N
 		{
 		}
 		""",
-		"""
-		using System;
+		editorConfig: "csharp_blank_lines_after_using_list = 0");
 
+	[Test]
+	public Task A_block_scoped_namespace_can_be_given_air_under_its_opening_brace() => Formats(
+		// csharp_blank_lines_inside_namespace is BlankLinesInsideType's analogue for a block-scoped
+		// namespace body — see PrintNamespaceBody.
+		"""
 		namespace N
+		{
+		    public class C
+		    {
+		    }
+		}
+		""",
+		"""
+		namespace N
+		{
+
+		    public class C
+		    {
+		    }
+		}
+		""",
+		editorConfig: "csharp_blank_lines_inside_namespace = 1");
+
+	[Test]
+	public Task Regions_can_be_given_less_air_than_the_default() => Formats(
+		// csharp_blank_lines_around_region/inside_region both default to one and are forced exactly
+		// (see RegionTests); this proves both are bound by turning them off together.
+		"""
+		public class C
+		{
+		    #region Values
+
+		    public int Value;
+
+		    #endregion
+		}
+		public class D
+		{
+		}
+		""",
+		"""
+		public class C
+		{
+		    #region Values
+		    public int Value;
+		    #endregion
+		}
+
+		public class D
+		{
+		}
+		""",
+		editorConfig: """
+		csharp_blank_lines_around_region = 0
+		csharp_blank_lines_inside_region = 0
+		""");
+
+	[Test]
+	public Task Namespaces_have_their_own_setting() => Formats(
+		// Two adjacent namespaces rather than a using directive above one: csharp_blank_lines_after_
+		// using_list now defaults to one of its own (see BlankLineTests), which would otherwise force
+		// the same blank line and leave this case proving nothing about the option under test.
+		"""
+		namespace N
+		{
+		}
+		namespace M
+		{
+		}
+		""",
+		"""
+		namespace N
+		{
+		}
+
+		namespace M
 		{
 		}
 		""",

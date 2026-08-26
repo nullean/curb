@@ -18,6 +18,10 @@ Column target for reflow. off disables reflow entirely and selects preservation 
 
 **Default:** `off`
 
+## Conformance
+
+No known case where Curb's output is not a fixed point of `dotnet format` — see [conformance](../../design-principles/conformance.md).
+
 ### `max_line_length = off`
 
 ```ini

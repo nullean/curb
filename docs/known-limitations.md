@@ -5,15 +5,6 @@ description: Current limitations in Curb's formatting output and what to expect 
 
 # Known limitations
 
-## Multi-line trivia keeps source line endings
-
-{{product}} emits multi-line trivia — doc comments, verbatim string literals — as a raw source span,
-so their internal newlines survive unchanged while the breaks {{product}} emits itself use the configured
-line ending. The result is a file with mixed line endings.
-
-This means `dotnet format` disagrees with {{product}}'s output on any file containing doc comments
-whose source line endings differ from the configured `end_of_line`. It is the most common source of
-fixed-point failures in the [twelve-repository comparison](benchmarks/index.md).
 ## Expression-body conversions do not compose in one pass
 
 With both `csharp_style_expression_bodied_properties = true` and

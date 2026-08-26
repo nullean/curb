@@ -17,6 +17,10 @@ Blank lines before and after a namespace declaration.
 
 **Default:** `0`
 
+## Conformance
+
+No known case where Curb's output is not a fixed point of `dotnet format` — see [conformance](../../design-principles/conformance.md).
+
 ### `csharp_blank_lines_around_namespace = 1`
 
 ```ini

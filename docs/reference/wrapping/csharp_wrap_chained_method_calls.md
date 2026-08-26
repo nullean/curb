@@ -17,6 +17,10 @@ Break a chain of three or more calls onto its own line per call once it does not
 
 **Default:** `chop_if_long`
 
+## Conformance
+
+No known case where Curb's output is not a fixed point of `dotnet format` — see [conformance](../../design-principles/conformance.md).
+
 ### `csharp_wrap_chained_method_calls = chop_if_long`
 
 ```ini

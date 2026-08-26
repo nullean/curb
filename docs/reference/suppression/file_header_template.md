@@ -18,6 +18,10 @@ Insert or correct a // comment header at the top of the file. Supports {fileName
 
 **Default:** `(not set)`
 
+## Conformance
+
+No known case where Curb's output is not a fixed point of `dotnet format` — see [conformance](../../design-principles/conformance.md).
+
 ### `file_header_template = Copyright (c) Example Corp.\nLicensed under the MIT license.`
 
 ```ini

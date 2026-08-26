@@ -19,6 +19,10 @@ chop_always gives every argument its own line; wrap_if_long packs arguments inst
 
 **Default:** `chop_if_long`
 
+## Conformance
+
+No known case where Curb's output is not a fixed point of `dotnet format` — see [conformance](../../design-principles/conformance.md).
+
 ### `csharp_wrap_arguments_style = chop_always`
 
 ```ini

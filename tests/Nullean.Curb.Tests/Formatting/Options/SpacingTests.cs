@@ -184,9 +184,7 @@ public class SpacingTests : FormattingTest
 		{
 		    public void M()
 		    {
-		        try
-		        {
-		        }
+		        try { }
 		        catch(Exception e) when(a) { }
 		    }
 		}
@@ -274,6 +272,7 @@ public class SpacingTests : FormattingTest
 		public struct S:IThing
 		{
 		}
+
 		public interface I:IOther
 		{
 		}

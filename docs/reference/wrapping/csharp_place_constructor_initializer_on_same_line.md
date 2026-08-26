@@ -18,6 +18,10 @@ Keep : base(...) on the constructor's line rather than giving it its own.
 
 **Default:** `true`
 
+## Conformance
+
+No known case where Curb's output is not a fixed point of `dotnet format` — see [conformance](../../design-principles/conformance.md).
+
 ### `csharp_place_constructor_initializer_on_same_line = true`
 
 ```ini

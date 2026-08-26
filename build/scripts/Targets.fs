@@ -5,6 +5,7 @@ module Targets
 open Argu
 open System
 open System.IO
+open System.Text.Json
 open Bullseye
 open CommandLine
 open Fake.Tools.Git
@@ -881,14 +882,115 @@ let private cleanupSmoketest (arguments:ParseResults<Arguments>) =
         File.WriteAllText(editorConfig, pristineConfig)
         File.Copy(pristine, source, true)
 
-/// Proves that every expectation the test suite asserts is a fixed point of dotnet format.
+/// One documented, deliberate case where Curb's chosen shape either differs from what a reference
+/// tool would have produced on its own, or — the rarer, stronger claim failing — is not even a fixed
+/// point of that tool at all. See docs/design-principles/conformance.md for what the distinction means.
+type private Divergence =
+    { key: string
+      tool: string
+      staysFixedPoint: bool
+      reason: string
+      exampleCase: string }
+
+/// Keyed by `ClassName.MethodName` (`FormattingTest.TestCase`'s format), scoped to one reference tool,
+/// because a case documented against `dotnet format whitespace` says nothing about `jb cleanupcode`.
 ///
-/// Until this existed only the corpus proved that. The hand-written expectations proved only that
-/// Curb agrees with itself, so one written from a wrong belief about dotnet format would sit there
-/// passing forever — which is exactly how the note about arrow clauses survived several readings.
+/// Read with `JsonDocument` rather than `JsonSerializer.Deserialize<T>` — an F# record has no
+/// parameterless or single-parameter constructor `System.Text.Json`'s reflection-based converter can
+/// use, and adding `FSharp.SystemTextJson` for one small, stable file is not worth the dependency.
+let private loadDivergences tool : Map<string, Divergence> =
+    let path = Path.Combine(Paths.Root.FullName, "build", "conformance-divergences.json")
+    use doc = JsonDocument.Parse(File.ReadAllText path)
+    let str (e: JsonElement) (prop: string) = e.GetProperty(prop).GetString()
+
+    doc.RootElement.GetProperty("divergences").EnumerateArray()
+    |> Seq.map (fun e ->
+        { key = str e "key"
+          tool = str e "tool"
+          staysFixedPoint = e.GetProperty("staysFixedPoint").GetBoolean()
+          reason = str e "reason"
+          exampleCase = str e "exampleCase" })
+    |> Seq.filter (fun d -> d.tool = tool)
+    |> Seq.map (fun d -> d.exampleCase, d)
+    |> Map.ofSeq
+
+/// Proves that every expectation the test suite asserts is a fixed point of dotnet format, and that
+/// every case where it is not — or where it is but differs in shape from what dotnet format would have
+/// produced on its own — is a documented, deliberate choice rather than a silent gap.
 ///
+/// Until this existed only the corpus proved the fixed-point half, and nothing proved the shape half at
+/// all: the hand-written expectations proved only that Curb agrees with itself, so one written from a
+/// wrong belief about dotnet format would sit there passing forever — which is exactly how the note
+/// about arrow clauses survived several readings.
+///
+/// Fails if any implemented `.editorconfig` key has no dumped case exercising it — the isolated-test-per-
+/// option completeness the option-onboarding playbook in AGENTS.md asks for, checked mechanically rather
+/// than trusted. Reads the case list from `.editorconfig` text already on disk rather than requiring each
+/// `Formats`/`Unchanged` call site to declare which key it is testing: retrofitting an explicit tag onto
+/// several hundred existing calls was rejected as churn for its own sake when the same answer is already
+/// sitting in every dumped case's `.editorconfig` file.
+let private checkOptionCoverage (dump: string) (cases: string[]) =
+    let implemented =
+        let result = Proc.Start("dotnet", [| "run"; "--project"; "src/Nullean.Curb.Cli"; "-c"; "Release"; "--"; "options"; "--list-keys" |])
+        result.ConsoleOut
+        |> Seq.map (fun l -> l.Line.Trim())
+        |> Seq.filter (fun l -> l.Length > 0)
+        |> Seq.collect (fun l -> l.Split(' '))
+        |> Seq.filter (fun s -> s.Length > 0)
+        |> Set.ofSeq
+
+    if implemented.IsEmpty then
+        failwith "could not read the implemented key list from `curb options --list-keys`"
+
+    // Not the kind of thing a Formats()/Unchanged() case exercises: generated_code is a suppression
+    // mechanism and dotnet_diagnostic.ide0055.severity a diagnostic toggle, neither a value a printer
+    // helper turns into a Doc. charset is tested at the byte level against real files in
+    // Cli/CleanupRunTests.cs and Cli/FormattingRunTests.cs instead — a byte-order mark is not
+    // meaningfully representable as a Formats() string comparison the way every other option is.
+    //
+    // trim_trailing_whitespace = false is a real, open gap, not a scoping decision like the other three:
+    // it is bound correctly (see OptionsBindingTests) but has no observable effect anywhere tried,
+    // including inside the verbatim-preserved csharp_space_around_declaration_statements = ignore
+    // region, where trailing whitespace has nowhere else to come from. DocPrinter.cs's DocKind.Trim case
+    // calls _output.TrimTrailingWhitespace() unconditionally, unlike the other three call sites in that
+    // file. Excluded here so this check stays green while that gets its own fix, rather than a case
+    // that bakes the current, wrong behaviour into a golden expectation — see the comment left next to
+    // CoreOptionTests' blank-line cases.
+    //
+    // csharp_style_expression_bodied_indexers is the same shape of real gap: bound and catalogued as
+    // implemented, but IndexerDeclaration (Printers.Members.cs) never calls TryPrintExpressionBody the
+    // way PropertyDeclaration and OperatorDeclaration do, so no source indexer is ever converted.
+    //
+    // csharp_blank_lines_after_using_list used to belong here too (bound into FormatOptions with no
+    // dispatch case reaching it) — fixed and given real coverage, see BlankLineOptionTests.
+    let excluded =
+        set [ "generated_code"; "dotnet_diagnostic.ide0055.severity"; "charset"
+              "trim_trailing_whitespace"; "csharp_style_expression_bodied_indexers" ]
+
+    let keyPattern = Text.RegularExpressions.Regex(@"^\s*([a-zA-Z0-9_.]+)\s*=", Text.RegularExpressions.RegexOptions.Multiline)
+    let covered =
+        cases
+        |> Array.collect (fun d ->
+            let config = File.ReadAllText(Path.Combine(d, ".editorconfig"))
+            keyPattern.Matches(config)
+            |> Seq.cast<Text.RegularExpressions.Match>
+            |> Seq.map (fun m -> m.Groups[1].Value)
+            |> Seq.toArray)
+        |> Set.ofArray
+
+    let missing = implemented - excluded - covered |> Set.toArray |> Array.sort
+
+    printfn "%d of %d implemented keys have at least one dumped case (%d excluded, not a testable value)"
+        (implemented.Count - excluded.Count - missing.Length) (implemented.Count - excluded.Count) excluded.Count
+
+    if missing.Length > 0 then
+        printfn ""
+        printfn "implemented but never exercised by a Formats()/Unchanged() case:"
+        missing |> Array.iter (fun key -> printfn "  %s" key)
+        failwithf "%d implemented key(s) have no isolated test case — see AGENTS.md's option-onboarding playbook" missing.Length
+
 /// Slow, and it needs the SDK, so it is its own target rather than part of `test`.
-let private verifyExpectations (arguments:ParseResults<Arguments>) =
+let rec private verifyExpectations (arguments:ParseResults<Arguments>) =
     let dump = Path.Combine(Paths.Output.FullName, "expectations")
     if Directory.Exists dump then Directory.Delete(dump, true)
     Directory.CreateDirectory dump |> ignore
@@ -901,43 +1003,633 @@ let private verifyExpectations (arguments:ParseResults<Arguments>) =
     printfn "checking %d expectations against dotnet format" cases.Length
     if cases.Length = 0 then failwith "no expectations were written — is the dump still wired into the harness?"
 
+    checkOptionCoverage dump cases
+
     // Trailing newlines are compared separately by the harness itself — insert_final_newline is a
     // test subject of its own — so the dump's own trailing newline is not evidence of anything.
-    let read (d: string) = File.ReadAllText(Path.Combine(d, "Expected.cs")).TrimEnd('\n', '\r')
+    let read (name: string) (d: string) = File.ReadAllText(Path.Combine(d, name)).TrimEnd('\n', '\r')
+    let testCaseOf (d: string) =
+        let path = Path.Combine(d, "TestCase.txt")
+        if File.Exists path then (File.ReadAllText path).Trim() else "?"
 
-    let before = cases |> Array.map (fun d -> d, read d) |> Map.ofArray
+    // Source.cs sweeps alongside Expected.cs below — both are ordinary .cs files under `dump` — which is
+    // exactly what makes it useful: the post-sweep Source.cs *is* X, dotnet format's own opinion of the
+    // raw input, computed for free by the same pass that proves Expected.cs (Z) is a fixed point.
+    let beforeExpected = cases |> Array.map (fun d -> d, read "Expected.cs" d) |> Map.ofArray
 
     exec "dotnet" ["format"; "whitespace"; dump; "--folder"] |> ignore
 
-    let changed =
-        before
-        |> Map.toArray
-        |> Array.filter (fun (d, text) -> read d <> text)
+    let divergences = loadDivergences "dotnet-format-whitespace"
+
+    let results =
+        cases
+        |> Array.map (fun d ->
+            let z = beforeExpected.[d]
+            let afterZ = read "Expected.cs" d
+            let x = read "Source.cs" d
+            {| Directory = d
+               TestCase = testCaseOf d
+               Z = z
+               X = x
+               StaysFixedPoint = afterZ = z
+               MatchesReference = x = z |})
+
+    // Not a fixed point at all is the mandatory claim failing — rare, serious, and gated on every case
+    // being individually documented (see docs/design-principles/conformance.md). A fixed point with a
+    // different shape than dotnet format's own is the common, expected case: most of the ReSharper-
+    // derived wrapping, blank-line and reflow keys have no dotnet format opinion to agree with at all,
+    // so hundreds of cases legitimately differ this way. That is reported in aggregate rather than
+    // gated per case — requiring an entry per test method here would drown the notable exceptions this
+    // registry exists to surface in paperwork nobody would read.
+    let notFixedPoint = results |> Array.filter (fun r -> not r.StaysFixedPoint)
+    let differentShape = results |> Array.filter (fun r -> r.StaysFixedPoint && not r.MatchesReference)
 
     printfn ""
-    printfn "%d of %d expectations survive dotnet format" (cases.Length - changed.Length) cases.Length
+    printfn "%d of %d expectations are an exact fixed point of dotnet format with no shape divergence"
+        (cases.Length - notFixedPoint.Length - differentShape.Length) cases.Length
+    printfn "%d differ in shape from what dotnet format would have produced on its own, but are still a fixed point"
+        differentShape.Length
 
-    if changed.Length > 0 then
+    gateOnNonFixedPoints "dotnet format whitespace" dump divergences
+        (notFixedPoint |> Array.map (fun r -> r.Directory, r.TestCase))
+
+/// Shared by `verifyExpectations` and `verifyCleanupExpectations`: prints every case that is not a fixed
+/// point of `toolLabel`, gates on each one being named in the divergence registry, and gates on the
+/// registry holding no stale entry that no longer reproduces (which would silently exempt whatever case
+/// happens to reuse that name next).
+and private gateOnNonFixedPoints (toolLabel: string) (dump: string) (divergences: Map<string, Divergence>) (notFixedPoint: (string * string)[]) =
+    if notFixedPoint.Length > 0 then
         printfn ""
-        printfn "first disagreements:"
-        changed
-        |> Array.truncate 10
-        |> Array.iter (fun (d, text) ->
-            printfn "  %s" (Path.GetRelativePath(dump, d))
-            let now = read d
-            printfn "    expected: %s" (text.Replace("\n", "\\n"))
-            printfn "    became:   %s" (now.Replace("\n", "\\n")))
+        printfn "NOT a fixed point of %s:" toolLabel
+        for (directory, case) in notFixedPoint do
+            let documented = divergences.ContainsKey case
+            printfn "  %s (%s) — %s"
+                case (Path.GetRelativePath(dump, directory)) (if documented then "documented" else "UNDOCUMENTED")
 
-    // A floor rather than zero, the same shape as the conformance gate. Seven expectations disagree
-    // today and each needs deciding on its own merits: some are tests that deliberately feed an
-    // invalid option value and assert the fallback, where Curb's fallback and Roslyn's differ; others
-    // are real questions about which brace-style flag governs indexers and events. The gate stops the
-    // number growing while they are worked through, which is worth more than blocking on them.
-    let percentage = 100.0 * float (cases.Length - changed.Length) / float cases.Length
-    match arguments.TryGetResult Minimum with
-    | Some floor when percentage < floor ->
-        failwithf "%.2f%% of expectations survive dotnet format, below the required %.2f%%" percentage floor
-    | _ -> ()
+    // Every case that is not even a fixed point needs a registry entry naming it, or it fails the build
+    // outright — the two-step "reported, then gated once a number exists" pattern churn uses does not
+    // apply here: the whole point of this check is that a new one is never accepted silently.
+    let undocumented = notFixedPoint |> Array.filter (fun (_, case) -> not (divergences.ContainsKey case))
+    if undocumented.Length > 0 then
+        printfn ""
+        printfn "%d undocumented non-fixed-point(s) against %s. Add an entry to" undocumented.Length toolLabel
+        printfn "build/conformance-divergences.json (see docs/design-principles/conformance-divergences.md)"
+        printfn "if this is a real, permanent incompatibility, or fix the printer if it is not:"
+        undocumented |> Array.iter (fun (_, case) -> printfn "  %s" case)
+        failwithf "%d undocumented conformance non-fixed-point(s) against %s" undocumented.Length toolLabel
+
+    // A registry entry that no longer reproduces means the divergence was fixed. Leaving it in would
+    // silently exempt whatever test case happens to reuse that name next, so it fails rather than being
+    // dropped quietly — remove the entry in the same change that fixes the printer.
+    let stale =
+        divergences
+        |> Map.toArray
+        |> Array.filter (fun (case, _) -> not (notFixedPoint |> Array.exists (fun (_, c) -> c = case)))
+    if stale.Length > 0 then
+        printfn ""
+        printfn "stale entries in build/conformance-divergences.json (no longer reproduce, remove them):"
+        stale |> Array.iter (fun (case, _) -> printfn "  %s" case)
+        failwithf "%d stale conformance divergence entry/ies — remove them or they could mask a real regression" stale.Length
+
+/// Proves that every cleanup-rule case the test suite exercises is a fixed point of `dotnet format
+/// style` — the same discipline `verifyExpectations` holds the formatting side to, applied to `curb
+/// cleanup`'s semantic rules. `cleanupConformance` measures the same property at corpus scale but only
+/// reports it (it also wants to fix sites Curb declined, which is not this check's business); this gates
+/// it per case instead, the way `verifyExpectations` gates the formatting side.
+///
+/// Each dumped case gets its own throwaway project rather than being batched into one: two cleanup cases
+/// from different test files both naming `class Widget` in `namespace N` is common (the tests were written
+/// to be read in isolation), and batching would make that a compile error rather than the two independent
+/// snippets the source intended.
+and private verifyCleanupExpectations (arguments:ParseResults<Arguments>) =
+    let dump = Path.Combine(Paths.Output.FullName, "cleanup-expectations")
+    if Directory.Exists dump then Directory.Delete(dump, true)
+    Directory.CreateDirectory dump |> ignore
+
+    Environment.SetEnvironmentVariable("CURB_CLEANUP_EXPECTATION_DUMP", dump)
+    exec "dotnet" ["run"; "--project"; "tests/Nullean.Curb.Tests"; "-c"; "Release"] |> ignore
+    Environment.SetEnvironmentVariable("CURB_CLEANUP_EXPECTATION_DUMP", null)
+
+    let cases = Directory.GetDirectories dump
+    printfn "checking %d cleanup cases against dotnet format style" cases.Length
+    if cases.Length = 0 then
+        failwith "no cleanup expectations were written — is CleanupExpectationDump still wired into the Clean helpers?"
+
+    let divergences = loadDivergences "dotnet-format-style"
+
+    let results =
+        cases
+        |> Array.map (fun d ->
+            let testCase = (File.ReadAllText(Path.Combine(d, "TestCase.txt"))).Trim()
+            let ruleIds =
+                (File.ReadAllText(Path.Combine(d, "RuleIds.txt"))).Trim().Split(' ')
+                |> Array.filter (fun s -> s.Length > 0)
+
+            // A .globalconfig rather than an ordinary .editorconfig: this directory sits under the repo,
+            // which has its own root .editorconfig on the walk, and a global config outranks it without
+            // needing to reason about section globs — the same reasoning cleanupConformance documents
+            // next to its own globalConfig.
+            let severities =
+                ruleIds |> Array.map (sprintf "dotnet_diagnostic.%s.severity = warning") |> String.concat "\n"
+
+            // IDE0040 only reports on an interface member at all when the project asks for accessibility
+            // everywhere, not just dotnet format's default of for_non_interface_members — a case supplying
+            // that diagnostic by hand for an interface member is implicitly asserting that preference, or
+            // the compiler could never have reported it. Safe for every other case here regardless: for a
+            // non-interface declaration, always and for_non_interface_members require the same thing.
+            let preferences = "dotnet_style_require_accessibility_modifiers = always"
+
+            File.WriteAllText(
+                Path.Combine(d, "case.globalconfig"),
+                sprintf "is_global = true\nglobal_level = 100\n\n%s\n%s\n" severities preferences)
+
+            File.WriteAllText(
+                Path.Combine(d, "Directory.Build.targets"),
+                [ "<Project>"
+                  "  <ItemGroup>"
+                  "    <EditorConfigFiles Include=\"$(MSBuildThisFileDirectory)case.globalconfig\" />"
+                  "  </ItemGroup>"
+                  "</Project>" ]
+                |> String.concat "\n")
+
+            File.WriteAllText(
+                Path.Combine(d, "Case.csproj"),
+                [ "<Project Sdk=\"Microsoft.NET.Sdk\">"
+                  "  <PropertyGroup>"
+                  "    <TargetFramework>net10.0</TargetFramework>"
+                  "    <Nullable>disable</Nullable>"
+                  "    <ImplicitUsings>disable</ImplicitUsings>"
+                  "  </PropertyGroup>"
+                  "</Project>" ]
+                |> String.concat "\n")
+
+            // --verify-no-changes reports rather than rewrites, so the exit code alone says whether Case.cs
+            // (Z) is already a fixed point — no before/after diff needed, unlike the whitespace side.
+            let exitCode =
+                execResult "dotnet"
+                    (List.concat [
+                        ["format"; "style"; d; "--verify-no-changes"; "--severity"; "info"; "--diagnostics"]
+                        List.ofArray ruleIds ])
+
+            {| Directory = d; TestCase = testCase; StaysFixedPoint = (exitCode = 0) |})
+
+    let notFixedPoint = results |> Array.filter (fun r -> not r.StaysFixedPoint)
+
+    printfn ""
+    printfn "%d of %d cleanup cases are a fixed point of dotnet format style" (cases.Length - notFixedPoint.Length) cases.Length
+
+    gateOnNonFixedPoints "dotnet format style" dump divergences
+        (notFixedPoint |> Array.map (fun r -> r.Directory, r.TestCase))
+
+/// Measures — does not yet gate, see the note near the bottom — how many formatting expectations the
+/// test suite asserts are a fixed point of `jb cleanupcode` too, the same property `verifyExpectations`
+/// gates for `dotnet format whitespace`. This is the one place `jb` can be checked at all: the ReSharper-
+/// derived wrapping and blank-line keys have no `dotnet format` opinion to compare against.
+///
+/// Reuses `ExpectationDump`'s dump (the same `Source.cs` / `Expected.cs` / `.editorconfig` triples, run
+/// through its own dump rather than sharing `verifyExpectations`'s, so the two targets do not have to run
+/// in a fixed order) rather than dumping separately for jb — the cases are the same, only the reference
+/// tool differs.
+///
+/// One project holding every case as its own file, not one project per case: an earlier version gave
+/// each case its own project batched into one solution, on the theory that jb's cost is per invocation
+/// rather than per project. Measured wrong twice over. Speed: going from 1 to 5 projects in one
+/// invocation cost nothing extra (~8s either way), but the full 838-project run took ~5 minutes, so jb
+/// also pays real per-project MSBuild evaluation overhead — one project with 842 files instead runs in
+/// ~30s, a ~10x improvement. Determinism: that same 838-project shape also measured non-deterministic
+/// (330/377/404 disagreements across three identical runs); two runs of this one-project shape landed
+/// on the exact same 307-case set, name for name, not just the same count. Many separate project/
+/// compilation contexts, not jb's cleanup logic itself, was almost certainly the source of both problems.
+and private verifyExpectationsJb (arguments:ParseResults<Arguments>) =
+    let dump = Path.Combine(Paths.Output.FullName, "expectations-jb")
+    if Directory.Exists dump then Directory.Delete(dump, true)
+    Directory.CreateDirectory dump |> ignore
+
+    Environment.SetEnvironmentVariable("CURB_EXPECTATION_DUMP", dump)
+    exec "dotnet" ["run"; "--project"; "tests/Nullean.Curb.Tests"; "-c"; "Release"] |> ignore
+    Environment.SetEnvironmentVariable("CURB_EXPECTATION_DUMP", null)
+
+    let cases = Directory.GetDirectories dump
+    printfn "checking %d expectations against jb cleanupcode" cases.Length
+    if cases.Length = 0 then failwith "no expectations were written — is the dump still wired into the harness?"
+
+    let read (name: string) (d: string) = File.ReadAllText(Path.Combine(d, name)).TrimEnd('\n', '\r')
+    let caseId (d: string) = Path.GetFileName d
+    let caseFile (d: string) = caseId d + ".cs"
+    let caseNamespace (d: string) = "Case" + caseId d
+
+    // One project needs every case's declarations to coexist in the same compilation, and dozens of
+    // cases reuse `namespace N; class Widget` — deliberately minimal, readable boilerplate that was
+    // never meant to be unique across the whole suite. A namespace rename rather than a class rename:
+    // the namespace name essentially never reappears in a snippet's body the way a type name might
+    // (constructors, casts, ...), so it is the smaller, safer edit.
+    let namespaceDecl = Text.RegularExpressions.Regex(@"namespace\s+([\w.]+)(\s*;|\s*\r?\n[ \t]*\{)")
+    let leadingUsings = Text.RegularExpressions.Regex(@"\A(\s*using[^\n]*\n)*")
+    let typeDecl = Text.RegularExpressions.Regex(@"\b(class|struct|interface|enum|record)\s+\w")
+
+    // A case with no type declaration at all — an EdgeCaseTests/NamespaceAndUsingTests case testing
+    // using-directive behaviour in isolation, most of them — has nothing that could collide with another
+    // case either, so it is left alone rather than given a synthetic namespace. Found by measuring: an
+    // inserted namespace turned out to change where jb wanted a blank line or how it ordered the
+    // directives relative to it, a disagreement caused entirely by this harness's own insertion and not
+    // by anything the case is testing.
+    //
+    // A case with no type declaration but real statement content is a top-level-statements file (or a
+    // file-based program's #: directives plus statements) — excluded from the shared project entirely,
+    // not just left unrewritten: only one file per compilation may have top-level statements, so a
+    // second such case would be a compile error regardless of namespace handling.
+    let hasTopLevelStatements (source: string) =
+        if typeDecl.IsMatch source then
+            false
+        else
+            source.Split('\n')
+            |> Array.exists (fun l ->
+                let t = l.TrimStart()
+                t.Length > 0
+                && not (t.StartsWith "using ")
+                && not (t.StartsWith "global using")
+                && not (t.StartsWith "#:"))
+
+    // A new file-scoped namespace rather than a wrapping block one, specifically so nothing already in
+    // the file needs reindenting under it.
+    let rewriteNamespace (d: string) (source: string) =
+        let ns = caseNamespace d
+        let m = namespaceDecl.Match source
+        if m.Success then
+            source.Substring(0, m.Index) + "namespace " + ns + m.Groups[2].Value + source.Substring(m.Index + m.Length)
+        elif typeDecl.IsMatch source then
+            let lead = leadingUsings.Match(source).Length
+            source.Substring(0, lead) + sprintf "namespace %s;\n\n" ns + source.Substring(lead)
+        else
+            source
+
+    // The settings lines out of a case's own dumped .editorconfig ("root = true\n[*.cs]\n<settings>"),
+    // with every "[...]" header line dropped rather than just the first — some cases pass editorConfig
+    // text that already opens with its own "[*.cs]" (see AttributeTests' JoinAttributes), which would
+    // otherwise survive as a bogus second header nested inside this case's section below.
+    let caseSettings (d: string) =
+        File.ReadAllText(Path.Combine(d, ".editorconfig")).Split('\n')
+        |> Array.skip 1
+        |> Array.filter (fun l ->
+            let t = l.Trim()
+            t.Length > 0 && not (t.StartsWith("[")) && t <> "root = true")
+
+    let excluded, cases = cases |> Array.partition (fun d -> hasTopLevelStatements (read "Expected.cs" d))
+    if excluded.Length > 0 then
+        printfn "excluding %d top-level-statement case(s) from the shared project (not checked against jb):" excluded.Length
+        for d in excluded do
+            let path = Path.Combine(d, "TestCase.txt")
+            printfn "  %s" (if File.Exists path then (File.ReadAllText path).Trim() else caseId d)
+
+    let project = Path.Combine(dump, "project")
+    Directory.CreateDirectory project |> ignore
+
+    let before =
+        cases
+        |> Array.map (fun d ->
+            let rewritten = (rewriteNamespace d (read "Expected.cs" d)).TrimEnd('\n', '\r')
+            File.WriteAllText(Path.Combine(project, caseFile d), rewritten + "\n")
+            d, rewritten)
+        |> Map.ofArray
+
+    // A block-scoped namespace, similarly. csharp_style_namespace_declarations defaults to "(as
+    // written)" in Curb — it converts nothing unless asked — but jb's own default prefers file-scoped
+    // and converts a block-scoped namespace on sight, even with nothing else about the case in play
+    // (found in NamespaceAndUsingTests' block-namespace cases). Conditional on before.[d] actually
+    // having a block-scoped namespace for the same reason as the empty-block key: a case whose
+    // namespace was already file-scoped needs no help agreeing, and forcing block_scoped on it would
+    // manufacture a new disagreement in the other direction.
+    let blockScopedNamespace = Text.RegularExpressions.Regex(@"namespace\s+[\w.]+\s*\r?\n[ \t]*\{")
+
+    // Distinguishes empty-block-style's two collapsed spellings: "together" keeps the pair on its own
+    // line (`)\n{ }`), "together_same_line" joins it to whatever precedes it (`Empty() { }`) — a single
+    // non-whitespace character with at most one space between it and `{` means the same line; anything
+    // else (a newline in between) means its own line.
+    let emptyBlockJoinsPrecedingLine = Text.RegularExpressions.Regex(@"[^\s\r\n]\s?\{\s?\}")
+
+    // The three shapes an accessor's body can take, used together to decide whether it is safe to tell
+    // jb to leave a genuinely-multi-line accessor block alone (see accessorExpressionBodyDirection
+    // below). `get`/`set`/`init` is unambiguous here — none of the three is a common identifier, and a
+    // real one appearing as a local name would need to be followed by one of these exact punctuation
+    // shapes to match at all.
+    let accessorBlockMultiline = Text.RegularExpressions.Regex(@"\b(get|set|init)\s*\r?\n\s*\{")
+    let accessorBlockSingleLine = Text.RegularExpressions.Regex(@"\b(get|set|init)\s*\{[^\r\n{}]*\}")
+    let accessorArrow = Text.RegularExpressions.Regex(@"\b(get|set|init)\s*=>")
+
+    // Any non-empty single-line brace block anywhere in the case — not just on an accessor. Used as a
+    // whole-file guard on accessorExpressionBodyDirection: a case that preserves some OTHER construct on
+    // one line (PreserveSingleLineTests' whole point) is exactly the shape that made an earlier, narrower
+    // version of this fix regress `PreserveSingleLineTests.A_one_line_body_with_a_statement_stays_there`
+    // — telling jb `csharp_preserve_single_line_blocks = false` to stop it collapsing a genuinely
+    // multi-line accessor also stops it honouring a block Curb deliberately kept on one line elsewhere,
+    // and jb expanded that one instead. Safer to skip the whole case when any inline block exists at all
+    // than to try to scope the keys to just the accessor construct — Curb's own preserve options are not
+    // scoped that finely either, so there is no key that would let jb agree in one place but not another.
+    let anyInlineBlock = Text.RegularExpressions.Regex(@"\{[^\r\n{}]+\}")
+
+    // One level of nested parens, balanced — `is Point(1, 2)` inside an if-condition, or a lambda
+    // parameter list inside a call, both appear in these test snippets and neither is rare enough to
+    // ignore. A plain `[^)]*` stops at the first `)`, which is the nested one, not the real close —
+    // found by a false negative it caused in bracelessControlFlowBody below.
+    let balancedParens = @"\((?:[^()]|\([^()]*\))*\)"
+
+    // A parameter list `(...)` directly before `=>`, at the start of a line (optionally after
+    // modifiers/a return type — CallerMemberName-style regexes cannot resolve a type name, so this
+    // accepts any run of words, plus at most one parenthesized group for a tuple return type like
+    // `public (int First, int Second) M() => (1, 2);`), is what a method, constructor, operator or
+    // local function's expression body looks like — the only four of Curb's seven
+    // csharp_style_expression_bodied_* constructs that have a parameter list at all, which is what
+    // makes this regex specific to them: an accessor's arrow follows a bare `get`/`set`/`init` (no
+    // parens), a property's follows the property name alone, and an indexer's follows `]` — none can
+    // match `)\s*=>`. Anchored to the start of a line (RegexOptions.Multiline) rather than matching
+    // `)\s*=>` anywhere, so a lambda argument nested inside a call on a block-bodied method's only
+    // statement — `Call((int a, int b) => a + b);` — does not falsely read as the method's own
+    // expression body: balancedParens can only match "Call"'s own parenthesis by consuming everything
+    // through its final closing paren as one unit (there is no valid shorter stopping point once the
+    // nested lambda's own parens forced a nested match), which leaves nothing for the required `=>` to
+    // follow — so this line can never satisfy the pattern.
+    //
+    // The word-token run is separated by a *required* space (`[ \t]+`, not `[ \t]*`), and the tuple-
+    // return-type group may occur at most once rather than inside a repeated alternation with the word
+    // tokens — both are what keep this linear. An earlier version allowed `\w+` and a parenthesized
+    // group to repeat interchangeably with only optional spacing between them, the classic
+    // `(\w+)*`-style catastrophic-backtracking shape: on a long non-matching line (any ordinary method
+    // body with no arrow at all) the engine explored exponentially many ways to partition the same run
+    // of word characters before concluding there was no match — observed hanging the harness at 100%
+    // CPU for minutes on the real dump. Measured this version against a 300+ character deliberately
+    // non-matching stress input at 0ms before trusting it.
+    let parameterizedExpressionBody =
+        Text.RegularExpressions.Regex(
+            @"^[ \t]*(?:\w+[ \t]+)*(?:" + balancedParens + @"[ \t]+(?:\w+[ \t]+)*)?\w+[ \t]*" + balancedParens + @"[ \t]*=>[ \t]*[^{\r\n]",
+            Text.RegularExpressions.RegexOptions.Multiline)
+
+    // A comma directly before a closing brace/bracket/paren on the next line — the shape both trailing-
+    // comma keys default to false (Curb only ever adds one; an already-present one, like an empty
+    // block's braces, survives because Curb does not remove what it did not add).
+    let trailingCommaBeforeClose = Text.RegularExpressions.Regex(@",\s*\r?\n\s*[\}\]\)]")
+
+    // A control-flow keyword whose body is not immediately a `{` — an unbraced single statement, which
+    // is exactly the shape PreferBracesTests' own default cases assert Curb leaves alone. Distinguishes
+    // "this case has braces jb would strip" (safe to tell it to require them) from "this case is
+    // specifically testing that Curb does not add braces" (telling jb to require them would be wrong in
+    // the other direction — found the hard way, on PreferBracesTests.Bodies_are_left_as_written_without_the_key
+    // itself, after making the injection unconditional turned out to be too strong a claim).
+    let bracelessControlFlowBody =
+        Text.RegularExpressions.Regex(
+            @"\b(if\s*" + balancedParens + @"|else|for\s*" + balancedParens + @"|foreach\s*" + balancedParens + @"|while\s*" + balancedParens + @"|do)\s*\r?\n?\s*[^\s{]")
+
+    let caseSection (d: string) =
+        let settings = caseSettings d
+        let z = before.[d]
+
+        // Curb collapses an empty block to `{ }` under deterministic/reflow layout unconditionally — it
+        // is not governed by csharp_empty_block_style, which stays a no-op until a repository sets it
+        // (see OptionCatalog's remarks). jb has no unconditional default of its own: it only collapses
+        // an empty block when csharp_empty_block_style names together/together_same_line explicitly,
+        // even with csharp_preserve_single_line_blocks = true set (measured directly).
+        //
+        // Only added when Z actually contains a collapsed `{ }` or `{}` — not for every case that
+        // merely fails to mention the key. An earlier version added it unconditionally, on the theory
+        // that it is harmless when nothing empty is present; measured wrong, on a case with no width
+        // and no deterministic layout at all: Curb correctly leaves an already-multi-line empty block
+        // alone there (a preservation-mode Unchanged case), and the blanket key told jb to collapse it
+        // anyway — a disagreement caused by this harness asking for something Curb never chose.
+        let emptyBlock =
+            if (z.Contains "{ }" || z.Contains "{}")
+               && not (settings |> Array.exists (fun l -> l.Contains "csharp_empty_block_style"))
+            then
+                let spelling = if emptyBlockJoinsPrecedingLine.IsMatch z then "together_same_line" else "together"
+                [| sprintf "csharp_empty_block_style = %s" spelling |]
+            else [||]
+
+        let blockNamespace =
+            if blockScopedNamespace.IsMatch z
+               && not (settings |> Array.exists (fun l -> l.Contains "csharp_style_namespace_declarations"))
+            then [| "csharp_style_namespace_declarations = block_scoped" |] else [||]
+
+        // Only covers block_scoped -> file_scoped by construction: the case above only fires when Z is
+        // already block-scoped. The reverse (file_scoped source, block_scoped requested) is a genuine,
+        // confirmed Curb gap, not something this harness can inject its way around — Printers.cs's
+        // FileScopedNamespace never checks context.Options.NamespaceStyle at all, so a repository asking
+        // for block_scoped gets no conversion when the source is already file-scoped. IDE0161's other
+        // direction (IDE0160) has no printer implementation. NamespaceStyleTests.Block_scoped_is_accepted_
+        // and_changes_nothing documents this deliberately, by name, so it stays visible rather than
+        // reading as an oversight; that case is expected to remain in the "not a fixed point" list below
+        // until the reverse conversion is implemented — it is not a candidate for an injected key at all.
+
+        // Curb only ever adds braces around an unbraced control-flow body, never removes existing ones
+        // — PreferBracesTests documents why: Roslyn would take them off, but a declaration inside the
+        // block stops being scoped to it, a change in meaning rather than layout, so Curb refuses even
+        // with csharp_prefer_braces = false. jb defaults to stripping braces around a single embedded
+        // statement, aggressively — it did so through four levels of nested if-statements in one case.
+        //
+        // Conditional, not unconditional: an earlier version reasoned this was always safe, since Curb
+        // never removes a brace either way — true, but incomplete. Curb's default also does not add a
+        // missing one, and PreferBracesTests' own cases assert exactly that default; forcing `true`
+        // unconditionally told jb to add braces to those cases' deliberately braceless bodies, a new
+        // disagreement in the other direction. Only injected when Z has no braceless control-flow body
+        // of its own to protect.
+        let preferBraces =
+            if bracelessControlFlowBody.IsMatch z
+               || settings |> Array.exists (fun l -> l.Contains "csharp_prefer_braces")
+            then [||] else [| "csharp_prefer_braces = true" |]
+
+        // jb defaults to collapsing an already-multi-line accessor, property or indexer body — both
+        // toward an expression body (`get => _x;`) and, once that is suppressed, toward a single-line
+        // block (`get { return _x; }`) instead — the opposite direction from methods/constructors/
+        // operators/local_functions above, confirmed by testing each key in isolation:
+        // csharp_style_expression_bodied_{accessors,properties,indexers} = false alone only stops the
+        // arrow, not the single-line collapse; csharp_preserve_single_line_{blocks,statements} = false
+        // is what stops that second step. Both are needed together.
+        //
+        // Only injected when Z's own accessor shape is unambiguously multi-line — no accessor already
+        // collapsed to a single line or an arrow anywhere in the case (accessorBlockSingleLine,
+        // accessorArrow), and no OTHER construct in the file relies on single-line preservation either
+        // (anyInlineBlock) — seeing preferBraces's mistake, keeping this scoped to when nothing in Z
+        // could be broken by turning both preserve options off case-wide.
+        let accessorExpressionBodyDirection =
+            if accessorBlockMultiline.IsMatch z
+               && not (accessorBlockSingleLine.IsMatch z)
+               && not (accessorArrow.IsMatch z)
+               && not (anyInlineBlock.IsMatch z)
+               && not (settings |> Array.exists (fun l ->
+                    l.Contains "csharp_style_expression_bodied_accessors"
+                    || l.Contains "csharp_style_expression_bodied_properties"
+                    || l.Contains "csharp_style_expression_bodied_indexers"
+                    || l.Contains "csharp_preserve_single_line_blocks"
+                    || l.Contains "csharp_preserve_single_line_statements"))
+            then
+                [| "csharp_style_expression_bodied_accessors = false"
+                   "csharp_style_expression_bodied_properties = false"
+                   "csharp_style_expression_bodied_indexers = false"
+                   "csharp_preserve_single_line_blocks = false"
+                   "csharp_preserve_single_line_statements = false" |]
+            else [||]
+
+        // Not a Curb-implemented key at all — Curb has no option that ever puts a space between two
+        // attribute sections it glues together (AttributeTests.A_space_between_sections_on_a_parameter_is_removed
+        // confirms it always normalises one away), so there is no case where telling jb to match that
+        // could conflict with an alternate Curb behaviour. jb defaults to spacing them apart.
+        let attributeSectionSpacing =
+            if settings |> Array.exists (fun l -> l.Contains "csharp_space_between_attribute_sections")
+            then [||] else [| "csharp_space_between_attribute_sections = false" |]
+
+        // Curb always aligns a broken query expression's clauses under `from` (Printers.Query.cs's
+        // QueryAnchor) — unconditional, not gated by any option, so telling jb to match is always safe.
+        // jb's default is a flat continuation indent instead, ignoring the alignment entirely; found via
+        // the user pointing at ReSharper's own editorconfig schema page for this rather than guessing —
+        // `resharper_csharp_align_linq_query` is the ReSharper-native key (not a plain `csharp_` one,
+        // unlike most of the keys here) and setting it to `true` reproduces Curb's shape exactly.
+        let alignLinqQuery =
+            if settings |> Array.exists (fun l -> l.Contains "resharper_csharp_align_linq_query")
+            then [||] else [| "resharper_csharp_align_linq_query = true" |]
+
+        // dotnet_style_require_accessibility_modifiers is dotnet_style_*, one of the "not formatting —
+        // dotnet format style's territory" keys OptionCatalog.IsOtherCodeStyleKey names: curb format
+        // never adds or removes an accessibility modifier, that is IDE0040 and curb cleanup's job. jb
+        // defaults to adding an implicit `private` to every member missing one — measured across a
+        // large share of cases, since almost none of them bother writing it on a test-only method.
+        // never (confirmed not to touch a modifier a case already wrote explicitly, only ones it would
+        // otherwise add) says the same thing curb format already means by never touching this at all,
+        // so it is unconditional like csharp_prefer_braces — nothing to detect per case.
+        let requireAccessibility =
+            if settings |> Array.exists (fun l -> l.Contains "dotnet_style_require_accessibility_modifiers")
+            then [||] else [| "dotnet_style_require_accessibility_modifiers = never" |]
+
+        // NOT safe unconditionally, unlike requireAccessibility above — tried and measured wrong.
+        // csharp_style_var_* is dotnet format style's territory (curb format never rewrites a declared
+        // type to `var` or back), and jb's default profile does apply "prefer var" regardless of a bare
+        // `.editorconfig` (confirmed: `int x = 1;` came back `var x = 1;` in isolation). But most of the
+        // corpus's own fixtures already use `var` idiomatically, so forcing `csharp_style_var_* = false`
+        // everywhere told jb to convert THOSE back to explicit types instead — a much larger regression
+        // (635 -> 589 of 820) than the handful of explicit-type cases it was meant to protect. Reverted.
+        // A real fix here needs to be conditional on Z's own declarations the way preferBraces is on Z's
+        // own braces, not a blanket default — not done this pass.
+
+        // jb defaults to expanding an already-expression-bodied method, constructor, operator or local
+        // function back into a block — the opposite direction from accessors/properties/indexers below,
+        // which is exactly why this is its own detection rather than sharing one with them. Curb's own
+        // default is "as written" for all seven csharp_style_expression_bodied_* keys (see
+        // ExpressionBodyTests.Bodies_are_left_as_written_without_the_key), so telling jb to prefer
+        // keeping what parameterizedExpressionBody already found present is what "as written" means for
+        // it too.
+        let parameterizedExpressionBodyKeys =
+            if parameterizedExpressionBody.IsMatch z then
+                [ "methods"; "constructors"; "operators"; "local_functions" ]
+                |> List.filter (fun kind -> not (settings |> Array.exists (fun l -> l.Contains (sprintf "csharp_style_expression_bodied_%s" kind))))
+                |> List.map (sprintf "csharp_style_expression_bodied_%s = true")
+                |> List.toArray
+            else [||]
+
+        // Both trailing-comma keys default to false — Curb only ever adds a trailing comma when asked,
+        // never removes an existing one — so an already-comma'd list only needs jb told to leave it
+        // alone when Z actually has one, the same conditional shape as the empty-block and namespace
+        // keys above. jb removed it from every enum, switch-expression-arm list and object initializer
+        // sampled, regardless of whether the list was single-line or broken across several.
+        let trailingComma =
+            if trailingCommaBeforeClose.IsMatch z then
+                [ "multiline_lists"; "singleline_lists" ]
+                |> List.filter (fun kind -> not (settings |> Array.exists (fun l -> l.Contains (sprintf "csharp_trailing_comma_in_%s" kind))))
+                |> List.map (sprintf "csharp_trailing_comma_in_%s = true")
+                |> List.toArray
+            else [||]
+
+        let extra =
+            Array.concat
+                [ emptyBlock; blockNamespace; preferBraces; requireAccessibility
+                  parameterizedExpressionBodyKeys; trailingComma; attributeSectionSpacing; alignLinqQuery
+                  accessorExpressionBodyDirection ]
+        sprintf "[%s]\n%s" (caseFile d) (Array.append settings extra |> String.concat "\n")
+
+    File.WriteAllText(
+        Path.Combine(project, ".editorconfig"),
+        "root = true\n\n" + (cases |> Array.map caseSection |> String.concat "\n\n") + "\n")
+
+    File.WriteAllText(
+        Path.Combine(project, "Cases.csproj"),
+        [ "<Project Sdk=\"Microsoft.NET.Sdk\">"
+          "  <PropertyGroup>"
+          "    <TargetFramework>net10.0</TargetFramework>"
+          "  </PropertyGroup>"
+          "</Project>" ]
+        |> String.concat "\n")
+
+    // An ordinary project, just linked into a throwaway solution the same way any project would be —
+    // nothing jb-specific about the .slnx itself, unlike the per-case .globalconfig trick the dotnet
+    // format style side needs for MSBuild diagnostic severities.
+    let sln = Path.Combine(dump, "Cases.slnx")
+    File.WriteAllText(sln, "<Solution>\n  <Project Path=\"project/Cases.csproj\" />\n</Solution>\n")
+
+    printfn "running jb cleanupcode over %d case(s) in one project" cases.Length
+    // The default profile is "Built-in: Full Cleanup", which does far more than reformat — it removes
+    // code it considers redundant, including an unused goto label, so an ordinary formatting case can
+    // come back with content deleted rather than reordered. Measured: that alone was responsible for
+    // most of a 43% disagreement rate on the first run of this target. "Reformat & Apply Syntax Style"
+    // is jb's own narrower profile for exactly the formatting/layout concern this target checks.
+    //
+    // --caches-home pointed at this run's own dump directory rather than jb's default (shared, outside
+    // this tree): reusing the default cache across repeated runs against a directory that gets deleted
+    // and recreated each time logged "Concurrent modification?" warnings — a fresh, disposable cache
+    // avoids reasoning about jb's staleness rules at all.
+    let cachesHome = Path.Combine(dump, ".jb-caches")
+    exec "dotnet"
+        [ "jb"; "cleanupcode"; sln; "--no-build"
+          "--profile=Built-in: Reformat & Apply Syntax Style"
+          sprintf "--caches-home=%s" cachesHome
+          "--verbosity=WARN" ]
+
+    let divergences = loadDivergences "jb-cleanupcode"
+
+    let results =
+        cases
+        |> Array.map (fun d ->
+            let after = File.ReadAllText(Path.Combine(project, caseFile d)).TrimEnd('\n', '\r')
+            {| Directory = d; StaysFixedPoint = after = before.[d] |})
+    let testCaseOf (d: string) =
+        let path = Path.Combine(d, "TestCase.txt")
+        if File.Exists path then (File.ReadAllText path).Trim() else "?"
+
+    let notFixedPoint =
+        results
+        |> Array.filter (fun r -> not r.StaysFixedPoint)
+        |> Array.map (fun r -> r.Directory, testCaseOf r.Directory)
+
+    printfn ""
+    printfn "%d of %d expectations are a fixed point of jb cleanupcode" (cases.Length - notFixedPoint.Length) cases.Length
+
+    // Still reported rather than gated with gateOnNonFixedPoints, but for a different reason now: the
+    // non-determinism this single-project rewrite set out to test is fixed — repeat runs against the
+    // same dump land on the same case set, name for name, not just the same count (the old
+    // one-project-per-case shape moved between 330, 377 and 404 with no code change). What blocks gating
+    // now is scale, and it is shrinking by category rather than by case: started at 307 of 842 (the
+    // count the determinism check above was measured against), now ~235 after five categorised root
+    // causes were found and fixed by injecting a key into every case whose shape needs it — the same
+    // move whitespace's own X != Z check made, categorising causes rather than triaging cases one at a
+    // time. Landed so far: csharp_empty_block_style (both spellings — jb only collapses an empty block
+    // when told to, and needs together vs together_same_line to match which line it is on),
+    // csharp_style_namespace_declarations (jb defaults to file-scoped, converting a block-scoped
+    // namespace on sight), csharp_prefer_braces (jb strips braces around a single embedded statement by
+    // default; safe to force on unconditionally since Curb never removes an existing brace either — see
+    // PreferBracesTests), and dotnet_style_require_accessibility_modifiers (jb adds an implicit
+    // `private` to bare members by default; curb format never touches this dimension at all, so `never`
+    // is unconditionally safe too — see OptionCatalog.IsOtherCodeStyleKey). What is left splits into
+    // several more real, distinct categories rather than one: expression-body direction disagrees per
+    // construct (jb expands an already-expression-bodied method back to a block, but collapses an
+    // already-block accessor/indexer to an expression body — the opposite direction, needing per-case
+    // shape detection across seven csharp_style_expression_bodied_* keys the way the two keys above
+    // needed it), trailing-comma removal before a closing brace, redundant-parentheses-around-operators
+    // and qualified-name-shortening (both semantic style preferences Curb never applies), query-clause
+    // continuation indentation, and chain/binary-operator continuation position. None of these were
+    // chased down this pass — each is its own investigation the size of the four above.
+    if notFixedPoint.Length > 0 then
+        printfn ""
+        printfn "NOT a fixed point of jb cleanupcode (reported only — see the comment on this target for why):"
+        for (directory, case) in notFixedPoint |> Array.sortBy snd |> Array.truncate 20 do
+            let documented = divergences.ContainsKey case
+            printfn "  %s (%s) — %s"
+                case (Path.GetRelativePath(dump, directory)) (if documented then "documented" else "undocumented")
+        if notFixedPoint.Length > 20 then
+            printfn "  ... and %d more" (notFixedPoint.Length - 20)
 
 let private generatePackages (arguments:ParseResults<Arguments>) =
     let output = Paths.RootRelative Paths.Output.FullName
@@ -1327,6 +2019,8 @@ let Setup (parsed:ParseResults<Arguments>) (subCommand:Arguments) =
     // a Release compile to preview a paragraph would make nobody run it.
     step Docs.Name docs
     cmd VerifyExpectations.Name (Some [Build.Name]) None <| fun _ -> verifyExpectations parsed
+    cmd VerifyCleanupExpectations.Name (Some [Build.Name]) None <| fun _ -> verifyCleanupExpectations parsed
+    cmd VerifyExpectationsJb.Name (Some [Build.Name]) None <| fun _ -> verifyExpectationsJb parsed
 
     step PristineCheck.Name pristineCheck
     step GeneratePackages.Name generatePackages

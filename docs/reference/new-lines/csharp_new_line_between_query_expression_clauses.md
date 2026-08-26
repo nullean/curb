@@ -18,6 +18,10 @@ Put each clause of a query expression on its own line.
 
 **Default:** `false`
 
+## Conformance
+
+No known case where Curb's output is not a fixed point of `dotnet format` — see [conformance](../../design-principles/conformance.md).
+
 ### `csharp_new_line_between_query_expression_clauses = true`
 
 ```ini

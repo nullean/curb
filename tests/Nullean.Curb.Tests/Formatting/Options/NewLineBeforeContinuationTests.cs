@@ -203,9 +203,7 @@ public class NewLineBeforeContinuationTests : FormattingTest
 		{
 		    public void M()
 		    {
-		        try
-		        {
-		        }
+		        try { }
 		        catch (Exception e) { }
 		    }
 		}
@@ -232,9 +230,7 @@ public class NewLineBeforeContinuationTests : FormattingTest
 		{
 		    public void M()
 		    {
-		        try
-		        {
-		        } catch (Exception e) { }
+		        try { } catch (Exception e) { }
 		    }
 		}
 		""",
@@ -267,9 +263,7 @@ public class NewLineBeforeContinuationTests : FormattingTest
 		{
 		    public void M()
 		    {
-		        try
-		        {
-		        } catch (ArgumentException) { } catch (Exception e) when (e.Message.Length > 0) { } catch { }
+		        try { } catch (ArgumentException) { } catch (Exception e) when (e.Message.Length > 0) { } catch { }
 		    }
 		}
 		""",
@@ -297,9 +291,7 @@ public class NewLineBeforeContinuationTests : FormattingTest
 		{
 		    public void M()
 		    {
-		        try
-		        {
-		        }
+		        try { }
 		        finally { }
 		    }
 		}
@@ -326,9 +318,7 @@ public class NewLineBeforeContinuationTests : FormattingTest
 		{
 		    public void M()
 		    {
-		        try
-		        {
-		        } finally { }
+		        try { } finally { }
 		    }
 		}
 		""",
@@ -358,9 +348,7 @@ public class NewLineBeforeContinuationTests : FormattingTest
 		{
 		    public void M()
 		    {
-		        try
-		        {
-		        }
+		        try { }
 		        catch (Exception e) { } finally { }
 		    }
 		}
@@ -423,9 +411,7 @@ public class NewLineBeforeContinuationTests : FormattingTest
 		{
 		    public void M()
 		    {
-		        try
-		        {
-		        }
+		        try { }
 		        finally { }
 		    }
 		}

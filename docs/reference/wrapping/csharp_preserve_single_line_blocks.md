@@ -18,6 +18,10 @@ Allow a block the author wrote on one line to stay on one line.
 
 **Default:** `true`
 
+## Conformance
+
+No known case where Curb's output is not a fixed point of `dotnet format` — see [conformance](../../design-principles/conformance.md).
+
 ### `csharp_preserve_single_line_blocks = true`
 
 ```ini
