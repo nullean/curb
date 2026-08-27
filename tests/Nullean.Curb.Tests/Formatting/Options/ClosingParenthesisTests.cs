@@ -340,14 +340,17 @@ public class ClosingParenthesisTests : FormattingTest
 	// ---- the chain head -------------------------------------------------------------------------------
 
 	[Test]
-	public Task A_plain_receiver_keeps_its_first_call_by_default() => Unchanged(
-		// `source.Where(…)` reads as one thing, so the receiver is not left stranded.
+	public Task A_plain_receiver_stands_alone_by_default() => Unchanged(
+		// Every receiver stands alone once a chain is breaking at all, unset behaving like
+		// csharp_wrap_before_first_method_call = true — uniform stacking rather than a first call
+		// kept attached only because its receiver happened to be a plain identifier.
 		"""
 		public class C
 		{
 		    public void M()
 		    {
-		        var r = source.Where(x => x.Active)
+		        var r = source
+		            .Where(x => x.Active)
 		            .Select(x => x.Name)
 		            .ToList();
 		    }
@@ -356,24 +359,13 @@ public class ClosingParenthesisTests : FormattingTest
 		editorConfig: Narrow);
 
 	[Test]
-	public Task Wrapping_before_the_first_call_strands_the_receiver() => WithAndWithout(
+	public Task Attaching_the_first_call_is_the_one_override_left() => WithAndWithout(
 		"""
 		public class C
 		{
 		    public void M()
 		    {
 		        var r = source.Where(x => x.Active).Select(x => x.Name).ToList();
-		    }
-		}
-		""",
-		"""
-		public class C
-		{
-		    public void M()
-		    {
-		        var r = source.Where(x => x.Active)
-		            .Select(x => x.Name)
-		            .ToList();
 		    }
 		}
 		""",
@@ -389,7 +381,18 @@ public class ClosingParenthesisTests : FormattingTest
 		    }
 		}
 		""",
-		"csharp_wrap_before_first_method_call = true",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        var r = source.Where(x => x.Active)
+		            .Select(x => x.Name)
+		            .ToList();
+		    }
+		}
+		""",
+		"csharp_wrap_before_first_method_call = false",
 		editorConfig: Narrow);
 
 	[Test]

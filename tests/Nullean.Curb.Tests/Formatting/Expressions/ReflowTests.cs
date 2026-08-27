@@ -372,7 +372,8 @@ public class ReflowTests : FormattingTest
 		{
 		    public void M()
 		    {
-		        result = result.WithArgs(alpha)
+		        result = result
+		            .WithArgs(alpha)
 		            .WaitForCompletion(beta)
 		            .WithParentRelationship(gamma);
 		    }
@@ -428,7 +429,8 @@ public class ReflowTests : FormattingTest
 		    public void M()
 		    {
 		        Configure(
-		            s => s.Indices(alphaIndex)
+		            s => s
+		                .Indices(alphaIndex)
 		                .Query(betaQuery)
 		                .Size(oneResult)
 		        );

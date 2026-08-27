@@ -349,7 +349,8 @@ public class InvocationTests : FormattingTest
 		{
 		    public void M()
 		    {
-		        instance.First()
+		        instance
+		            .First()
 		            .Second()
 		            .Third()
 		            .Fourth();

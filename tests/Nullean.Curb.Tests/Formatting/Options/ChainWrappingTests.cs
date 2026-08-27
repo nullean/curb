@@ -30,7 +30,8 @@ public class ChainWrappingTests : FormattingTest
 		{
 		    void M()
 		    {
-		        instance.First()
+		        instance
+		            .First()
 		            .Second()
 		            .Third()
 		            .Fourth();
@@ -67,7 +68,8 @@ public class ChainWrappingTests : FormattingTest
 		{
 		    void M()
 		    {
-		        var deduped = allUrls.GroupBy(u => u.Location)
+		        var deduped = allUrls
+		            .GroupBy(u => u.Location)
 		            .Select(g => g.First())
 		            .ToList();
 		    }
@@ -172,4 +174,54 @@ public class ChainWrappingTests : FormattingTest
 		}
 		""",
 		editorConfig: "max_line_length = 60");
+
+	// ---- a call-shaped receiver counts toward the minimum, even with only two dots after it --------
+
+	[Test]
+	public Task A_creation_receiver_with_only_two_links_still_breaks_when_it_does_not_fit() => Formats(
+		// Two links (.Configure, .Build) sit below MinimumLinksToBreak on their own, and SpansLines —
+		// preservation mode's escape hatch for a chain the author already opened out — reads nothing
+		// under csharp_keep_existing_linebreaks = false. Without counting the creation's own
+		// arguments as a third link, this chain could never engage at all: the tail broke inside
+		// .Configure's own argument list instead of at its dots.
+		"""
+		public class C
+		{
+		    void M()
+		    {
+		        result = new Builder(alphaArgument, betaArgument).Configure(gammaArgument).Build(deltaArgument);
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    void M()
+		    {
+		        result = new Builder(
+		            alphaArgument,
+		            betaArgument
+		        )
+		            .Configure(gammaArgument)
+		            .Build(deltaArgument);
+		    }
+		}
+		""",
+		editorConfig: "max_line_length = 40");
+
+	[Test]
+	public Task A_creation_receiver_with_no_arguments_does_not_count_toward_the_minimum() => Unchanged(
+		// new Widget() carries nothing of its own to chain against — an empty argument list is as
+		// simple as a plain identifier receiver, so two links after it stays below the minimum same
+		// as foo.Bar().Baz() does, and the line is left to overflow rather than broken for no reason.
+		"""
+		public class C
+		{
+		    void M()
+		    {
+		        result = new Widget().ConfigureSomethingReasonablyLong().BuildSomethingElseEntirely();
+		    }
+		}
+		""",
+		editorConfig: "max_line_length = 40");
 }

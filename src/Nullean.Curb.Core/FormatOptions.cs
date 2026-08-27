@@ -886,9 +886,11 @@ public readonly record struct FormatOptions
 	/// </summary>
 	/// <remarks>
 	/// <para>
-	/// Null keeps what Curb does: a plain identifier receiver keeps its first call, because
-	/// <c>builder.AddProject(…)</c> reads as one thing, while anything more involved is left to
-	/// stand alone. <c>true</c> strands every receiver; <c>false</c> attaches every first call.
+	/// Null keeps what Curb does, which is the same thing <c>true</c> does: every receiver stands
+	/// alone once a chain is breaking at all, uniform stacking rather than a first call that stays
+	/// attached only because its receiver happened to be a plain identifier. <c>false</c> is the one
+	/// override — it attaches the first call regardless of receiver shape, including a call or
+	/// creation that would otherwise stand alone too.
 	/// </para>
 	/// <para>
 	/// An author's own break at that dot is theirs either way — this decides what Curb does when it

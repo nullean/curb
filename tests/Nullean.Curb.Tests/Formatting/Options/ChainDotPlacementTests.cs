@@ -133,7 +133,7 @@ public class ChainDotPlacementTests : FormattingTest
 
 	[Test]
 	public Task A_receiver_that_keeps_its_first_call_keeps_that_dot_glued() => Formats(
-		// Where Curb introduces the breaks itself, a plain identifier receiver keeps its first call —
+		// csharp_wrap_before_first_method_call = false is the one way left to attach a first call —
 		// and that link has no break for its dot to sit on either side of, so the dot stays glued.
 		"""
 		public class C
@@ -155,5 +155,5 @@ public class ChainDotPlacementTests : FormattingTest
 		    }
 		}
 		""",
-		editorConfig: DotTrails + "\nmax_line_length = 45");
+		editorConfig: DotTrails + "\ncsharp_wrap_before_first_method_call = false\nmax_line_length = 45");
 }
