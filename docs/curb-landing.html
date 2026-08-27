@@ -738,6 +738,56 @@ formatting you see in a diff.
   </div>
 </section>
 
+<hr class="divider"/>
+
+<!-- ══════════════  GITHUB ACTION  ══════════════ -->
+<section class="section reveal">
+  <div class="inner">
+    <div class="split">
+      <div>
+        <p class="section-label">// ci without the sdk</p>
+        <h2 class="section-title">Or skip the SDK entirely.</h2>
+        <p class="section-sub" style="margin-bottom:2rem">
+          A pre-built, distroless container image on GitHub Container Registry — pulled, not built, so
+          there is nothing to compile in your workflow. <code>check</code> fails the job if anything
+          would reformat; <code>format</code> rewrites in place.
+        </p>
+        <div class="steps">
+          <div class="step">
+            <div class="step-num">01</div>
+            <div>
+              <div class="step-title">No .NET SDK install</div>
+              <p class="step-body">One <code>uses:</code> line. No <code>actions/setup-dotnet</code>, no tool install, no restore.</p>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-num">02</div>
+            <div>
+              <div class="step-title">~32 MB, shell-less</div>
+              <p class="step-body">Native-AOT on a chiseled base image. Pulled in about a second, not built on every run.</p>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-num">03</div>
+            <div>
+              <div class="step-title">Same binary, same rules</div>
+              <p class="step-body">Reads the <code>.editorconfig</code> already in your repo — nothing new to configure.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="code-panel">
+        <div class="code-panel-head">.github/workflows/ci.yml</div>
+<pre><span class="c-tag">- uses:</span> <span class="c-val">nullean/curb@main</span>
+  <span class="c-tag">with:</span>
+    <span class="c-key">command</span>: <span class="c-val">check</span>          <span class="c-com"># or "format"</span>
+    <span class="c-key">path</span>: <span class="c-val">.</span></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- ══════════════  CTA  ══════════════ -->
 <section class="section cta reveal">
   <div class="inner">
