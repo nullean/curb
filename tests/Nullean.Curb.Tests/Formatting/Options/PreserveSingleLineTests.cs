@@ -342,7 +342,6 @@ public class PreserveSingleLineTests : FormattingTest
 		    {
 		        if (a)
 		            return;
-
 		        int y = 1;
 		        int z = 2;
 		    }

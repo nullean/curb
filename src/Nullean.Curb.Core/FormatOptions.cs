@@ -1164,17 +1164,21 @@ public readonly record struct FormatOptions
 	/// <summary>
 	/// <c>csharp_blank_lines_before_block_statements</c>: above an <c>if</c>/<c>while</c>/<c>for</c>/
 	/// <c>foreach</c>/<c>do</c>/<c>switch</c>/<c>using</c>/<c>lock</c>/<c>try</c> statement. Zero by
-	/// default, matching jb: unlike the gap after one, nothing about a block statement's own opening
-	/// line asks to be set off from whatever ordinary code precedes it.
+	/// default: nothing about a block statement's own opening line asks to be set off from whatever
+	/// ordinary code precedes it.
 	/// </summary>
 	public int BlankLinesBeforeBlockStatements { get; init; }
 
 	/// <summary>
-	/// <c>csharp_blank_lines_after_block_statements</c>, the same after one. One by default, matching
-	/// jb: a block statement reads as a distinct unit of control flow, and separating it from whatever
-	/// follows is closer to how most C# actually gets written than leaving the two flush.
+	/// <c>csharp_blank_lines_after_block_statements</c>, the same after one. Zero by default too — a
+	/// deliberate divergence from jb's own default of one. jb reads a block statement as a distinct
+	/// unit of control flow and always sets it off from whatever follows; Curb's own taste is to keep
+	/// this symmetric with <see cref="BlankLinesBeforeBlockStatements"/> and leave the gap to the
+	/// author on both sides, the same "preserve, don't impose" default every other member/statement
+	/// spacing key in this family already uses except <see cref="BlankLinesAroundType"/> and
+	/// <see cref="BlankLinesAroundLocalMethod"/> — both narrower, more clearly-conventional cases.
 	/// </summary>
-	public int BlankLinesAfterBlockStatements { get; init; } = 1;
+	public int BlankLinesAfterBlockStatements { get; init; }
 
 	/// <summary>
 	/// <c>csharp_blank_lines_before_control_transfer_statements</c>: above a <c>return</c>/

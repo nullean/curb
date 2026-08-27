@@ -519,7 +519,6 @@ public class ControlFlowTests : FormattingTest
 		        {
 		            return true;
 		        }
-
 		        return false;
 		    }
 		}
@@ -558,7 +557,6 @@ public class ControlFlowTests : FormattingTest
 		        {
 		            return true;
 		        }
-
 		        return false;
 		    }
 		}

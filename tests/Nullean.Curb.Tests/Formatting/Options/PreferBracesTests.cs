@@ -217,17 +217,14 @@ public class PreferBracesTests : FormattingTest
 		        {
 		            Call();
 		        }
-
 		        while (x > 0)
 		        {
 		            Call();
 		        }
-
 		        foreach (var i in items)
 		        {
 		            Call();
 		        }
-
 		        lock (this)
 		        {
 		            Call();
@@ -358,7 +355,6 @@ public class PreferBracesTests : FormattingTest
 		        {
 		            return false;
 		        }
-
 		        return true;
 		    }
 		}
