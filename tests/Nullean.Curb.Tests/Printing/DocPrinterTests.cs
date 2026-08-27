@@ -420,6 +420,36 @@ public class DocPrinterTests
 		await Task.CompletedTask;
 	}
 
+	[Test]
+	public async Task A_carriage_return_in_a_source_span_does_not_count_toward_width()
+	{
+		// A CRLF-checked-out file (e.g. Windows with core.autocrlf=true and end_of_line unset) can hand
+		// the printer a source slice that still carries a literal '\r'. It is a line-ending byte, not a
+		// column of content, and must not count toward the wrap budget — see issue #70, where it made
+		// lines measure one column wider on Windows than on macOS/Linux and flip wrap decisions.
+		const string source = "0123\r678";
+		var arena = new DocArena();
+		using (arena.Group())
+		{
+			arena.SourceText(0, 5); // "0123\r" — 4 columns of content plus a trailing '\r'
+			arena.Line();
+			arena.SourceText(5, 3); // "678"
+		}
+
+		DocValidator.Validate(arena, source.Length);
+		var options = new FormatOptions
+		{
+			MaxLineLength = 8, // "0123" (4) + line-as-space (1) + "678" (3) = 8 columns, ignoring '\r'
+			IndentSize = 2,
+			EndOfLine = EndOfLine.Lf,
+			InsertFinalNewLine = false,
+		};
+
+		DocLayout.Render(arena, source, options).Should().Be("0123\r 678",
+			"the '\\r' must not count toward the 8-column budget, so the group still fits flat");
+		await Task.CompletedTask;
+	}
+
 	// ---- aiming at another group's decision --------------------------------------------------------
 
 	/// <summary>

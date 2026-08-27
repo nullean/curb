@@ -676,6 +676,13 @@ internal sealed class DocPrinter
 				continue;
 			}
 
+			// A source slice can carry a literal '\r' straight from a CRLF-checked-out file (e.g.
+			// Windows with core.autocrlf=true) even when end_of_line is unset. It is a line-ending
+			// byte, not a column of content, so it must not count toward the wrap width — otherwise
+			// wrap decisions diverge between CRLF and LF checkouts of the same source.
+			if (text[i] == '\r')
+				continue;
+
 			if (char.IsHighSurrogate(text[i]) && i + 1 < text.Length && char.IsLowSurrogate(text[i + 1]))
 				i++;
 
