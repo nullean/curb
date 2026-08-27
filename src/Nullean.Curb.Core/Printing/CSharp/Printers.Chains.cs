@@ -231,17 +231,26 @@ internal static partial class Printers
 		var trailerBuffer = context.TrailerBuffer;
 		var trailersStart = trailerBuffer.Count;
 
+		// The outermost invocation/indexer wrapper seen since the last link (or since the start), so a
+		// receiver that is itself a call or an indexer — `GetFactory()`, `factories[0]` — can be handed
+		// back whole rather than disqualifying the chain: without this, `GetFactory().Add(x).Add(y)…`
+		// fell all the way through to ordinary printing and broke inside whichever argument list
+		// happened to overflow first, rather than at the chain's own dots.
+		ExpressionSyntax? receiverBoundary = null;
+
 		while (true)
 		{
 			switch (current)
 			{
 				case InvocationExpressionSyntax invocation:
+					receiverBoundary ??= current;
 					// Append outward: innermost trailers arrive last; reversed below before storing.
 					trailerBuffer.Add(invocation.ArgumentList);
 					current = invocation.Expression;
 					continue;
 
 				case ElementAccessExpressionSyntax elementAccess:
+					receiverBoundary ??= current;
 					trailerBuffer.Add(elementAccess.ArgumentList);
 					current = elementAccess.Expression;
 					continue;
@@ -256,6 +265,7 @@ internal static partial class Printers
 						(links ??= []).Add(new ChainLink(access.OperatorToken, access.Name, trailersStart, trailersCount, end));
 						trailersStart = trailerBuffer.Count;
 						current = access.Expression;
+						receiverBoundary = null;
 						continue;
 					}
 
@@ -265,9 +275,11 @@ internal static partial class Printers
 						var hasReceiverTrailers = trailerBuffer.Count > trailersStart;
 						if (hasReceiverTrailers)
 						{
-							// Remove the receiver's pending trailers — they are not part of any link.
+							// Remove the receiver's pending trailers — they are not part of any link. The
+							// receiver is everything from receiverBoundary down, printed as one unbroken
+							// unit by the ordinary printer for whatever kind of expression it is.
 							trailerBuffer.RemoveRange(trailersStart, trailerBuffer.Count - trailersStart);
-							receiver = node;
+							receiver = receiverBoundary ?? node;
 						}
 						else
 						{
@@ -275,7 +287,7 @@ internal static partial class Printers
 						}
 						// Links were appended outermost-first; reverse into source order before returning.
 						links?.Reverse();
-						return hasReceiverTrailers ? null : links;
+						return links;
 					}
 			}
 		}

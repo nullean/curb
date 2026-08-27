@@ -116,4 +116,60 @@ public class ChainWrappingTests : FormattingTest
 		}
 		""",
 		editorConfig: "max_line_length = 120\ncsharp_max_chained_method_calls_on_line = 1");
+
+	// ---- a receiver that is itself a call or an indexer still chains --------------------------------
+
+	[Test]
+	public Task A_bare_call_receiver_still_breaks_at_the_dots() => Formats(
+		// GetFactory() has no leading identifier to collect a link from, so the walk that finds a
+		// chain's receiver used to see its own argument list as unresolved and give up on the whole
+		// expression — the chain never engaged at all, and the line broke wherever an argument list
+		// happened to overflow instead of at the dots.
+		"""
+		public class C
+		{
+		    void M()
+		    {
+		        var result = GetFactory().AddDependency("core").AddDependency("shared").Build();
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    void M()
+		    {
+		        var result = GetFactory()
+		            .AddDependency("core")
+		            .AddDependency("shared")
+		            .Build();
+		    }
+		}
+		""",
+		editorConfig: "max_line_length = 60");
+
+	[Test]
+	public Task An_indexer_receiver_still_breaks_at_the_dots() => Formats(
+		"""
+		public class C
+		{
+		    void M()
+		    {
+		        var result = factories[0].AddDependency("core").AddDependency("shared").Build();
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    void M()
+		    {
+		        var result = factories[0]
+		            .AddDependency("core")
+		            .AddDependency("shared")
+		            .Build();
+		    }
+		}
+		""",
+		editorConfig: "max_line_length = 60");
 }
