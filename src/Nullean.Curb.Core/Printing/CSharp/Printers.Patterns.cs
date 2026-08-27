@@ -13,6 +13,16 @@ internal static partial class Printers
 		context.Arena.Synthetic(SyntheticText.Space);
 		TokenPrinter.Print(node.IsKeyword, context);
 
+		// A bare recursive pattern (`is { ... }`, no type or positional clause ahead of the brace) that
+		// the author kept on the `is` line owns the gap to its own opening brace: that gap answers the
+		// same fits question as whether the property list wraps, so RecursivePattern controls it with a
+		// fits-aware line instead of a fixed space — see BareRecursivePatternOwnsLeadingBrace.
+		if (BareRecursivePatternOwnsLeadingBrace(node.Pattern, context))
+		{
+			Node.Print(node.Pattern, context);
+			return;
+		}
+
 		// A break the author put after `is` is theirs, the same as one between two alternatives of the
 		// pattern that follows. Without this, `x is` / `A or` / `B` kept its `or` breaks and lost the
 		// first one, which reads worse than either preserving all of them or none.
@@ -23,6 +33,22 @@ internal static partial class Printers
 
 		Node.Print(node.Pattern, context);
 	}
+
+	/// <summary>
+	/// True for the exact shape RecursivePattern defers its leading brace-line to: a property-only
+	/// pattern directly under an <c>is</c> expression, with nothing between the `is` keyword and the
+	/// pattern in the source. Author-broken input keeps the caller's forced line instead, matching every
+	/// other pattern shape.
+	/// </summary>
+	private static bool BareRecursivePatternOwnsLeadingBrace(PatternSyntax pattern, PrintContext context) =>
+		pattern is RecursivePatternSyntax
+		{
+			Type: null,
+			PositionalPatternClause: null,
+			PropertyPatternClause.Subpatterns.Count: > 0,
+			Parent: IsPatternExpressionSyntax isExpression,
+		}
+		&& !context.AuthorBroke(isExpression.IsKeyword.Span.End, pattern.SpanStart);
 
 	public static void DeclarationPattern(DeclarationPatternSyntax node, PrintContext context)
 	{
@@ -56,14 +82,23 @@ internal static partial class Printers
 		if (node.PropertyPatternClause is not null)
 		{
 			var property = node.PropertyPatternClause;
-			if (node.Type is not null || node.PositionalPatternClause is not null)
-				arena.Synthetic(SyntheticText.Space);
+			var hasPrecedingContent = node.Type is not null || node.PositionalPatternClause is not null;
 
-			TokenPrinter.Print(property.OpenBraceToken, context);
 			if (property.Subpatterns.Count > 0)
 			{
+				// The brace has to answer the same fits question as the property list behind it — dotnet
+				// format moves it to its own line whenever that list doesn't fit, the same way an
+				// initializer's brace does. A plain space before an unconditionally-printed brace, as
+				// before, could never move: the group guarding the list only ever affected what came
+				// after the brace, not the brace itself. A bare pattern directly under `is` gets the same
+				// treatment for the `is`-to-brace gap — see BareRecursivePatternOwnsLeadingBrace, whose
+				// caller (IsPatternExpression) skips its own separator in exactly this case.
+				var ownsLeadingGap = hasPrecedingContent || BareRecursivePatternOwnsLeadingBrace(node, context);
 				using (arena.Group())
 				{
+					if (ownsLeadingGap)
+						arena.Line();
+					TokenPrinter.Print(property.OpenBraceToken, context);
 					using (arena.Indent())
 					{
 						arena.Line();
@@ -77,13 +112,17 @@ internal static partial class Printers
 						}
 					}
 					arena.Line();
+					TokenPrinter.Print(property.CloseBraceToken, context);
 				}
 			}
 			else
 			{
+				if (hasPrecedingContent)
+					arena.Synthetic(SyntheticText.Space);
+				TokenPrinter.Print(property.OpenBraceToken, context);
 				arena.Synthetic(SyntheticText.Space);
+				TokenPrinter.Print(property.CloseBraceToken, context);
 			}
-			TokenPrinter.Print(property.CloseBraceToken, context);
 		}
 
 		if (node.Designation is null)
