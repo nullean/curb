@@ -53,6 +53,41 @@ See [The build integration](../workflow/msbuild.md) for all properties, diagnost
 
 Download the binary for your platform from the GitHub releases page and put it on `PATH`. No SDK required to run it — only to install it via `dotnet tool`.
 
+## GitHub Action
+
+```yaml
+- uses: nullean/curb@main
+  with:
+    path: .            # default; a file or directory
+    command: check      # default; or "format" to rewrite in place
+```
+
+Runs curb from a pre-built, distroless container (`ghcr.io/nullean/curb`) — no .NET SDK install needed in
+the workflow. `command: check` fails the job if anything would be reformatted; switch to `format` to rewrite
+files instead. Extra flags pass through verbatim via `args`:
+
+```yaml
+- uses: nullean/curb@main
+  with:
+    command: check
+    args: --cache /tmp/curb.cache
+```
+
+Linux runners only (`ubuntu-latest` and similar) — container actions can't run on Windows or macOS runners.
+
+## Container image
+
+`ghcr.io/nullean/curb` also works as a general-purpose container, outside GitHub Actions — GitLab CI, a
+local machine without the .NET SDK, anywhere `docker run` works:
+
+```sh
+docker run --rm -v "$(pwd)":/workspace ghcr.io/nullean/curb:edge check /workspace
+```
+
+Distroless: native-AOT, chiseled `runtime-deps` base, no shell, ~32 MB, runs as a non-root user. Tags follow
+curb's own releases — `edge` tracks the latest commit on `main`, `latest` and a semver tag (e.g. `0.6.0`)
+follow tagged releases.
+
 ## Verifying the install
 
 ```sh
