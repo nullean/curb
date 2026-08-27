@@ -21,7 +21,11 @@
          and structurally never will be. Matching it is deliberately not attempted; see docs/cleanup.md
          for why that rules out hosting the SDK's own code style analysers. -->
     <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="[5.6.0]" />
-    <PackageVersion Include="editorconfig" Version="0.17.0" />
+    <!-- 0.18.0 fixes a static, process-wide cache collision (editorconfig/editorconfig-core-net#64,
+         found while diagnosing nullean/curb#65): EditorConfigFileCache is now private per
+         EditorConfigParser instance by default, so CurbEditorConfig no longer needs its own
+         workaround cache — see CurbEditorConfig.cs. -->
+    <PackageVersion Include="editorconfig" Version="0.18.0" />
     <PackageVersion Include="System.IO.Abstractions" Version="22.2.0" />
     <!-- 0.18.0 fixes handler exit codes (nullean/argh#65), an illink crash under TreatWarningsAsErrors
          (nullean/argh#67), and drops a ~1 MB System.Text.Json dependency (nullean/argh#66). Reference

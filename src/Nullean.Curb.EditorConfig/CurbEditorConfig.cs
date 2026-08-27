@@ -17,6 +17,12 @@ namespace Nullean.Curb.EditorConfig;
 /// </param>
 public sealed class CurbEditorConfig(IFileSystem fileSystem)
 {
+	// EditorConfigParser's file cache is private per instance by default as of editorconfig 0.18.0
+	// (editorconfig/editorconfig-core-net#64, filed from this repo — nullean/curb#65). Before that,
+	// the default constructor routed every parse through a static, process-wide cache keyed on
+	// path+mtime+length with no regard for which IFileSystem produced it, so two MockFileSystem-backed
+	// tests reusing the same conventional path could collide and one would silently read the other's
+	// settings. Fixed upstream; no workaround needed here any more.
 	private readonly EditorConfigParser _parser = new(fileSystem);
 	private readonly Dictionary<string, EditorConfigResolvedChain> _chains = new(StringComparer.Ordinal);
 
