@@ -38,13 +38,18 @@ internal static class CleanupRun
 	/// <param name="logs">Explicit log paths, from <c>--sarif-log</c>.</param>
 	/// <param name="explicitFiles">Restrict to these files, from <c>--files</c>/<c>--msbuild-list-file</c>. Empty means every file the logs mention.</param>
 	/// <param name="forward">Hand what Curb did not fix to <c>dotnet format</c>, from <c>--forward</c>.</param>
+	/// <param name="separateWhitespace">
+	/// Run <c>style</c> and <c>analyzers</c> as two invocations instead of one bare <c>dotnet format</c>,
+	/// from <c>--no-whitespace</c>.
+	/// </param>
 	public static int Execute(
 		IFileSystem fileSystem,
 		string target,
 		bool write,
 		string[]? logs = null,
 		string[]? explicitFiles = null,
-		bool forward = false)
+		bool forward = false,
+		bool separateWhitespace = false)
 	{
 		logs = logs is { Length: > 0 } ? logs : Discover(fileSystem, target);
 
@@ -248,7 +253,7 @@ internal static class CleanupRun
 		if (forward)
 		{
 			forwardFailed = Forward(
-				fileSystem.Path.GetFullPath(target), [.. notOurs, .. unfixed], stopwatch.ElapsedMilliseconds, write);
+				fileSystem.Path.GetFullPath(target), [.. notOurs, .. unfixed], stopwatch.ElapsedMilliseconds, write, separateWhitespace);
 		}
 
 		if (failed > 0 || forwardFailed)
@@ -270,13 +275,16 @@ internal static class CleanupRun
 	/// </para>
 	/// <para>
 	/// One invocation for the whole target rather than one per project, since the workspace load is the
-	/// cost and doing it repeatedly would multiply the only expensive part.
+	/// cost and doing it repeatedly would multiply the only expensive part. By default that also means one
+	/// bare <c>dotnet format</c> rather than a separate <c>style</c> and <c>analyzers</c> call, since the
+	/// two would each pay for their own workspace load; <c>--no-whitespace</c> asks for the split instead.
 	/// </para>
 	/// </remarks>
 	/// <returns>True when a forwarded invocation failed.</returns>
-	private static bool Forward(string target, IReadOnlyList<CleanupDiagnostic> remainder, long ourMilliseconds, bool write)
+	private static bool Forward(
+		string target, IReadOnlyList<CleanupDiagnostic> remainder, long ourMilliseconds, bool write, bool separateWhitespace)
 	{
-		var plan = ForwardPlan.For(remainder, target);
+		var plan = ForwardPlan.For(remainder, target, separateWhitespace);
 
 		if (plan.Withheld.Count > 0)
 		{
@@ -309,8 +317,10 @@ internal static class CleanupRun
 				? $"{invocation.Files.Count} file(s)"
 				: "the whole project, since a reported file sits outside the working directory";
 
+			var command = invocation.Subcommand is { Length: > 0 } sub ? $"dotnet format {sub}" : "dotnet format";
+
 			Console.WriteLine($"  forwarding {invocation.RuleIds.Count} rule(s) in {scope} "
-				+ $"to `dotnet format {invocation.Subcommand}`: {string.Join(' ', invocation.RuleIds)}");
+				+ $"to `{command}`: {string.Join(' ', invocation.RuleIds)}");
 
 			var start = Stopwatch.StartNew();
 			var exitCode = Run(target, arguments);
@@ -321,7 +331,7 @@ internal static class CleanupRun
 			// failure. Anything else non-zero means the tool could not run.
 			if (exitCode != 0 && !(!write && exitCode == 2))
 			{
-				Console.Error.WriteLine($"  `dotnet format {invocation.Subcommand}` exited {exitCode}");
+				Console.Error.WriteLine($"  `{command}` exited {exitCode}");
 				failed = true;
 			}
 		}

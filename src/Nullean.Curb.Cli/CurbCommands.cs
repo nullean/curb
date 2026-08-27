@@ -97,15 +97,22 @@ internal sealed class CurbCommands
 	/// Hand what Curb cannot fix to <c>dotnet format</c>, scoped to the reported rules and files, and
 	/// report both timings.
 	/// </param>
+	/// <param name="noWhitespace">
+	/// With <paramref name="forward"/>, run <c>dotnet format style</c> and <c>dotnet format analyzers</c>
+	/// as two separate invocations instead of one bare <c>dotnet format</c>. The default runs whitespace
+	/// too, which is a no-op against Curb's own output, in exchange for loading the MSBuild workspace once
+	/// instead of twice.
+	/// </param>
 	public int Cleanup(
 		[Argument] string path = ".",
 		List<string>? sarifLogs = null,
 		List<FileInfo>? files = null,
 		[Existing] FileInfo? msbuildListFile = null,
 		bool check = false,
-		bool forward = false
+		bool forward = false,
+		bool noWhitespace = false
 	) =>
-		CleanupRun.Execute(_fileSystem, path, write: !check, logs: sarifLogs?.ToArray(), explicitFiles: ResolveExplicitFiles(files, msbuildListFile), forward: forward);
+		CleanupRun.Execute(_fileSystem, path, write: !check, logs: sarifLogs?.ToArray(), explicitFiles: ResolveExplicitFiles(files, msbuildListFile), forward: forward, separateWhitespace: noWhitespace);
 
 	/// <summary>Show which code style rules Curb fixes, and which it does not.</summary>
 	/// <param name="cleanupIds">Print only the ids <c>curb cleanup</c> fixes, space separated, for scripting.</param>

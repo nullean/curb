@@ -26,12 +26,28 @@ public class ForwardPlanTests
 	private static ForwardResult Plan(params CleanupDiagnostic[] diagnostics) =>
 		ForwardPlan.For(diagnostics, Root);
 
+	private static ForwardResult SeparatePlan(params CleanupDiagnostic[] diagnostics) =>
+		ForwardPlan.For(diagnostics, Root, separateWhitespace: true);
+
 	// ---- which subcommand ------------------------------------------------------------------------
 
 	[Test]
-	public async Task The_ide_series_goes_to_style()
+	public async Task By_default_everything_goes_to_one_bare_invocation()
 	{
-		var plan = Plan(Diagnostic("IDE0017"), Diagnostic("IDE0028"));
+		var plan = Plan(Diagnostic("IDE0017"), Diagnostic("CA1822"));
+
+		plan.Invocations.Should().ContainSingle();
+		plan.Invocations[0].Subcommand.Should().BeNull();
+		plan.Invocations[0].RuleIds.Should().Equal("CA1822", "IDE0017");
+		plan.Invocations[0].Arguments.Should().StartWith(["format", "--diagnostics"]);
+
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task No_whitespace_sends_the_ide_series_to_style()
+	{
+		var plan = SeparatePlan(Diagnostic("IDE0017"), Diagnostic("IDE0028"));
 
 		plan.Invocations.Should().ContainSingle();
 		plan.Invocations[0].Subcommand.Should().Be("style");
@@ -41,9 +57,9 @@ public class ForwardPlanTests
 	}
 
 	[Test]
-	public async Task A_third_party_analyser_goes_to_analyzers()
+	public async Task No_whitespace_sends_a_third_party_analyser_to_analyzers()
 	{
-		var plan = Plan(Diagnostic("CA1822"), Diagnostic("SA1200"));
+		var plan = SeparatePlan(Diagnostic("CA1822"), Diagnostic("SA1200"));
 
 		plan.Invocations.Should().ContainSingle();
 		plan.Invocations[0].Subcommand.Should().Be("analyzers");
@@ -53,9 +69,9 @@ public class ForwardPlanTests
 	}
 
 	[Test]
-	public async Task Both_kinds_produce_one_invocation_each()
+	public async Task No_whitespace_produces_one_invocation_per_kind()
 	{
-		var plan = Plan(Diagnostic("IDE0017"), Diagnostic("CA1822"));
+		var plan = SeparatePlan(Diagnostic("IDE0017"), Diagnostic("CA1822"));
 
 		plan.Invocations.Should().HaveCount(2);
 		plan.Invocations.Select(i => i.Subcommand).Should().Equal("style", "analyzers");
@@ -208,7 +224,7 @@ public class ForwardPlanTests
 	{
 		var arguments = Plan(Diagnostic("IDE0017")).Invocations[0].Arguments;
 
-		arguments.Should().StartWith(["format", "style", "--diagnostics", "IDE0017"]);
+		arguments.Should().StartWith(["format", "--diagnostics", "IDE0017"]);
 		arguments.Should().ContainInOrder("--severity", "info");
 		arguments.Should().Contain("--no-restore", "the build that produced the log already restored");
 		arguments.Should().NotContain("--no-build", "dotnet format has no such flag; it loads a workspace");
@@ -233,8 +249,18 @@ public class ForwardPlanTests
 	{
 		var plan = Plan(Diagnostic("IDE0017", "/repo/my code/Widget.cs"));
 
-		plan.Invocations[0].CommandLine.Should().StartWith("dotnet format style --diagnostics IDE0017");
+		plan.Invocations[0].CommandLine.Should().StartWith("dotnet format --diagnostics IDE0017");
 		plan.Invocations[0].CommandLine.Should().Contain("\"my code", "a path with a space has to survive being read back");
+
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task No_whitespace_keeps_the_subcommand_in_the_command_line()
+	{
+		var plan = SeparatePlan(Diagnostic("IDE0017", "/repo/my code/Widget.cs"));
+
+		plan.Invocations[0].CommandLine.Should().StartWith("dotnet format style --diagnostics IDE0017");
 
 		await Task.CompletedTask;
 	}
