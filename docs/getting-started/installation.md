@@ -84,7 +84,7 @@ local machine without the .NET SDK, anywhere `docker run` works:
 docker run --rm -v "$(pwd)":/workspace ghcr.io/nullean/curb:edge check /workspace
 ```
 
-Distroless: native-AOT, chiseled `runtime-deps` base, no shell, ~32 MB, runs as a non-root user. Tags follow
+Distroless: native-AOT, chiseled `runtime-deps` base, no shell, ~53 MB, runs as a non-root user. Tags follow
 curb's own releases — `edge` tracks the latest commit on `main`, `latest` and a semver tag (e.g. `0.6.0`)
 follow tagged releases.
 
