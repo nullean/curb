@@ -357,4 +357,67 @@ public class InvocationTests : FormattingTest
 		}
 		""",
 		editorConfig: "max_line_length = 40");
+
+	// ---- a trailing block-bodied callback hugs the call, even with earlier arguments ---------------
+
+	[Test]
+	public Task A_leading_argument_before_a_trailing_callback_stays_inline() => Unchanged(
+		// The single-argument hug only fired for one argument total — `On("click", () => { … })` has
+		// two, so it fell through to the ordinary "wrap every argument" path and exploded the leading
+		// string argument onto its own line for no reason.
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        app.Add("", async Task (Cancel _) =>
+		        {
+		            Call();
+		        });
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Several_leading_arguments_before_a_trailing_callback_all_stay_inline() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        On("click", target, true, () =>
+		        {
+		            Call();
+		        });
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_trailing_expression_bodied_lambda_does_not_hug_even_with_a_leading_argument() => Formats(
+		// EndsWithBlockBodiedCallback, not the broader EndsWithOwnBlock: a trailing argument that
+		// could still print flat has to leave the list its own break opportunity — hugging it the
+		// same way a genuine block does would strand the list without one.
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        Configure(alphaOption, s => s.Indices(betaIndex).Query(gammaQuery));
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        Configure(
+		            alphaOption,
+		            s => s.Indices(betaIndex).Query(gammaQuery)
+		        );
+		    }
+		}
+		""",
+		editorConfig: "max_line_length = 55");
 }

@@ -938,6 +938,32 @@ internal static partial class Printers
 			return;
 		}
 
+		// Several arguments where the LAST is a genuinely block-bodied callback — `On("click", () =>
+		// { … })` — hug it the same way a sole argument would: the leading arguments print flat and
+		// comma-separated, then the callback's own block supplies the break, with no list group or
+		// indent wrapping the whole thing. EndsWithBlockBodiedCallback rather than the broader
+		// EndsWithOwnBlock above: with several arguments already inline, only a genuine block
+		// guarantees a break exists to hug against — a `with` or object initializer tail could still
+		// print flat and would leave the list with no break opportunity of its own.
+		if (node.Arguments.Count > 1 && EndsWithBlockBodiedCallback(node.Arguments[^1].Expression))
+		{
+			Spacing.InsideCallParens(context);
+			for (var i = 0; i < node.Arguments.Count - 1; i++)
+			{
+				Node.Print(node.Arguments[i], context);
+				Spacing.BeforeComma(context);
+				TokenPrinter.Print(node.Arguments.GetSeparator(i), context);
+				Spacing.AfterComma(context);
+			}
+
+			context.OwnBlockGroup = 0;
+			Node.Print(node.Arguments[^1], context);
+			Spacing.InsideCallParens(context);
+			TokenPrinter.Print(node.CloseParenToken, context);
+			context.ArgumentListGroup = context.OwnBlockGroup;
+			return;
+		}
+
 		// Named so that an initializer hanging off the creation this list belongs to can put its brace
 		// on its own line exactly when this list wrapped. Published on the way out rather than on the
 		// way in: these lists nest, and it is the outermost one the creation is asking about.
