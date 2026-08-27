@@ -7,7 +7,7 @@ description: Every case where Curb's output is not a fixed point of dotnet forma
 
 This page lists every known case where {{product}}'s output `Z` is **not a fixed point** of a reference
 tool at all — `T(Z) != Z` — because the tool cannot recognise what {{product}} did, so no shape Curb could
-have chosen instead would fix it. See [conformance](conformance.md#when-tz--z-cannot-hold-at-all) for what
+have chosen instead would fix it. See [conformance](conformance.md#when-tz-z-cannot-hold-at-all) for what
 that means and how it differs from the ordinary, unlisted case of a fixed point in a different shape than
 the tool's own (`X != Z` with `T(Z) == Z` still holding — expected, common, and reported only in aggregate
 by `./build.sh verifyexpectations`, not itemised here). Each row below is a deliberate, investigated choice,
