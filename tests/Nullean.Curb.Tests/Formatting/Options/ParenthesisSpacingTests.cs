@@ -74,27 +74,21 @@ public class ParenthesisSpacingTests : FormattingTest
 		        if ( a )
 		        {
 		        }
-
 		        while ( a )
 		        {
 		        }
-
 		        for ( var i = 0; i < 1; i++ )
 		        {
 		        }
-
 		        foreach ( var i in items )
 		        {
 		        }
-
 		        switch ( a )
 		        {
 		        }
-
 		        lock ( gate )
 		        {
 		        }
-
 		        using ( var s = Open() )
 		        {
 		        }
@@ -238,7 +232,6 @@ public class ParenthesisSpacingTests : FormattingTest
 		        if ( a )
 		        {
 		        }
-
 		        var c = ( int )value;
 		        var p = ( a + b ) * c;
 		    }

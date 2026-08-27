@@ -62,7 +62,6 @@ public class Widget
             return "positive";
         else if (n < 0)
             return "negative";
-
         return "zero";
     }
 }
@@ -91,7 +90,6 @@ public class Widget
             return "positive";
         else if (n < 0)
             return "negative";
-
         return "zero";
     }
 }
@@ -110,7 +108,6 @@ public class Widget
             return "positive";
         else if ( n < 0 )
             return "negative";
-
         return "zero";
     }
 }
@@ -139,7 +136,6 @@ public class Widget
             return "positive";
         else if (n < 0)
             return "negative";
-
         return "zero";
     }
 }
@@ -158,7 +154,6 @@ public class Widget
             return "positive";
         else if (n < 0)
             return "negative";
-
         return "zero";
     }
 }
@@ -187,7 +182,6 @@ public class Widget
             return "positive";
         else if (n < 0)
             return "negative";
-
         return "zero";
     }
 }
@@ -206,7 +200,6 @@ public class Widget
             return "positive";
         else if (n < 0)
             return "negative";
-
         return "zero";
     }
 }

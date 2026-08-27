@@ -10,20 +10,16 @@ namespace Nullean.Curb.Tests.Formatting.Trivia;
 /// anything Curb does here it may keep doing.
 /// </para>
 /// <para>
-/// Six of the seven are already what Curb writes, which is why they were never onboarded as options.
-/// Offering them as keys would mean an option whose <c>false</c> is already the behaviour, and whose
-/// <c>true</c> would have to make Curb <em>preserve</em> a blank line it currently removes — a worse
-/// default in exchange for a key almost nobody sets. They are asserted here instead, so they are a
-/// decision rather than an accident.
-/// </para>
-/// <para>
-/// The seventh, IDE2003, is the only one that would <em>add</em> a blank line — between a block
-/// statement and whatever follows it. Reconsidered since: jb's own default does exactly this, and on
-/// its own merits a block statement reads as a distinct unit of control flow worth setting off from
-/// what comes next — closer to how most C# actually gets written than leaving the two flush. It is a
-/// real option now, <c>csharp_blank_lines_after_block_statements</c> (default on), covered in
-/// <c>BlankLineOptionTests</c> rather than here, since it is no longer free-ground default behaviour
-/// but a documented, controllable one.
+/// All seven are already what Curb writes, which is why none of them were onboarded as an option
+/// with its own default tied to this behaviour. The seventh, IDE2003 — a blank line between a block
+/// statement and whatever follows it — briefly was: <c>csharp_blank_lines_after_block_statements</c>
+/// defaulted to one on the strength of jb's own default and "closer to how most C# actually gets
+/// written." Reverted deliberately: kept symmetric with
+/// <c>csharp_blank_lines_before_block_statements</c>, which stayed at zero throughout, and left to
+/// the author on both sides like every other member/statement spacing key in the family bar
+/// <c>around_type</c> and <c>around_local_method</c> — both narrower, more clearly-conventional
+/// cases. The key itself is unaffected and still forces air when asked; see
+/// <c>BlankLineOptionTests.Block_statements_have_their_own_setting</c>.
 /// </para>
 /// </remarks>
 public class ExperimentalBlankLineTests : FormattingTest
@@ -141,11 +137,10 @@ public class ExperimentalBlankLineTests : FormattingTest
 		""");
 
 	[Test]
-	public Task IDE2003_a_statement_after_a_block_is_now_a_real_option_not_free_ground() => Formats(
-		// Once the only rule of the seven Curb did not hold; now it does, by default, via
-		// csharp_blank_lines_after_block_statements — see BlankLineOptionTests for the key itself,
-		// including proving it can be turned back off. Kept here too, unchanged in shape from before,
-		// so this file's own claim (nothing here needs configuration) stays checked.
+	public Task IDE2003_no_blank_line_between_a_block_statement_and_what_follows() => Unchanged(
+		// Back to free ground, alongside the other six — see this class's own remarks for why
+		// csharp_blank_lines_after_block_statements's default reverted rather than staying the one
+		// rule here that added a blank line by default.
 		"""
 		public class C
 		{
@@ -155,20 +150,6 @@ public class ExperimentalBlankLineTests : FormattingTest
 		        {
 		            Call();
 		        }
-		        Next();
-		    }
-		}
-		""",
-		"""
-		public class C
-		{
-		    public void M()
-		    {
-		        if (true)
-		        {
-		            Call();
-		        }
-
 		        Next();
 		    }
 		}

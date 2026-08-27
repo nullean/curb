@@ -151,7 +151,7 @@ public sealed record OptionDescriptor(
 		new("csharp_blank_lines_after_using_list", OptionGroup.BlankLines, ["<integer>"], "1", "Blank lines below the last using directive, forced exactly rather than floored.", "usings"),
 		new("csharp_blank_lines_after_file_scoped_namespace_directive", OptionGroup.BlankLines, ["<integer>"], "1", "Blank lines after a file-scoped namespace declaration.", "usings"),
 		new("csharp_blank_lines_before_block_statements", OptionGroup.BlankLines, ["<integer>"], "0", "Blank lines above an if/while/for/foreach/do/switch/using/lock/try statement.", "members"),
-		new("csharp_blank_lines_after_block_statements", OptionGroup.BlankLines, ["<integer>"], "1", "Blank lines below one of those statements.", "members"),
+		new("csharp_blank_lines_after_block_statements", OptionGroup.BlankLines, ["<integer>"], "0", "Blank lines below one of those statements.", "members"),
 		new("csharp_blank_lines_before_control_transfer_statements", OptionGroup.BlankLines, ["<integer>"], "0", "Blank lines above a return/throw/break/continue/goto/yield statement.", "members"),
 		new("csharp_blank_lines_after_control_transfer_statements", OptionGroup.BlankLines, ["<integer>"], "0", "Blank lines below one of those statements.", "members"),
 		new("csharp_blank_lines_before_case", OptionGroup.BlankLines, ["<integer>"], "0", "Blank lines above a switch section's first label.", "members"),

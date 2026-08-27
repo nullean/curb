@@ -320,10 +320,11 @@ public class BlankLineOptionTests : FormattingTest
 		editorConfig: "csharp_blank_lines_before_block_statements = 1");
 
 	[Test]
-	public Task Block_statements_have_their_own_setting() => Unchanged(
-		// The default is already one (see ExperimentalBlankLineTests' IDE2003 case), so proving the
-		// key is bound means proving it can be turned off — the same shape as Types_have_their_own_
-		// setting above.
+	public Task Block_statements_have_their_own_setting() => Formats(
+		// Both before and after default to zero — deliberately symmetric, and a deliberate divergence
+		// from jb's own default of one after a block statement (see ExperimentalBlankLineTests'
+		// IDE2003 case, which documents why this reverted to free ground). Proving the key is bound
+		// means proving it can add air, the same shape as Block_statements_can_be_given_air_in_front_too.
 		"""
 		public class C
 		{
@@ -337,17 +338,33 @@ public class BlankLineOptionTests : FormattingTest
 		    }
 		}
 		""",
-		editorConfig: "csharp_blank_lines_after_block_statements = 0");
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        if (a)
+		        {
+		            Call2();
+		        }
+
+		        Call3();
+		    }
+		}
+		""",
+		editorConfig: "csharp_blank_lines_after_block_statements = 1");
 
 	[Test]
 	public Task A_comment_aligned_under_a_trailing_one_is_not_pushed_apart_by_the_air_after_it() => Unchanged(
-		// csharp_blank_lines_after_block_statements defaults to one, and forced a blank line directly
-		// in front of the aligned comment before this test existed — invisible to
+		// csharp_blank_lines_after_block_statements defaulted to one when this test was written
+		// (before it reverted to zero — see ExperimentalBlankLineTests' IDE2003 case), and forced a
+		// blank line directly in front of the aligned comment — invisible to
 		// TokenPrinter.AlignsUnderTrailingComment's own trivia walk on the run that forced it (the
 		// walk only starts counting once it begins, after the blank line already went out through a
 		// separate call), but real literal source text by the very next run, which then read the two
 		// comments as belonging to separate runs and dropped the alignment — an idempotency bug the
-		// corpus caught, not a hand-written case, since it needs a real author-aligned comment.
+		// corpus caught, not a hand-written case, since it needs a real author-aligned comment. Set
+		// explicitly now that it is no longer the default, so this regression stays covered.
 		"""
 		public class C
 		{
@@ -360,7 +377,8 @@ public class BlankLineOptionTests : FormattingTest
 		            Call2();
 		    }
 		}
-		""");
+		""",
+		editorConfig: "csharp_blank_lines_after_block_statements = 1");
 
 	[Test]
 	public Task Control_transfer_statements_have_their_own_setting() => Formats(
