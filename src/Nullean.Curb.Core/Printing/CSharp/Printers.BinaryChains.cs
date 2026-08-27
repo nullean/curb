@@ -81,11 +81,19 @@ internal static partial class Printers
 			}
 		}
 
-		using (arena.IndentIf(!callerAlreadyIndented))
+		// wrap_if_long packs operands onto a line until the next one would not fit, rather than
+		// the group's all-flat-or-all-broken choice the other two values make — see DocKind.Fill.
+		//
+		// Unlike the Group branch below, operand 0 stays inside the same indent scope as the rest
+		// here rather than printing ahead of it — Fill needs a flat, alternating item/separator
+		// child list to pack correctly, and wrapping only part of that list in its own Indent scope
+		// left Fill unable to see the later items as siblings of the first, so it stopped packing
+		// them onto shared lines at all. A first operand carrying its own object initializer can
+		// still land at the wrong indent under this style — narrower than issue #77's report, and
+		// left for a follow-up that finds a fix compatible with Fill's own structure.
+		if (context.Options.WrapChainedBinaryExpressions == WrapStyle.WrapIfLong)
 		{
-			// wrap_if_long packs operands onto a line until the next one would not fit, rather than
-			// the group's all-flat-or-all-broken choice the other two values make — see DocKind.Fill.
-			if (context.Options.WrapChainedBinaryExpressions == WrapStyle.WrapIfLong)
+			using (arena.IndentIf(!callerAlreadyIndented))
 			{
 				using var fill = arena.Fill();
 
@@ -100,20 +108,24 @@ internal static partial class Printers
 					using (fill.Item())
 						Node.Print(operands[i], context);
 				}
-
-				return true;
 			}
 
-			using (arena.Group())
+			return true;
+		}
+
+		using (arena.Group())
+		{
+			// A count, not a fit measurement: chop_always is the same decision
+			// csharp_wrap_arguments_style's chop_always makes, forcing the break outright instead
+			// of leaving it to whether the chain fits.
+			if (context.Options.WrapChainedBinaryExpressions == WrapStyle.ChopAlways)
+				arena.BreakParent();
+
+			// See the WrapIfLong branch above for why operand 0 prints before the indent opens.
+			Node.Print(operands[0], context);
+
+			using (arena.IndentIf(!callerAlreadyIndented))
 			{
-				// A count, not a fit measurement: chop_always is the same decision
-				// csharp_wrap_arguments_style's chop_always makes, forcing the break outright instead
-				// of leaving it to whether the chain fits.
-				if (context.Options.WrapChainedBinaryExpressions == WrapStyle.ChopAlways)
-					arena.BreakParent();
-
-				Node.Print(operands[0], context);
-
 				for (var i = 1; i < operands.Count; i++)
 				{
 					PrintOperator(i - 1);

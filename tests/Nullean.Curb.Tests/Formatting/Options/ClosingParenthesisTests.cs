@@ -693,6 +693,41 @@ public class ClosingParenthesisTests : FormattingTest
 		""",
 		editorConfig: "max_line_length = 120\ncsharp_wrap_chained_binary_expressions = chop_always");
 
+	/// <summary>
+	/// A first operand that carries its own multi-line layout — an object initializer here — used to
+	/// print one indent level deeper than it belongs, because the chain opened its indent scope before
+	/// printing that operand even though the operand itself never actually moved down a line. Roslyn's
+	/// <c>IDE0055</c> rejects the mismatch outright, with no editorconfig key able to reproduce it, so
+	/// this broke the tool's own conformance goal rather than just reading oddly.
+	/// See <see href="https://github.com/nullean/curb/issues/77">issue #77</see>.
+	/// </summary>
+	[Test]
+	public Task A_first_operand_with_an_object_initializer_keeps_its_own_indent() => Formats(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        var query = (Query)new ConstantScoreQuery { Boost = alpha, Name = beta } || new MultiMatchQuery { Query = gamma };
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        var query = (Query)new ConstantScoreQuery
+		        {
+		            Boost = alpha,
+		            Name = beta
+		        }
+		            || new MultiMatchQuery { Query = gamma };
+		    }
+		}
+		""",
+		editorConfig: Narrow + "\ncsharp_wrap_chained_binary_expressions = chop_if_long");
+
 	// ---- initializer element counts ---------------------------------------------------------------------
 
 	[Test]
