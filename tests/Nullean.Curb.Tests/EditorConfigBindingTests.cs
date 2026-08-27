@@ -80,4 +80,31 @@ public class EditorConfigBindingTests
 		config.MaxLineLength.Should().Be(120);
 		await Task.CompletedTask;
 	}
+
+	[Test]
+	public async Task Concurrent_instances_at_the_same_path_never_cross_wires()
+	{
+		// Regression for issue #65. EditorConfig.Core's own EditorConfigParser, used the way
+		// CurbEditorConfig's constructor used to call it, routes every parse through a *static*,
+		// process-wide EditorConfigFileCache keyed on `{path}|{LastWriteTimeUtc.Ticks}|{Length}`. Two
+		// CurbEditorConfig instances built over different MockFileSystems at the same conventional path
+		// (every test in this file uses the same `/repo/.editorconfig`, the same shape FingerprintTests
+		// and OptOutTests use) can collide on that key under real concurrency — MockFileSystem's clock
+		// resolution is coarser than the collision needs — and one gets served the other's settings.
+		// A synthetic stress replicating this measured ~16% cross-contamination on the pre-fix
+		// constructor; this asserts zero across a smaller but still generous burst, quickly, in CI.
+		var mismatches = 0;
+
+		await Task.WhenAll(Enumerable.Range(0, 2_000).Select(i => Task.Run(() =>
+		{
+			var width = 80 + (i % 40);
+			var fs = WithEditorConfig($"root = true\n\n[*.cs]\nmax_line_length = {width}\n");
+
+			var resolved = new CurbEditorConfig(fs).For($"{Root}/src/Foo.cs");
+			if (resolved.Properties["max_line_length"] != width.ToString(System.Globalization.CultureInfo.InvariantCulture))
+				Interlocked.Increment(ref mismatches);
+		})));
+
+		mismatches.Should().Be(0);
+	}
 }
