@@ -3,14 +3,17 @@ using Nullean.Curb.Options;
 namespace Nullean.Curb.Cleanup;
 
 /// <summary>One <c>dotnet format</c> invocation, covering the diagnostics Curb left behind.</summary>
-/// <param name="Subcommand"><c>style</c> for the IDE series, <c>analyzers</c> for third-party rules.</param>
+/// <param name="Subcommand">
+/// <c>null</c> for the default bare invocation covering everything at once. <c>style</c>/<c>analyzers</c>
+/// only when <c>--no-whitespace</c> asked for the two to run separately.
+/// </param>
 /// <param name="RuleIds">Exactly the ids to fix, sorted. Never a rule the log did not report.</param>
 /// <param name="Files">
 /// Exactly the files the log named, sorted, <b>relative to the working directory</b>. Empty means the
 /// whole project, which is what happens when a file cannot be expressed relatively.
 /// </param>
 public readonly record struct ForwardInvocation(
-	string Subcommand,
+	string? Subcommand,
 	IReadOnlyList<string> RuleIds,
 	IReadOnlyList<string> Files)
 {
@@ -19,11 +22,19 @@ public readonly record struct ForwardInvocation(
 	/// </summary>
 	/// <remarks>
 	/// <para>
-	/// <c>--include</c> is here for blast radius, not for speed. Measured on a 61-file project: 1.97 s with
-	/// it and 1.98 s without, because the cost is the workspace load rather than applying fixes. What it
-	/// does buy is that a file the build never complained about is not rewritten — checked, and a second
-	/// file carrying the identical offence was left untouched. Fixing exactly what was reported is the
-	/// whole premise of cleanup, so forwarding keeps it.
+	/// No subcommand by default: <c>style</c> and <c>analyzers</c> both need the same MSBuild workspace
+	/// loaded, which is the entire cost — 1.97 s narrowed to one file and one rule against 1.98 s over
+	/// everything, so the difference between one invocation and two is a whole second workspace load, not
+	/// the work done in it. The bare command runs whitespace too, but Curb's own output is already
+	/// conformant with <c>dotnet format whitespace</c>, so that pass is a genuine no-op here rather than a
+	/// second opinion on layout. <c>--no-whitespace</c> asks for the split back, for anyone unwilling to
+	/// trust that conformance in their own tree.
+	/// </para>
+	/// <para>
+	/// <c>--include</c> is here for blast radius, not for speed. What it buys is that a file the build never
+	/// complained about is not rewritten — checked, and a second file carrying the identical offence was
+	/// left untouched. Fixing exactly what was reported is the whole premise of cleanup, so forwarding
+	/// keeps it.
 	/// </para>
 	/// <para>
 	/// The paths have to be <b>relative</b>. Measured: an absolute path matches nothing and
@@ -37,10 +48,17 @@ public readonly record struct ForwardInvocation(
 	/// output, it loads an MSBuild workspace, and that is the cost.
 	/// </para>
 	/// </remarks>
-	public IReadOnlyList<string> Arguments =>
-		Files.Count > 0
-			? ["format", Subcommand, "--diagnostics", .. RuleIds, "--severity", "info", "--no-restore", "--include", .. Files]
-			: ["format", Subcommand, "--diagnostics", .. RuleIds, "--severity", "info", "--no-restore"];
+	public IReadOnlyList<string> Arguments
+	{
+		get
+		{
+			IReadOnlyList<string> command = Subcommand is { Length: > 0 } sub ? ["format", sub] : ["format"];
+
+			return Files.Count > 0
+				? [.. command, "--diagnostics", .. RuleIds, "--severity", "info", "--no-restore", "--include", .. Files]
+				: [.. command, "--diagnostics", .. RuleIds, "--severity", "info", "--no-restore"];
+		}
+	}
 
 	/// <summary>The invocation as someone would type it, for reporting.</summary>
 	public string CommandLine => "dotnet " + string.Join(' ', Arguments.Select(Quote));
@@ -53,7 +71,11 @@ public readonly record struct ForwardInvocation(
 public readonly record struct WithheldRule(string Id, string Title, string Reason);
 
 /// <summary>What forwarding would run, and what it deliberately left out.</summary>
-/// <param name="Invocations">At most one per <c>dotnet format</c> subcommand.</param>
+/// <param name="Invocations">
+/// At most one by default — everything forwarded goes to a single bare <c>dotnet format</c> call. At most
+/// two, one per subcommand, when <c>--no-whitespace</c> asked to keep <c>style</c> and <c>analyzers</c>
+/// separate.
+/// </param>
 /// <param name="Withheld">Rules Curb will not hand to another tool either, with the reason.</param>
 /// <param name="Quiet">How many diagnostics were skipped for being reported below warning.</param>
 public readonly record struct ForwardResult(
@@ -94,7 +116,12 @@ public static class ForwardPlan
 	/// cannot be named in <c>--include</c>, and rather than let it match nothing the invocation drops
 	/// <c>--include</c> altogether and widens to the project.
 	/// </param>
-	public static ForwardResult For(IEnumerable<CleanupDiagnostic> unfixed, string workingDirectory)
+	/// <param name="separateWhitespace">
+	/// From <c>--no-whitespace</c>: keep <c>style</c> and <c>analyzers</c> as two invocations instead of one
+	/// bare <c>dotnet format</c>, so the whitespace formatter never runs.
+	/// </param>
+	public static ForwardResult For(
+		IEnumerable<CleanupDiagnostic> unfixed, string workingDirectory, bool separateWhitespace = false)
 	{
 		var style = new SortedSet<string>(StringComparer.Ordinal);
 		var analyzers = new SortedSet<string>(StringComparer.Ordinal);
@@ -153,11 +180,24 @@ public static class ForwardPlan
 
 		// One un-includable file widens the whole invocation, because a partial `--include` would silently
 		// skip it while looking like a complete run.
-		if (style.Count > 0)
-			invocations.Add(new ForwardInvocation("style", [.. style], unscoped ? [] : [.. styleFiles]));
+		if (separateWhitespace)
+		{
+			if (style.Count > 0)
+				invocations.Add(new ForwardInvocation("style", [.. style], unscoped ? [] : [.. styleFiles]));
 
-		if (analyzers.Count > 0)
-			invocations.Add(new ForwardInvocation("analyzers", [.. analyzers], unscoped ? [] : [.. analyzerFiles]));
+			if (analyzers.Count > 0)
+				invocations.Add(new ForwardInvocation("analyzers", [.. analyzers], unscoped ? [] : [.. analyzerFiles]));
+		}
+		else if (style.Count > 0 || analyzers.Count > 0)
+		{
+			var ruleIds = new SortedSet<string>(style, StringComparer.Ordinal);
+			ruleIds.UnionWith(analyzers);
+
+			var files = new SortedSet<string>(styleFiles, StringComparer.Ordinal);
+			files.UnionWith(analyzerFiles);
+
+			invocations.Add(new ForwardInvocation(null, [.. ruleIds], unscoped ? [] : [.. files]));
+		}
 
 		return new ForwardResult([.. invocations], [.. withheld.Values], quiet);
 	}
