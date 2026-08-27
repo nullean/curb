@@ -58,19 +58,19 @@ public class Widget
     )
     {
         return a
-                > 0
+            > 0
             && b
                 > 0
             && c
                 > 0
             && a
-                    + b
+                + b
                 > c
             && a
-                    + c
+                + c
                 > b
             && b
-                    + c
+                + c
                 > a;
     }
 }
