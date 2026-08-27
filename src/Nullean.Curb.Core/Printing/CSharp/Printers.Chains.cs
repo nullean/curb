@@ -45,7 +45,9 @@ internal static partial class Printers
 		// Declining a two-link chain outright joined `x.SynonymGraph()\n.Synonyms(y)` back onto one
 		// line, and joining anything risks a line too long to break, which is what stopped a file
 		// settling after two runs.
-		if (CountLinks(node) < MinimumLinksToBreak && !SpansLines(node, context))
+		var linkCount = CountLinks(node, out var receiverIsCallShaped);
+		var effectiveLinks = receiverIsCallShaped ? linkCount + 1 : linkCount;
+		if (effectiveLinks < MinimumLinksToBreak && !SpansLines(node, context))
 			return false;
 
 		// Record the trailer buffer base before collecting. All trailer nodes appended by this
@@ -56,7 +58,7 @@ internal static partial class Printers
 		try
 		{
 			var links = CollectLinks(node, context, out var receiver);
-			if (links is null || (links.Count < MinimumLinksToBreak && !SpansLines(node, context)))
+			if (links is null || (effectiveLinks < MinimumLinksToBreak && !SpansLines(node, context)))
 				return false;
 
 
@@ -68,18 +70,14 @@ internal static partial class Printers
 
 			Node.Print(receiver, context);
 
-			// `builder.AddProject(…)` reads as one thing, so a plain identifier receiver keeps its first
-			// call rather than being left stranded on a line of its own — but not when the author put
-			// their own break there, which is theirs to keep.
-			//
-			// csharp_wrap_before_first_method_call overrides the judgement in either direction: true
-			// strands every receiver, false attaches every first call.
+			// Every receiver stands alone once a chain is breaking at all, unset behaving exactly like
+			// csharp_wrap_before_first_method_call = true — uniform stacking reads more consistently
+			// than a first call that stays attached only because its receiver happened to be a plain
+			// identifier. false is the one override left: it attaches the first call regardless of
+			// receiver shape, including a call or creation that would otherwise stand alone too.
 			var attached = context.Options.WrapBeforeFirstMethodCall switch
 			{
-				true => 0,
 				false => 1,
-				null when !asWritten
-					&& receiver is IdentifierNameSyntax or PredefinedTypeSyntax or ThisExpressionSyntax or BaseExpressionSyntax => 1,
 				_ => 0,
 			};
 
@@ -142,30 +140,52 @@ internal static partial class Printers
 		}
 	}
 
-	/// <summary>Counts a chain's links without allocating, so a non-chain costs one walk.</summary>
-	private static int CountLinks(ExpressionSyntax node)
+	/// <summary>
+	/// Counts a chain's links without allocating, so a non-chain costs one walk. Also reports
+	/// whether the receiver itself is call-shaped.
+	/// </summary>
+	/// <remarks>
+	/// A bare call (<c>GetFactory()</c>), an indexer, or a creation with its own arguments
+	/// (<c>new Foo(a, b)</c>) counts as one extra link toward the minimum: <c>new
+	/// Foo(a, b).Bar().Baz()</c> is exactly as chain-like as <c>foo.Bar().Baz().Qux()</c> — three
+	/// genuinely separate steps — even though only two of them are member-access dots. Without
+	/// this, a chain hanging off a call-shaped receiver could sit at the two-link "not really a
+	/// chain" floor forever under reflow: <see cref="SpansLines"/>, the escape hatch preservation
+	/// mode gets for a chain the author already opened out, reads nothing under
+	/// <c>csharp_keep_existing_linebreaks = false</c>, so a receiver that is itself long enough to
+	/// need several lines had no way to earn its tail a break at all — the tail broke inside
+	/// whichever argument list overflowed first instead of at its own dots.
+	/// </remarks>
+	private static int CountLinks(ExpressionSyntax node, out bool receiverIsCallShaped)
 	{
 		var count = 0;
 		var current = node;
+		var lastWasInvocationOrElementAccess = false;
 
 		while (true)
 		{
 			switch (current)
 			{
 				case InvocationExpressionSyntax invocation:
+					lastWasInvocationOrElementAccess = true;
 					current = invocation.Expression;
 					continue;
 
 				case ElementAccessExpressionSyntax elementAccess:
+					lastWasInvocationOrElementAccess = true;
 					current = elementAccess.Expression;
 					continue;
 
 				case MemberAccessExpressionSyntax access when access.IsKind(SyntaxKind.SimpleMemberAccessExpression):
 					count++;
+					lastWasInvocationOrElementAccess = false;
 					current = access.Expression;
 					continue;
 
 				default:
+					receiverIsCallShaped = lastWasInvocationOrElementAccess
+						|| current is ObjectCreationExpressionSyntax { ArgumentList.Arguments.Count: > 0 }
+						|| current is ImplicitObjectCreationExpressionSyntax { ArgumentList.Arguments.Count: > 0 };
 					return count;
 			}
 		}

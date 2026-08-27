@@ -350,4 +350,92 @@ public class ReflowTests : FormattingTest
 		}
 		""",
 		editorConfig: "max_line_length = 28");
+
+	// ---- an operand with its own layout stays attached to the operator that precedes it -----------
+
+	[Test]
+	public Task An_assignments_chain_rhs_stays_attached_and_breaks_at_its_own_dots() => Formats(
+		// Without BreaksWithoutHelp, the RHS hung on its own indented line — which then measured as
+		// fitting flat at that shallower indent, so the chain never broke at its own dots either: the
+		// assignment ate the only break the line needed.
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        result = result.WithArgs(alpha).WaitForCompletion(beta).WithParentRelationship(gamma);
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        result = result
+		            .WithArgs(alpha)
+		            .WaitForCompletion(beta)
+		            .WithParentRelationship(gamma);
+		    }
+		}
+		""",
+		editorConfig: "max_line_length = 60");
+
+	[Test]
+	public Task A_discard_assignments_awaited_call_stays_attached() => Formats(
+		// BreaksWithoutHelp looks through the await to the call it wraps — the keyword adds no break
+		// opportunity of its own and hides none of the call's.
+		"""
+		public class C
+		{
+		    public async Task M()
+		    {
+		        _ = await repository.PutItemAsync(alphaArgument, betaArgument, gammaArgument, deltaArgument);
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public async Task M()
+		    {
+		        _ = await repository.PutItemAsync(
+		            alphaArgument,
+		            betaArgument,
+		            gammaArgument,
+		            deltaArgument
+		        );
+		    }
+		}
+		""",
+		editorConfig: "max_line_length = 60");
+
+	[Test]
+	public Task A_lambda_body_that_is_a_chain_stays_attached_to_its_arrow() => Formats(
+		// Same reasoning as OperandOnRight, one step further out: a lambda arrow is an operator like
+		// any other, and a body that is itself a chain has somewhere to break already.
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        Configure(s => s.Indices(alphaIndex).Query(betaQuery).Size(oneResult));
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        Configure(
+		            s => s
+		                .Indices(alphaIndex)
+		                .Query(betaQuery)
+		                .Size(oneResult)
+		        );
+		    }
+		}
+		""",
+		editorConfig: "max_line_length = 45");
 }

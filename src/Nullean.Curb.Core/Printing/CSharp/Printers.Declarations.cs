@@ -134,17 +134,27 @@ internal static partial class Printers
 	/// redundant, and consulted in deterministic mode only — see the call site for why.
 	/// </remarks>
 	private static bool BreaksWithoutHelp(ExpressionSyntax? value) =>
-		value is InvocationExpressionSyntax
-			or MemberAccessExpressionSyntax
-			or ElementAccessExpressionSyntax
-			or ConditionalAccessExpressionSyntax
-			or BinaryExpressionSyntax
-			or ObjectCreationExpressionSyntax
-			or ImplicitObjectCreationExpressionSyntax
-			// A ternary breaks at its own ? and :, one indent in from wherever it starts. Breaking
-			// after the = as well nests those a level deeper than the assignment they belong to —
-			// issue #34.
-			or ConditionalExpressionSyntax;
+		value switch
+		{
+			// Looks through to the awaited value: `await dynamoDb.PutItemAsync(…)` has the same break
+			// opportunities `dynamoDb.PutItemAsync(…)` does, the `await` keyword adds none of its own
+			// and hides none of the call's.
+			AwaitExpressionSyntax awaitExpression => BreaksWithoutHelp(awaitExpression.Expression),
+
+			InvocationExpressionSyntax
+				or MemberAccessExpressionSyntax
+				or ElementAccessExpressionSyntax
+				or ConditionalAccessExpressionSyntax
+				or BinaryExpressionSyntax
+				or ObjectCreationExpressionSyntax
+				or ImplicitObjectCreationExpressionSyntax
+				// A ternary breaks at its own ? and :, one indent in from wherever it starts. Breaking
+				// after the = as well nests those a level deeper than the assignment they belong to —
+				// issue #34.
+				or ConditionalExpressionSyntax => true,
+
+			_ => false,
+		};
 
 	/// <summary>True for values whose own layout supplies the indentation of their contents.</summary>
 	internal static bool BringsOwnBlock(ExpressionSyntax? value) =>
