@@ -1,0 +1,25 @@
+name: 'curb'
+description: 'Check or format C# source with curb, driven by your .editorconfig'
+branding:
+  icon: 'code'
+  color: 'blue'
+inputs:
+  path:
+    description: 'File or directory to check/format, relative to the repository root'
+    required: false
+    default: '.'
+  command:
+    description: '"check" fails the job if anything would change; "format" rewrites files in place'
+    required: false
+    default: 'check'
+  args:
+    description: 'Extra arguments passed through to curb verbatim, e.g. "--cache /tmp/curb.cache"'
+    required: false
+    default: ''
+runs:
+  using: 'docker'
+  image: 'docker://ghcr.io/nullean/curb:edge'
+  args:
+    - ${{ inputs.command }}
+    - ${{ inputs.path }}
+    - ${{ inputs.args }}

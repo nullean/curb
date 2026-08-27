@@ -1741,6 +1741,45 @@ let private createReleaseOnGithub (arguments:ParseResults<Arguments>) =
 
     exec "dotnet" (["release-notes"] @ releaseArgs) |> ignore
 
+/// Tags for the container image, mirroring the versioning currentVersion already derives from git:
+/// "edge" always (so `ghcr.io/nullean/curb:edge` is always the latest main build), plus "latest" and
+/// the plain semver when this is an exact release tag rather than a canary commit — MinVer's canary
+/// suffix always contains a hyphen, a clean tag never does.
+let private containerImageTags =
+    lazy(
+        let version = currentVersion.Value
+        if version.Contains("-") then "edge" else sprintf "edge;latest;%s" version
+    )
+
+/// Publishes the CLI's native-AOT build as a container image via the .NET SDK's own container
+/// support (`dotnet publish -t:PublishContainer`) — the same mechanism elastic/docs-builder uses for
+/// its own image, not a hand-written Dockerfile. linux-x64 only for now; a second RID becomes a
+/// second manifest-list platform later with no change to action.yml.
+///
+/// Base image is the chiseled/distroless runtime-deps image: no shell, minimal surface, and correct
+/// for an AOT binary specifically because there is no managed runtime to host — a plain `runtime`
+/// image would carry a CLR this binary never uses.
+///
+/// --push is an explicit flag, not inferred from a CI/event-name environment variable: the aot-pack
+/// job's linux-x64 leg calls this on every trigger (PR, push, tag) purely to prove the container
+/// build itself still works, with no ghcr.io credentials configured there, and an env-based "is this
+/// a push?" check would have tried (and failed) to push from that job on every non-PR trigger. Only
+/// the build job, which does log in, passes --push.
+let private publishContainers (arguments:ParseResults<Arguments>) =
+    let baseImageTag = "10.0-noble-chiseled"
+    let registryArgs =
+        if arguments.Contains Push then ["-p"; "ContainerRegistry=ghcr.io"] else []
+    let args =
+        ["publish"; "src/Nullean.Curb.Cli"; "-c"; "Release"; "-r"; "linux-x64"]
+        @ ["/t:PublishContainer"
+           "-p"; "DebugType=none"
+           "-p"; sprintf "ContainerBaseImage=mcr.microsoft.com/dotnet/runtime-deps:%s" baseImageTag
+           "-p"; sprintf "ContainerRepository=%s" Paths.Repository
+           "-p"; sprintf "ContainerImageTags=\"%s\"" containerImageTags.Value
+           "-p"; "ContainerUser=1001:1001"]
+        @ registryArgs
+    exec "dotnet" args |> ignore
+
 /// Timings and metrics for one repository in the compare run.
 type private RepoResult = {
     Name: string
@@ -2033,7 +2072,8 @@ let Setup (parsed:ParseResults<Arguments>) (subCommand:Arguments) =
         <| fun _ -> release parsed
 
     step CreateReleaseOnGithub.Name createReleaseOnGithub
+    step PublishContainers.Name publishContainers
     cmd Publish.Name
         (Some [Release.Name])
-        (Some [CreateReleaseOnGithub.Name])
+        (Some [CreateReleaseOnGithub.Name; PublishContainers.Name])
         <| fun _ -> publish parsed

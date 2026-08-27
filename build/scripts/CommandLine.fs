@@ -23,6 +23,7 @@ type Arguments =
     | [<CliPrefix(CliPrefix.None);SubCommand>] Release
 
     | [<CliPrefix(CliPrefix.None);Hidden;SubCommand>] CreateReleaseOnGithub
+    | [<CliPrefix(CliPrefix.None);Hidden;SubCommand>] PublishContainers
     | [<CliPrefix(CliPrefix.None);SubCommand>] Publish
 
     | [<Inherit>] Corpus of string
@@ -46,6 +47,7 @@ type Arguments =
     | [<Inherit>] Maximum of double
     | [<Inherit;AltCommandLine("-s")>] SingleTarget of bool
     | [<Inherit>] Token of string
+    | [<Inherit>] Push
     | [<Inherit;AltCommandLine("-c")>] CleanCheckout of bool
 with
     interface IArgParserTemplate with
@@ -85,6 +87,7 @@ with
             | SingleTarget _ -> "runs the provided sub command without running its dependencies"
             | Token _ -> "token used to authenticate with github"
             | CleanCheckout _ -> "skip the clean checkout check that guards the release/publish targets"
+            | Push -> "publishcontainers only: push the built image to ghcr.io instead of building it into the local Docker daemon"
 
             | PristineCheck
             | GeneratePackages
@@ -92,6 +95,7 @@ with
             | GenerateReleaseNotes
             | GenerateApiChanges
             | CreateReleaseOnGithub
+            | PublishContainers
                 -> "Undocumented, dependent target"
 
     member this.Name =
