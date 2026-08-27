@@ -151,7 +151,12 @@ internal static partial class Printers
 				// A ternary breaks at its own ? and :, one indent in from wherever it starts. Breaking
 				// after the = as well nests those a level deeper than the assignment they belong to —
 				// issue #34.
-				or ConditionalExpressionSyntax => true,
+				or ConditionalExpressionSyntax
+				// An assignment prints its own left side, operator and OperandOnRight-driven right
+				// side — `context.EnvironmentVariables[k] = v` inside a lambda body needs the arrow
+				// attached to it the same way, not hung on a line of its own only for the assignment
+				// to then decide its own break from a level it does not belong at.
+				or AssignmentExpressionSyntax => true,
 
 			_ => false,
 		};

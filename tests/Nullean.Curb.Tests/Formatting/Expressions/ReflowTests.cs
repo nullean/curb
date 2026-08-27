@@ -438,4 +438,33 @@ public class ReflowTests : FormattingTest
 		}
 		""",
 		editorConfig: "max_line_length = 45");
+
+	[Test]
+	public Task A_lambda_body_that_is_an_assignment_stays_attached_to_its_arrow() => Formats(
+		// An assignment prints its own left side, operator and OperandOnRight-driven right side —
+		// `context.EnvironmentVariables[k] = v` needs the arrow attached to it the same way a chain
+		// body does, not hung on a line of its own only for the assignment to then decide its own
+		// break from a level it does not belong at.
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        Configure(context => context.EnvironmentVariables[alphaKey] = betaValue);
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        Configure(
+		            context => context.EnvironmentVariables[alphaKey] =
+		                betaValue
+		        );
+		    }
+		}
+		""",
+		editorConfig: "max_line_length = 40");
 }
