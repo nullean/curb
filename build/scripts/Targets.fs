@@ -989,6 +989,72 @@ let private checkOptionCoverage (dump: string) (cases: string[]) =
         missing |> Array.iter (fun key -> printfn "  %s" key)
         failwithf "%d implemented key(s) have no isolated test case — see AGENTS.md's option-onboarding playbook" missing.Length
 
+/// Shared by verifyExpectationsJb and verifyExpectationsIde0055: both batch every case an
+/// ExpectationDump run produced into ONE synthetic project rather than one project per case (see
+/// verifyExpectationsJb's own doc comment for the measured cost/determinism reasons that shape holds
+/// for any tool, not just jb), which means every case's declarations have to coexist in the same
+/// compilation.
+let private caseId (d: string) = Path.GetFileName d
+let private caseFile (d: string) = caseId d + ".cs"
+let private caseNamespace (d: string) = "Case" + caseId d
+
+// Dozens of cases reuse `namespace N; class Widget` — deliberately minimal, readable boilerplate that
+// was never meant to be unique across the whole suite. A namespace rename rather than a class rename:
+// the namespace name essentially never reappears in a snippet's body the way a type name might
+// (constructors, casts, ...), so it is the smaller, safer edit.
+let private namespaceDecl = Text.RegularExpressions.Regex(@"namespace\s+([\w.]+)(\s*;|\s*\r?\n[ \t]*\{)")
+let private leadingUsings = Text.RegularExpressions.Regex(@"\A(\s*using[^\n]*\n)*")
+let private typeDecl = Text.RegularExpressions.Regex(@"\b(class|struct|interface|enum|record)\s+\w")
+
+// A case with no type declaration at all — an EdgeCaseTests/NamespaceAndUsingTests case testing
+// using-directive behaviour in isolation, most of them — has nothing that could collide with another
+// case either, so it is left alone rather than given a synthetic namespace. Found by measuring: an
+// inserted namespace turned out to change where jb wanted a blank line or how it ordered the
+// directives relative to it, a disagreement caused entirely by this harness's own insertion and not by
+// anything the case is testing.
+//
+// A case with no type declaration but real statement content is a top-level-statements file (or a
+// file-based program's #: directives plus statements) — excluded from the shared project entirely, not
+// just left unrewritten: only one file per compilation may have top-level statements, so a second such
+// case would be a compile error regardless of namespace handling.
+let private hasTopLevelStatements (source: string) =
+    if typeDecl.IsMatch source then
+        false
+    else
+        source.Split('\n')
+        |> Array.exists (fun l ->
+            let t = l.TrimStart()
+            t.Length > 0
+            && not (t.StartsWith "using ")
+            && not (t.StartsWith "global using")
+            && not (t.StartsWith "#:"))
+
+// A new file-scoped namespace rather than a wrapping block one, specifically so nothing already in the
+// file needs reindenting under it — a block-scoped wrap would manufacture a fake indent-level
+// disagreement of the harness's own making, exactly the kind of false positive both consumers of this
+// function exist to avoid introducing.
+let private rewriteNamespace (d: string) (source: string) =
+    let ns = caseNamespace d
+    let m = namespaceDecl.Match source
+    if m.Success then
+        source.Substring(0, m.Index) + "namespace " + ns + m.Groups[2].Value + source.Substring(m.Index + m.Length)
+    elif typeDecl.IsMatch source then
+        let lead = leadingUsings.Match(source).Length
+        source.Substring(0, lead) + sprintf "namespace %s;\n\n" ns + source.Substring(lead)
+    else
+        source
+
+// The settings lines out of a case's own dumped .editorconfig ("root = true\n[*.cs]\n<settings>"), with
+// every "[...]" header line dropped rather than just the first — some cases pass editorConfig text that
+// already opens with its own "[*.cs]" (see AttributeTests' JoinAttributes), which would otherwise
+// survive as a bogus second header nested inside this case's section below.
+let private caseSettings (d: string) =
+    File.ReadAllText(Path.Combine(d, ".editorconfig")).Split('\n')
+    |> Array.skip 1
+    |> Array.filter (fun l ->
+        let t = l.Trim()
+        t.Length > 0 && not (t.StartsWith("[")) && t <> "root = true")
+
 /// Slow, and it needs the SDK, so it is its own target rather than part of `test`.
 let rec private verifyExpectations (arguments:ParseResults<Arguments>) =
     let dump = Path.Combine(Paths.Output.FullName, "expectations")
@@ -1214,66 +1280,11 @@ and private verifyExpectationsJb (arguments:ParseResults<Arguments>) =
     if cases.Length = 0 then failwith "no expectations were written — is the dump still wired into the harness?"
 
     let read (name: string) (d: string) = File.ReadAllText(Path.Combine(d, name)).TrimEnd('\n', '\r')
-    let caseId (d: string) = Path.GetFileName d
-    let caseFile (d: string) = caseId d + ".cs"
-    let caseNamespace (d: string) = "Case" + caseId d
 
-    // One project needs every case's declarations to coexist in the same compilation, and dozens of
-    // cases reuse `namespace N; class Widget` — deliberately minimal, readable boilerplate that was
-    // never meant to be unique across the whole suite. A namespace rename rather than a class rename:
-    // the namespace name essentially never reappears in a snippet's body the way a type name might
-    // (constructors, casts, ...), so it is the smaller, safer edit.
-    let namespaceDecl = Text.RegularExpressions.Regex(@"namespace\s+([\w.]+)(\s*;|\s*\r?\n[ \t]*\{)")
-    let leadingUsings = Text.RegularExpressions.Regex(@"\A(\s*using[^\n]*\n)*")
-    let typeDecl = Text.RegularExpressions.Regex(@"\b(class|struct|interface|enum|record)\s+\w")
-
-    // A case with no type declaration at all — an EdgeCaseTests/NamespaceAndUsingTests case testing
-    // using-directive behaviour in isolation, most of them — has nothing that could collide with another
-    // case either, so it is left alone rather than given a synthetic namespace. Found by measuring: an
-    // inserted namespace turned out to change where jb wanted a blank line or how it ordered the
-    // directives relative to it, a disagreement caused entirely by this harness's own insertion and not
-    // by anything the case is testing.
-    //
-    // A case with no type declaration but real statement content is a top-level-statements file (or a
-    // file-based program's #: directives plus statements) — excluded from the shared project entirely,
-    // not just left unrewritten: only one file per compilation may have top-level statements, so a
-    // second such case would be a compile error regardless of namespace handling.
-    let hasTopLevelStatements (source: string) =
-        if typeDecl.IsMatch source then
-            false
-        else
-            source.Split('\n')
-            |> Array.exists (fun l ->
-                let t = l.TrimStart()
-                t.Length > 0
-                && not (t.StartsWith "using ")
-                && not (t.StartsWith "global using")
-                && not (t.StartsWith "#:"))
-
-    // A new file-scoped namespace rather than a wrapping block one, specifically so nothing already in
-    // the file needs reindenting under it.
-    let rewriteNamespace (d: string) (source: string) =
-        let ns = caseNamespace d
-        let m = namespaceDecl.Match source
-        if m.Success then
-            source.Substring(0, m.Index) + "namespace " + ns + m.Groups[2].Value + source.Substring(m.Index + m.Length)
-        elif typeDecl.IsMatch source then
-            let lead = leadingUsings.Match(source).Length
-            source.Substring(0, lead) + sprintf "namespace %s;\n\n" ns + source.Substring(lead)
-        else
-            source
-
-    // The settings lines out of a case's own dumped .editorconfig ("root = true\n[*.cs]\n<settings>"),
-    // with every "[...]" header line dropped rather than just the first — some cases pass editorConfig
-    // text that already opens with its own "[*.cs]" (see AttributeTests' JoinAttributes), which would
-    // otherwise survive as a bogus second header nested inside this case's section below.
-    let caseSettings (d: string) =
-        File.ReadAllText(Path.Combine(d, ".editorconfig")).Split('\n')
-        |> Array.skip 1
-        |> Array.filter (fun l ->
-            let t = l.Trim()
-            t.Length > 0 && not (t.StartsWith("[")) && t <> "root = true")
-
+    // caseId/caseFile/caseNamespace, hasTopLevelStatements, rewriteNamespace and caseSettings are
+    // shared with verifyExpectationsIde0055 below, which batches the same dump the same way for a
+    // different reference tool — see their definitions just below loadDivergences for the shared
+    // reasoning.
     let excluded, cases = cases |> Array.partition (fun d -> hasTopLevelStatements (read "Expected.cs" d))
     if excluded.Length > 0 then
         printfn "excluding %d top-level-statement case(s) from the shared project (not checked against jb):" excluded.Length
@@ -1630,6 +1641,153 @@ and private verifyExpectationsJb (arguments:ParseResults<Arguments>) =
                 case (Path.GetRelativePath(dump, directory)) (if documented then "documented" else "undocumented")
         if notFixedPoint.Length > 20 then
             printfn "  ... and %d more" (notFixedPoint.Length - 20)
+
+/// Proves that every expectation the test suite asserts — Expected.cs, what Curb actually ships — is
+/// free of IDE0055 under a real, analyzer-driven `dotnet build`, not just a fixed point of `dotnet
+/// format whitespace`'s plain rewrite pass (verifyExpectations above). The two are not the same claim:
+/// IDE0055's CSharpIndentBlockFormattingRule resolves indentation from full block context, which the
+/// whitespace rewriter does not exercise the same way. Issue #77 was exactly this gap — a fixed point
+/// of `dotnet format whitespace` (verifyExpectations's own StaysFixedPoint = true) that still failed a
+/// real `dotnet build -p:EnforceCodeStyleInBuild=true` outright, with no `.editorconfig` escape hatch.
+/// That is what a curb-formatted file failing a code-style-enforced CI build elsewhere actually looks
+/// like, and verifyExpectations structurally cannot catch it — this closes that gap.
+///
+/// One project per case, unlike verifyExpectationsJb's shared batch above — deliberately not reusing
+/// that shape, and not for the reason verifyCleanupExpectations already gives for its own per-case
+/// projects (two cases both naming `class Widget` colliding). A real, analyzer-driven `dotnet build`
+/// turned out to have a much sharper failure mode than a plain compile error: a SEVERE diagnostic
+/// anywhere in a shared compilation — not just an unresolved symbol, but a wide, apparently open-ended
+/// set of them (multiple base classes, an interface member left unimplemented, an unsafe block without
+/// AllowUnsafeBlocks, a name colliding with its own enclosing type used as an attribute, and more found
+/// by bisection than were worth enumerating) — silently drops ALL diagnostic reporting for every OTHER
+/// file in the same build, not just IDE0055 and not just the offending file's own. Confirmed
+/// concretely: a known-bad case (this session's own issue #77 shape) reported its 4 real IDE0055 sites
+/// correctly alone, and again paired with one unrelated broken case — but batched with the other ~875,
+/// reported nothing, with no build-level error to explain why. Stubbing fixed the unresolved-symbol
+/// version of this (a uniform `class X : System.Attribute` per fictitious name resolves both a bare
+/// type usage and an attribute usage without ambiguity) and a second stub shape fixed the
+/// resolves-to-the-wrong-kind version (`CAttribute` alongside a real, non-Attribute `C`) — but a single
+/// bisection pass over the full dump surfaced 37 MORE independently-poisoning cases across a dozen
+/// further diagnostic codes, with no reason to believe that was the ceiling. A formatter's own test
+/// suite exists specifically to exercise unusual, borderline and outright invalid C# shapes — this
+/// failure mode is not a short, enumerable tail to patch around, it is close to the suite's whole
+/// purpose. Per-case isolation sidesteps the entire category by construction: no case's diagnostics can
+/// ever be silenced by another case's content, because no two cases are ever compiled together.
+///
+/// Slower for it — measured ~0.6s per case even with a warm build server, ~9 minutes for the full dump
+/// run sequentially — so this runs with bounded parallelism (Parallel.ForEach, capped at
+/// Environment.ProcessorCount; Array.Parallel.map's own default degree was enough concurrent `dotnet
+/// build` processes to make ProcNet's stdout/stderr readers time out outright) rather than
+/// Array.Parallel.map's uncapped default, landing at 5-8 minutes depending on the machine. No stubbing
+/// needed either: alone, a case's own fictitious types/attributes are ordinary CS0103/CS0246 body-level
+/// noise the same way an undefined local already is, confirmed directly earlier — they do not stop that
+/// SAME case's own IDE0055 sites from reporting when nothing else is in the compilation to poison.
+///
+/// `-p:UseSharedCompilation=false` earns its own line in every one of these builds — not a speed tweak,
+/// a correctness fix found the hard way. With the shared VBCSCompiler server (the default), which cases
+/// reported IDE0055 genuinely varied between otherwise-identical runs against the same, already-
+/// complete divergence registry — confirmed by narrowing it down to registry churn first (an early false
+/// "it's stable" reading, from two runs that happened to agree) and then reproducing the flip by toggling
+/// only this flag with nothing else changed. Hundreds of concurrent `dotnet build` processes sharing one
+/// compiler server was apparently enough to make its own diagnostic reporting unreliable under this much
+/// load; a fresh compiler process per case is not.
+and private verifyExpectationsIde0055 (arguments:ParseResults<Arguments>) =
+    let dump = Path.Combine(Paths.Output.FullName, "expectations-ide0055")
+    if Directory.Exists dump then Directory.Delete(dump, true)
+    Directory.CreateDirectory dump |> ignore
+
+    Environment.SetEnvironmentVariable("CURB_EXPECTATION_DUMP", dump)
+    exec "dotnet" ["run"; "--project"; "tests/Nullean.Curb.Tests"; "-c"; "Release"] |> ignore
+    Environment.SetEnvironmentVariable("CURB_EXPECTATION_DUMP", null)
+
+    let cases = Directory.GetDirectories dump
+    printfn "checking %d expectations against a real dotnet build (IDE0055), one project per case" cases.Length
+    if cases.Length = 0 then failwith "no expectations were written — is the dump still wired into the harness?"
+
+    let read (name: string) (d: string) = File.ReadAllText(Path.Combine(d, name)).TrimEnd('\n', '\r')
+    let testCaseOf (d: string) =
+        let path = Path.Combine(d, "TestCase.txt")
+        if File.Exists path then (File.ReadAllText path).Trim() else "?"
+
+    let project = Path.Combine(dump, "project")
+    Directory.CreateDirectory project |> ignore
+
+    let ide0055Pattern = Text.RegularExpressions.Regex(@"\): (?:warning|error) IDE0055")
+
+    let buildOne (d: string) =
+        let caseDir = Path.Combine(project, caseId d)
+        Directory.CreateDirectory caseDir |> ignore
+
+        File.WriteAllText(Path.Combine(caseDir, "Case.cs"), read "Expected.cs" d + "\n")
+
+        // Same shape ExpectationDump already writes ("root = true\n[*.cs]\n<settings>"), with the gate
+        // itself added ahead of the case's own settings.
+        File.WriteAllText(
+            Path.Combine(caseDir, ".editorconfig"),
+            sprintf "root = true\n[*.cs]\ndotnet_diagnostic.IDE0055.severity = error\n%s\n" (caseSettings d |> String.concat "\n"))
+
+        File.WriteAllText(
+            Path.Combine(caseDir, "Case.csproj"),
+            [ "<Project Sdk=\"Microsoft.NET.Sdk\">"
+              "  <PropertyGroup>"
+              "    <TargetFramework>net10.0</TargetFramework>"
+              "    <Nullable>disable</Nullable>"
+              // Resolves a case's bare BCL references (Console, Exception, Task, ...) for free, so a
+              // case using one is not ALSO reported as a fictitious name — though since this target
+              // does not stub fictitious names at all any more, it mostly just keeps a case's own real
+              // errors closer to what a real consuming project would actually see.
+              "    <ImplicitUsings>enable</ImplicitUsings>"
+              "    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>"
+              "  </PropertyGroup>"
+              "</Project>" ]
+            |> String.concat "\n")
+
+        // Not gated on the exit code — most cases do not compile cleanly and are not meant to (see the
+        // doc comment above); IDE0055 is read straight off the console output regardless of whether the
+        // rest of the case's own content resolves.
+        //
+        // -maxcpucount:1: each of these is a one-file project, with nothing for MSBuild's own internal
+        // multi-node build to parallelise — left at its default, hundreds of these run concurrently
+        // (below) each also fanning out its own worker nodes, and ProcNet's stdout/stderr readers
+        // started timing out under the combined load. One node per case, many cases at once instead.
+        let result =
+            Proc.Start("dotnet",
+                [| "build"; caseDir; "-tl:off"; "--nologo"; "-maxcpucount:1"
+                   "-p:EnforceCodeStyleInBuild=true"
+                   "-p:RunAnalyzersDuringBuild=true"
+                   "-p:TreatWarningsAsErrors=false"
+                   // Required, not just a speed tweak — see the doc comment above. With the shared
+                   // VBCSCompiler server (the default), which cases report IDE0055 genuinely varied
+                   // between otherwise-identical runs under this much concurrent build load; a fresh
+                   // compiler process per case does not.
+                   "-p:UseSharedCompilation=false" |])
+        let output = result.ConsoleOut |> Seq.map (fun l -> l.Line) |> String.concat "\n"
+        d, ide0055Pattern.IsMatch output
+
+    printfn "building %d isolated case project(s)..." cases.Length
+    // A bounded degree rather than Array.Parallel.map's default (~2x processor count): that default was
+    // enough concurrently-running `dotnet build` processes to starve ProcNet's own stdout/stderr reader
+    // threads, which started timing out outright rather than just running slowly. Matches processor
+    // count instead — measured directly (10 cases, 8-way: ~2.1s; sequential: ~6.1s) as the point past
+    // which more concurrency stopped buying anything on this machine.
+    let results = System.Collections.Concurrent.ConcurrentBag<string * bool>()
+    System.Threading.Tasks.Parallel.ForEach(
+        cases,
+        System.Threading.Tasks.ParallelOptions(MaxDegreeOfParallelism = Environment.ProcessorCount),
+        fun d -> results.Add(buildOne d))
+    |> ignore
+    let results = results.ToArray()
+
+    let divergences = loadDivergences "ide0055"
+    let notFixedPoint =
+        results
+        |> Array.filter snd
+        |> Array.map (fun (d, _) -> d, testCaseOf d)
+
+    printfn ""
+    printfn "%d of %d expectations report no IDE0055 under a real dotnet build" (cases.Length - notFixedPoint.Length) cases.Length
+
+    gateOnNonFixedPoints "dotnet build (IDE0055)" dump divergences notFixedPoint
 
 let private generatePackages (arguments:ParseResults<Arguments>) =
     let output = Paths.RootRelative Paths.Output.FullName
@@ -2060,6 +2218,7 @@ let Setup (parsed:ParseResults<Arguments>) (subCommand:Arguments) =
     cmd VerifyExpectations.Name (Some [Build.Name]) None <| fun _ -> verifyExpectations parsed
     cmd VerifyCleanupExpectations.Name (Some [Build.Name]) None <| fun _ -> verifyCleanupExpectations parsed
     cmd VerifyExpectationsJb.Name (Some [Build.Name]) None <| fun _ -> verifyExpectationsJb parsed
+    cmd VerifyExpectationsIde0055.Name (Some [Build.Name]) None <| fun _ -> verifyExpectationsIde0055 parsed
 
     step PristineCheck.Name pristineCheck
     step GeneratePackages.Name generatePackages

@@ -62,6 +62,55 @@
       "staysFixedPoint": false,
       "reason": "Same permanent divergence as SpacingTests.The_ternary_operator_can_lose_its_surrounding_space, exercised on a ternary long enough to wrap under max_line_length — the wrap point itself (a SoftLine) is unaffected by the option, only the flat spacing dotnet format keeps re-adding is.",
       "exampleCase": "SpacingTests.A_wrapped_ternary_still_breaks_without_the_space"
+    },
+    {
+      "key": "csharp_new_line_before_open_brace",
+      "tool": "ide0055",
+      "staysFixedPoint": false,
+      "reason": "Same fallback-mismatch divergence as the dotnet-format-whitespace entry above (Curb falls back to the documented default for an unrecognised value; dotnet format's own fallback for the same invalid value disagrees), now confirmed to reproduce under a real, analyzer-driven `dotnet build -p:EnforceCodeStyleInBuild=true` too, not just the `dotnet format whitespace` CLI — expected, since IDE0055 is the same underlying Roslyn formatting engine.",
+      "exampleCase": "NewLineBeforeOpenBraceTests.An_unrecognised_value_falls_back_to_the_default"
+    },
+    {
+      "key": "csharp_space_after_unary_operator",
+      "tool": "ide0055",
+      "staysFixedPoint": false,
+      "reason": "Same permanent divergence as the dotnet-format-whitespace entry above (a ReSharper-only key dotnet format has no concept of, so it always normalises the space back out), now confirmed under a real `dotnet build -p:EnforceCodeStyleInBuild=true` as well as the `dotnet format whitespace` CLI.",
+      "exampleCase": "SpacingTests.Unary_minus_plus_and_not_take_a_space_when_asked"
+    },
+    {
+      "key": "csharp_space_around_ternary_operator",
+      "tool": "ide0055",
+      "staysFixedPoint": false,
+      "reason": "Same permanent divergence as the dotnet-format-whitespace entry above (a ReSharper-only key dotnet format has no concept of, so it always normalises the spacing back), now confirmed under a real `dotnet build -p:EnforceCodeStyleInBuild=true` as well as the `dotnet format whitespace` CLI.",
+      "exampleCase": "SpacingTests.The_ternary_operator_can_lose_its_surrounding_space"
+    },
+    {
+      "key": "csharp_space_around_ternary_operator",
+      "tool": "ide0055",
+      "staysFixedPoint": false,
+      "reason": "Same permanent divergence as SpacingTests.The_ternary_operator_can_lose_its_surrounding_space above, exercised on a wrapped ternary, now confirmed under a real `dotnet build -p:EnforceCodeStyleInBuild=true` as well as the `dotnet format whitespace` CLI.",
+      "exampleCase": "SpacingTests.A_wrapped_ternary_still_breaks_without_the_space"
+    },
+    {
+      "key": "csharp_empty_block_style",
+      "tool": "ide0055",
+      "staysFixedPoint": false,
+      "reason": "Same direct conflict as the dotnet-format-whitespace entry above between csharp_empty_block_style and csharp_preserve_single_line_blocks = false, now confirmed to reproduce under a real `dotnet build -p:EnforceCodeStyleInBuild=true` as well as the `dotnet format whitespace` CLI.",
+      "exampleCase": "EmptyBlockStyleTests.Together_ignores_preserve_single_line_blocks_being_off"
+    },
+    {
+      "key": "csharp_indent_labels",
+      "tool": "ide0055",
+      "staysFixedPoint": false,
+      "reason": "Same fallback-mismatch divergence as the dotnet-format-whitespace entry above, now confirmed under a real `dotnet build -p:EnforceCodeStyleInBuild=true` as well as the `dotnet format whitespace` CLI.",
+      "exampleCase": "IndentationTests.An_unrecognised_label_value_falls_back_to_the_default"
+    },
+    {
+      "key": "tab_width",
+      "tool": "ide0055",
+      "staysFixedPoint": false,
+      "reason": "Same not-fully-root-caused divergence as the dotnet-format-whitespace entry above (indent_style = tab combined with a width narrow enough to force wrapping), now confirmed to reproduce under a real `dotnet build -p:EnforceCodeStyleInBuild=true` as well as the `dotnet format whitespace` CLI.",
+      "exampleCase": "CoreOptionTests.Tab_width_counts_toward_the_line_length"
     }
   ]
 }
