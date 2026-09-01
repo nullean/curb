@@ -328,6 +328,21 @@ jobs:
         if: env.CURB_FULL_GATES == 'true'
         run: ./build.sh cleanupconformance -s true --corpus /tmp/corpus
 
+      # Being a fixed point of dotnet format whitespace (below) is not the same claim as passing a
+      # real, analyzer-driven build — issue #77 was both a fixed point of dotnet format whitespace AND
+      # a hard IDE0055 failure under `dotnet build -p:EnforceCodeStyleInBuild=true`, with no
+      # .editorconfig escape hatch, because IDE0055's CSharpIndentBlockFormattingRule resolves
+      # indentation from full block context in a way the plain whitespace rewriter never exercises.
+      # Gated to this tier, not every PR: one project per case (batching all ~900 into one build turned
+      # out to have its own, much sharper failure mode — a severe diagnostic anywhere in a shared
+      # compilation silently drops IDE0055 reporting for every OTHER file too, and a formatter's own
+      # test suite exists specifically to exercise the unusual/borderline C# shapes that trigger it) —
+      # ~9 minutes even with bounded parallelism, closer to cleanupconformance's cost than the fast
+      # checks below it.
+      - name: Expectations report no IDE0055 under a real build
+        if: env.CURB_FULL_GATES == 'true'
+        run: ./build.sh verifyexpectationside0055 -s true
+
       # Every expectation the suite asserts, written out and run through dotnet format. Until this
       # existed only the corpus proved the fixed-point property; the hand-written expectations proved
       # only that Curb agrees with itself, so one written from a wrong belief would pass forever — it

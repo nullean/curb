@@ -33,6 +33,7 @@ Which constructs put their opening brace on a new line.
 Curb's output is not always a fixed point of the tool(s) below for this key — see [conformance divergences](../../design-principles/conformance-divergences.md) for the full registry.
 
 - **dotnet-format-whitespace**: Same fallback-mismatch shape as csharp_indent_labels: Curb falls back to the documented default (all/Allman) for an unrecognised value. Measured: dotnet format leaves the source untouched for the same unrecognised value, i.e. it silently skips applying the setting rather than falling back to its own documented default. (`NewLineBeforeOpenBraceTests.An_unrecognised_value_falls_back_to_the_default`)
+- **ide0055**: Same fallback-mismatch divergence as the dotnet-format-whitespace entry above (Curb falls back to the documented default for an unrecognised value; dotnet format's own fallback for the same invalid value disagrees), now confirmed to reproduce under a real, analyzer-driven `dotnet build -p:EnforceCodeStyleInBuild=true` too, not just the `dotnet format whitespace` CLI — expected, since IDE0055 is the same underlying Roslyn formatting engine. (`NewLineBeforeOpenBraceTests.An_unrecognised_value_falls_back_to_the_default`)
 
 ### `csharp_new_line_before_open_brace = all`
 

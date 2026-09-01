@@ -24,6 +24,7 @@ How goto labels are indented.
 Curb's output is not always a fixed point of the tool(s) below for this key — see [conformance divergences](../../design-principles/conformance-divergences.md) for the full registry.
 
 - **dotnet-format-whitespace**: For an unrecognised value, Curb falls back to the option's documented default (one_less_than_current). Measured: dotnet format's own behaviour for the same unrecognised value does not match its documented default either (it indents the label level with its statement, the no_change shape), so the two fallbacks disagree. Curb's choice — the documented default — is the more defensible of the two; dotnet format's fallback for an invalid value is undocumented. (`IndentationTests.An_unrecognised_label_value_falls_back_to_the_default`)
+- **ide0055**: Same fallback-mismatch divergence as the dotnet-format-whitespace entry above, now confirmed under a real `dotnet build -p:EnforceCodeStyleInBuild=true` as well as the `dotnet format whitespace` CLI. (`IndentationTests.An_unrecognised_label_value_falls_back_to_the_default`)
 
 ### `csharp_indent_labels = one_less_than_current`
 
