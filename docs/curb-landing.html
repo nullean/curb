@@ -251,6 +251,14 @@
     background: var(--line-soft); border: 1px solid var(--line-soft);
     border-radius: 8px; overflow: hidden;
   }
+  /* 3-up, then 2-up: 6 tracks, first 3 cards span 2 each, last 2 span 3 each. */
+  .grid-5 {
+    display: grid; grid-template-columns: repeat(6, 1fr); gap: 1px;
+    background: var(--line-soft); border: 1px solid var(--line-soft);
+    border-radius: 8px; overflow: hidden;
+  }
+  .grid-5 .card { grid-column: span 2; }
+  .grid-5 .card:nth-child(4), .grid-5 .card:nth-child(5) { grid-column: span 3; }
   .card {
     background: var(--bg2); padding: 2rem 1.9rem;
     text-decoration: none; color: inherit; display: block;
@@ -355,7 +363,7 @@
     .inner { padding: 0 1.5rem; }
     .hero .inner { grid-template-columns: 1fr; gap: 3rem; padding-top: 3rem; padding-bottom: 3.5rem; }
     .split { grid-template-columns: 1fr; gap: 2.5rem; }
-    .grid-3, .grid-2 { grid-template-columns: 1fr; }
+    .grid-3, .grid-2, .grid-5 { grid-template-columns: 1fr; }
     .stats { grid-template-columns: 1fr; }
     .section .inner { padding-top: 3.75rem; padding-bottom: 3.75rem; }
     .nav-links { display: none; }
@@ -402,6 +410,7 @@
       <li><a href="#why">why</a></li>
       <li><a href="#how">how it works</a></li>
       <li><a href="#passes">scope</a></li>
+      <li><a href="#cli">cli</a></li>
       <li><a href="getting-started/">docs</a></li>
       <li><a href="benchmarks/">benchmarks</a></li>
       <li><a href="why-not/">vs X</a></li>
@@ -481,37 +490,56 @@
       compiler reads a file, the style is already applied.
     </p>
 
-    <div class="grid-3">
-      <a class="card" href="why/">
+    <div class="grid-5">
+      <a class="card" href="#how">
+        <div class="card-kicker">one line, forever</div>
+        <div class="card-title">Runs inside<br/>dotnet build</div>
+        <p class="card-body">
+          One <code>PackageReference</code>. Curb runs <code>BeforeTargets="CoreCompile"</code>, reading
+          the <strong>.editorconfig</strong> already in your repo. Nothing to remember, nothing to add
+          to CI.
+        </p>
+        <span class="card-more">how it works →</span>
+      </a>
+      <a class="card" href="#speed">
         <div class="card-kicker">fast is the feature</div>
         <div class="card-title">Cheap enough to<br/>always run</div>
         <p class="card-body">
-          Speed is not the goal — it is what makes running unconditionally possible. Curb never loads
-          a compilation, ships as a native binary with a 10 ms start, and is skipped entirely by MSBuild
-          when nothing changed.
+          A linter that isn't instant becomes a linter people skip. Curb never loads a compilation and
+          starts in ~10 ms. MSBuild skips it entirely when a project is untouched — and even when it
+          runs, curb itself reformats only the files that changed.
         </p>
-        <span class="card-more">where the time goes →</span>
+        <span class="card-more">the numbers →</span>
       </a>
       <a class="card" href="reference/">
         <div class="card-kicker">your choices, not ours</div>
         <div class="card-title">97 keys.<br/>All from .editorconfig.</div>
         <p class="card-body">
-          All 39 IDE0055 options, the 8 core EditorConfig keys, wrapping, blank lines, trailing commas,
-          expression bodies. Defaults are Roslyn's. Curb invents no keys — where Rider already had an
-          opinion, Curb reads Rider's key rather than creating a competing one.
+          All 39 IDE0055 keys, the 8 core EditorConfig keys, plus ReSharper's wrapping and blank-line
+          keys — read from the <strong>.editorconfig</strong> you already have. Curb invents nothing.
         </p>
         <span class="card-more">the full option reference →</span>
       </a>
-      <a class="card" href="why-not/">
+      <a class="card" href="design-principles/conformance/">
         <div class="card-kicker">coexists, does not compete</div>
-        <div class="card-title">Works with what<br/>you already have</div>
+        <div class="card-title">Your editor and curb<br/>will not disagree</div>
         <p class="card-body">
-          Curb's output is a fixed point of <code>dotnet format whitespace</code> — measured and gated
-          in CI on every push. Hit Format Document in the IDE and nothing moves. Run
-          <code>EnforceCodeStyleInBuild</code> and the IDE0055 diagnostics are gone before the compiler
-          sees them.
+          Curb's output is a fixed point of <code>dotnet format</code> — 100% with reflow off, 100%
+          with reflow on, 99.9% with preservation on, gated in CI on every push. <code>curb cleanup</code>
+          is held to the same standard against <code>dotnet format style</code>. Hit Format Document and
+          nothing moves.
         </p>
-        <span class="card-more">how it fits in →</span>
+        <span class="card-more">how conformance is measured →</span>
+      </a>
+      <a class="card" href="#ai">
+        <div class="card-kicker">for coding agents</div>
+        <div class="card-title">IDE0055, gone before<br/>an agent ever sees it</div>
+        <p class="card-body">
+          The build an agent reads has already been formatted. What's left — rules that need a
+          compilation, like unused usings and <code>var</code> — <code>curb cleanup</code> fixes in one
+          pass, not one round trip per offence.
+        </p>
+        <span class="card-more">style enforcement that costs no context →</span>
       </a>
     </div>
   </div>
@@ -588,12 +616,13 @@
 <hr class="divider"/>
 
 <!-- ══════════════  SPEED  ══════════════ -->
-<section class="section reveal">
+<section class="section reveal" id="speed">
   <div class="inner">
     <p class="section-label">// where the time goes</p>
     <h2 class="section-title">Fast enough that<br/>skipping it makes no sense.</h2>
     <p class="section-sub">
-      Newtonsoft.Json — 945 files, no <code>.editorconfig</code>. Wall-clock time, best of three runs.
+      Newtonsoft.Json — 945 files, no <code>.editorconfig</code>. Wall-clock time, best of three
+      <strong>cold</strong> runs — first invocation, nothing cached, every file reparsed.
     </p>
 
     <div class="stats">
@@ -607,12 +636,14 @@
       </div>
       <div class="stat">
         <div class="stat-num slow">4.85 s</div>
-        <div class="stat-label">CSharpier (cold — no prior cache)</div>
+        <div class="stat-label">CSharpier</div>
       </div>
     </div>
     <p class="stats-note">
-      Curb ships as a native-AOT binary — about 10 ms to start, no warm-up cost. MSBuild
-      skips it entirely when the project is untouched: no process start, no directory walk.
+      Curb ships as a native-AOT binary — about 10 ms to start, no warm-up cost. And that's still not
+      the fastest curb gets: MSBuild's own incremental build skips curb entirely once a project is
+      untouched — no process start, no directory walk — and even when curb does run, it reformats only
+      the files that changed since its own cache, not the whole project. Curb is fast cold, faster warm.
       <a href="benchmarks/">Full benchmark table →</a>
     </p>
   </div>
@@ -657,13 +688,21 @@
         <a class="pass-link" href="workflow/cleanup/">curb cleanup →</a>
       </div>
     </div>
+
+    <p class="stats-note" style="margin-top:2.5rem">
+      Pass 1's output is measured as a fixed point of <code>dotnet format whitespace</code> in CI, on
+      every push: 100% with reflow off, 100% with reflow on, 99.9% with
+      <code>csharp_keep_existing_linebreaks = true</code>. Pass 2 is held to the same discipline against
+      <code>dotnet format style</code>. Both read the same <strong>.editorconfig</strong> in your repo.
+      <a href="design-principles/conformance/">How it's measured →</a>
+    </p>
   </div>
 </section>
 
 <hr class="divider"/>
 
 <!-- ══════════════  AI  ══════════════ -->
-<section class="section reveal">
+<section class="section reveal" id="ai">
   <div class="inner">
     <div class="split">
       <div>
@@ -673,20 +712,23 @@
           Style rules written as prose in an <code>AGENTS.md</code> get followed inconsistently, and
           every correction is a round trip: the agent writes, the build complains, the agent edits, the
           build runs again. Every one of those edits is mechanical — there was one right answer, and it
-          was already in your <code>.editorconfig</code>.
+          was already in your <strong>.editorconfig</strong>.
         </p>
         <p class="section-sub" style="margin-bottom:2rem">
-          Put the rules where they belong and let the build apply them. The agent never sees the
-          mechanical offences, never spends a token on them, and never has to be told about them. What
-          reaches it is the part that needed judgement.
+          Layout needs no compilation, so it is already fixed by the time an agent's build even
+          finishes — that half of IDE0055 never reaches it. What's left after that is the handful of
+          rules that do need a compilation to decide: unused usings, <code>var</code>, readonly fields.
+          <code>curb cleanup</code> fixes all of them in one pass over the diagnostics the build already
+          produced — one command, not one round trip per offence.
         </p>
         <div class="actions">
           <a class="btn-secondary" href="design-principles/ai-native/">read the argument →</a>
         </div>
       </div>
 
-      <div class="code-panel">
-        <div class="code-panel-head">AGENTS.md — the whole style section</div>
+      <div>
+        <div class="code-panel">
+          <div class="code-panel-head">AGENTS.md — the whole style section</div>
 <pre><span class="c-tag">## Style</span>
 
 Formatting and syntax-level code style are
@@ -696,6 +738,21 @@ applied automatically by the build — see
 Do not hand-format code, and do not "fix"
 formatting you see in a diff.
 <span class="c-key">dotnet build</span> will do it.</pre>
+        </div>
+
+        <div class="code-panel">
+          <div class="code-panel-head">what's left after layout, fixed in one pass</div>
+<pre><span class="c-tag">$</span> dotnet build
+Order.cs(3,1): error IDE0005: Using directive is unnecessary
+Order.cs(4,1): error IDE0005: Using directive is unnecessary
+Build FAILED.
+
+<span class="c-tag">$</span> curb cleanup
+<span class="c-val">fixed 2 of 2 diagnostics · 0 refused</span>
+
+<span class="c-tag">$</span> dotnet build
+Build succeeded.</pre>
+        </div>
       </div>
     </div>
   </div>
@@ -734,6 +791,35 @@ formatting you see in a diff.
         </p>
         <span class="card-more">nuget →</span>
       </a>
+    </div>
+  </div>
+</section>
+
+<hr class="divider"/>
+
+<!-- ══════════════  CLI / PRE-COMMIT  ══════════════ -->
+<section class="section reveal" id="cli">
+  <div class="inner">
+    <div class="split">
+      <div>
+        <p class="section-label">// outside the build</p>
+        <h2 class="section-title">Pre-commit, and anywhere<br/>dotnet build doesn't run.</h2>
+        <p class="section-sub" style="margin-bottom:2rem">
+          <code>curb-cli</code> isn't only for CI steps without the SDK. Point <code>check</code> at a
+          git pre-commit hook and most runs cost a hash comparison against a cache, not a full parse —
+          it reads the same <strong>.editorconfig</strong> your build already does. Husky.NET wires it
+          up for the whole team in one config file.
+        </p>
+        <div class="actions">
+          <a class="btn-secondary" href="workflow/integrations/">pre-commit &amp; agent workflows →</a>
+        </div>
+      </div>
+
+      <div class="code-panel">
+        <div class="code-panel-head">.git/hooks/pre-commit</div>
+<pre><span class="c-com">#!/bin/sh</span>
+<span class="c-tag">curb</span> check <span class="c-key">--cache</span> .git/curb.cache ./src</pre>
+      </div>
     </div>
   </div>
 </section>
