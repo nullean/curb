@@ -123,6 +123,30 @@ public class CoreOptionTests : FormattingTest
 		$"public class C{Environment.NewLine}{{{Environment.NewLine}}}{Environment.NewLine}",
 		editorConfig: "end_of_line = auto");
 
+	// A string literal's newlines are characters of its value, not layout, so end_of_line does not
+	// reach inside one. Re-issuing them with the configured ending changed both the string the
+	// program builds and the token's own text, which made the file fail its own round-trip check
+	// (issue #85). Interpolated strings are the case that regressed: they print as one verbatim run
+	// rather than as a single token, so they took the line-splitting path the others never did.
+
+	[Test]
+	public Task An_interpolated_raw_string_keeps_its_own_line_endings() => FormatsExactly(
+		"class A\n{\n    string M(string x)\n    {\n        return $\"\"\"\n            <a>{x}</a>\n            \"\"\";\n    }\n}",
+		"class A\r\n{\r\n    string M(string x)\r\n    {\r\n        return $\"\"\"\n            <a>{x}</a>\n            \"\"\";\r\n    }\r\n}\r\n",
+		editorConfig: "end_of_line = crlf");
+
+	[Test]
+	public Task An_interpolated_verbatim_string_keeps_its_own_line_endings() => FormatsExactly(
+		"class A\r\n{\r\n    string M(int x)\r\n    {\r\n        return $@\"one{x}\r\ntwo\";\r\n    }\r\n}",
+		"class A\n{\n    string M(int x)\n    {\n        return $@\"one{x}\r\ntwo\";\n    }\n}\n",
+		editorConfig: "end_of_line = lf");
+
+	[Test]
+	public Task A_raw_string_keeps_its_own_line_endings() => FormatsExactly(
+		"class A\n{\n    string M()\n    {\n        return \"\"\"\n            <a>b</a>\n            \"\"\";\n    }\n}",
+		"class A\r\n{\r\n    string M()\r\n    {\r\n        return \"\"\"\n            <a>b</a>\n            \"\"\";\r\n    }\r\n}\r\n",
+		editorConfig: "end_of_line = crlf");
+
 	// ---- insert_final_newline ------------------------------------------------------------------
 
 	[Test]

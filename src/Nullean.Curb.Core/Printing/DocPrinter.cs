@@ -84,16 +84,7 @@ internal sealed class DocPrinter
 		_depth = 0;
 		_lastSourceEnd = -1;
 		_insideLineComment = false;
-
-		// Verbatim runs are re-emitted line by line with the configured ending, so when that differs
-		// from the source's own ending the content of a multi-line string literal changes. The
-		// boundary tracking below cannot see that — but only files that actually contain a verbatim
-		// or raw string literal are at risk, so check for the relevant delimiters before forcing a
-		// round-trip parse.
-		var sourceNewLine = source.Span.IndexOf('\n');
-		var sourceUsesCrLf = sourceNewLine > 0 && source.Span[sourceNewLine - 1] == '\r';
-		RoundTripAtRisk = sourceNewLine >= 0 && sourceUsesCrLf != (_endOfLine == "\r\n")
-			&& HasVerbatimOrRawString(source.Span);
+		RoundTripAtRisk = false;
 
 		_breaks.Run(arena);
 		EnsureGroupModes(arena.Count);
@@ -368,7 +359,15 @@ internal sealed class DocPrinter
 		// indent because whatever it sits inside (a raw string) owns its own leading whitespace.
 		if (type == LineType.Literal)
 		{
-			_output.Append(_endOfLine);
+			// B says whose ending this is. A break between two lines of a comment or a disabled #if
+			// branch takes the configured one; a newline inside a string literal keeps the source's,
+			// because there it is a character of the value rather than layout.
+			_output.Append(doc.B switch
+			{
+				Doc.LfEnding => "\n",
+				Doc.CrLfEnding => "\r\n",
+				_ => _endOfLine,
+			});
 			_column = 0;
 			_insideLineComment = false;
 			return;
@@ -472,26 +471,6 @@ internal sealed class DocPrinter
 
 		if (WeldDetector.CanWeld(previous, text[0]))
 			RoundTripAtRisk = true;
-	}
-
-	/// <summary>
-	/// Returns true when the source contains at least one verbatim or raw string delimiter.
-	/// Only such strings have their line endings rewritten by the verbatim-run emitter, so only
-	/// they can have their token text changed when the configured line ending differs from the
-	/// source's own.
-	/// </summary>
-	private static bool HasVerbatimOrRawString(ReadOnlySpan<char> source)
-	{
-		// Fast exit: no double-quote means no string literals at all.
-		if (source.IndexOf('"') < 0)
-			return false;
-
-		// @"..." and $@"..." both contain the two-character sequence @" (in $@" it appears at
-		// offset 1), so one search covers both. @$"..." has @ followed by $ followed by ", so
-		// it requires its own check. Raw string literals start with """.
-		return source.Contains("@\"", StringComparison.Ordinal)
-			|| source.Contains("@$\"", StringComparison.Ordinal)
-			|| source.Contains("\"\"\"", StringComparison.Ordinal);
 	}
 
 	private void Emit(ReadOnlySpan<char> text, DocFlags flags, bool suppressWidth)

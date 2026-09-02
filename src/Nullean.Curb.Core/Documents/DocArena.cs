@@ -90,6 +90,17 @@ internal sealed class DocArena
 	public void LiteralLine(DocFlags flags = DocFlags.None) => AddLine(LineType.Literal, flags);
 
 	/// <summary>
+	/// A literal line that reproduces the ending the source had here rather than the configured one.
+	/// </summary>
+	/// <remarks>
+	/// For newlines that are part of a string literal's value. A raw or verbatim string's line
+	/// endings are content: rewriting them changes the string the program builds, and changes the
+	/// token's own text, which is why the re-parse comparer reports it as a changed token.
+	/// </remarks>
+	public void SourceLine(bool crLf) =>
+		Add(new Doc(DocKind.Line, a: (int)LineType.Literal, b: crLf ? Doc.CrLfEnding : Doc.LfEnding));
+
+	/// <summary>
 	/// A newline, but only when the group <paramref name="groupId"/> names ended up broken.
 	/// </summary>
 	/// <remarks>
