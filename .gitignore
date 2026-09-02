@@ -58,3 +58,6 @@ BenchmarkDotNet.Artifacts/
 
 # Corpus checkouts used by the conformance/corpus jobs
 tests/corpus-repos/
+
+# Claude Code personal settings
+.claude/settings.local.json
