@@ -555,7 +555,16 @@ internal static class TokenPrinter
 	/// Emits <paramref name="length"/> characters from <paramref name="start"/> exactly as written,
 	/// splitting on newlines so that the printer does not re-indent them.
 	/// </summary>
-	internal static void EmitVerbatimRange(PrintContext context, int start, int length)
+	/// <remarks>
+	/// <paramref name="preserveLineEndings"/> says the newlines in the range belong to the content
+	/// rather than to the layout, which is the case inside a string literal: an interpolated string
+	/// is printed as one verbatim run, and its line endings are characters of the value it builds.
+	/// Re-issuing them as the configured <c>end_of_line</c> rewrites the literal — an LF raw string
+	/// in a file formatted to CRLF came back with its string changed, and the re-parse comparer
+	/// reported it as a changed token (issue #85). Comments and disabled <c>#if</c> branches want the
+	/// opposite, and leave it false so their endings normalise with everything else.
+	/// </remarks>
+	internal static void EmitVerbatimRange(PrintContext context, int start, int length, bool preserveLineEndings = false)
 	{
 		var source = context.Text;
 		var arena = context.Arena;
@@ -568,13 +577,19 @@ internal static class TokenPrinter
 				continue;
 
 			var lineLength = i - lineStart;
-			// Drop a \r that belongs to this \n; the printer emits the configured line ending.
-			if (lineLength > 0 && source[lineStart + lineLength - 1] == '\r')
+			// Drop a \r that belongs to this \n; the printer, not the text leaf, emits the ending.
+			var crLf = lineLength > 0 && source[lineStart + lineLength - 1] == '\r';
+			if (crLf)
 				lineLength--;
 
 			if (lineLength > 0)
 				arena.SourceText(lineStart, lineLength);
-			arena.LiteralLine();
+
+			if (preserveLineEndings)
+				arena.SourceLine(crLf);
+			else
+				arena.LiteralLine();
+
 			lineStart = i + 1;
 		}
 

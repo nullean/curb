@@ -50,7 +50,12 @@ internal static class DocDumper
 						LineType.Normal => "line",
 						LineType.Soft => "softline",
 						LineType.Hard => "hardline",
-						LineType.Literal => "literalline",
+						LineType.Literal => doc.B switch
+						{
+							Doc.LfEnding => "literalline lf",
+							Doc.CrLfEnding => "literalline crlf",
+							_ => "literalline",
+						},
 						_ => "line?",
 					});
 					AppendFlags(output, doc.Flags);

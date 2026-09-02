@@ -88,7 +88,8 @@ internal enum LineType : byte
 
 	/// <summary>
 	/// Always a newline, emitted at column 0 with no indent. Used inside verbatim and raw string
-	/// literals, whose content must not be re-indented.
+	/// literals, whose content must not be re-indented. <c>B</c> picks the ending — see
+	/// <see cref="Doc.ConfiguredEnding"/>.
 	/// </summary>
 	Literal = 3,
 }
@@ -168,6 +169,23 @@ internal readonly struct Doc
 {
 	/// <summary>Sentinel for <see cref="DocKind.Indent"/> meaning "dedent to column 0".</summary>
 	public const int IndentToRoot = int.MinValue;
+
+	/// <summary>
+	/// <c>B</c> on a <see cref="LineType.Literal"/> line: write the configured <c>end_of_line</c>.
+	/// </summary>
+	/// <remarks>
+	/// The default, and what a break between two lines of a comment, a doc comment or a disabled
+	/// <c>#if</c> branch wants: those newlines are layout, so normalising them is the whole point.
+	/// A newline that is part of a string literal's value is not layout, and asks for one of the two
+	/// below instead — rewriting it changes what the program computes.
+	/// </remarks>
+	public const int ConfiguredEnding = 0;
+
+	/// <summary><c>B</c> on a <see cref="LineType.Literal"/> line: write <c>\n</c> whatever the configuration says.</summary>
+	public const int LfEnding = 1;
+
+	/// <summary><c>B</c> on a <see cref="LineType.Literal"/> line: write <c>\r\n</c> whatever the configuration says.</summary>
+	public const int CrLfEnding = 2;
 
 	public readonly DocKind Kind;
 	public readonly DocFlags Flags;

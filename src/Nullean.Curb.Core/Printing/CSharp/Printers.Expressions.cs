@@ -26,8 +26,9 @@ internal static partial class Printers
 		if (first.RawKind != 0)
 			TokenPrinter.PrintLeadingTrivia(first, context);
 
+		// preserveLineEndings: the run is a string literal, so its newlines are part of the value.
 		var span = node.Span;
-		TokenPrinter.EmitVerbatimRange(context, span.Start, span.Length);
+		TokenPrinter.EmitVerbatimRange(context, span.Start, span.Length, preserveLineEndings: true);
 
 		if (last.RawKind != 0)
 			TokenPrinter.PrintTrailingTrivia(last, context);

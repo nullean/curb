@@ -100,20 +100,39 @@ public class RoundTripRiskTests
 	}
 
 	[Test]
-	public async Task Fires_when_line_endings_are_being_rewritten()
+	public async Task Does_not_fire_merely_because_the_file_holds_a_multi_line_literal()
 	{
-		// Verbatim string content is re-emitted with the configured ending, which changes the value
-		// of a multi-line literal. Only files that actually contain a verbatim or raw string need
-		// the second parse — the guard prevents unnecessary re-parses on files that have none.
+		// A verbatim string's newlines are content, and DocArena.SourceLine now reproduces them, so
+		// a file whose endings differ from the configured one no longer has its literals rewritten
+		// and no longer owes a second parse for that reason alone. Before that, every mixed-ending
+		// file containing @" or """ paid for one.
 		var arena = new DocArena();
 		arena.SourceText(0, 3);
 
 		using var output = new OutputBuffer();
 		var printer = new DocPrinter();
-		// Source contains @" so HasVerbatimOrRawString fires; CRLF source with LF target triggers the risk.
 		printer.Print(arena, "@\"a\r\nb\"".AsMemory(), new FormatOptions { EndOfLine = EndOfLine.Lf }, output);
 
-		printer.RoundTripAtRisk.Should().BeTrue();
+		printer.RoundTripAtRisk.Should().BeFalse();
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task A_source_line_keeps_its_own_ending_rather_than_the_configured_one()
+	{
+		var arena = new DocArena();
+		arena.SourceText(0, 3);
+		arena.SourceLine(crLf: true);
+		arena.SourceText(4, 3);
+		arena.SourceLine(crLf: false);
+		arena.SourceText(8, 1);
+
+		using var output = new OutputBuffer();
+		var printer = new DocPrinter();
+		printer.Print(arena, Source.AsMemory(), Options, output);
+
+		// Options say LF; both endings come from the document, not from the configuration.
+		output.ToString().Should().Be("out\r\nvar\na");
 		await Task.CompletedTask;
 	}
 
