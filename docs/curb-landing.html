@@ -424,11 +424,12 @@
   <div class="inner">
     <div>
       <span class="badge"><span class="badge-dot"></span> syntax + code-style · C# · .NET 10</span>
-      <h1>C# style enforcement<br/>on <em>every build</em>.</h1>
+      <h1>A C# formatter for<br/>every <em>dotnet build</em>.</h1>
+      <p class="hero-tagline">Fast. Always on. Fully configurable.</p>
       <p class="hero-sub">
-        A C# formatter built into <code>dotnet build</code>. It reads the <strong>.editorconfig</strong>
-        you already have, agrees with <code>dotnet format</code> and your IDE, and fixes the mechanical
-        work before the compiler reads a line. Formatting just happens.
+        Curb reads your <strong>.editorconfig</strong> when you have one, and works out of the box when
+        you don't. Mechanical style fixes happen before an AI agent ever reports a diagnostic, so it
+        edits less and finishes faster.
       </p>
       <div class="pkg-commands">
         <div class="pkg-row">
@@ -664,7 +665,7 @@
 
     <div class="grid-2">
       <div class="pass">
-        <span class="pass-tag amber">pass 1 · before compile</span>
+        <span class="pass-tag amber">pass 1 · always on</span>
         <h3>Layout</h3>
         <p>Decided from the parse tree alone. No restore, no compilation, no project system — runs <em>before</em> <code>CoreCompile</code>, rewrites the file, and the compiler reads formatted source.</p>
         <ul>
@@ -676,14 +677,16 @@
         <a class="pass-link" href="reference/">97 options →</a>
       </div>
       <div class="pass">
-        <span class="pass-tag purple">pass 2 · after compile</span>
+        <span class="pass-tag purple">pass 2 · on demand</span>
         <h3>Code-style fixes</h3>
-        <p>Runs on the diagnostics the compiler already reported. Applies fixes the build already knows how to make — no extra analysis step, no separate command to remember.</p>
+        <p>Manual, not automatic. Run <code>curb cleanup</code> yourself after a build, and set
+        <code>EnforceCodeStyleInBuild = true</code> (usually in <code>Directory.Build.props</code>) so
+        the build actually reports the diagnostics it reads.</p>
         <ul>
-          <li>Redundant parentheses (IDE0047 / IDE0048)</li>
-          <li>Unnecessary casts and type annotations</li>
-          <li>Object and collection initialiser style</li>
-          <li>Anything with a Roslyn code fix and a severity in .editorconfig</li>
+          <li>Unused usings, <code>var</code>, readonly fields</li>
+          <li><code>new()</code>, string interpolation, redundant <code>#nullable</code></li>
+          <li>Accessibility modifiers, readonly structs and members</li>
+          <li>Ten rules total. Everything that needs a compilation to decide.</li>
         </ul>
         <a class="pass-link" href="workflow/cleanup/">curb cleanup →</a>
       </div>
@@ -731,13 +734,19 @@
           <div class="code-panel-head">AGENTS.md — the whole style section</div>
 <pre><span class="c-tag">## Style</span>
 
-Formatting and syntax-level code style are
-applied automatically by the build — see
-<span class="c-key">.editorconfig</span>.
-
+Formatting and syntax-level code style are applied
+automatically by the build. See <span class="c-key">.editorconfig</span>.
 Do not hand-format code, and do not "fix"
 formatting you see in a diff.
-<span class="c-key">dotnet build</span> will do it.</pre>
+<span class="c-key">dotnet build</span> will do it.
+
+After a build reports style diagnostics, run
+<span class="c-key">curb cleanup --forward</span>. It owns IDE0005, IDE0007,
+IDE0034, IDE0040, IDE0044, IDE0071, IDE0090,
+IDE0240, IDE0250, and IDE0251, and forwards
+anything else to <span class="c-key">dotnet format style</span>. Always safe
+to add: it skips dotnet format entirely once
+curb has already fixed everything.</pre>
         </div>
 
         <div class="code-panel">
