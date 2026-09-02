@@ -424,11 +424,12 @@
   <div class="inner">
     <div>
       <span class="badge"><span class="badge-dot"></span> syntax + code-style · C# · .NET 10</span>
-      <h1>C# style enforcement<br/>on <em>every build</em>.</h1>
+      <h1>Fast. Always on.<br/><em>Fully configurable.</em></h1>
       <p class="hero-sub">
-        A C# formatter built into <code>dotnet build</code>. It reads the <strong>.editorconfig</strong>
-        you already have, agrees with <code>dotnet format</code> and your IDE, and fixes the mechanical
-        work before the compiler reads a line. Formatting just happens.
+        Curb runs inside every <code>dotnet build</code> and finishes in milliseconds. It reads your
+        <strong>.editorconfig</strong> when you have one, and works out of the box when you don't.
+        Mechanical style fixes happen before an AI agent ever reports a diagnostic, so it edits less and
+        finishes faster.
       </p>
       <div class="pkg-commands">
         <div class="pkg-row">
@@ -731,14 +732,25 @@
           <div class="code-panel-head">AGENTS.md — the whole style section</div>
 <pre><span class="c-tag">## Style</span>
 
-Formatting and syntax-level code style are
-applied automatically by the build — see
-<span class="c-key">.editorconfig</span>.
-
+Formatting and syntax-level code style are applied
+automatically by the build. See <span class="c-key">.editorconfig</span>.
 Do not hand-format code, and do not "fix"
 formatting you see in a diff.
-<span class="c-key">dotnet build</span> will do it.</pre>
+<span class="c-key">dotnet build</span> will do it.
+
+After a build reports style diagnostics, run
+<span class="c-key">curb cleanup --forward</span>. It owns IDE0005, IDE0007,
+IDE0034, IDE0040, IDE0044, IDE0071, IDE0090,
+IDE0240, IDE0250, and IDE0251, and forwards
+anything else to <span class="c-key">dotnet format style</span>. Always safe
+to add: it skips dotnet format entirely once
+curb has already fixed everything.</pre>
         </div>
+        <p class="stats-note" style="margin-top:-0.9rem; margin-bottom:1.2rem">
+          A close relative of this block runs in
+          <a href="https://github.com/elastic/docs-builder/blob/main/AGENTS.md">elastic/docs-builder's own AGENTS.md</a>
+          today.
+        </p>
 
         <div class="code-panel">
           <div class="code-panel-head">what's left after layout, fixed in one pass</div>
