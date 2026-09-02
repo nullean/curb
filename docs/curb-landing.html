@@ -424,12 +424,12 @@
   <div class="inner">
     <div>
       <span class="badge"><span class="badge-dot"></span> syntax + code-style · C# · .NET 10</span>
-      <h1>Fast. Always on.<br/><em>Fully configurable.</em></h1>
+      <h1>A C# formatter for<br/>every <em>dotnet build</em>.</h1>
+      <p class="hero-tagline">Fast. Always on. Fully configurable.</p>
       <p class="hero-sub">
-        Curb runs inside every <code>dotnet build</code> and finishes in milliseconds. It reads your
-        <strong>.editorconfig</strong> when you have one, and works out of the box when you don't.
-        Mechanical style fixes happen before an AI agent ever reports a diagnostic, so it edits less and
-        finishes faster.
+        Curb reads your <strong>.editorconfig</strong> when you have one, and works out of the box when
+        you don't. Mechanical style fixes happen before an AI agent ever reports a diagnostic, so it
+        edits less and finishes faster.
       </p>
       <div class="pkg-commands">
         <div class="pkg-row">
@@ -665,7 +665,7 @@
 
     <div class="grid-2">
       <div class="pass">
-        <span class="pass-tag amber">pass 1 · before compile</span>
+        <span class="pass-tag amber">pass 1 · always on</span>
         <h3>Layout</h3>
         <p>Decided from the parse tree alone. No restore, no compilation, no project system — runs <em>before</em> <code>CoreCompile</code>, rewrites the file, and the compiler reads formatted source.</p>
         <ul>
@@ -677,14 +677,16 @@
         <a class="pass-link" href="reference/">97 options →</a>
       </div>
       <div class="pass">
-        <span class="pass-tag purple">pass 2 · after compile</span>
+        <span class="pass-tag purple">pass 2 · on demand</span>
         <h3>Code-style fixes</h3>
-        <p>Runs on the diagnostics the compiler already reported. Applies fixes the build already knows how to make — no extra analysis step, no separate command to remember.</p>
+        <p>Manual, not automatic. Run <code>curb cleanup</code> yourself after a build, and set
+        <code>EnforceCodeStyleInBuild = true</code> (usually in <code>Directory.Build.props</code>) so
+        the build actually reports the diagnostics it reads.</p>
         <ul>
-          <li>Redundant parentheses (IDE0047 / IDE0048)</li>
-          <li>Unnecessary casts and type annotations</li>
-          <li>Object and collection initialiser style</li>
-          <li>Anything with a Roslyn code fix and a severity in .editorconfig</li>
+          <li>Unused usings, <code>var</code>, readonly fields</li>
+          <li><code>new()</code>, string interpolation, redundant <code>#nullable</code></li>
+          <li>Accessibility modifiers, readonly structs and members</li>
+          <li>Ten rules total. Everything that needs a compilation to decide.</li>
         </ul>
         <a class="pass-link" href="workflow/cleanup/">curb cleanup →</a>
       </div>
@@ -746,11 +748,6 @@ anything else to <span class="c-key">dotnet format style</span>. Always safe
 to add: it skips dotnet format entirely once
 curb has already fixed everything.</pre>
         </div>
-        <p class="stats-note" style="margin-top:-0.9rem; margin-bottom:1.2rem">
-          A close relative of this block runs in
-          <a href="https://github.com/elastic/docs-builder/blob/main/AGENTS.md">elastic/docs-builder's own AGENTS.md</a>
-          today.
-        </p>
 
         <div class="code-panel">
           <div class="code-panel-head">what's left after layout, fixed in one pass</div>
