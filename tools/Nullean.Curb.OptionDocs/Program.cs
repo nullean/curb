@@ -455,7 +455,7 @@ internal static class Program
                     _ => (Nullean.Curb.EmptyBlockStyle?)null,
                 }
             },
-            "csharp_preserve_single_line_statements" => opts with { PreserveSingleLineStatements = b },
+            "csharp_preserve_single_line_statements" => opts with { PreserveSingleLineStatementsOption = b },
             "csharp_keep_existing_linebreaks" => opts with { KeepExistingLinebreaksOption = b },
             "csharp_wrap_before_first_method_call" => opts with { WrapBeforeFirstMethodCall = b },
             "csharp_wrap_before_first_type_parameter_constraint" => opts with { WrapBeforeFirstTypeParameterConstraint = b },

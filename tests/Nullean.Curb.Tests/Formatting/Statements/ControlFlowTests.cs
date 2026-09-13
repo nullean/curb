@@ -421,13 +421,97 @@ public class ControlFlowTests : FormattingTest
 		""");
 
 	[Test]
-	public Task Chained_using_statements_stay_on_one_line() => Unchanged(
+	public Task Chained_using_statements_are_split_even_when_the_author_joined_them() => Formats(
+		// A chain is a sequence: both usings guard the same block and neither is the body of the other, so
+		// each gets its own line at the same indent. Nothing is configured here, which is the case that
+		// matters — joining is a rewrite, and an absent key is nobody having asked for one.
 		"""
 		public class C
 		{
 		    public void M()
 		    {
 		        using (var first = Open()) using (var second = Open())
+		        {
+		            Call();
+		        }
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        using (var first = Open())
+		        using (var second = Open())
+		        {
+		            Call();
+		        }
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Chained_using_statements_the_author_split_stay_split() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        using (var first = Open())
+		        using (var second = Open())
+		        {
+		            Call();
+		        }
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Chained_using_statements_stay_joined_when_the_option_is_written_out() => Unchanged(
+		// The one way back to the old behaviour. Splitting is what an absent key does, not an opinion Curb
+		// holds over the author's head: somebody who writes the option out and turns it on has asked for
+		// their own line to be kept, and gets it. Without this .editorconfig the same source splits, which
+		// is the case above.
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        using (var first = Open()) using (var second = Open())
+		        {
+		            Call();
+		        }
+		    }
+		}
+		""",
+		editorConfig: """
+		[*.cs]
+		csharp_preserve_single_line_statements = true
+		""");
+
+	[Test]
+	public Task Three_chained_usings_split_together() => Formats(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        using (var a = Open()) using (var b = Open()) using (var c = Open())
+		        {
+		            Call();
+		        }
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        using (var a = Open())
+		        using (var b = Open())
+		        using (var c = Open())
 		        {
 		            Call();
 		        }

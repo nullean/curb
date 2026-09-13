@@ -67,7 +67,7 @@ Use the filter above to search by name. Each group below links to its own index.
 
 - [csharp_preserve_single_line_blocks](wrapping/csharp_preserve_single_line_blocks.md) — Allow a block the author wrote on one line to stay on one line.
 - [csharp_empty_block_style](wrapping/csharp_empty_block_style.md) — How an empty method, constructor, accessor or control-flow body is laid out. together_same_line keeps { } on the signature's line.
-- [csharp_preserve_single_line_statements](wrapping/csharp_preserve_single_line_statements.md) — Allow a control-flow body the author left on its header's line to stay there.
+- [csharp_preserve_single_line_statements](wrapping/csharp_preserve_single_line_statements.md) — Allow a control-flow body the author left on its header's line to stay there. Chained using statements are the exception and take their own lines unless this key is written out and set to true.
 - [csharp_keep_existing_linebreaks](wrapping/csharp_keep_existing_linebreaks.md) — Preservation mode. Defaults to true when max_line_length is off.
 - [csharp_wrap_before_first_method_call](wrapping/csharp_wrap_before_first_method_call.md) — When a chain breaks, break before the first call too, leaving the receiver on its own line.
 - [csharp_wrap_before_first_type_parameter_constraint](wrapping/csharp_wrap_before_first_type_parameter_constraint.md) — Put a where clause on its own line.

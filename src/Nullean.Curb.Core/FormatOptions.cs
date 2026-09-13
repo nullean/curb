@@ -415,7 +415,19 @@ public readonly record struct FormatOptions
 	/// member, type, namespace, enum and switch bodies. A one-line <c>if (a) { return; }</c> is
 	/// therefore kept by this option even with the block option off.
 	/// </remarks>
-	public bool PreserveSingleLineStatements { get; init; } = true;
+	public bool PreserveSingleLineStatements => PreserveSingleLineStatementsOption ?? true;
+
+	/// <summary>
+	/// <c>csharp_preserve_single_line_statements</c> exactly as written, or null when it was not mentioned.
+	/// </summary>
+	/// <remarks>
+	/// Kept separately from <see cref="PreserveSingleLineStatements"/> because one shape has to tell an
+	/// absent key apart from an explicit true: a chain of <c>using</c> statements. Joining those is a
+	/// rewrite nobody asked for, so an unset key leaves them on their own lines, and only somebody who
+	/// has written the option out gets the author's joining honoured. Everything else the option governs
+	/// reads the resolved value and so still defaults to preservation.
+	/// </remarks>
+	public bool? PreserveSingleLineStatementsOption { get; init; }
 
 	/// <summary>
 	/// <c>csharp_keep_existing_linebreaks</c> exactly as written, or null when it was not mentioned.

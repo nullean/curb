@@ -471,10 +471,25 @@ internal static partial class Printers
 		Spacing.InsideControlFlowParens(context);
 		TokenPrinter.Print(node.CloseParenToken, context);
 
-		// Chained `using (a) using (b) { }` keeps the inner using on the same line.
-		if (node.Statement is UsingStatementSyntax)
+		// Chained `using (a) using (b) { }` is a sequence, not a nesting: every using in the chain guards the
+		// same block, and none of them is the body of the one before it. So each takes its own line at the
+		// same indent unless somebody has asked, in as many words, for the author's line to be kept.
+		//
+		// That asking is csharp_preserve_single_line_statements written out and set to true, which is why this
+		// reads the raw option rather than the resolved one. Previously the chain joined unconditionally, so
+		// an explicit false was ignored (issue #89). Resolving the option would fix that much and still leave
+		// the larger half wrong: it defaults to true, so a repository with no .editorconfig — or one that
+		// never mentions this key — would go on having its usings pulled onto one line, which is a rewrite
+		// nobody asked for and not the shape IDE0055 expects. An absent key therefore splits, an explicit
+		// false splits, and only an explicit true hands the decision back to the author's own line breaks.
+		if (node.Statement is UsingStatementSyntax chained)
 		{
-			arena.Synthetic(SyntheticText.Space);
+			if (context.Options.PreserveSingleLineStatementsOption == true
+				&& context.AuthorJoined(node.CloseParenToken.Span.End, chained.SpanStart))
+				arena.Synthetic(SyntheticText.Space);
+			else
+				arena.HardLine();
+
 			Node.Print(node.Statement, context);
 			return;
 		}

@@ -585,7 +585,7 @@ public static class EditorConfigOptionsBinder
 		// accessor-list printer reads it as a plain option rather than through the source.
 		if (TryBool(properties, "csharp_preserve_single_line_statements", diagnostics, out var preserveStatements))
 		{
-			options = options with { PreserveSingleLineStatements = preserveStatements };
+			options = options with { PreserveSingleLineStatementsOption = preserveStatements };
 			ReportIfDeterministic(
 				"csharp_preserve_single_line_statements",
 				"every body, label and statement takes its own line");
