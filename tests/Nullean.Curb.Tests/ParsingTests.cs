@@ -40,4 +40,19 @@ public class ParsingTests
 		errors.Should().BeEmpty();
 		await Task.CompletedTask;
 	}
+
+	[Test]
+	public async Task Accepts_C15_closed_modifier()
+	{
+		// Roslyn 5.6.0 rejected `closed` as a modifier (nullean/curb#92); 5.9.0+ accepts it.
+		const string source = """
+			namespace Demo;
+			public closed record class Foo(string Name);
+			public sealed record Bar(string Name) : Foo(Name);
+			""";
+
+		CSharpSource.TryParse(source, out _, out var errors).Should().BeTrue();
+		errors.Should().BeEmpty();
+		await Task.CompletedTask;
+	}
 }
