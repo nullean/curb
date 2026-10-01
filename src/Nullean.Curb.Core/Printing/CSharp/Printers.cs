@@ -325,7 +325,12 @@ internal static partial class Printers
 		// type to its name, so `using X = (int Left, string Right)` came out as `intLeft`. That is the
 		// fourth content bug traced to this helper and the first the release build could not catch,
 		// GuardAgainstWelding being debug-only.
-		if (node.NamespaceOrType is NameSyntax)
+		//
+		// A NameSyntax is not necessarily *only* a dotted name, though: a GenericName's type argument
+		// list can nest anything, including a tuple with named elements, and that tuple hits the exact
+		// same welding a few levels down — `using static C<(int Left, string Right)>;` came out as
+		// `intLeft` too. So the token path is only safe once the whole subtree is checked for one.
+		if (node.NamespaceOrType is NameSyntax && !ContainsTupleType(node.NamespaceOrType))
 			Tokens(node.NamespaceOrType, context);
 		else
 			Node.Print(node.NamespaceOrType, context);
@@ -1065,6 +1070,27 @@ internal static partial class Printers
 			context.Arena.Synthetic(SyntheticText.Space);
 			previousLast = ' ';
 		}
+	}
+
+	/// <summary>
+	/// True if <paramref name="node"/> or anything beneath it is a tuple type.
+	/// </summary>
+	/// <remarks>
+	/// Only called on a <see cref="NameSyntax"/> about to go through <see cref="Tokens"/>, to rule out
+	/// the one shape that helper cannot space correctly — see the caller in
+	/// <see cref="UsingDirective(UsingDirectiveSyntax, PrintContext, bool)"/>. A plain dotted name never
+	/// nests one, so this walk only ever runs its full length on a generic argument list, which is rare
+	/// enough on a using directive's target that a real printer being correct matters more than this
+	/// being free.
+	/// </remarks>
+	private static bool ContainsTupleType(SyntaxNode node)
+	{
+		foreach (var descendant in node.DescendantNodesAndSelf())
+		{
+			if (descendant.IsKind(SyntaxKind.TupleType))
+				return true;
+		}
+		return false;
 	}
 
 	/// <summary>

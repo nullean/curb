@@ -94,6 +94,24 @@ public class NamespaceAndUsingTests : FormattingTest
 		""");
 
 	[Test]
+	public Task Using_alias_targeting_a_tuple() => Unchanged(
+		"""
+		using X = (int Left, string Right);
+		""");
+
+	[Test]
+	public Task Using_static_targeting_a_generic_with_a_named_tuple_argument() => Unchanged(
+		"""
+		using static Repro.Constraints<(Repro.Order From, Repro.Order To)>;
+		""");
+
+	[Test]
+	public Task Using_alias_targeting_a_generic_with_a_named_tuple_argument() => Unchanged(
+		"""
+		using Y = System.Collections.Generic.Dictionary<string, (int Left, string Right)>;
+		""");
+
+	[Test]
 	public Task Global_using() => Unchanged(
 		"""
 		global using System;
