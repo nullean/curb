@@ -1,5 +1,6 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Nullean.Curb.Documents;
 
 namespace Nullean.Curb.Printing.CSharp;
@@ -249,9 +250,15 @@ internal static class TokenPrinter
 						FlushBlankLine(arena, ref pendingNewLines, emittedAnything);
 					arena.Trim();
 					arena.LiteralLine(DocFlags.OnlyIfNotAtLineStart);
-					EmitVerbatimBlock(trivia, context);
+					// The line endings the block trims off its end are the gap to whatever follows —
+					// a directive inside the same false branch, say. Dropping them lost a blank line
+					// in front of it. The first one only ends the block's last line, so it is emitted
+					// here; carrying the count lets FlushBlankLine keep one blank line, as it would
+					// anywhere.
+					pendingNewLines = EmitVerbatimBlock(trivia, context);
+					if (pendingNewLines > 0)
+						arena.HardLine();
 					emittedAnything = true;
-					pendingNewLines = 0;
 					lastWasDocComment = false;
 					break;
 
@@ -272,8 +279,14 @@ internal static class TokenPrinter
 					// jb does not add a blank line between `{` and a #region immediately inside it —
 					// so that one case is excluded even though a real token (the brace) precedes it.
 					// Every other directive keeps the ordinary at-most-one treatment.
+					//
+					// A region inside a false #if branch is still lexed as a directive, but the code
+					// around it is disabled text printed verbatim, blank lines and all. Forcing a gap
+					// there stacks on the blank lines the verbatim text already carries, so each run
+					// adds one more; an inactive region keeps the gaps it was written with.
 					var isRegionBoundary = trivia.IsKind(SyntaxKind.RegionDirectiveTrivia) || trivia.IsKind(SyntaxKind.EndRegionDirectiveTrivia);
-					var before = isRegionBoundary
+					var forcesRegionGap = isRegionBoundary && trivia.GetStructure() is DirectiveTriviaSyntax { IsActive: true };
+					var before = forcesRegionGap
 						? (trivia.IsKind(SyntaxKind.RegionDirectiveTrivia) ? context.Options.BlankLinesAroundRegion : context.Options.BlankLinesInsideRegion)
 						: 0;
 					// emittedAnything catches what PreviousToken cannot: a comment earlier in this same
@@ -283,7 +296,7 @@ internal static class TokenPrinter
 					var hasRealPredecessor = emittedAnything || (context.PreviousToken.RawKind != 0
 						&& !context.PreviousToken.IsKind(SyntaxKind.OpenBraceToken));
 
-					if (isRegionBoundary && hasRealPredecessor)
+					if (forcesRegionGap && hasRealPredecessor)
 					{
 						arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
 						// A gap the previous region marker's "after" force already settled does not
@@ -334,7 +347,7 @@ internal static class TokenPrinter
 					// than emitted outright: the next thing along consumes it (and, for another region
 					// marker immediately following, only tops it up to the larger of the two — see
 					// forcedGapPending above) instead of also adding its own gap on top.
-					if (isRegionBoundary)
+					if (forcesRegionGap)
 					{
 						forcedGapPending = trivia.IsKind(SyntaxKind.RegionDirectiveTrivia)
 							? context.Options.BlankLinesInsideRegion
@@ -541,14 +554,17 @@ internal static class TokenPrinter
 	/// <summary>
 	/// Emits a multi-line run verbatim, keeping its own line structure and its own indentation.
 	/// </summary>
-	private static void EmitVerbatimBlock(SyntaxTrivia trivia, PrintContext context)
+	/// <returns>The number of line endings trimmed off the end of the run.</returns>
+	private static int EmitVerbatimBlock(SyntaxTrivia trivia, PrintContext context)
 	{
 		var span = trivia.FullSpan;
 		var length = TrimTrailingNewLines(context, span.Start, span.Length);
+		var trimmedNewLines = CountNewLines(context, span.Start + Math.Max(length, 0), span.Length - Math.Max(length, 0));
 		if (length <= 0)
-			return;
+			return trimmedNewLines;
 
 		EmitVerbatimRange(context, span.Start, length);
+		return trimmedNewLines;
 	}
 
 	/// <summary>

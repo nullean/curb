@@ -202,4 +202,46 @@ public class RegionTests : FormattingTest
 
 		#endregion
 		""");
+
+	[Test]
+	public Task Region_inside_a_false_conditional_branch_is_left_as_written() => Unchanged(
+		// Roslyn still lexes an inactive #region as a directive, but the code around it is disabled
+		// text printed verbatim, blank lines included. Forcing csharp_blank_lines_inside_region on top
+		// of those added one more blank line on every run, so the file never settled.
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		#if NOT_DEFINED
+		        var first = 0;
+
+		        #region Hidden
+
+		        // var second = 1;
+
+		        #endregion
+
+		        var third = 2;
+		#endif
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Region_inside_a_false_conditional_branch_is_not_given_gaps() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		#if NOT_DEFINED
+		        var first = 0;
+		        #region Hidden
+		        var second = 1;
+		        #endregion
+		#endif
+		    }
+		}
+		""");
 }

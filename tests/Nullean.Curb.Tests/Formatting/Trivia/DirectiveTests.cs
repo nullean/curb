@@ -265,4 +265,23 @@ public class DirectiveTests : FormattingTest
 		    public int Value;
 		}
 		""");
+
+	[Test]
+	public Task Blank_line_closing_a_false_branch_is_kept() => Unchanged(
+		// Disabled text is emitted with its trailing line endings trimmed, and the blank line they
+		// carried used to be dropped in front of the directive that follows.
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		#if NOT_DEFINED
+		        var value = 0;
+
+		#else
+		        var value = 1;
+		#endif
+		    }
+		}
+		""");
 }
