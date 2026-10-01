@@ -436,6 +436,20 @@ internal static partial class Printers
 						InsideBrace(node.Expressions[^1].Span.End, node.CloseBraceToken.SpanStart);
 				}
 			}
+			else if (TokenPrinter.HasLeadingContent(node.CloseBraceToken))
+			{
+				// `{ // X = x }` — no members, but comments above the closing brace. They are its leading
+				// trivia, which PrintWithoutLeadingTrivia below skips, so the `{ }` shape dropped them and
+				// the verifier refused the file. Printed at the members' level, as the non-empty case does.
+				using (arena.Indent())
+				{
+					arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
+					TokenPrinter.PrintLeadingTrivia(node.CloseBraceToken, context, trailingBreak: false);
+				}
+
+				using (arena.IndentIf(context.Options.IndentBraces))
+					arena.HardLine(DocFlags.Reindent);
+			}
 			else
 			{
 				// `{ }` — nothing to break around, so the brace pair just gets air between it.

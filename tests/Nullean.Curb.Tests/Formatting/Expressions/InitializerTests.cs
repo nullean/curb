@@ -545,4 +545,64 @@ public class InitializerTests : FormattingTest
 		    }
 		}
 		""");
+
+	// ---- comment-only initializers -----------------------------------------------------------
+
+	[Test]
+	public Task Object_initializer_holding_only_comments_keeps_them() => Unchanged(
+		// The comments are the closing brace's leading trivia. The empty `{ }` shape skipped it, so
+		// they were dropped and the verifier refused the file rather than format it.
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        var args = new Args
+		        {
+		            // TenantId = tenantId,
+		            // UserId = userId
+		        };
+		        Enqueue(args);
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Array_initializer_holding_only_a_block_comment_keeps_it() => Unchanged(
+		"""
+		public class C
+		{
+		    private int[] _values = new int[]
+		    {
+		        /* none yet */
+		    };
+		}
+		""");
+
+	[Test]
+	public Task Comment_only_initializer_is_reindented_to_member_level() => Formats(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        var args = new Args
+		        {
+		  // TenantId = tenantId
+		        };
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        var args = new Args
+		        {
+		            // TenantId = tenantId
+		        };
+		    }
+		}
+		""");
 }
