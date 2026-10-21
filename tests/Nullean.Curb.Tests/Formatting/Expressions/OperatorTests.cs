@@ -390,6 +390,165 @@ public class OperatorTests : FormattingTest
 		"public class C\n{\n\tpublic bool M(bool a, bool b)\n\t{\n\t\treturn a\n\t\t\t// why\n\t\t\t&& b;\n\t}\n}",
 		editorConfig: "indent_style = tab");
 
+	// The right operand's own lines sit as far in from its continuation line as they would from the
+	// indent. They fell back to the statement's column instead, four columns left of the `??` above.
+	[Test]
+	public Task Broken_chain_operand_keeps_its_own_lines_under_its_continuation() => Formats(
+		"""
+		public class C
+		{
+		    public Foo M(Foo a, bool b)
+		    {
+		        var q = a
+		            ?? new Foo
+		            {
+		                X = 1
+		            };
+		        var r = a
+		            ?? Make(
+		                1);
+		        var s = a ??
+		            Make(
+		                1,
+		                2);
+		        return b
+		            || new Foo
+		            {
+		                X = 1
+		            }.Ok;
+		    }
+
+		    public bool Lambda(Foo a, bool b)
+		    {
+		            return b
+		                || Run(() =>
+		                {
+		                    Go();
+		                });
+		    }
+
+		    public bool Nested(bool a, bool b, bool c)
+		    {
+		        return a
+		            && (b
+		                || Make(
+		                    c));
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public Foo M(Foo a, bool b)
+		    {
+		        var q = a
+		            ?? new Foo
+		            {
+		                X = 1
+		            };
+		        var r = a
+		            ?? Make(
+		                1);
+		        var s = a ??
+		            Make(
+		                1,
+		                2);
+		        return b
+		            || new Foo
+		            {
+		                X = 1
+		            }.Ok;
+		    }
+
+		    public bool Lambda(Foo a, bool b)
+		    {
+		        return b
+		            || Run(() =>
+		            {
+		                Go();
+		            });
+		    }
+
+		    public bool Nested(bool a, bool b, bool c)
+		    {
+		        return a
+		            && (b
+		                || Make(
+		                    c));
+		    }
+		}
+		""");
+
+	// Tabs as far as they reach, then spaces, on the operand's lines as on its continuation line.
+	[Test]
+	public Task Broken_chain_operand_keeps_its_own_lines_under_its_continuation_under_tabs() => Formats(
+		"public class C\n{\n\tpublic Foo M(Foo a)\n\t{\n\t\t\tvar q = a\n\t\t\t      ?? new Foo\n\t\t\t      {\n\t\t\t          X = 1\n\t\t\t      };\n\t\treturn q;\n\t}\n}",
+		"public class C\n{\n\tpublic Foo M(Foo a)\n\t{\n\t\tvar q = a\n\t\t\t  ?? new Foo\n\t\t\t  {\n\t\t\t\t  X = 1\n\t\t\t  };\n\t\treturn q;\n\t}\n}",
+		editorConfig: "indent_style = tab");
+
+	// A case label is not a statement: dotnet format moves a broken `when` chain's continuation lines
+	// as far as the line `switch` starts on moved, not as far as the label moved.
+	[Test]
+	public Task Broken_chain_in_a_case_label_measures_from_the_switch() => Formats(
+		"""
+		public class C
+		{
+		    public bool LabelMoved(object o, bool a, bool b)
+		    {
+		        switch (o)
+		        {
+		                case Foo f when a &&
+		                                b:
+		                    return true;
+		                case Foo g when a
+		                    && b:
+		                    return true;
+		        }
+		        return false;
+		    }
+
+		    public bool SwitchMoved(object o, bool a, bool b)
+		    {
+		            switch (o)
+		            {
+		                case Foo f when a &&
+		                                b:
+		                    return true;
+		            }
+		        return false;
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public bool LabelMoved(object o, bool a, bool b)
+		    {
+		        switch (o)
+		        {
+		            case Foo f when a &&
+		                                b:
+		                return true;
+		            case Foo g when a
+		                    && b:
+		                return true;
+		        }
+		        return false;
+		    }
+
+		    public bool SwitchMoved(object o, bool a, bool b)
+		    {
+		        switch (o)
+		        {
+		            case Foo f when a &&
+		                            b:
+		                return true;
+		        }
+		        return false;
+		    }
+		}
+		""");
+
 	[Test]
 	public Task Is_and_as_operators() => Unchanged(
 		"""

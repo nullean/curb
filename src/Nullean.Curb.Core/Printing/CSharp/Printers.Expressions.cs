@@ -128,50 +128,69 @@ internal static partial class Printers
 		// captured there — in a register of this chain's own, since an operand may hold a chain of
 		// its own that captures another before this one's continuation lines read theirs. Where Curb
 		// moves the first operand onto a line of its own there is nothing to measure from, and the
-		// continuation lines break to the ambient indent instead.
-		var anchor = breakBefore || breakAfter ? context.EnterContinuation() : -1;
-		if (anchor >= 0)
-			context.Arena.LineShiftAnchor(anchor);
+		// continuation lines break to the ambient indent instead. A chain in a case label measures
+		// from the switch, which captured its register already — see CaseLabelContinuation.
+		var anchor = -1;
+		if (breakBefore || breakAfter)
+		{
+			anchor = context.CaseLabelContinuation;
+			if (anchor < 0)
+			{
+				anchor = context.EnterContinuation();
+				context.Arena.LineShiftAnchor(anchor);
+			}
+		}
 
 		Node.Print(node.Left, context);
 
 		// A trailing `// note` on the left operand has already ended its own line; the aligned line
 		// reuses it rather than making a blank one, which then moved the comment run below it out of
 		// reach of the align-under-a-trailing-comment rule on the next run.
+		var offset = 0;
 		if (breakBefore)
-			ContinuationLine(node.OperatorToken, anchor, context);
+			offset = ContinuationLine(node.OperatorToken, anchor, context);
 		else
 			Spacing.BeforeOperator(context);
 
 		TokenPrinter.Print(node.OperatorToken, context);
 
+		// The right operand's own lines — an initializer's braces, a call's arguments, a lambda's
+		// block — sit as far in from its continuation line as they would from the indent. Printed
+		// at the indent itself, they fell back to the left of the line they belong to.
 		if (breakAfter)
 		{
-			ContinuationLine(node.Right.GetFirstToken(), anchor, context);
-			Node.Print(node.Right, context);
+			offset = ContinuationLine(node.Right.GetFirstToken(), anchor, context);
+			using (context.Arena.AlignedIndent(anchor, offset))
+				Node.Print(node.Right, context);
+		}
+		else if (breakBefore)
+		{
+			using (context.Arena.AlignedIndent(anchor, offset))
+				OperandOnRight(node.Right, context, node.OperatorToken.Span.End, alreadyIndented);
 		}
 		else
 			OperandOnRight(node.Right, context, node.OperatorToken.Span.End, alreadyIndented);
 
-		if (anchor >= 0)
+		if (anchor >= 0 && anchor != context.CaseLabelContinuation)
 			context.ExitContinuation();
 	}
 
 	/// <summary>
 	/// Breaks before <paramref name="next"/>, moving it as far as the line the expression starts on
-	/// moved.
+	/// moved, and returns the offset the break reads <paramref name="anchor"/> with.
 	/// </summary>
 	/// <remarks>
 	/// A comment ahead of <paramref name="next"/> goes on the same column, as dotnet format puts it,
 	/// rather than at the ambient indent with the operand stranded to its right (issue #115). A
 	/// conditional-compilation directive still goes to column 0.
 	/// </remarks>
-	private static void ContinuationLine(SyntaxToken next, int anchor, PrintContext context)
+	private static int ContinuationLine(SyntaxToken next, int anchor, PrintContext context)
 	{
 		var offset = context.SourceIndent(next.SpanStart);
 		context.Arena.AlignedLine(anchor, offset);
 		if (TokenPrinter.HasLeadingContent(next))
 			context.AlignLeadingTrivia(next, anchor, offset);
+		return offset;
 	}
 
 	public static void AssignmentExpression(AssignmentExpressionSyntax node, PrintContext context)
