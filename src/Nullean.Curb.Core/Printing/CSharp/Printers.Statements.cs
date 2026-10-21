@@ -682,10 +682,7 @@ internal static partial class Printers
 	{
 		TokenPrinter.Print(node.ThrowKeyword, context);
 		if (node.Expression is not null)
-		{
-			context.Arena.Synthetic(SyntheticText.Space);
-			Node.Print(node.Expression, context);
-		}
+			ValueAfterKeyword(node.ThrowKeyword, node.Expression, context);
 		TokenPrinter.Print(node.SemicolonToken, context);
 	}
 
@@ -695,11 +692,42 @@ internal static partial class Printers
 		context.Arena.Synthetic(SyntheticText.Space);
 		TokenPrinter.Print(node.ReturnOrBreakKeyword, context);
 		if (node.Expression is not null)
+			ValueAfterKeyword(node.ReturnOrBreakKeyword, node.Expression, context);
+		TokenPrinter.Print(node.SemicolonToken, context);
+	}
+
+	/// <summary>
+	/// Prints the value a <c>return</c>, <c>throw</c> or <c>yield return</c> introduces: after a space,
+	/// or on the line below where the author put it there.
+	/// </summary>
+	/// <remarks>
+	/// A value below the keyword moves as far as the keyword's line moved, which is where dotnet format
+	/// leaves it, at whatever column the author chose. Joining it back onto the keyword lengthened the
+	/// line, and the continuation lines of a chain it started kept a column measured from a line that
+	/// was no longer there (issue #117). A comment ahead of the value goes on the value's column.
+	/// The value prints one level in, so a construct inside it that indents from the ambient level, a
+	/// call's arguments or an initializer's braces, stays where dotnet format leaves it too.
+	/// </remarks>
+	private static void ValueAfterKeyword(SyntaxToken keyword, ExpressionSyntax value, PrintContext context)
+	{
+		if (!context.AuthorBroke(keyword.Span.End, value.SpanStart))
 		{
 			context.Arena.Synthetic(SyntheticText.Space);
-			Node.Print(node.Expression, context);
+			Node.Print(value, context);
+			return;
 		}
-		TokenPrinter.Print(node.SemicolonToken, context);
+
+		// The keyword's line is already open, so the anchor measures it now. A keyword that sat
+		// mid-line in the source measures as unmoved, and the value keeps its source column.
+		var anchor = context.EnterContinuation();
+		context.Arena.LineShiftAnchor(anchor);
+		using (context.Arena.Indent())
+		{
+			ContinuationLine(value.GetFirstToken(), anchor, context);
+			Node.Print(value, context);
+		}
+
+		context.ExitContinuation();
 	}
 
 	/// <summary>Covers <c>break;</c>, <c>continue;</c> and the empty statement.</summary>

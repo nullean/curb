@@ -897,10 +897,7 @@ internal static partial class Printers
 	{
 		TokenPrinter.Print(node.ReturnKeyword, context);
 		if (node.Expression is not null)
-		{
-			context.Arena.Synthetic(SyntheticText.Space);
-			Node.Print(node.Expression, context);
-		}
+			ValueAfterKeyword(node.ReturnKeyword, node.Expression, context);
 		TokenPrinter.Print(node.SemicolonToken, context);
 	}
 
