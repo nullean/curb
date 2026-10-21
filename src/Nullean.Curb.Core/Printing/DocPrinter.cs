@@ -20,11 +20,14 @@ namespace Nullean.Curb.Printing;
 /// </remarks>
 internal sealed class DocPrinter
 {
-	private readonly struct Scope(int end, int indent, PrintMode mode, int resume, bool suppressWidth)
+	private readonly struct Scope(int end, int indent, PrintMode mode, int resume, bool suppressWidth, int align)
 	{
 		public readonly int End = end;
 		public readonly int Indent = indent;
 		public readonly PrintMode Mode = mode;
+
+		/// <summary>Columns on top of <see cref="Indent"/>'s levels, set by an aligned indent; may be negative.</summary>
+		public readonly int Align = align;
 
 		/// <summary>Where to continue once this scope closes, or -1 to just carry on.</summary>
 		public readonly int Resume = resume;
@@ -50,7 +53,19 @@ internal sealed class DocPrinter
 	private bool _trimTrailingWhitespace;
 
 	/// <summary>Columns captured by <see cref="DocKind.Anchor"/>, read back by an aligned break.</summary>
-	private readonly int[] _anchors = new int[4];
+	private int[] _anchors = new int[8];
+
+	/// <summary>
+	/// Line-shift registers anchored before the current line had any text, waiting for its first.
+	/// </summary>
+	private int[] _pendingAnchors = new int[8];
+	private int _pendingAnchorCount;
+
+	/// <summary>Whether the current line has had any text written to it.</summary>
+	private bool _lineOpen;
+
+	/// <summary>Where in the source the current line's first text came from, or -1 if it was synthetic.</summary>
+	private int _lineSource;
 
 	// --- round-trip risk tracking ------------------------------------------------------------
 	private int _lastSourceEnd;
@@ -84,12 +99,14 @@ internal sealed class DocPrinter
 		_depth = 0;
 		_lastSourceEnd = -1;
 		_insideLineComment = false;
+		_lineOpen = false;
+		_pendingAnchorCount = 0;
 		RoundTripAtRisk = false;
 
 		_breaks.Run(arena);
 		EnsureGroupModes(arena.Count);
 
-		RunSegment(0, arena.Count, 0, PrintMode.Break, false);
+		RunSegment(0, arena.Count, 0, 0, PrintMode.Break, false);
 
 		// insert_final_newline terminates the last line; a file with no lines has nothing to
 		// terminate, so an empty result stays empty rather than becoming a lone newline.
@@ -111,10 +128,10 @@ internal sealed class DocPrinter
 	/// stack is for, and <paramref name="start"/>/<paramref name="end"/> bound each call to its own
 	/// slice of the arena regardless of how deep it is nested.
 	/// </remarks>
-	private void RunSegment(int start, int end, int indent, PrintMode mode, bool suppressWidth)
+	private void RunSegment(int start, int end, int indent, int align, PrintMode mode, bool suppressWidth)
 	{
 		var baseDepth = _depth;
-		Push(new Scope(end, indent, mode, -1, suppressWidth));
+		Push(new Scope(end, indent, mode, -1, suppressWidth, align));
 
 		var i = start;
 		while (i < end)
@@ -146,6 +163,8 @@ internal sealed class DocPrinter
 				case DocKind.SrcText:
 					{
 						var text = _source.Span.Slice(doc.A, doc.B);
+						if (!_lineOpen)
+							OpenLine(text, doc.A);
 						TrackRoundTripRisk(doc, text);
 						Emit(text, doc.Flags, scope.SuppressWidth);
 						_lastSourceEnd = doc.A + doc.B;
@@ -154,17 +173,35 @@ internal sealed class DocPrinter
 					}
 
 				case DocKind.SynText:
+					if (!_lineOpen)
+						OpenLine(SyntheticText.Get(doc.A), -1);
 					Emit(SyntheticText.Get(doc.A), doc.Flags, scope.SuppressWidth);
 					i++;
 					break;
 
 				case DocKind.ExternalText:
+					if (!_lineOpen)
+						OpenLine(_arena.ExternalTexts[doc.A], -1);
 					Emit(_arena.ExternalTexts[doc.A], doc.Flags, scope.SuppressWidth);
 					i++;
 					break;
 
 				case DocKind.Anchor:
-					_anchors[doc.A] = _column;
+					if (doc.A >= _anchors.Length)
+						Array.Resize(ref _anchors, Math.Max(doc.A + 1, _anchors.Length * 2));
+					if (doc.B == Doc.AnchorAtColumn)
+						_anchors[doc.A] = _column;
+					else if (_lineOpen)
+						_anchors[doc.A] = LineShift(anchoredAtLineStart: false);
+					else
+					{
+						// Nothing on the line yet says which source line it is; the first text will.
+						_anchors[doc.A] = Doc.AnchorUnset;
+						if (_pendingAnchorCount == _pendingAnchors.Length)
+							Array.Resize(ref _pendingAnchors, _pendingAnchors.Length * 2);
+						_pendingAnchors[_pendingAnchorCount++] = doc.A;
+					}
+
 					i++;
 					break;
 
@@ -185,24 +222,44 @@ internal sealed class DocPrinter
 						// is the safer of the two answers.
 						if (doc.GroupId != 0 && _groupModes[doc.GroupId] != PrintMode.Break)
 						{
-							Push(new Scope(i + doc.Length, scope.Indent, scope.Mode, -1, scope.SuppressWidth));
+							Push(new Scope(i + doc.Length, scope.Indent, scope.Mode, -1, scope.SuppressWidth, scope.Align));
 							i++;
 							break;
 						}
 
-						var indentLevel = doc.B == Doc.IndentToRoot ? 0 : scope.Indent + doc.B;
-						Push(new Scope(i + doc.Length, Math.Max(0, indentLevel), scope.Mode, -1, scope.SuppressWidth));
+						if (doc.Flags.HasFlag(DocFlags.AlignToAnchor))
+						{
+							// The subtree's lines sit as far in from the column an aligned break with
+							// the same register and offset lands on as they would from the indent:
+							// Prettier's align, with the width only known at print time.
+							var anchor = _anchors[doc.B & ((1 << Doc.AnchorOffsetShift) - 1)];
+							var shift = anchor == Doc.AnchorUnset
+								? scope.Align
+								: Math.Max(0, anchor + (doc.B >> Doc.AnchorOffsetShift)) - _indenter.ColumnsFor(scope.Indent);
+							Push(new Scope(i + doc.Length, scope.Indent, scope.Mode, -1, scope.SuppressWidth, shift));
+							i++;
+							break;
+						}
+
+						if (doc.B == Doc.IndentToRoot)
+						{
+							Push(new Scope(i + doc.Length, 0, scope.Mode, -1, scope.SuppressWidth, 0));
+							i++;
+							break;
+						}
+
+						Push(new Scope(i + doc.Length, Math.Max(0, scope.Indent + doc.B), scope.Mode, -1, scope.SuppressWidth, scope.Align));
 						i++;
 						break;
 					}
 
 				case DocKind.ForceFlat:
-					Push(new Scope(i + doc.Length, scope.Indent, PrintMode.ForceFlat, -1, scope.SuppressWidth));
+					Push(new Scope(i + doc.Length, scope.Indent, PrintMode.ForceFlat, -1, scope.SuppressWidth, scope.Align));
 					i++;
 					break;
 
 				case DocKind.AlwaysFits:
-					Push(new Scope(i + doc.Length, scope.Indent, scope.Mode, -1, true));
+					Push(new Scope(i + doc.Length, scope.Indent, scope.Mode, -1, true, scope.Align));
 					i++;
 					break;
 
@@ -211,7 +268,7 @@ internal sealed class DocPrinter
 						var groupMode = ResolveGroupMode(i, doc, scope);
 						if (doc.GroupId != 0)
 							_groupModes[doc.GroupId] = groupMode;
-						Push(new Scope(i + doc.Length, scope.Indent, groupMode, -1, scope.SuppressWidth));
+						Push(new Scope(i + doc.Length, scope.Indent, groupMode, -1, scope.SuppressWidth, scope.Align));
 						i++;
 						break;
 					}
@@ -223,7 +280,7 @@ internal sealed class DocPrinter
 						if (doc.GroupId != 0)
 							_groupModes[doc.GroupId] = conditionalMode;
 
-						Push(new Scope(chosen + _arena[chosen].Length, scope.Indent, conditionalMode, i + doc.Length, scope.SuppressWidth));
+						Push(new Scope(chosen + _arena[chosen].Length, scope.Indent, conditionalMode, i + doc.Length, scope.SuppressWidth, scope.Align));
 						i = chosen;
 						break;
 					}
@@ -238,7 +295,7 @@ internal sealed class DocPrinter
 						var breakStart = flatStart + doc.A;
 						var chosen = targetBroken ? breakStart : flatStart;
 
-						Push(new Scope(chosen + _arena[chosen].Length, scope.Indent, scope.Mode, i + doc.Length, scope.SuppressWidth));
+						Push(new Scope(chosen + _arena[chosen].Length, scope.Indent, scope.Mode, i + doc.Length, scope.SuppressWidth, scope.Align));
 						i = chosen;
 						break;
 					}
@@ -298,13 +355,13 @@ internal sealed class DocPrinter
 		{
 			if (scope.Mode is PrintMode.Flat or PrintMode.ForceFlat)
 			{
-				RunSegment(index + 1, end, scope.Indent, scope.Mode, scope.SuppressWidth);
+				RunSegment(index + 1, end, scope.Indent, scope.Align, scope.Mode, scope.SuppressWidth);
 				return;
 			}
 
 			if (_width == FormatOptions.Off)
 			{
-				RunSegment(index + 1, end, scope.Indent, PrintMode.Flat, scope.SuppressWidth);
+				RunSegment(index + 1, end, scope.Indent, scope.Align, PrintMode.Flat, scope.SuppressWidth);
 				return;
 			}
 		}
@@ -321,7 +378,7 @@ internal sealed class DocPrinter
 				var lastMode = !_breaks.HasHardBreak(itemStart, itemEnd) && Fits(itemStart, itemEnd, scope)
 					? PrintMode.Flat
 					: PrintMode.Break;
-				RunSegment(itemStart, itemEnd, scope.Indent, lastMode, scope.SuppressWidth);
+				RunSegment(itemStart, itemEnd, scope.Indent, scope.Align, lastMode, scope.SuppressWidth);
 				break;
 			}
 
@@ -334,8 +391,8 @@ internal sealed class DocPrinter
 			var itemMode = pairFits || itemFitsAlone ? PrintMode.Flat : PrintMode.Break;
 			var sepMode = pairFits ? PrintMode.Flat : PrintMode.Break;
 
-			RunSegment(itemStart, itemEnd, scope.Indent, itemMode, scope.SuppressWidth);
-			RunSegment(sepStart, sepEnd, scope.Indent, sepMode, scope.SuppressWidth);
+			RunSegment(itemStart, itemEnd, scope.Indent, scope.Align, itemMode, scope.SuppressWidth);
+			RunSegment(sepStart, sepEnd, scope.Indent, scope.Align, sepMode, scope.SuppressWidth);
 
 			// To the item just printed, past its own separator — not past the next item too, which
 			// this iteration only measured as pairFits's lookahead and never actually printed.
@@ -370,6 +427,7 @@ internal sealed class DocPrinter
 			});
 			_column = 0;
 			_insideLineComment = false;
+			_lineOpen = false;
 			return;
 		}
 
@@ -394,9 +452,9 @@ internal sealed class DocPrinter
 			_output.TrimTrailingWhitespace();
 			if (!_output.AtLineStart())
 				_output.Append(_endOfLine);
-			_output.Append(_indenter.For(scope.Indent));
-			_column = _indenter.ColumnsFor(scope.Indent);
+			WriteIndent(scope);
 			_insideLineComment = false;
+			_lineOpen = false;
 			return;
 		}
 
@@ -408,30 +466,111 @@ internal sealed class DocPrinter
 			if (!_output.AtLineStart())
 				_output.Append(_endOfLine);
 
-			// Tabs as far as they reach, then spaces for the remainder — what dotnet format writes,
-			// and the only way to land on a column no tab stop falls on while still honouring
-			// indent_style. Under `indent_style = space` the loop simply never fires.
-			var target = Math.Max(0, _anchors[doc.B]);
-			var at = 0;
-
-			while (_useTabs && at + _tabWidth <= target)
-			{
-				_output.Append('\t');
-				at += _tabWidth;
-			}
-
-			for (; at < target; at++)
-				_output.Append(' ');
-
-			_column = target;
+			var anchor = _anchors[doc.B & ((1 << Doc.AnchorOffsetShift) - 1)];
 			_insideLineComment = false;
+			_lineOpen = false;
+			if (anchor == Doc.AnchorUnset)
+				WriteIndent(scope);
+			else
+				WriteColumns(Math.Max(0, anchor + (doc.B >> Doc.AnchorOffsetShift)));
 			return;
 		}
 
 		_output.Append(_endOfLine);
-		_output.Append(_indenter.For(scope.Indent));
-		_column = _indenter.ColumnsFor(scope.Indent);
+		WriteIndent(scope);
 		_insideLineComment = false;
+		_lineOpen = false;
+	}
+
+	/// <summary>Writes the indentation <paramref name="scope"/> asks for at the start of a line.</summary>
+	private void WriteIndent(in Scope scope)
+	{
+		if (scope.Align == 0)
+		{
+			_output.Append(_indenter.For(scope.Indent));
+			_column = _indenter.ColumnsFor(scope.Indent);
+		}
+		else
+			WriteColumns(Math.Max(0, _indenter.ColumnsFor(scope.Indent) + scope.Align));
+	}
+
+	/// <summary>Writes whitespace out to column <paramref name="target"/> at the start of a line.</summary>
+	/// <remarks>
+	/// Tabs as far as they reach, then spaces for the remainder — what dotnet format writes, and the
+	/// only way to land on a column no tab stop falls on while still honouring indent_style. Under
+	/// <c>indent_style = space</c> the loop simply never fires.
+	/// </remarks>
+	private void WriteColumns(int target)
+	{
+		var at = 0;
+		while (_useTabs && at + _tabWidth <= target)
+		{
+			_output.Append('\t');
+			at += _tabWidth;
+		}
+
+		for (; at < target; at++)
+			_output.Append(' ');
+
+		_column = target;
+	}
+
+	/// <summary>
+	/// Notes where the current line's first text came from, and settles the line-shift anchors that
+	/// were waiting for it.
+	/// </summary>
+	/// <remarks>Whitespace does not open the line; it is not what the line starts with.</remarks>
+	private void OpenLine(ReadOnlySpan<char> text, int sourceStart)
+	{
+		var leading = 0;
+		while (leading < text.Length && text[leading] is ' ' or '\t')
+			leading++;
+
+		if (leading == text.Length)
+			return;
+
+		_lineOpen = true;
+		_lineSource = sourceStart < 0 ? -1 : sourceStart + leading;
+
+		for (var i = 0; i < _pendingAnchorCount; i++)
+			_anchors[_pendingAnchors[i]] = LineShift(anchoredAtLineStart: true);
+		_pendingAnchorCount = 0;
+	}
+
+	/// <summary>
+	/// How far the current line has moved from its source line, in columns — see
+	/// <see cref="Doc.AnchorAtLineShift"/>.
+	/// </summary>
+	/// <param name="anchoredAtLineStart">
+	/// The anchored construct opened this line itself. If it did not open its source line too, Curb
+	/// moved it here, and its continuation lines have nothing to keep their offset from.
+	/// </param>
+	private int LineShift(bool anchoredAtLineStart)
+	{
+		if (_lineSource < 0)
+			return Doc.AnchorUnset;
+
+		var source = _source.Span;
+		var lineStart = _lineSource;
+		while (lineStart > 0 && source[lineStart - 1] is ' ' or '\t')
+			lineStart--;
+
+		// Broken before mid-line, by Curb or by dotnet format alike: dotnet format leaves the lines
+		// after it at their source columns.
+		if (lineStart > 0 && source[lineStart - 1] != '\n')
+			return anchoredAtLineStart ? Doc.AnchorUnset : 0;
+
+		return IndentWidth(_output.Written[(_output.Written.LastIndexOf('\n') + 1)..]) - IndentWidth(source[lineStart.._lineSource]);
+	}
+
+	/// <summary>The width, in columns, of the spaces and tabs <paramref name="line"/> starts with.</summary>
+	private int IndentWidth(ReadOnlySpan<char> line)
+	{
+		var columns = 0;
+		for (var i = 0; i < line.Length && line[i] is ' ' or '\t'; i++)
+			columns = line[i] == '\t' ? columns - (columns % _tabWidth) + _tabWidth : columns + 1;
+
+		return columns;
 	}
 
 	/// <summary>
