@@ -2144,14 +2144,22 @@ internal static partial class Printers
 			// compensating. That is stable and it is the conservative direction; whether it is also
 			// right is a corpus question, not one to guess at here.
 			//
-			// A ternary the author broke anchors the same way: its `?` and `:` lines indent once from
-			// the line it starts on, not twice — issue #102. Only on the `(` line, though: one sharing
-			// a later line with another argument is already at the list's depth.
+			// Any argument that indents its own continuation lines anchors the same way: a nested call,
+			// a member chain, a lambda or a broken ternary continues one level in from the line it
+			// starts on, not one level in from the list — issues #102 and #108. Only on the `(` line,
+			// though: one starting on a later line is already at the list's depth. An attribute's
+			// arguments anchor exactly as an invocation's do.
 			var previousEnd = i == 0 ? anchorEnd : list[i - 1].Span.End;
-			var ownBlock = list[i] is ArgumentSyntax { Expression: var value }
-				&& (value is ConditionalExpressionSyntax
-					? anchorEnd >= 0 && context.AuthorJoined(anchorEnd, list[i].SpanStart)
-					: EndsWithOwnBlock(value) && previousEnd >= 0 && context.AuthorJoined(previousEnd, list[i].SpanStart));
+			var value = list[i] switch
+			{
+				ArgumentSyntax argument => argument.Expression,
+				AttributeArgumentSyntax argument => argument.Expression,
+				_ => null,
+			};
+			var ownBlock = value is not null
+				&& (EndsWithOwnBlock(value)
+					? previousEnd >= 0 && context.AuthorJoined(previousEnd, list[i].SpanStart)
+					: IndentsOwnContinuation(value) && anchorEnd >= 0 && context.AuthorJoined(anchorEnd, list[i].SpanStart));
 
 			using (arena.IndentIf(ownBlock, -1))
 				Node.Print(list[i], context);
@@ -2726,6 +2734,34 @@ internal static partial class Printers
 				EndsWithBlockBodiedCallback(lambda),
 
 			_ => BringsOwnBlock(expression),
+		};
+
+	/// <summary>
+	/// True for an argument whose own layout indents its continuation lines a level in from where it
+	/// starts: a call or creation through its argument list, a member chain at its dots, a ternary at
+	/// its <c>?</c> and <c>:</c>, and a lambda through its body.
+	/// </summary>
+	/// <remarks>
+	/// A binary expression is the exception that keeps this a list rather than "anything": its
+	/// operands continue at the level it is printed at, so inside an argument list they already sit
+	/// one level in, and taking the list's level back off would put <c>Foo(a &amp;&amp;</c> /
+	/// <c>b)</c> at the statement's own indent.
+	/// </remarks>
+	private static bool IndentsOwnContinuation(ExpressionSyntax expression) =>
+		expression switch
+		{
+			InvocationExpressionSyntax
+				or ObjectCreationExpressionSyntax
+				or ImplicitObjectCreationExpressionSyntax
+				or MemberAccessExpressionSyntax
+				or ElementAccessExpressionSyntax
+				or ConditionalAccessExpressionSyntax
+				or ConditionalExpressionSyntax => true,
+			AnonymousFunctionExpressionSyntax { ExpressionBody: not null } => true,
+			AwaitExpressionSyntax awaitExpression => IndentsOwnContinuation(awaitExpression.Expression),
+			PrefixUnaryExpressionSyntax prefix => IndentsOwnContinuation(prefix.Operand),
+			CastExpressionSyntax cast => IndentsOwnContinuation(cast.Expression),
+			_ => false,
 		};
 
 	private static bool LastArgumentEndsWithOwnBlock(BaseArgumentListSyntax? arguments) =>

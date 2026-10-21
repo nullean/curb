@@ -193,23 +193,45 @@ internal static partial class Printers
 		//
 		// One that spans lines only inside a branch, such as a block-bodied lambda, keeps its operators
 		// inline and takes no indent: the block anchors to its line, as dotnet format leaves it.
+		//
+		// A block-bodied lambda that opens out as the true branch ends its own line: dotnet format puts
+		// the `:` after its closing brace on a new line at the indent the ternary started from, wherever
+		// the author had it — issue #106. That break is not the author's, so it neither indents the
+		// ternary nor moves the block a level right of the line the lambda starts on.
 		if (SpansLines(node, context))
 		{
+			var colonAfterBlock = OpensOutBlock(node.WhenTrue, context);
 			var broken = context.AuthorBroke(node.Condition.Span.End, node.QuestionToken.SpanStart)
 				|| context.AuthorBroke(node.QuestionToken.Span.End, node.WhenTrue.SpanStart)
-				|| context.AuthorBroke(node.WhenTrue.Span.End, node.ColonToken.SpanStart)
+				|| (!colonAfterBlock && context.AuthorBroke(node.WhenTrue.Span.End, node.ColonToken.SpanStart))
 				|| context.AuthorBroke(node.ColonToken.Span.End, node.WhenFalse.SpanStart);
+			var indented = broken && !alreadyIndented;
 
-			using (arena.IndentIf(broken && !alreadyIndented))
+			using (arena.IndentIf(indented))
 			{
 				AuthorTernaryBreak(node.Condition.Span.End, node.QuestionToken.SpanStart, spaced, context);
 				TokenPrinter.Print(node.QuestionToken, context);
 				AuthorTernaryBreak(node.QuestionToken.Span.End, node.WhenTrue.SpanStart, spaced, context);
 				Node.Print(node.WhenTrue, context);
-				AuthorTernaryBreak(node.WhenTrue.Span.End, node.ColonToken.SpanStart, spaced, context);
+
+				if (!colonAfterBlock)
+				{
+					AuthorTernaryBreak(node.WhenTrue.Span.End, node.ColonToken.SpanStart, spaced, context);
+					TokenPrinter.Print(node.ColonToken, context);
+					AuthorTernaryBreak(node.ColonToken.Span.End, node.WhenFalse.SpanStart, spaced, context);
+					Node.Print(node.WhenFalse, context);
+				}
+			}
+
+			if (colonAfterBlock)
+			{
+				arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
 				TokenPrinter.Print(node.ColonToken, context);
-				AuthorTernaryBreak(node.ColonToken.Span.End, node.WhenFalse.SpanStart, spaced, context);
-				Node.Print(node.WhenFalse, context);
+				using (arena.IndentIf(indented && context.AuthorBroke(node.ColonToken.Span.End, node.WhenFalse.SpanStart)))
+				{
+					AuthorTernaryBreak(node.ColonToken.Span.End, node.WhenFalse.SpanStart, spaced, context);
+					Node.Print(node.WhenFalse, context);
+				}
 			}
 			return;
 		}
@@ -260,6 +282,22 @@ internal static partial class Printers
 
 		return openParen.RawKind != 0 && context.AuthorJoined(openParen.Span.End, node.SpanStart);
 	}
+
+	/// <summary>
+	/// True for a lambda or anonymous method whose block prints opened out, the same question
+	/// <see cref="PrintBody"/> answers when it prints it.
+	/// </summary>
+	/// <remarks>
+	/// A block <c>csharp_place_simple_blocks_on_single_line</c> may collapse answers false: whether it
+	/// does is measured against the width, and a hard break after a block that collapsed would strand
+	/// the <c>:</c> on a line of its own.
+	/// </remarks>
+	private static bool OpensOutBlock(ExpressionSyntax expression, PrintContext context) =>
+		expression is AnonymousFunctionExpressionSyntax { Block: { } block }
+		&& !KeepsOneLine(block, context)
+		&& !CollapsesEmptyBraces(block, context)
+		&& !JoinsEmptyBracesToHeader(block, context)
+		&& !context.Options.CollapsesSimpleBlocks;
 
 	private static void AuthorTernaryBreak(int from, int to, bool spaced, PrintContext context)
 	{
