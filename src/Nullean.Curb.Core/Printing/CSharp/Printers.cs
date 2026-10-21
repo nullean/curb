@@ -939,7 +939,17 @@ internal static partial class Printers
 		// happened to spread over lines drops the group as well as the indent, leaving a long
 		// argument no break opportunity at all — it came back out as one over-long line, which the
 		// next run then broke again.
-		if (node.Arguments.Count == 1 && EndsWithOwnBlock(node.Arguments[0].Expression))
+		//
+		// Both hugging paths print the list's ends joined, so a list the author broke after `(` or
+		// before `)` goes the ordinary way, which keeps those breaks: `Register(` / `() =>` was joined
+		// onto one line (issue #135). A break between two arguments is left to the hugging path, which
+		// keeps one a trailing comment forces at the column the author had; the ordinary path would
+		// move that argument to the list's level.
+		var hugs = node.Arguments.Count > 0
+			&& !context.AuthorBroke(node.OpenParenToken.Span.End, node.Arguments[0].SpanStart)
+			&& !context.AuthorBroke(node.Arguments[^1].Span.End, node.CloseParenToken.SpanStart);
+
+		if (hugs && node.Arguments.Count == 1 && EndsWithOwnBlock(node.Arguments[0].Expression))
 		{
 			Spacing.InsideCallParens(context);
 			context.OwnBlockGroup = 0;
@@ -961,7 +971,7 @@ internal static partial class Printers
 		// EndsWithOwnBlock above: with several arguments already inline, only a genuine block
 		// guarantees a break exists to hug against — a `with` or object initializer tail could still
 		// print flat and would leave the list with no break opportunity of its own.
-		if (node.Arguments.Count > 1 && EndsWithBlockBodiedCallback(node.Arguments[^1].Expression))
+		if (hugs && node.Arguments.Count > 1 && EndsWithBlockBodiedCallback(node.Arguments[^1].Expression))
 		{
 			Spacing.InsideCallParens(context);
 			for (var i = 0; i < node.Arguments.Count - 1; i++)
@@ -1285,6 +1295,26 @@ internal static partial class Printers
 		// by emitting the break from a deeper scope rather than by moving the token afterwards.
 		using (context.Arena.IndentIf(context.Options.IndentBraces))
 			context.Arena.HardLine();
+	}
+
+	/// <summary>
+	/// The source column of a block's opening brace when the author put it on a line of its own and
+	/// <see cref="BeforeOpenBrace"/> will too, or -1.
+	/// </summary>
+	/// <remarks>
+	/// -1 under <c>csharp_indent_braces</c>: that break comes from a level deeper than the block, so a
+	/// column read for the block would land the brace a level right of where the author had it, and
+	/// further right on every run.
+	/// </remarks>
+	internal static int OwnLineBraceColumn(BlockSyntax block, BraceStyle construct, PrintContext context)
+	{
+		if (!context.Options.NewLineBeforeOpenBrace.HasFlag(construct) || context.Options.IndentBraces)
+			return -1;
+
+		var open = block.OpenBraceToken;
+		return context.AuthorBroke(open.GetPreviousToken().Span.End, open.SpanStart)
+			? context.SourceIndent(open.SpanStart)
+			: -1;
 	}
 
 	/// <summary>

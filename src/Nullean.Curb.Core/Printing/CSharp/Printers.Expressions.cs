@@ -279,7 +279,7 @@ internal static partial class Printers
 
 			if (colonAfterBlock)
 			{
-				arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
+				ColonAfterBlockLine(node, context);
 				TokenPrinter.Print(node.ColonToken, context);
 				using (arena.IndentIf(indented && context.AuthorBroke(node.ColonToken.Span.End, node.WhenFalse.SpanStart)))
 				{
@@ -335,6 +335,56 @@ internal static partial class Printers
 		};
 
 		return openParen.RawKind != 0 && context.AuthorJoined(openParen.Span.End, node.SpanStart);
+	}
+
+	/// <summary>
+	/// Breaks before the <c>:</c> that follows a block lambda, to the indent of the line the ternary's
+	/// enclosing statement, lambda, member, switch arm or initializer element starts on.
+	/// </summary>
+	/// <remarks>
+	/// That is where dotnet format puts it, however deep the ternary sits: an argument list adds no
+	/// level of its own, so a ternary on a later argument line still has its <c>:</c> at the
+	/// statement's indent rather than the argument's — issue #134. Where that construct starts
+	/// mid-line there is no such line, and the break goes to the ternary's own indent instead.
+	/// </remarks>
+	private static void ColonAfterBlockLine(ConditionalExpressionSyntax node, PrintContext context)
+	{
+		var start = IndentationContextStart(node);
+		if (start < 0)
+		{
+			context.Arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
+			return;
+		}
+
+		var register = context.EnterContinuation();
+		context.Arena.SourceLineAnchor(register, start);
+		context.Arena.AlignedLine(register);
+		context.ExitContinuation();
+	}
+
+	/// <summary>
+	/// Where the nearest construct that dotnet format indents its own lines from starts: a statement,
+	/// a lambda, a switch expression arm, an initializer or collection element, or a member.
+	/// </summary>
+	private static int IndentationContextStart(SyntaxNode node)
+	{
+		for (var current = node.Parent; current is not null; current = current.Parent)
+		{
+			switch (current)
+			{
+				case StatementSyntax or AnonymousFunctionExpressionSyntax or SwitchExpressionArmSyntax
+					or ExpressionElementSyntax or AnonymousObjectMemberDeclaratorSyntax:
+					return current.SpanStart;
+				case ExpressionSyntax when current.Parent is InitializerExpressionSyntax:
+					return current.SpanStart;
+				case MemberDeclarationSyntax member:
+					return member.AttributeLists.Count == 0
+						? member.SpanStart
+						: member.AttributeLists[^1].GetLastToken().GetNextToken().SpanStart;
+			}
+		}
+
+		return -1;
 	}
 
 	/// <summary>
@@ -795,7 +845,7 @@ internal static partial class Printers
 
 		if (block is not null)
 		{
-			PrintBody(block, BraceStyle.Lambdas, context);
+			PrintAnonymousFunctionBody(block, BraceStyle.Lambdas, context);
 			return;
 		}
 
@@ -894,7 +944,33 @@ internal static partial class Printers
 			Node.Print(node.ParameterList, context);
 		}
 
-		PrintBody(node.Block, BraceStyle.AnonymousMethods, context);
+		PrintAnonymousFunctionBody(node.Block, BraceStyle.AnonymousMethods, context);
+	}
+
+	/// <summary>
+	/// Prints a lambda's or anonymous method's block, keeping a brace the author put on a line of its
+	/// own at the offset they gave it from the line the function starts on.
+	/// </summary>
+	/// <remarks>
+	/// dotnet format leaves such a block where the author put it, one level in, two or flush with the
+	/// line, and moves it as far as that line moves. Curb anchored it to the line's indent and pulled
+	/// it back — issue #135. The block's statements and closing brace follow the opening brace, as they
+	/// would from the indent.
+	/// </remarks>
+	private static void PrintAnonymousFunctionBody(BlockSyntax block, BraceStyle construct, PrintContext context)
+	{
+		var column = OwnLineBraceColumn(block, construct, context);
+		if (column < 0)
+		{
+			PrintBody(block, construct, context);
+			return;
+		}
+
+		var register = context.EnterContinuation();
+		context.Arena.LineShiftAnchor(register);
+		using (context.Arena.AlignedIndent(register, column))
+			PrintBody(block, construct, context);
+		context.ExitContinuation();
 	}
 
 	public static void AnonymousObjectCreationExpression(AnonymousObjectCreationExpressionSyntax node, PrintContext context)
@@ -1007,6 +1083,31 @@ internal static partial class Printers
 	{
 		Spacing.BeforeOpenBracket(context);
 		TokenPrinter.Print(node.OpenBracketToken, context);
+
+		// A bracketed list the author broke keeps their breaks, as an invocation's or an attribute's
+		// does. Printed flat it was joined onto one line however it was written — issue #124.
+		var arguments = node.Arguments;
+		if (arguments.Count > 0 && SpansLines(node, context))
+		{
+			using (context.Arena.Indent())
+			{
+				if (context.AuthorBroke(node.OpenBracketToken.Span.End, arguments[0].SpanStart))
+					context.Arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
+				else
+					Spacing.InsideBrackets(context);
+
+				PrintSeparated(arguments, context, asWritten: true, node.OpenBracketToken.Span.End);
+			}
+
+			if (context.AuthorBroke(arguments[^1].Span.End, node.CloseBracketToken.SpanStart))
+				context.Arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
+			else
+				Spacing.InsideBrackets(context);
+
+			TokenPrinter.Print(node.CloseBracketToken, context);
+			return;
+		}
+
 		Spacing.InsideBrackets(context);
 
 		for (var i = 0; i < node.Arguments.Count; i++)

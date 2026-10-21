@@ -1,0 +1,441 @@
+namespace Nullean.Curb.Tests.Formatting.Expressions;
+
+/// <summary>
+/// Breaks in a bracketed argument list, the <c>:</c> after a block lambda in a ternary, and a lambda
+/// block's offset stay where <c>dotnet format whitespace</c> leaves them. See
+/// <see href="https://github.com/nullean/curb/issues/124">issue #124</see>,
+/// <see href="https://github.com/nullean/curb/issues/134">issue #134</see> and
+/// <see href="https://github.com/nullean/curb/issues/135">issue #135</see>.
+/// </summary>
+public class BracketAndLambdaBlockTests : FormattingTest
+{
+	// Issue #124: a bracketed argument list the author broke keeps its breaks.
+
+	[Test]
+	public Task A_broken_element_access_is_kept() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M(int[] arr, int[][] grid, int[]? maybe, int[,] two)
+		    {
+		        Foo(arr[
+		            0]);
+		        var x = arr[
+		            0];
+		        var y = arr[
+		            0
+		        ];
+		        var w = maybe?[
+		            0];
+		        var v = two[0,
+		            1];
+		        var u = two[
+		            0,
+		            1];
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Nested_and_chained_brackets_keep_their_breaks() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M(int[] arr, int[][] grid)
+		    {
+		        var y = grid[
+		            0][
+		            1];
+		        var z = grid[arr[
+		            0]];
+		        var t = arr[Foo(
+		            a)];
+		        var d = new Dictionary<int, int>
+		        {
+		            [
+		                1] = 2,
+		        };
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_joined_element_access_stays_joined() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M(int[] arr, int[,] two)
+		    {
+		        var x = arr[0];
+		        var v = two[0, 1];
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_reindented_element_access_moves_with_its_statement() => Formats(
+		"""
+		public class C
+		{
+		    public void M(int[] arr)
+		    {
+		            var x = arr[
+		                0];
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M(int[] arr)
+		    {
+		        var x = arr[
+		            0];
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_broken_element_access_with_tabs_is_kept() => Unchanged(
+		"public class C\n{\n\tpublic void M(int[] arr)\n\t{\n\t\tvar x = arr[\n\t\t\t0];\n\t\tFoo(arr[\n\t\t\t  0]);\n\t}\n}",
+		editorConfig: "indent_style = tab");
+
+	// Issue #134: the `:` after a block lambda goes to the indent of the line its statement, lambda,
+	// member, switch arm or initializer element starts on.
+
+	[Test]
+	public Task A_colon_after_a_block_lambda_on_a_later_argument_line_goes_to_the_statement() => Formats(
+		"""
+		public class C
+		{
+		    public void M(bool enabled)
+		    {
+		        Register(
+		            enabled ? () =>
+		            {
+		                Run();
+		            }
+		            : null);
+		        Register(a,
+		            enabled ? () =>
+		            {
+		                Run();
+		            } : null);
+		        var r = Outer(
+		            Inner(
+		                enabled ? () =>
+		                {
+		                    Run();
+		                } : null));
+		    }
+
+		    Action P => Wrap(
+		        enabled ? () =>
+		        {
+		            Run();
+		        } : null);
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M(bool enabled)
+		    {
+		        Register(
+		            enabled ? () =>
+		            {
+		                Run();
+		            }
+		        : null);
+		        Register(a,
+		            enabled ? () =>
+		            {
+		                Run();
+		            }
+		        : null);
+		        var r = Outer(
+		            Inner(
+		                enabled ? () =>
+		                {
+		                    Run();
+		                }
+		        : null));
+		    }
+
+		    Action P => Wrap(
+		        enabled ? () =>
+		        {
+		            Run();
+		        }
+		    : null);
+		}
+		""");
+
+	[Test]
+	public Task A_colon_after_a_block_lambda_goes_to_its_lambda_arm_or_initializer_line() => Formats(
+		"""
+		public class C
+		{
+		    public void M(bool enabled, int value)
+		    {
+		        Register(
+		            x => x ? () =>
+		            {
+		                Run();
+		            } : null);
+		        var o = new Options
+		        {
+		            Handler = enabled ? () =>
+		            {
+		                Run();
+		            } : null,
+		        };
+		        var s = value switch
+		        {
+		            1 => enabled ? () =>
+		            {
+		                Run();
+		            } : null,
+		            _ => null,
+		        };
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M(bool enabled, int value)
+		    {
+		        Register(
+		            x => x ? () =>
+		            {
+		                Run();
+		            }
+		            : null);
+		        var o = new Options
+		        {
+		            Handler = enabled ? () =>
+		            {
+		                Run();
+		            }
+		            : null,
+		        };
+		        var s = value switch
+		        {
+		            1 => enabled ? () =>
+		            {
+		                Run();
+		            }
+		            : null,
+		            _ => null,
+		        };
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_colon_after_a_block_lambda_with_a_trailing_comment_goes_to_the_statement() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M(bool enabled)
+		    {
+		        Register(
+		            enabled ? () =>
+		            {
+		                Run();
+		            } // note
+		        : null);
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_reindented_statement_takes_the_colon_with_it() => Formats(
+		"""
+		public class C
+		{
+		    public void M(bool enabled)
+		    {
+		            Register(
+		                enabled ? () =>
+		                {
+		                    Run();
+		                } : null);
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M(bool enabled)
+		    {
+		        Register(
+		            enabled ? () =>
+		            {
+		                Run();
+		            }
+		        : null);
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_colon_after_a_block_lambda_goes_to_the_statement_with_tabs() => Formats(
+		"public class C\n{\n\tpublic void M(bool enabled)\n\t{\n\t\tRegister(\n\t\t\tenabled ? () =>\n\t\t\t{\n\t\t\t\tRun();\n\t\t\t} : null);\n\t}\n}",
+		"public class C\n{\n\tpublic void M(bool enabled)\n\t{\n\t\tRegister(\n\t\t\tenabled ? () =>\n\t\t\t{\n\t\t\t\tRun();\n\t\t\t}\n\t\t: null);\n\t}\n}",
+		editorConfig: "indent_style = tab");
+
+	// Issue #135: a lambda block keeps the offset the author gave it from the line the lambda
+	// starts on.
+
+	[Test]
+	public Task A_lambda_block_indented_past_its_line_stays_there() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M(bool enabled)
+		    {
+		        Action a = () =>
+		            {
+		                Run();
+		            };
+		        Register(() =>
+		            {
+		                Run();
+		            });
+		        Register(x, () =>
+		            {
+		                Run();
+		            });
+		        Action b = enabled ? () =>
+		            {
+		                Run();
+		            }
+		        : null;
+		        Action e = delegate
+		            {
+		                Run();
+		            };
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_lambda_block_at_any_offset_stays_there() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        Action c = () =>
+		                {
+		                    Run();
+		                };
+		        Action d = () =>
+		          {
+		              Run();
+		          };
+		        Action g = () =>
+		    {
+		        Run();
+		    };
+		        Register(() =>
+		            {
+		                Register(() =>
+		                    {
+		                        Run();
+		                    });
+		            });
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_block_lambda_argument_the_author_put_on_its_own_line_stays_there() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        Register(
+		            () =>
+		            {
+		                Run();
+		            });
+		        Register(
+		            () =>
+		                {
+		                    Run();
+		                });
+		        On(
+		            "click", () =>
+		            {
+		                Run();
+		            });
+		        Register(() =>
+		        {
+		            Run();
+		        }
+		        );
+		        Register(
+		            new Options
+		            {
+		                A = 1,
+		            });
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_joined_block_lambda_argument_still_hugs() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        On("click", () =>
+		        {
+		            Run();
+		        });
+		        Register(new Options
+		        {
+		            A = 1,
+		        });
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_reindented_statement_takes_its_lambda_block_with_it() => Formats(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		            Action a = () =>
+		                {
+		                    Run();
+		                };
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        Action a = () =>
+		            {
+		                Run();
+		            };
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_lambda_block_off_the_tab_stops_keeps_its_column() => Formats(
+		"public class C\n{\n\tpublic void M()\n\t{\n\t\tAction a = () =>\n\t\t\t{\n\t\t\t\tRun();\n\t\t\t};\n\t\tAction b = () =>\n\t\t  {\n\t\t      Run();\n\t\t  };\n\t}\n}",
+		"public class C\n{\n\tpublic void M()\n\t{\n\t\tAction a = () =>\n\t\t\t{\n\t\t\t\tRun();\n\t\t\t};\n\t\tAction b = () =>\n\t\t  {\n\t\t\t  Run();\n\t\t  };\n\t}\n}",
+		editorConfig: "indent_style = tab");
+}

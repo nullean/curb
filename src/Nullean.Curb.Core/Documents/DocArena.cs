@@ -195,6 +195,17 @@ internal sealed class DocArena
 	public void LineShiftAnchor(int register) => Add(new Doc(DocKind.Anchor, a: register, b: Doc.AnchorAtLineShift));
 
 	/// <summary>
+	/// Captures into <paramref name="register"/> the indent of the output line, already written, that
+	/// starts with the source text at <paramref name="position"/> — see <see cref="Doc.AnchorAtSourceLine"/>.
+	/// </summary>
+	/// <remarks>
+	/// For a break that lands at the indent of the line an enclosing construct starts on, however
+	/// deep the scope it is printed from.
+	/// </remarks>
+	public void SourceLineAnchor(int register, int position) =>
+		Add(new Doc(DocKind.Anchor, a: register, b: Doc.AnchorAtSourceLine(position)));
+
+	/// <summary>
 	/// A hard break that indents to a column captured by <see cref="Anchor"/>, shifted by
 	/// <paramref name="offset"/> columns. A register <see cref="LineShiftAnchor"/> left unset breaks to
 	/// the enclosing indent instead.

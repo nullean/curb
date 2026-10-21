@@ -188,6 +188,20 @@ internal readonly struct Doc
 	public const int AnchorAtLineShift = 1;
 
 	/// <summary>
+	/// <c>B</c> on a <see cref="DocKind.Anchor"/> for <see cref="DocArena.SourceLineAnchor"/>: capture the
+	/// indent of the output line, already written, that starts with the source text at
+	/// <paramref name="position"/>. Encoded below zero, apart from the two modes above.
+	/// </summary>
+	/// <remarks>
+	/// A register no such line fills is left <see cref="AnchorUnset"/>, so an aligned line reading it
+	/// breaks to the enclosing indent instead.
+	/// </remarks>
+	public static int AnchorAtSourceLine(int position) => -1 - position;
+
+	/// <summary>The source position an <see cref="AnchorAtSourceLine"/> mode names.</summary>
+	public static int SourceLinePosition(int mode) => -1 - mode;
+
+	/// <summary>
 	/// A register a line-shift anchor declined to fill. An aligned line reading it breaks to the
 	/// enclosing indent instead.
 	/// </summary>
