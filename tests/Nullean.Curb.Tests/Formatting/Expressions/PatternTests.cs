@@ -379,6 +379,127 @@ public class PatternTests : FormattingTest
 		""",
 		editorConfig: "csharp_new_line_before_open_brace = none");
 
+	[Test]
+	public Task Property_pattern_under_indent_braces_matches_dotnet_format() => Formats(
+		// dotnet format indents the brace a level, the members a level past it, and the closing brace
+		// to the members' column, the same at every depth.
+		"""
+		public class C
+		{
+		    public bool M(object value)
+		    {
+		        var a = value is Version
+		        {
+		            Major: 1,
+		            Minor: 2,
+		        } v;
+		        var b = value is
+		        {
+		            Length: 0,
+		        };
+		        var c = value is Version { Major: 1,
+		            Minor: 2 };
+		        return value is Person
+		        {
+		            Name: "x",
+		            Address:
+		            {
+		                City: "y",
+		            },
+		            Home: Address
+		            {
+		                Zip: 1,
+		            },
+		        };
+		    }
+		}
+		""",
+		"""
+		public class C
+		    {
+		    public bool M(object value)
+		        {
+		        var a = value is Version
+		            {
+		                Major: 1,
+		                Minor: 2,
+		                } v;
+		        var b = value is
+		            {
+		                Length: 0,
+		                };
+		        var c = value is Version
+		            {
+		                Major: 1,
+		                Minor: 2
+		                };
+		        return value is Person
+		            {
+		                Name: "x",
+		                Address:
+		                    {
+		                        City: "y",
+		                        },
+		                Home: Address
+		                    {
+		                        Zip: 1,
+		                        },
+		                };
+		        }
+		    }
+		""",
+		editorConfig: "csharp_indent_braces = true");
+
+	[Test]
+	public Task Empty_property_pattern_and_patterns_after_not_and_or_under_indent_braces() => Formats(
+		"""
+		public class C
+		{
+		    public bool M(object value)
+		    {
+		        var a = value is not
+		        {
+		            Length: 0,
+		        };
+		        var b = value is string or
+		        {
+		            Length: 0,
+		        };
+		        var c = value is Version
+		        {
+		        } w;
+		        return value is Version
+		        {
+		            // none
+		        };
+		    }
+		}
+		""",
+		"""
+		public class C
+		    {
+		    public bool M(object value)
+		        {
+		        var a = value is not
+		            {
+		                Length: 0,
+		                };
+		        var b = value is string or
+		            {
+		                Length: 0,
+		                };
+		        var c = value is Version
+		            {
+		                } w;
+		        return value is Version
+		            {
+		                // none
+		                };
+		        }
+		    }
+		""",
+		editorConfig: "csharp_indent_braces = true");
+
 	// ---- deterministic: a pattern that fits is joined, and the comma follows the options ------------
 
 	[Test]

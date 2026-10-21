@@ -28,11 +28,22 @@ internal static partial class Printers
 		// pattern that follows. Without this, `x is` / `A or` / `B` kept its `or` breaks and lost the
 		// first one, which reads worse than either preserving all of them or none.
 		if (context.AuthorBroke(node.IsKeyword.Span.End, node.Pattern.SpanStart))
-			context.Arena.HardLine();
+			BreakBeforePattern(node.Pattern, context);
 		else
 			context.Arena.Synthetic(SyntheticText.Space);
 
 		Node.Print(node.Pattern, context);
+	}
+
+	/// <summary>
+	/// The break an author put ahead of a pattern. A pattern that opens with its own brace has that brace
+	/// placed by this break, so <c>csharp_indent_braces</c> moves it in a level, as BeforeOpenBrace does.
+	/// </summary>
+	private static void BreakBeforePattern(PatternSyntax pattern, PrintContext context)
+	{
+		var opensWithBrace = pattern is RecursivePatternSyntax { Type: null, PositionalPatternClause: null, PropertyPatternClause: not null };
+		using (context.Arena.IndentIf(opensWithBrace && context.Options.IndentBraces))
+			context.Arena.HardLine();
 	}
 
 	/// <summary>
@@ -132,6 +143,10 @@ internal static partial class Printers
 					}
 
 					TokenPrinter.Print(property.OpenBraceToken, context);
+
+					// Under csharp_indent_braces dotnet format puts the members a level in from the indented
+					// brace and the closing brace at their column, not back under the opening one.
+					using (arena.IndentIf(context.Options.IndentBraces))
 					using (arena.Indent())
 					{
 						InsideBrace(property.OpenBraceToken.Span.End, subpatterns[0].SpanStart);
@@ -164,7 +179,8 @@ internal static partial class Printers
 							PrintTrailingComma(context);
 					}
 
-					InsideBrace(property.CloseBraceToken.GetPreviousToken().Span.End, property.CloseBraceToken.SpanStart);
+					using (arena.IndentIf(context.Options.IndentBraces, levels: 2))
+						InsideBrace(property.CloseBraceToken.GetPreviousToken().Span.End, property.CloseBraceToken.SpanStart);
 					TokenPrinter.Print(property.CloseBraceToken, context);
 				}
 
@@ -196,18 +212,19 @@ internal static partial class Printers
 				{
 					// A comment above the closing brace is its leading trivia; printed inside the indent it
 					// sits where a member would, as an empty initializer's does.
+					using (arena.IndentIf(context.Options.IndentBraces))
 					using (arena.Indent())
 					{
 						arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
 						TokenPrinter.PrintLeadingTrivia(property.CloseBraceToken, context, trailingBreak: false);
 					}
 
-					using (arena.IndentIf(context.Options.IndentBraces))
+					using (arena.IndentIf(context.Options.IndentBraces, levels: 2))
 						arena.HardLine(DocFlags.Reindent);
 				}
 				else if (context.AuthorBroke(property.OpenBraceToken.Span.End, property.CloseBraceToken.SpanStart))
 				{
-					using (arena.IndentIf(context.Options.IndentBraces))
+					using (arena.IndentIf(context.Options.IndentBraces, levels: 2))
 						arena.HardLine();
 				}
 				else
@@ -233,7 +250,7 @@ internal static partial class Printers
 
 			// `Address:` / `{ … }` — a nested pattern the author put on a line of its own stays there.
 			if (context.AuthorBroke(node.ExpressionColon.ColonToken.Span.End, node.Pattern.SpanStart))
-				context.Arena.HardLine();
+				BreakBeforePattern(node.Pattern, context);
 			else
 				context.Arena.Synthetic(SyntheticText.Space);
 		}
@@ -258,7 +275,7 @@ internal static partial class Printers
 		TokenPrinter.Print(node.OperatorToken, context);
 
 		if (context.AuthorBroke(node.OperatorToken.Span.End, node.Right.SpanStart))
-			context.Arena.HardLine();
+			BreakBeforePattern(node.Right, context);
 		else
 			context.Arena.Synthetic(SyntheticText.Space);
 
@@ -271,7 +288,7 @@ internal static partial class Printers
 
 		// `is not` / `{ … }` — a break the author put after `not` is theirs, as one after `is` or `or` is.
 		if (context.AuthorBroke(node.OperatorToken.Span.End, node.Pattern.SpanStart))
-			context.Arena.HardLine();
+			BreakBeforePattern(node.Pattern, context);
 		else
 			context.Arena.Synthetic(SyntheticText.Space);
 
