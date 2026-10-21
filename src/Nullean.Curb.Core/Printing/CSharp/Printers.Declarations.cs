@@ -91,34 +91,16 @@ internal static partial class Printers
 		arena.Synthetic(SyntheticText.Space);
 
 		// A value the author put below the `=` stays there. The group further down cannot keep it: with
-		// no width it never breaks, so `_comparers =` / `new(…)` was joined — issue #102. The `=` prints
-		// inside the indent so that a trailing `// note` on it ends its line at the value's level.
-		//
-		// That includes a value with brackets of its own, such as `[1, 2, 3]`, `new Options { … }` or a
-		// block lambda, which BringsOwnBlock below would hug to the `=` — issue #107. Only a bracket
-		// alone on its line takes the brace position instead, at the declaration's own level.
-		if (context.AuthorBroke(node.EqualsToken.Span.End, node.Value.SpanStart)
-			&& !OpensOutBelowEquals(node.Value, node.EqualsToken, context))
+		// no width it never breaks, so `_comparers =` / `new(…)` was joined — issue #102. That includes a
+		// value with brackets of its own, such as `[1, 2, 3]`, `new Options { … }` or a block lambda,
+		// which BringsOwnBlock below would hug to the `=` — issue #107.
+		if (context.AuthorBroke(node.EqualsToken.Span.End, node.Value.SpanStart))
 		{
-			using (arena.Indent())
-			{
-				TokenPrinter.Print(node.EqualsToken, context);
-				arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
-				Node.Print(node.Value, context);
-			}
+			ValueBelowOperator(node.EqualsToken, node.Value, context);
 			return;
 		}
 
 		TokenPrinter.Print(node.EqualsToken, context);
-
-		// `int[] values =` / `{` — the array initializer's brace on a line of its own, where the author
-		// put it. A collection expression places its own bracket the same way.
-		if (node.Value is InitializerExpressionSyntax && OpensOutBelowEquals(node.Value, node.EqualsToken, context))
-		{
-			BeforeOpenBrace(BraceStyle.ObjectCollectionArrayInitializers, context);
-			Node.Print(node.Value, context);
-			return;
-		}
 
 		// A value that brings its own braces or brackets already positions its contents, so adding a
 		// continuation indent here would shift the whole construct one level right of where it
@@ -192,32 +174,32 @@ internal static partial class Printers
 		};
 
 	/// <summary>
-	/// True for a collection expression or bare initializer the author put below <paramref name="equals"/>
-	/// with its opening bracket alone on its line, which is the brace placement
-	/// <c>csharp_new_line_before_open_brace</c> asks for.
+	/// Prints <paramref name="operatorToken"/> and a <paramref name="value"/> the author put on a line below
+	/// it, as far in from the operator's line as they put it.
 	/// </summary>
 	/// <remarks>
-	/// Such a bracket sits at the declaration's level, as one the reflow puts there does. Any other value
-	/// below the <c>=</c> is a continuation and sits one level in. <c>dotnet format</c> accepts either
-	/// indent for both shapes, so the line after the bracket is what tells them apart: the source does
-	/// not say which level the author meant, and reading their columns would make the answer depend on
-	/// alignment Curb itself rewrites.
+	/// <c>dotnet format</c> leaves that line at whatever indent it has, so the offset is read from the
+	/// source: a bracket at the declaration's own level, one level in, or deeper all stay put, and a
+	/// statement Curb re-indents takes the value along with it. The value's own lines follow it. Where
+	/// the operator's line has no source line to measure from, the value sits one level in. The operator
+	/// prints inside that indent so that a trailing <c>// note</c> on it ends its line at the value's
+	/// level.
 	/// </remarks>
-	internal static bool OpensOutBelowEquals(ExpressionSyntax value, SyntaxToken equals, PrintContext context)
+	private static void ValueBelowOperator(SyntaxToken operatorToken, ExpressionSyntax value, PrintContext context)
 	{
-		var (open, next) = value switch
-		{
-			CollectionExpressionSyntax collection => (collection.OpenBracketToken,
-				collection.Elements.Count > 0 ? collection.Elements[0].SpanStart : collection.CloseBracketToken.SpanStart),
-			InitializerExpressionSyntax initializer => (initializer.OpenBraceToken,
-				initializer.Expressions.Count > 0 ? initializer.Expressions[0].SpanStart : initializer.CloseBraceToken.SpanStart),
-			_ => (default, -1),
-		};
+		var arena = context.Arena;
+		var anchor = context.EnterContinuation();
+		arena.LineShiftAnchor(anchor);
 
-		return next >= 0
-			&& BraceOnOwnLine(BraceStyle.ObjectCollectionArrayInitializers, context)
-			&& context.AuthorBroke(equals.Span.End, value.SpanStart)
-			&& context.AuthorBroke(open.Span.End, next);
+		using (arena.Indent())
+		{
+			TokenPrinter.Print(operatorToken, context);
+			var offset = ContinuationLine(value.GetFirstToken(), anchor, context);
+			using (arena.AlignedIndent(anchor, offset))
+				Node.Print(value, context);
+		}
+
+		context.ExitContinuation();
 	}
 
 	/// <summary>True for values whose own layout supplies the indentation of their contents.</summary>

@@ -118,35 +118,58 @@ public class CollectionBreakTests : FormattingTest
 		""");
 
 	/// <summary>
-	/// A bracket alone on its line below the <c>=</c> is the brace placement
-	/// <c>csharp_new_line_before_open_brace</c> asks for, so it sits at the declaration's level rather
-	/// than one in. <c>dotnet format</c> accepts either indent; Curb has one answer for each shape.
+	/// A bracket below the <c>=</c> stays at whichever level the author put it, as <c>dotnet format</c>
+	/// leaves it: the declaration's own, one level in, or deeper.
 	/// </summary>
 	[Test]
-	public Task An_opened_out_collection_below_the_equals_takes_the_brace_position() => Formats(
+	public Task An_opened_out_collection_below_the_equals_keeps_the_level_the_author_gave_it() => Unchanged(
 		"""
 		public class C
 		{
-		    private int[] _numbers =
-		        [
-		            1,
-		            2,
-		        ];
-		}
-		""",
-		"""
-		public class C
-		{
-		    private int[] _numbers =
+		    private int[] _first =
 		    [
 		        1,
 		        2,
 		    ];
+
+		    private int[] _second =
+		        [
+		            1,
+		            2,
+		        ];
+
+		    private int[] _third =
+		            [
+		                1,
+		            ];
 		}
 		""");
 
 	[Test]
-	public Task Without_a_brace_line_an_opened_out_collection_stays_one_indent_in() => Unchanged(
+	public Task Values_below_the_equals_keep_a_deeper_indent() => Unchanged(
+		"""
+		public class C
+		{
+		    private int[] _numbers =
+		            [1, 2, 3];
+
+		    private Options _options =
+		            new Options
+		            {
+		                Retries = 3,
+		            };
+
+		    private int _count =
+		            Compute();
+		}
+		""");
+
+	/// <summary>
+	/// <c>dotnet format</c> does not apply <c>csharp_new_line_before_open_brace</c> to a collection
+	/// expression or to an array or collection initializer, so each bracket stays where the author put it.
+	/// </summary>
+	[Test]
+	public Task Without_a_brace_line_collection_brackets_stay_where_the_author_put_them() => Unchanged(
 		"""
 		public class C {
 		    private int[] _numbers =
@@ -155,11 +178,21 @@ public class CollectionBreakTests : FormattingTest
 		            2,
 		        ];
 
+		    private int[] _first =
+		    [
+		        1,
+		    ];
+
 		    private int[] _array =
 		        {
 		            1,
 		            2,
 		        };
+
+		    private List<int> _list = new List<int>
+		    {
+		        1,
+		    };
 		}
 		""",
 		editorConfig: "csharp_new_line_before_open_brace = none");
@@ -170,7 +203,7 @@ public class CollectionBreakTests : FormattingTest
 		editorConfig: "indent_style = tab");
 
 	[Test]
-	public Task A_collection_the_author_broke_partway_keeps_its_brackets_on_the_equals_line() => Formats(
+	public Task A_collection_the_author_broke_partway_keeps_its_brackets_on_the_equals_line() => Unchanged(
 		"""
 		public class C
 		{
@@ -181,15 +214,76 @@ public class CollectionBreakTests : FormattingTest
 		        return a;
 		    }
 		}
+		""");
+
+	[Test]
+	public Task Collection_continuation_lines_keep_the_column_the_author_gave_them() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        int[] a = [1,
+		            2];
+		        int[] b = [1,
+		                   2,
+		                   3];
+		        int[] c = [
+		                1,
+		              2,
+		            ];
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_reindented_statement_takes_its_collection_lines_along() => Formats(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		          int[] a = [1,
+		                     2];
+		    int[] b =
+		        [
+		            1,
+		        ];
+		    }
+		}
 		""",
 		"""
 		public class C
 		{
-		    public int[] M()
+		    public void M()
 		    {
 		        int[] a = [1,
-		            2];
-		        return a;
+		                   2];
+		        int[] b =
+		            [
+		                1,
+		            ];
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Aligned_collection_lines_keep_their_column_with_tabs() => Unchanged(
+		"public class C\n{\n\tpublic void M()\n\t{\n\t\tint[] a = [1,\n\t\t\t\t   2];\n\t\tint[] b =\n\t\t\t[\n\t\t\t\t1,\n\t\t\t];\n\t}\n}",
+		editorConfig: "indent_style = tab");
+
+	[Test]
+	public Task A_nested_aligned_collection_keeps_its_columns() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        int[][] a = [[1,
+		                      2],
+		                     [3]];
+		        Use([1,
+		             2]);
 		    }
 		}
 		""");
@@ -254,7 +348,7 @@ public class CollectionBreakTests : FormattingTest
 		editorConfig: "indent_style = tab");
 
 	[Test]
-	public Task An_array_initializer_broken_inside_an_element_is_not_opened_out() => Formats(
+	public Task An_array_initializer_broken_inside_an_element_is_not_opened_out() => Unchanged(
 		"""
 		public class C
 		{
@@ -265,16 +359,31 @@ public class CollectionBreakTests : FormattingTest
 		        return flags;
 		    }
 		}
-		""",
+		""");
+
+	[Test]
+	public Task Initializer_continuation_lines_keep_the_column_the_author_gave_them() => Unchanged(
 		"""
 		public class C
 		{
-		    public bool[] Flags(bool a, bool b)
+		    public void M()
 		    {
-		        var flags = new[] { a ||
-		            b };
-		        return flags;
+		        var a = new[] { 1,
+		                        2 };
+		        var b = new List<int>
+		          {
+		               1,
+		          };
+		        var c = new[] {
+		                1,
+		           };
 		    }
+
+		    private static readonly int[] F =
+		        {
+		            1,
+		          2,
+		        };
 		}
 		""");
 
