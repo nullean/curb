@@ -176,10 +176,13 @@ internal static partial class Printers
 
 		// Consumed as BinaryExpression consumes it: an if/while/do/lock condition already sits inside
 		// the indent that opens out its parentheses, so a broken ternary there takes no second level
-		// — issue #109. Cleared either way, so a ternary further inside the condition still indents.
+		// — issue #109. One deeper in the condition, behind parentheses of its own, needs none either
+		// while it still starts on the `(` line: that indent is already one level in from its line.
 		var alreadyIndented = ReferenceEquals(context.IndentedCondition, node);
 		if (alreadyIndented)
 			context.IndentedCondition = null;
+		else
+			alreadyIndented = StartsOnConditionLine(node, context);
 
 		Node.Print(node.Condition, context);
 
@@ -234,6 +237,28 @@ internal static partial class Printers
 				arena.Synthetic(SyntheticText.Space);
 			Node.Print(node.WhenFalse, context);
 		}
+	}
+
+	/// <summary>
+	/// True for an operand of an if/while/do/lock condition, reached only through parentheses, operators
+	/// and <c>!</c>, that starts on the line of the condition's <c>(</c>.
+	/// </summary>
+	private static bool StartsOnConditionLine(ExpressionSyntax node, PrintContext context)
+	{
+		SyntaxNode current = node;
+		while (current.Parent is ParenthesizedExpressionSyntax or BinaryExpressionSyntax or PrefixUnaryExpressionSyntax)
+			current = current.Parent;
+
+		var openParen = current.Parent switch
+		{
+			IfStatementSyntax statement when statement.Condition == current => statement.OpenParenToken,
+			WhileStatementSyntax statement when statement.Condition == current => statement.OpenParenToken,
+			DoStatementSyntax statement when statement.Condition == current => statement.OpenParenToken,
+			LockStatementSyntax statement when statement.Expression == current => statement.OpenParenToken,
+			_ => default,
+		};
+
+		return openParen.RawKind != 0 && context.AuthorJoined(openParen.Span.End, node.SpanStart);
 	}
 
 	private static void AuthorTernaryBreak(int from, int to, bool spaced, PrintContext context)

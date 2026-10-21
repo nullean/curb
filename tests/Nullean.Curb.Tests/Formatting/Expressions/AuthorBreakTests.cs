@@ -313,6 +313,56 @@ public class AuthorBreakTests : FormattingTest
 		""");
 
 	[Test]
+	public Task A_broken_ternary_in_parentheses_inside_a_condition_indents_once() => Unchanged(
+		// Still on the `(` line, so the condition's own indent is the one level it needs. One starting on
+		// a later line of the condition indents from that line. The `&&` chain at the end is the
+		// control: it already printed this way.
+		"""
+		public class C
+		{
+		    public void M(bool b)
+		    {
+		        if (a && (b
+		            ? x
+		            : y))
+		        {
+		        }
+		        if (a || (b ?
+		            x :
+		            y))
+		        {
+		        }
+		        if (!(b
+		            ? x
+		            : y) && a)
+		        {
+		        }
+		        while (a && (b
+		            ? x
+		            : y))
+		        {
+		        }
+		        do
+		        {
+		        }
+		        while (a && (b
+		            ? x
+		            : y));
+		        if (a &&
+		            (b
+		                ? x
+		                : y))
+		        {
+		        }
+		        if (a && (b
+		            && c))
+		        {
+		        }
+		    }
+		}
+		""");
+
+	[Test]
 	public Task An_expression_body_on_the_arrow_line_keeps_its_own_continuation_indent() => Unchanged(
 		"""
 		public class C
