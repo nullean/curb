@@ -1277,6 +1277,17 @@ internal static partial class Printers
 	}
 
 	/// <summary>
+	/// True when <see cref="BeforeOpenBrace"/> put the brace on a line of its own and indented it there.
+	/// </summary>
+	/// <remarks>
+	/// For a construct whose contents dotnet format indents from the brace's own line rather than from the
+	/// header's, so that they follow a brace <c>csharp_indent_braces</c> moved in. Only the switch
+	/// expression asks this today.
+	/// </remarks>
+	internal static bool IndentsOpenBrace(BraceStyle construct, PrintContext context) =>
+		context.Options.IndentBraces && context.Options.NewLineBeforeOpenBrace.HasFlag(construct);
+
+	/// <summary>
 	/// Emits a construct's braced body, keeping it on one line when the author wrote it on one.
 	/// </summary>
 	/// <remarks>
