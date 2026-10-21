@@ -137,10 +137,9 @@ internal static partial class Printers
 
 		// A trailing `// note` on the left operand has already ended its own line; the aligned line
 		// reuses it rather than making a blank one, which then moved the comment run below it out of
-		// reach of the align-under-a-trailing-comment rule on the next run. OnlyIfNotAtLineStart does
-		// the same on the fallback.
+		// reach of the align-under-a-trailing-comment rule on the next run.
 		if (breakBefore)
-			ContinuationLine(node.OperatorToken, anchor, DocFlags.OnlyIfNotAtLineStart, context);
+			ContinuationLine(node.OperatorToken, anchor, context);
 		else
 			Spacing.BeforeOperator(context);
 
@@ -148,7 +147,7 @@ internal static partial class Printers
 
 		if (breakAfter)
 		{
-			ContinuationLine(node.Right.GetFirstToken(), anchor, DocFlags.None, context);
+			ContinuationLine(node.Right.GetFirstToken(), anchor, context);
 			Node.Print(node.Right, context);
 		}
 		else
@@ -163,19 +162,16 @@ internal static partial class Printers
 	/// moved.
 	/// </summary>
 	/// <remarks>
-	/// A comment or directive ahead of <paramref name="next"/> prints at the ambient indent on its own
-	/// line, so the break stays there too rather than leaving the comment stranded to the left of the
-	/// operand it introduces.
+	/// A comment ahead of <paramref name="next"/> goes on the same column, as dotnet format puts it,
+	/// rather than at the ambient indent with the operand stranded to its right (issue #115). A
+	/// conditional-compilation directive still goes to column 0.
 	/// </remarks>
-	private static void ContinuationLine(SyntaxToken next, int anchor, DocFlags fallbackFlags, PrintContext context)
+	private static void ContinuationLine(SyntaxToken next, int anchor, PrintContext context)
 	{
+		var offset = context.SourceIndent(next.SpanStart);
+		context.Arena.AlignedLine(anchor, offset);
 		if (TokenPrinter.HasLeadingContent(next))
-		{
-			context.Arena.HardLine(fallbackFlags);
-			return;
-		}
-
-		context.Arena.AlignedLine(anchor, context.SourceIndent(next.SpanStart));
+			context.AlignLeadingTrivia(next, anchor, offset);
 	}
 
 	public static void AssignmentExpression(AssignmentExpressionSyntax node, PrintContext context)

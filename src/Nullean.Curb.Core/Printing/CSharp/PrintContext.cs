@@ -237,6 +237,37 @@ internal sealed class PrintContext(DocArena arena, SourceText text, FormatOption
 	/// <summary>Releases the register <see cref="EnterContinuation"/> claimed last.</summary>
 	public void ExitContinuation() => _continuationDepth--;
 
+	private int _alignedTriviaPosition = -1;
+	private int _alignedTriviaRegister;
+	private int _alignedTriviaOffset;
+
+	/// <summary>
+	/// Lines the comments ahead of <paramref name="token"/> up with it, on the continuation line an
+	/// <see cref="DocArena.AlignedLine"/> with the same register and offset puts it on.
+	/// </summary>
+	/// <remarks>
+	/// Matched on position, like <see cref="HeaderSkipTokenPosition"/>, because the token may be the
+	/// first of an operand printed several printers further down.
+	/// </remarks>
+	public void AlignLeadingTrivia(SyntaxToken token, int register, int offset)
+	{
+		_alignedTriviaPosition = token.SpanStart;
+		_alignedTriviaRegister = register;
+		_alignedTriviaOffset = offset;
+	}
+
+	/// <summary>Consumes what <see cref="AlignLeadingTrivia"/> recorded, if it was for <paramref name="token"/>.</summary>
+	public bool TryTakeLeadingTriviaAlignment(SyntaxToken token, out int register, out int offset)
+	{
+		register = _alignedTriviaRegister;
+		offset = _alignedTriviaOffset;
+		if (_alignedTriviaPosition != token.SpanStart)
+			return false;
+
+		_alignedTriviaPosition = -1;
+		return true;
+	}
+
 	/// <summary>
 	/// Benchmark-only: make unhandled nodes emit one document per token instead of one verbatim span
 	/// per line.

@@ -268,6 +268,128 @@ public class OperatorTests : FormattingTest
 		}
 		""");
 
+	// Issue #115: an own-line comment ahead of an operand, on either side of the operator, printed
+	// at the statement's column and took the operand with it. dotnet format moves the operand as far
+	// as the statement moved, and puts every comment above it at the operand's column.
+	[Test]
+	public Task Broken_logical_chain_keeps_its_indent_after_an_own_line_comment() => Formats(
+		"""
+		public class C
+		{
+		    public bool Before(bool a, bool b, bool c)
+		    {
+		            return a
+		                // before the operator
+		                && b
+		                && c;
+		    }
+
+		    public bool After(bool a, bool b, bool c)
+		    {
+		            return a &&
+		                // after the operator
+		                b &&
+		                c;
+		    }
+
+		    public bool Several(bool a, bool b)
+		    {
+		            return a
+		                // one
+		                /* two */
+		                    // three
+		                && b;
+		    }
+
+		    public bool Aligned(bool a, bool b, bool c)
+		    {
+		        return a
+		               // aligned comment
+		               && b
+		                 // deeper comment
+		               && c;
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public bool Before(bool a, bool b, bool c)
+		    {
+		        return a
+		            // before the operator
+		            && b
+		            && c;
+		    }
+
+		    public bool After(bool a, bool b, bool c)
+		    {
+		        return a &&
+		            // after the operator
+		            b &&
+		            c;
+		    }
+
+		    public bool Several(bool a, bool b)
+		    {
+		        return a
+		            // one
+		            /* two */
+		            // three
+		            && b;
+		    }
+
+		    public bool Aligned(bool a, bool b, bool c)
+		    {
+		        return a
+		               // aligned comment
+		               && b
+		               // deeper comment
+		               && c;
+		    }
+		}
+		""");
+
+	// Conditional-compilation directives stay at column 0; the operand after one keeps its indent.
+	[Test]
+	public Task Broken_logical_chain_keeps_its_indent_after_a_directive() => Formats(
+		"""
+		public class C
+		{
+		    public bool M(bool a, bool b, bool c)
+		    {
+		            return a
+		#if DEBUG
+		                && b
+		#else
+		                && c
+		#endif
+		                && !c;
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public bool M(bool a, bool b, bool c)
+		    {
+		        return a
+		#if DEBUG
+		                && b
+		#else
+		            && c
+		#endif
+		            && !c;
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Broken_logical_chain_keeps_its_indent_after_a_comment_under_tabs() => Formats(
+		"public class C\n{\n\tpublic bool M(bool a, bool b)\n\t{\n\t\t\treturn a\n\t\t\t\t// why\n\t\t\t\t&& b;\n\t}\n}",
+		"public class C\n{\n\tpublic bool M(bool a, bool b)\n\t{\n\t\treturn a\n\t\t\t// why\n\t\t\t&& b;\n\t}\n}",
+		editorConfig: "indent_style = tab");
+
 	[Test]
 	public Task Is_and_as_operators() => Unchanged(
 		"""
