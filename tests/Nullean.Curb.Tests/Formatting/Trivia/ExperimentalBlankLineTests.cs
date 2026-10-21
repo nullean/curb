@@ -100,10 +100,13 @@ public class ExperimentalBlankLineTests : FormattingTest
 
 	[Test]
 	public Task IDE2005_no_blank_line_after_a_conditional_token() => Formats(
+		// A blank line, as IDE2006 below has it. This test used to feed plain breaks and assert Curb
+		// joined the ternary onto one line, which dotnet format does not do — issue #102.
 		"""
 		public class C
 		{
 		    public int M(bool b) => b ?
+
 		        1 :
 		        2;
 		}
@@ -111,7 +114,9 @@ public class ExperimentalBlankLineTests : FormattingTest
 		"""
 		public class C
 		{
-		    public int M(bool b) => b ? 1 : 2;
+		    public int M(bool b) => b ?
+		        1 :
+		        2;
 		}
 		""");
 

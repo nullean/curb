@@ -151,6 +151,20 @@ internal static partial class Printers
 
 		Node.Print(node.Left, context);
 		Spacing.BeforeOperator(context);
+
+		// A right side the author put below the operator stays there, as EqualsValueClause keeps one
+		// below an initializer's `=` — issue #102.
+		if (!BringsOwnBlock(node.Right) && context.AuthorBroke(node.OperatorToken.Span.End, node.Right.SpanStart))
+		{
+			using (context.Arena.Indent())
+			{
+				TokenPrinter.Print(node.OperatorToken, context);
+				context.Arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
+				Node.Print(node.Right, context);
+			}
+			return;
+		}
+
 		TokenPrinter.Print(node.OperatorToken, context);
 		OperandOnRight(node.Right, context, node.OperatorToken.Span.End);
 	}
@@ -160,6 +174,34 @@ internal static partial class Printers
 		var arena = context.Arena;
 		var spaced = context.Options.SpaceAroundTernaryOperator;
 		Node.Print(node.Condition, context);
+
+		// A ternary the author broke keeps exactly their breaks, before or after either operator. The
+		// group below cannot: with no width it never breaks, so it joined them all — issue #102. And
+		// once one break is hard, every Line in the group breaks with it, so the joined positions
+		// need a plain space rather than a Line.
+		//
+		// One that spans lines only inside a branch, such as a block-bodied lambda, keeps its operators
+		// inline and takes no indent: the block anchors to its line, as dotnet format leaves it.
+		if (SpansLines(node, context))
+		{
+			var broken = context.AuthorBroke(node.Condition.Span.End, node.QuestionToken.SpanStart)
+				|| context.AuthorBroke(node.QuestionToken.Span.End, node.WhenTrue.SpanStart)
+				|| context.AuthorBroke(node.WhenTrue.Span.End, node.ColonToken.SpanStart)
+				|| context.AuthorBroke(node.ColonToken.Span.End, node.WhenFalse.SpanStart);
+
+			using (arena.IndentIf(broken))
+			{
+				AuthorTernaryBreak(node.Condition.Span.End, node.QuestionToken.SpanStart, spaced, context);
+				TokenPrinter.Print(node.QuestionToken, context);
+				AuthorTernaryBreak(node.QuestionToken.Span.End, node.WhenTrue.SpanStart, spaced, context);
+				Node.Print(node.WhenTrue, context);
+				AuthorTernaryBreak(node.WhenTrue.Span.End, node.ColonToken.SpanStart, spaced, context);
+				TokenPrinter.Print(node.ColonToken, context);
+				AuthorTernaryBreak(node.ColonToken.Span.End, node.WhenFalse.SpanStart, spaced, context);
+				Node.Print(node.WhenFalse, context);
+			}
+			return;
+		}
 
 		using (arena.Group())
 		using (arena.Indent())
@@ -184,6 +226,14 @@ internal static partial class Printers
 				arena.Synthetic(SyntheticText.Space);
 			Node.Print(node.WhenFalse, context);
 		}
+	}
+
+	private static void AuthorTernaryBreak(int from, int to, bool spaced, PrintContext context)
+	{
+		if (context.AuthorBroke(from, to))
+			context.Arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
+		else if (spaced)
+			context.Arena.Synthetic(SyntheticText.Space);
 	}
 
 	/// <summary>Operators csharp_space_after_unary_operator does not reach even when on — measured

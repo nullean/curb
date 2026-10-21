@@ -625,6 +625,20 @@ internal static partial class Printers
 		// second — 217 further roslyn files that never settled. The trap in docs/layout-decisions.md,
 		// walked straight into. Only the two arrow-adjacent breaks above are safe, because Curb
 		// reproduces those exactly.
+		//
+		// What is safe is the other half of the same arrow-adjacent question: where the body starts,
+		// not whether it spans lines. A body the author started on the arrow's line stays there. The
+		// group below broke as soon as the body kept a break of its own, so `=> b ?` / `1 :` / `2`
+		// gained a break after the arrow — issue #102. A ternary indents its own continuation, so it
+		// takes no second level from here, as EqualsValueClause gives it none either.
+		if (!arrowLeadsTheBody && context.AuthorJoined(node.ArrowToken.Span.End, node.Expression.SpanStart))
+		{
+			arena.Synthetic(SyntheticText.Space);
+			using (arena.IndentIf(node.Expression is not ConditionalExpressionSyntax))
+				Node.Print(node.Expression, context);
+			return;
+		}
+
 		using (arena.Group())
 		using (arena.Indent())
 		{
@@ -2132,9 +2146,12 @@ internal static partial class Printers
 			// csharp_keep_existing_linebreaks = false it currently stands down instead, never
 			// compensating. That is stable and it is the conservative direction; whether it is also
 			// right is a corpus question, not one to guess at here.
+			//
+			// A ternary the author broke anchors the same way: its `?` and `:` lines indent once from
+			// the line it starts on, not twice — issue #102.
 			var previousEnd = i == 0 ? anchorEnd : list[i - 1].Span.End;
 			var ownBlock = list[i] is ArgumentSyntax { Expression: var value }
-				&& EndsWithOwnBlock(value)
+				&& (EndsWithOwnBlock(value) || value is ConditionalExpressionSyntax)
 				&& previousEnd >= 0
 				&& context.AuthorJoined(previousEnd, list[i].SpanStart);
 
@@ -2153,10 +2170,12 @@ internal static partial class Printers
 				continue;
 			}
 
+			// OnlyIfNotAtLineStart: a trailing `// note` after the comma has already ended its own line,
+			// and a second break here made a blank one.
 			if (context.AuthorJoined(list[i].Span.End, list[i + 1].SpanStart))
 				Spacing.AfterComma(context);
 			else
-				arena.HardLine();
+				arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
 		}
 	}
 
