@@ -207,8 +207,9 @@ internal static partial class Printers
 		Spacing.BeforeOperator(context);
 
 		// A right side the author put below the operator stays there, as EqualsValueClause keeps one
-		// below an initializer's `=` — issue #102.
-		if (!BringsOwnBlock(node.Right) && context.AuthorBroke(node.OperatorToken.Span.End, node.Right.SpanStart))
+		// below an initializer's `=` — issue #102. A value with brackets of its own included (#107).
+		if (context.AuthorBroke(node.OperatorToken.Span.End, node.Right.SpanStart)
+			&& !OpensOutBelowEquals(node.Right, node.OperatorToken, context))
 		{
 			using (context.Arena.Indent())
 			{
@@ -531,6 +532,13 @@ internal static partial class Printers
 		// and produced things like a `new[]` at one indent with its brace at another.
 		var openItOut = oneMemberPerLine && spansLines;
 
+		// An array or collection initializer the author broke keeps exactly their breaks, as a
+		// collection expression does. dotnet format leaves both as written, where it opens out an
+		// object initializer that spans lines. The breakable lines below broke as soon as any member
+		// did, so `new[] { a ||` / `b }` came back with its braces on lines of their own — issue #113.
+		var exactly = asWritten
+			&& node.Kind() is SyntaxKind.ArrayInitializerExpression or SyntaxKind.CollectionInitializerExpression;
+
 		// A dictionary initializer — one whose elements are themselves brace-wrapped — is the one
 		// shape Roslyn declines to re-indent: hand `dotnet format` a `{ { "k", "v" } }` block
 		// indented four tabs too far and it leaves every line of it exactly where it is, in a way it
@@ -578,6 +586,8 @@ internal static partial class Printers
 					|| ownerSpansLines
 					|| (asWritten && context.AuthorBroke(node.SpanStart, node.Parent!.SpanStart)))
 					BeforeOpenBrace(BraceStyle.ObjectCollectionArrayInitializers, context);
+				else if (exactly)
+					arena.Synthetic(SyntheticText.Space);
 				else
 					BeforeOpenBraceWhenBroken(
 						BraceStyle.ObjectCollectionArrayInitializers, context, DocFlags.OnlyIfNotAtLineStart);
@@ -700,6 +710,8 @@ internal static partial class Printers
 		{
 			if (openItOut || (asWritten && context.AuthorBroke(from, to)))
 				arena.HardLine();
+			else if (exactly)
+				arena.Synthetic(SyntheticText.Space);
 			else
 				arena.Line();
 		}
@@ -752,17 +764,24 @@ internal static partial class Printers
 			// Soft, not the brace helpers' Normal line: EqualsValueClause and OperandOnRight already
 			// print the space that belongs here when this stays flat, so only the broken case needs
 			// anything from this line at all — a Normal line would double that space.
-			if (node.Parent is EqualsValueClauseSyntax or AssignmentExpressionSyntax
-				&& context.Options.NewLineBeforeOpenBrace.HasFlag(BraceStyle.ObjectCollectionArrayInitializers))
+			var equals = node.Parent switch
+			{
+				EqualsValueClauseSyntax clause => clause.EqualsToken,
+				AssignmentExpressionSyntax assignment => assignment.OperatorToken,
+				_ => default,
+			};
+
+			if (equals.RawKind != 0 && BraceOnOwnLine(BraceStyle.ObjectCollectionArrayInitializers, context))
 			{
 				using (arena.IndentIf(context.Options.IndentBraces))
 				{
-					// The author already broke before this bracket — keep it, the same as
-					// InitializerExpression's own asWritten-broke branch, so preservation mode does
-					// not silently join what the author split across lines.
-					if (asWritten && context.AuthorBroke(node.Parent.SpanStart, node.SpanStart))
+					// The author put the bracket on a line of its own below the `=` — keep it there. A
+					// value they broke below the `=` some other way is EqualsValueClause's to place,
+					// and one they started on the `=` line stays on it however its contents break:
+					// the line would break with them and open out `= [1,` / `2]` — issue #113.
+					if (OpensOutBelowEquals(node, equals, context))
 						arena.HardLine();
-					else
+					else if (!context.AuthorJoined(equals.Span.End, node.SpanStart))
 						arena.SoftLine(DocFlags.OnlyIfNotAtLineStart);
 				}
 			}
@@ -805,12 +824,16 @@ internal static partial class Printers
 
 		TokenPrinter.Print(node.CloseBracketToken, context);
 
+		// An edge the author left joined stays joined. A breakable line there broke as soon as any element
+		// did, which opened out `[1,` / `2]` in full — issue #113.
 		void Edge(int from, int to)
 		{
-			if (asWritten && context.AuthorBroke(from, to))
+			if (!asWritten)
+				Spacing.InsideBracketsBreakable(context);
+			else if (context.AuthorBroke(from, to))
 				arena.HardLine();
 			else
-				Spacing.InsideBracketsBreakable(context);
+				Spacing.InsideBrackets(context);
 		}
 	}
 

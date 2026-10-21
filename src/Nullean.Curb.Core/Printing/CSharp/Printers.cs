@@ -1352,6 +1352,10 @@ internal static partial class Printers
 			context.Arena.HardLine();
 	}
 
+	/// <summary>True when <c>csharp_new_line_before_open_brace</c> puts this construct's brace on a line of its own.</summary>
+	internal static bool BraceOnOwnLine(BraceStyle construct, PrintContext context) =>
+		context.Options.NewLineBeforeOpenBrace.HasFlag(construct);
+
 	/// <summary>
 	/// The source column of a block's opening brace when the author put it on a line of its own and
 	/// <see cref="BeforeOpenBrace"/> will too, or -1.
