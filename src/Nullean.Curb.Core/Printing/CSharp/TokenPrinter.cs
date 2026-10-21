@@ -489,8 +489,9 @@ internal static class TokenPrinter
 		// `Call(); // why` still keeps the one it did.
 		var separated = false;
 
-		foreach (var trivia in trailing)
+		for (var i = 0; i < trailing.Count; i++)
 		{
+			var trivia = trailing[i];
 			switch (trivia.Kind())
 			{
 				case SyntaxKind.WhitespaceTrivia:
@@ -513,11 +514,17 @@ internal static class TokenPrinter
 						// The break the enclosing printer emits next is merged into this one.
 						context.Arena.LineCommentBreak();
 					}
-					else
+					else if (i + 1 < trailing.Count
+						&& (trailing[i + 1].IsKind(SyntaxKind.WhitespaceTrivia) || trailing[i + 1].IsKind(SyntaxKind.EndOfLineTrivia)))
 					{
 						// A /* */ comment can have code after it on the same line; keep them apart,
 						// with the one space the printer may already be about to write.
 						context.Arena.Synthetic(SyntheticText.MergingSpace);
+					}
+					else
+					{
+						// Written against what follows, which dotnet format leaves alone: `{ /* c */}`.
+						context.Arena.GlueTo(trivia.Span.End);
 					}
 					break;
 
