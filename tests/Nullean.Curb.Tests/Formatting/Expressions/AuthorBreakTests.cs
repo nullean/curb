@@ -261,6 +261,82 @@ public class AuthorBreakTests : FormattingTest
 		""");
 
 	[Test]
+	public Task A_broken_ternary_after_another_argument_on_a_line_of_its_own_indents_from_that_line() => Unchanged(
+		"""
+		public class C
+		{
+		    public int M(bool b)
+		    {
+		        Call(
+		            a, b ? 1
+		                : 2);
+		        Call(x,
+		            a, b
+		                ? 1
+		                : 2);
+		    }
+		}
+		""");
+
+	[Test]
+	public Task An_expression_body_on_the_arrow_line_keeps_its_own_continuation_indent() => Unchanged(
+		"""
+		public class C
+		{
+		    public int A => Call(
+		        1,
+		        2);
+		    public int B => a +
+		        b;
+		    public Foo F => new Foo
+		    {
+		        A = 1
+		    };
+		    public int G => a
+		        .B()
+		        .C();
+		    public int J => Call(() =>
+		    {
+		        Run();
+		    });
+		}
+		""");
+
+	[Test]
+	public Task A_broken_lambda_or_switch_arm_body_stays_on_the_arrow_line() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M(bool b)
+		    {
+		        Func<bool> g = () => x.A &&
+		            x.B;
+		        Func<int> h = () => Call(
+		            x);
+		        Func<Foo> i = () => new Foo
+		        {
+		            A = x
+		        };
+		        Func<int> k = () => b
+		            ? 1
+		            : 2;
+		    }
+
+		    public int N(int x, bool b) => x switch
+		    {
+		        1 => a &&
+		            b,
+		        2 => Call(
+		            b),
+		        3 => b
+		            ? 1
+		            : 2,
+		        _ => 0,
+		    };
+		}
+		""");
+
+	[Test]
 	public Task Deterministic_layout_still_joins_what_fits() => Formats(
 		"""
 		public class C

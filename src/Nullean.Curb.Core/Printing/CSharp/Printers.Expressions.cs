@@ -689,6 +689,15 @@ internal static partial class Printers
 			return;
 		}
 
+		// A body the author started on the arrow's line stays there, as an expression-bodied member's
+		// does — the group below broke as soon as the body kept a break of its own, so `x => x.Flag` /
+		// `? a` / `: b` gained a break after the arrow (issue #102).
+		if (expression is not null && context.AuthorJoined(arrow.Span.End, expression.SpanStart))
+		{
+			BodyOnArrowLine(expression, context);
+			return;
+		}
+
 		// An expression body that itself ends with a block-bodied callback — `builder =>
 		// builder.Add(x => { … })` — already positions its own contents once that block opens.
 		// Wrapping it in a breakable group as well would let the block's hardline propagate outward
@@ -721,6 +730,22 @@ internal static partial class Printers
 			arena.Line();
 			Node.Print(expression, context);
 		}
+	}
+
+	/// <summary>Prints an arrow's body on the arrow's own line, where the author started it.</summary>
+	/// <remarks>
+	/// Only a body whose continuation lines would otherwise sit at the arrow's own level takes an indent
+	/// here. A call, a member chain, a ternary or a construct with braces of its own already positions
+	/// its continuation one level in from the line it starts on, and indenting it again put
+	/// `=> Call(` / `1)` two levels in, where dotnet format leaves it at one.
+	/// </remarks>
+	private static void BodyOnArrowLine(ExpressionSyntax body, PrintContext context)
+	{
+		var hangs = body is BinaryExpressionSyntax || !(BringsOwnBlock(body) || BreaksWithoutHelp(body));
+
+		context.Arena.Synthetic(SyntheticText.Space);
+		using (context.Arena.IndentIf(hangs))
+			Node.Print(body, context);
 	}
 
 	/// <summary>The <c>delegate (T x) { }</c> form that predates lambdas.</summary>
@@ -936,6 +961,13 @@ internal static partial class Printers
 
 		arena.Synthetic(SyntheticText.Space);
 		TokenPrinter.Print(node.EqualsGreaterThanToken, context);
+
+		// Same as a lambda's body: one the author started on the arrow's line stays there.
+		if (context.AuthorJoined(node.EqualsGreaterThanToken.Span.End, node.Expression.SpanStart))
+		{
+			BodyOnArrowLine(node.Expression, context);
+			return;
+		}
 
 		using (arena.Group())
 		using (arena.Indent())

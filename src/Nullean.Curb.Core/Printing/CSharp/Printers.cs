@@ -629,13 +629,10 @@ internal static partial class Printers
 		// What is safe is the other half of the same arrow-adjacent question: where the body starts,
 		// not whether it spans lines. A body the author started on the arrow's line stays there. The
 		// group below broke as soon as the body kept a break of its own, so `=> b ?` / `1 :` / `2`
-		// gained a break after the arrow — issue #102. A ternary indents its own continuation, so it
-		// takes no second level from here, as EqualsValueClause gives it none either.
+		// gained a break after the arrow — issue #102.
 		if (!arrowLeadsTheBody && context.AuthorJoined(node.ArrowToken.Span.End, node.Expression.SpanStart))
 		{
-			arena.Synthetic(SyntheticText.Space);
-			using (arena.IndentIf(node.Expression is not ConditionalExpressionSyntax))
-				Node.Print(node.Expression, context);
+			BodyOnArrowLine(node.Expression, context);
 			return;
 		}
 
@@ -2148,12 +2145,13 @@ internal static partial class Printers
 			// right is a corpus question, not one to guess at here.
 			//
 			// A ternary the author broke anchors the same way: its `?` and `:` lines indent once from
-			// the line it starts on, not twice — issue #102.
+			// the line it starts on, not twice — issue #102. Only on the `(` line, though: one sharing
+			// a later line with another argument is already at the list's depth.
 			var previousEnd = i == 0 ? anchorEnd : list[i - 1].Span.End;
 			var ownBlock = list[i] is ArgumentSyntax { Expression: var value }
-				&& (EndsWithOwnBlock(value) || value is ConditionalExpressionSyntax)
-				&& previousEnd >= 0
-				&& context.AuthorJoined(previousEnd, list[i].SpanStart);
+				&& (value is ConditionalExpressionSyntax
+					? anchorEnd >= 0 && context.AuthorJoined(anchorEnd, list[i].SpanStart)
+					: EndsWithOwnBlock(value) && previousEnd >= 0 && context.AuthorJoined(previousEnd, list[i].SpanStart));
 
 			using (arena.IndentIf(ownBlock, -1))
 				Node.Print(list[i], context);
