@@ -223,6 +223,20 @@ internal sealed class PrintContext(DocArena arena, SourceText text, FormatOption
 	/// <summary>How deep the printer recursion currently is, so runaway nesting fails cleanly.</summary>
 	public int Depth { get; set; }
 
+	/// <summary>The first anchor register a broken binary expression's continuation lines use.</summary>
+	/// <remarks>Above the trailing-comment and query registers, which are fixed.</remarks>
+	private const int FirstContinuationRegister = 2;
+
+	private int _continuationDepth;
+
+	/// <summary>
+	/// Claims an anchor register for one broken binary expression, nested inside any already claimed.
+	/// </summary>
+	public int EnterContinuation() => FirstContinuationRegister + _continuationDepth++;
+
+	/// <summary>Releases the register <see cref="EnterContinuation"/> claimed last.</summary>
+	public void ExitContinuation() => _continuationDepth--;
+
 	/// <summary>
 	/// Benchmark-only: make unhandled nodes emit one document per token instead of one verbatim span
 	/// per line.
@@ -282,6 +296,27 @@ internal sealed class PrintContext(DocArena arena, SourceText text, FormatOption
 	/// <remarks>The other door; see <see cref="AuthorBroke"/>. Also false in deterministic mode.</remarks>
 	public bool AuthorJoined(int start, int end) =>
 		Options.KeepExistingLinebreaks && OnSameLine(start, end);
+
+	/// <summary>The indentation, in columns, of the source line holding <paramref name="position"/>.</summary>
+	/// <remarks>Not a break decision, so it reads the source directly: it asks where a line starts, not whether it does.</remarks>
+	public int SourceIndent(int position)
+	{
+		var line = Text.Lines.GetLineFromPosition(position);
+		var tabWidth = Math.Max(1, Options.TabWidth);
+		var columns = 0;
+		for (var i = line.Start; i < line.End; i++)
+		{
+			var c = Text[i];
+			if (c == ' ')
+				columns++;
+			else if (c == '\t')
+				columns = columns - (columns % tabWidth) + tabWidth;
+			else
+				break;
+		}
+
+		return columns;
+	}
 
 	/// <summary>Blank lines between two positions, capped at one — runs of blank lines collapse.</summary>
 	/// <remarks>

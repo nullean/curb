@@ -170,6 +170,21 @@ internal readonly struct Doc
 	/// <summary>Sentinel for <see cref="DocKind.Indent"/> meaning "dedent to column 0".</summary>
 	public const int IndentToRoot = int.MinValue;
 
+	/// <summary><c>B</c> on a <see cref="DocKind.Anchor"/>: capture the column the output has reached.</summary>
+	public const int AnchorAtColumn = 0;
+
+	/// <summary>
+	/// <c>B</c> on a <see cref="DocKind.Anchor"/>: capture the indentation of the line the output is on,
+	/// whatever has been written after it.
+	/// </summary>
+	public const int AnchorAtLineIndent = 1;
+
+	/// <summary>
+	/// How far an aligned line's <c>B</c> shifts its column offset: the low bits name the register, the
+	/// rest are a signed number of columns to add to it.
+	/// </summary>
+	public const int AnchorOffsetShift = 8;
+
 	/// <summary>
 	/// <c>B</c> on a <see cref="LineType.Literal"/> line: write the configured <c>end_of_line</c>.
 	/// </summary>

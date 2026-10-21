@@ -96,6 +96,105 @@ public class OperatorTests : FormattingTest
 		}
 		""");
 
+	// Issue #100: a broken &&/||/?? chain kept its breaks but lost its continuation indent, so every
+	// operand after the first landed at the statement's own column. dotnet format leaves a
+	// continuation line where the author put it, relative to the line above.
+	[Test]
+	public Task Broken_logical_chain_keeps_operands_aligned_under_the_first() => Unchanged(
+		"""
+		public class C
+		{
+		    public static bool Binary(string trimmed)
+		    {
+		        return trimmed.Length > 0
+		               && !string.Equals(trimmed, "false", StringComparison.OrdinalIgnoreCase)
+		               && !string.Equals(trimmed, "0", StringComparison.Ordinal);
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Broken_coalesce_keeps_its_aligned_continuation() => Unchanged(
+		"""
+		public class C
+		{
+		    public static string Coalesce(string? value)
+		    {
+		        var resolved = value?.Trim()
+		                       ?? throw new InvalidOperationException("missing");
+		        return resolved;
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Broken_logical_chain_keeps_a_one_level_continuation_indent() => Unchanged(
+		"""
+		public class C
+		{
+		    public bool M(string value)
+		    {
+		        var ok = value.Length > 0
+		            || value.Length < 5;
+		        return value.Length > 0
+		            && value.Length < 5
+		            && value[0] == 'a';
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Broken_logical_chain_with_the_operator_ending_the_line_keeps_its_indent() => Unchanged(
+		"""
+		public class C
+		{
+		    public bool M(string value)
+		    {
+		        return value.Length > 0 &&
+		               value.Length < 5;
+		    }
+		}
+		""");
+
+	// Issue #101 reported the same lost indent after a property pattern.
+	[Test]
+	public Task Broken_logical_chain_after_a_pattern_keeps_its_indent() => Unchanged(
+		"""
+		public class C
+		{
+		    public bool M(object value)
+		    {
+		        return value is Version { Major: 1 } version
+		            && version.Build > 0;
+		    }
+		}
+		""");
+
+	// The continuation moves with its statement when the statement is re-indented, keeping its
+	// offset from the line above rather than its absolute column.
+	[Test]
+	public Task Broken_logical_chain_moves_with_a_reindented_statement() => Formats(
+		"""
+		public class C
+		{
+		    public bool M(string value)
+		    {
+		            return value.Length > 0
+		                   && value.Length < 5;
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public bool M(string value)
+		    {
+		        return value.Length > 0
+		               && value.Length < 5;
+		    }
+		}
+		""");
+
 	[Test]
 	public Task Is_and_as_operators() => Unchanged(
 		"""

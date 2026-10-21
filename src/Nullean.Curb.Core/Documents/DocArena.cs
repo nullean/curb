@@ -181,11 +181,23 @@ internal sealed class DocArena
 		Open(new Doc(DocKind.Indent, b: levels, groupId: groupId));
 
 	/// <summary>Captures the current output column into <paramref name="register"/>.</summary>
-	public void Anchor(int register) => Add(new Doc(DocKind.Anchor, a: register));
+	public void Anchor(int register) => Add(new Doc(DocKind.Anchor, a: register, b: Doc.AnchorAtColumn));
 
-	/// <summary>A hard break that indents to a column captured by <see cref="Anchor"/>.</summary>
-	public void AlignedLine(int register) =>
-		Add(new Doc(DocKind.Line, a: (int)LineType.Hard, b: register, flags: DocFlags.AlignToAnchor));
+	/// <summary>
+	/// Captures the indentation of the line the output is currently on into <paramref name="register"/>.
+	/// </summary>
+	/// <remarks>
+	/// The line's own indentation rather than the column reached on it, for a continuation that keeps
+	/// the offset the author gave it from the line its construct started on.
+	/// </remarks>
+	public void LineIndentAnchor(int register) => Add(new Doc(DocKind.Anchor, a: register, b: Doc.AnchorAtLineIndent));
+
+	/// <summary>
+	/// A hard break that indents to a column captured by <see cref="Anchor"/>, shifted by
+	/// <paramref name="offset"/> columns.
+	/// </summary>
+	public void AlignedLine(int register, int offset = 0) =>
+		Add(new Doc(DocKind.Line, a: (int)LineType.Hard, b: register | (offset << Doc.AnchorOffsetShift), flags: DocFlags.AlignToAnchor));
 
 	/// <summary>
 	/// A break opportunity that lands on a captured column when it is taken, and is a space when it

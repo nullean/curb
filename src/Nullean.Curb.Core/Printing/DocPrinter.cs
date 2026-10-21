@@ -50,7 +50,7 @@ internal sealed class DocPrinter
 	private bool _trimTrailingWhitespace;
 
 	/// <summary>Columns captured by <see cref="DocKind.Anchor"/>, read back by an aligned break.</summary>
-	private readonly int[] _anchors = new int[4];
+	private int[] _anchors = new int[8];
 
 	// --- round-trip risk tracking ------------------------------------------------------------
 	private int _lastSourceEnd;
@@ -164,7 +164,9 @@ internal sealed class DocPrinter
 					break;
 
 				case DocKind.Anchor:
-					_anchors[doc.A] = _column;
+					if (doc.A >= _anchors.Length)
+						Array.Resize(ref _anchors, Math.Max(doc.A + 1, _anchors.Length * 2));
+					_anchors[doc.A] = doc.B == Doc.AnchorAtLineIndent ? CurrentLineIndent() : _column;
 					i++;
 					break;
 
@@ -411,7 +413,8 @@ internal sealed class DocPrinter
 			// Tabs as far as they reach, then spaces for the remainder — what dotnet format writes,
 			// and the only way to land on a column no tab stop falls on while still honouring
 			// indent_style. Under `indent_style = space` the loop simply never fires.
-			var target = Math.Max(0, _anchors[doc.B]);
+			var register = doc.B & ((1 << Doc.AnchorOffsetShift) - 1);
+			var target = Math.Max(0, _anchors[register] + (doc.B >> Doc.AnchorOffsetShift));
 			var at = 0;
 
 			while (_useTabs && at + _tabWidth <= target)
@@ -432,6 +435,17 @@ internal sealed class DocPrinter
 		_output.Append(_indenter.For(scope.Indent));
 		_column = _indenter.ColumnsFor(scope.Indent);
 		_insideLineComment = false;
+	}
+
+	/// <summary>The indentation, in columns, of the line the output is currently on.</summary>
+	private int CurrentLineIndent()
+	{
+		var written = _output.Written;
+		var columns = 0;
+		for (var i = written.LastIndexOf('\n') + 1; i < written.Length && written[i] is ' ' or '\t'; i++)
+			columns = written[i] == '\t' ? columns - (columns % _tabWidth) + _tabWidth : columns + 1;
+
+		return columns;
 	}
 
 	/// <summary>
