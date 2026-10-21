@@ -472,4 +472,152 @@ public class CollectionBreakTests : FormattingTest
 		}
 		""",
 		editorConfig: "max_line_length = 120");
+
+	/// <summary>
+	/// A collection that opens on the <c>=&gt;</c> line stays there, with its elements one level in and its
+	/// closing bracket at the member's level. See
+	/// <see href="https://github.com/nullean/curb/issues/126">issue #126</see>.
+	/// </summary>
+	[Test]
+	public Task A_collection_on_an_expression_body_arrow_line_stays_there() => Unchanged(
+		"""
+		public class C
+		{
+		    public int[] L() => [
+		        1,
+		        2,
+		    ];
+
+		    public int[] Short() => [1, 2];
+
+		    public int[] Values => [
+		        1,
+		        2,
+		    ];
+		}
+		""");
+
+	[Test]
+	public Task A_collection_on_a_lambda_or_switch_arm_arrow_line_stays_there() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M(int k)
+		    {
+		        Func<int[]> f = () => [
+		            1,
+		            2,
+		        ];
+		        var x = k switch
+		        {
+		            0 => [
+		                1,
+		            ],
+		            1 => [1, 2],
+		            _ => new[] {
+		                3,
+		            },
+		        };
+		        Use(() => [
+		            1,
+		        ]);
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Collections_and_initializers_on_an_arrow_line_keep_their_breaks() => Unchanged(
+		"""
+		public class C
+		{
+		    public int[] Partial() => [1,
+		        2];
+
+		    public int[] Below() =>
+		        [
+		            1,
+		        ];
+
+		    public int[] Array() => new[] {
+		        1,
+		    };
+
+		    public List<int> List() => new List<int>
+		    {
+		        1,
+		    };
+		}
+		""");
+
+	[Test]
+	public Task A_collection_on_an_arrow_line_indents_with_tabs() => Unchanged(
+		"public class C\n{\n\tpublic int[] L() => [\n\t\t1,\n\t\t2,\n\t];\n\n\tpublic void M()\n\t{\n\t\tFunc<int[]> f = () => [\n\t\t\t1,\n\t\t];\n\t}\n}",
+		editorConfig: "indent_style = tab");
+
+	/// <summary>
+	/// <c>dotnet format</c> aligns a comment under a trailing comment above it in a statement or an
+	/// argument list, but leaves one between collection elements where it is.
+	/// </summary>
+	[Test]
+	public Task A_comment_under_a_trailing_comment_between_elements_stays_where_it_is() => Unchanged(
+		"""
+		public class C
+		{
+		    public int[] Values => [
+		        1, // one
+		        // two
+		        2,
+		    ];
+
+		    public void M()
+		    {
+		        int[] a = [1, // one
+		                   // two
+		                   2];
+		        var b = new[] {
+		            1, // one
+		            // two
+		            2,
+		        };
+		        var c = new List<int>
+		        {
+		            1, // one
+		            // two
+		            2,
+		        };
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_trailing_comment_after_the_arrow_adds_no_blank_line() => Unchanged(
+		"""
+		public class C
+		{
+		    public int[] Values() => // the defaults
+		        [1, 2];
+
+		    public void M()
+		    {
+		        Func<int[]> f = () => // the defaults
+		            [1, 2];
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_switch_arm_value_below_the_arrow_stays_there() => Unchanged(
+		"""
+		public class C
+		{
+		    public int[] M(int k) => k switch
+		    {
+		        0 => // zero
+		            [1],
+		        1 =>
+		            [2, 3],
+		        _ => [],
+		    };
+		}
+		""");
 }

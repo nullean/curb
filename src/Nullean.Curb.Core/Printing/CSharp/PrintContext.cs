@@ -255,6 +255,7 @@ internal sealed class PrintContext(DocArena arena, SourceText text, FormatOption
 	private int _alignedTriviaPosition = -1;
 	private int _alignedTriviaRegister;
 	private int _alignedTriviaOffset;
+	private bool _alignedTriviaElement;
 
 	/// <summary>
 	/// Lines the comments ahead of <paramref name="token"/> up with it, on the continuation line an
@@ -264,18 +265,27 @@ internal sealed class PrintContext(DocArena arena, SourceText text, FormatOption
 	/// Matched on position, like <see cref="HeaderSkipTokenPosition"/>, because the token may be the
 	/// first of an operand printed several printers further down.
 	/// </remarks>
-	public void AlignLeadingTrivia(SyntaxToken token, int register, int offset)
+	/// <param name="token">The token whose leading comments to line up.</param>
+	/// <param name="register">The anchor register the continuation line reads.</param>
+	/// <param name="offset">The column offset the continuation line reads it with.</param>
+	/// <param name="element">
+	/// The token starts a collection or initializer element. dotnet format leaves a comment there on the
+	/// element's line even directly under a trailing comment, which it aligns under elsewhere.
+	/// </param>
+	public void AlignLeadingTrivia(SyntaxToken token, int register, int offset, bool element = false)
 	{
 		_alignedTriviaPosition = token.SpanStart;
 		_alignedTriviaRegister = register;
 		_alignedTriviaOffset = offset;
+		_alignedTriviaElement = element;
 	}
 
 	/// <summary>Consumes what <see cref="AlignLeadingTrivia"/> recorded, if it was for <paramref name="token"/>.</summary>
-	public bool TryTakeLeadingTriviaAlignment(SyntaxToken token, out int register, out int offset)
+	public bool TryTakeLeadingTriviaAlignment(SyntaxToken token, out int register, out int offset, out bool element)
 	{
 		register = _alignedTriviaRegister;
 		offset = _alignedTriviaOffset;
+		element = _alignedTriviaElement;
 		if (_alignedTriviaPosition != token.SpanStart)
 			return false;
 

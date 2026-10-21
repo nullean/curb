@@ -653,7 +653,9 @@ internal static partial class Printers
 			}
 			else if (breakAfterArrow)
 			{
-				arena.HardLine();
+				// Reindent: a trailing `// note` after the arrow has already ended its line, and a second
+				// break made a blank one. The body still takes its indent on the line the comment left open.
+				arena.HardLine(DocFlags.Reindent);
 			}
 			else
 			{

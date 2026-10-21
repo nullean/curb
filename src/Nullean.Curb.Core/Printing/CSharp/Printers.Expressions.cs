@@ -184,12 +184,12 @@ internal static partial class Printers
 	/// rather than at the ambient indent with the operand stranded to its right (issue #115). A
 	/// conditional-compilation directive still goes to column 0.
 	/// </remarks>
-	private static int ContinuationLine(SyntaxToken next, int anchor, PrintContext context)
+	private static int ContinuationLine(SyntaxToken next, int anchor, PrintContext context, bool element = false)
 	{
 		var offset = context.SourceIndent(next.SpanStart);
 		context.Arena.AlignedLine(anchor, offset);
 		if (TokenPrinter.HasLeadingContent(next))
-			context.AlignLeadingTrivia(next, anchor, offset);
+			context.AlignLeadingTrivia(next, anchor, offset, element);
 		return offset;
 	}
 
@@ -201,7 +201,7 @@ internal static partial class Printers
 	private static int MemberContinuationLine(int previousEnd, SyntaxNode next, int anchor, PrintContext context)
 	{
 		context.BlankLines(context.CodeSeparation(previousEnd, EffectiveStart(next)));
-		return ContinuationLine(next.GetFirstToken(), anchor, context);
+		return ContinuationLine(next.GetFirstToken(), anchor, context, element: true);
 	}
 
 	public static void AssignmentExpression(AssignmentExpressionSyntax node, PrintContext context)
@@ -742,7 +742,7 @@ internal static partial class Printers
 		int InsideBrace(int from, SyntaxToken next)
 		{
 			if (exactly && context.AuthorBroke(from, next.SpanStart))
-				return ContinuationLine(next, anchor, context);
+				return ContinuationLine(next, anchor, context, element: true);
 
 			if (openItOut || (asWritten && context.AuthorBroke(from, next.SpanStart)))
 				arena.HardLine();
@@ -894,7 +894,7 @@ internal static partial class Printers
 			if (!asWritten)
 				Spacing.InsideBracketsBreakable(context);
 			else if (context.AuthorBroke(from, next.SpanStart))
-				return ContinuationLine(next, anchor, context);
+				return ContinuationLine(next, anchor, context, element: true);
 			else
 				Spacing.InsideBrackets(context);
 
@@ -942,11 +942,13 @@ internal static partial class Printers
 		// out: the enclosing argument list saw nothing left to preserve, emitted no break
 		// opportunity, and the statement came back as one over-long line that only the next run
 		// broke — which is to say, formatting twice did not settle.
+		// Reindent: a trailing `// note` after the arrow has already ended its line, and a second break
+		// made a blank one. The body still takes its indent on the line the comment left open.
 		if (expression is not null && context.AuthorBroke(arrow.Span.End, expression.SpanStart))
 		{
 			using (arena.Indent())
 			{
-				arena.HardLine();
+				arena.HardLine(DocFlags.Reindent);
 				Node.Print(expression, context);
 			}
 
