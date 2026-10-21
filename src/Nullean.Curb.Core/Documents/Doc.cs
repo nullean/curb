@@ -142,7 +142,8 @@ internal enum DocFlags : byte
 
 	/// <summary>
 	/// Indent this break to a column captured by a <see cref="DocKind.Anchor"/> rather than to the
-	/// enclosing scope's level. The line's <c>B</c> names the register.
+	/// enclosing scope's level. The line's <c>B</c> names the register. On a <see cref="DocKind.Indent"/>,
+	/// shift the subtree's indent to that column instead of by a number of levels.
 	/// </summary>
 	AlignToAnchor = 1 << 7,
 }

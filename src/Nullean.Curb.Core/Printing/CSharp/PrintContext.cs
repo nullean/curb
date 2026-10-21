@@ -237,6 +237,16 @@ internal sealed class PrintContext(DocArena arena, SourceText text, FormatOption
 	/// <summary>Releases the register <see cref="EnterContinuation"/> claimed last.</summary>
 	public void ExitContinuation() => _continuationDepth--;
 
+	/// <summary>
+	/// The register a case label's broken chains read their continuation lines against, instead of
+	/// claiming their own, or -1 outside a case label.
+	/// </summary>
+	/// <remarks>
+	/// dotnet format measures those lines from the line the <c>switch</c> starts on, not the label's
+	/// own, so a label it re-indents leaves its continuation lines where they were.
+	/// </remarks>
+	public int CaseLabelContinuation { get; set; } = -1;
+
 	private int _alignedTriviaPosition = -1;
 	private int _alignedTriviaRegister;
 	private int _alignedTriviaOffset;

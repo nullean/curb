@@ -551,6 +551,12 @@ internal static partial class Printers
 	{
 		var arena = context.Arena;
 
+		// A case label is not a statement, so dotnet format moves its continuation lines as far as the
+		// line `switch` starts on moved, not as far as the label itself moved — see CaseLabelContinuation.
+		var labelAnchor = HasBrokenPatternLabel(node, context) ? context.EnterContinuation() : -1;
+		if (labelAnchor >= 0)
+			arena.LineShiftAnchor(labelAnchor);
+
 		TokenPrinter.Print(node.SwitchKeyword, context);
 		Spacing.AfterControlFlowKeyword(context);
 
@@ -580,11 +586,29 @@ internal static partial class Printers
 			else
 				BeforeOpenBrace(BraceStyle.ControlBlocks, context);
 
-			PrintSwitchBody(node, context);
+			PrintSwitchBody(node, labelAnchor, context);
 		}
+
+		if (labelAnchor >= 0)
+			context.ExitContinuation();
 	}
 
-	private static void PrintSwitchBody(SwitchStatementSyntax node, PrintContext context)
+	/// <summary>Whether any of the switch's pattern labels spans lines the author broke.</summary>
+	private static bool HasBrokenPatternLabel(SwitchStatementSyntax node, PrintContext context)
+	{
+		foreach (var section in node.Sections)
+		{
+			foreach (var label in section.Labels)
+			{
+				if (label is CasePatternSwitchLabelSyntax && SpansLines(label, context))
+					return true;
+			}
+		}
+
+		return false;
+	}
+
+	private static void PrintSwitchBody(SwitchStatementSyntax node, int labelAnchor, PrintContext context)
 	{
 		var arena = context.Arena;
 		TokenPrinter.Print(node.OpenBraceToken, context);
@@ -620,7 +644,10 @@ internal static partial class Printers
 					else
 						arena.HardLine();
 
+					var outerLabelAnchor = context.CaseLabelContinuation;
+					context.CaseLabelContinuation = labelAnchor;
 					Node.Print(label, context);
+					context.CaseLabelContinuation = outerLabelAnchor;
 					labelEnd = label.Span.End;
 					firstLabel = false;
 				}
