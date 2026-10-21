@@ -173,6 +173,14 @@ internal static partial class Printers
 	{
 		var arena = context.Arena;
 		var spaced = context.Options.SpaceAroundTernaryOperator;
+
+		// Consumed as BinaryExpression consumes it: an if/while/do/lock condition already sits inside
+		// the indent that opens out its parentheses, so a broken ternary there takes no second level
+		// — issue #109. Cleared either way, so a ternary further inside the condition still indents.
+		var alreadyIndented = ReferenceEquals(context.IndentedCondition, node);
+		if (alreadyIndented)
+			context.IndentedCondition = null;
+
 		Node.Print(node.Condition, context);
 
 		// A ternary the author broke keeps exactly their breaks, before or after either operator. The
@@ -189,7 +197,7 @@ internal static partial class Printers
 				|| context.AuthorBroke(node.WhenTrue.Span.End, node.ColonToken.SpanStart)
 				|| context.AuthorBroke(node.ColonToken.Span.End, node.WhenFalse.SpanStart);
 
-			using (arena.IndentIf(broken))
+			using (arena.IndentIf(broken && !alreadyIndented))
 			{
 				AuthorTernaryBreak(node.Condition.Span.End, node.QuestionToken.SpanStart, spaced, context);
 				TokenPrinter.Print(node.QuestionToken, context);

@@ -279,6 +279,40 @@ public class AuthorBreakTests : FormattingTest
 		""");
 
 	[Test]
+	public Task A_broken_ternary_as_a_condition_indents_once() => Unchanged(
+		// The condition's parentheses already indent it, so the ternary adds no level of its own, as a
+		// broken && chain there adds none — issue #109.
+		"""
+		public class C
+		{
+		    public void M(bool b)
+		    {
+		        if (b
+		            ? x
+		            : y)
+		        {
+		        }
+		        while (b ?
+		            x :
+		            y)
+		        {
+		        }
+		        do
+		        {
+		        }
+		        while (b
+		            ? x
+		            : y);
+		        lock (b
+		            ? x
+		            : y)
+		        {
+		        }
+		    }
+		}
+		""");
+
+	[Test]
 	public Task An_expression_body_on_the_arrow_line_keeps_its_own_continuation_indent() => Unchanged(
 		"""
 		public class C

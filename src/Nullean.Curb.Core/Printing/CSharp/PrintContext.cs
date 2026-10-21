@@ -121,7 +121,7 @@ internal sealed class PrintContext(DocArena arena, SourceText text, FormatOption
 	/// <see cref="Printers.BinaryExpression"/> so every operand — not just the first — lands at that
 	/// one level. Compared by reference and cleared by the first reader, so a chain further inside the
 	/// condition — behind a cast or a prefix operator's own parentheses — is a different node and
-	/// still gets its own indent.
+	/// still gets its own indent. A broken ternary at the top of the condition reads it the same way.
 	/// </remarks>
 	public SyntaxNode? IndentedCondition { get; set; }
 
