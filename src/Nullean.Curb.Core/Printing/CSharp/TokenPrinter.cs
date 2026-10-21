@@ -117,6 +117,10 @@ internal static class TokenPrinter
 
 		var arena = context.Arena;
 
+		// The first token of a continuation line in a broken binary chain: its comments sit at its
+		// column, where dotnet format puts them, rather than at the ambient indent.
+		var aligned = context.TryTakeLeadingTriviaAlignment(token, out var alignRegister, out var alignOffset);
+
 		// Blank lines are only preserved *between* things, never introduced at the start of a run,
 		// and never more than one however many the source had.
 		var pendingNewLines = 0;
@@ -223,6 +227,11 @@ internal static class TokenPrinter
 					{
 						arena.AlignedLine(TrailingCommentAnchor);
 						alignedRun = true;
+					}
+					else if (aligned)
+					{
+						arena.AlignedLine(alignRegister, alignOffset);
+						alignedRun = false;
 					}
 					else
 					{
@@ -374,6 +383,11 @@ internal static class TokenPrinter
 				pendingNewLines = Math.Min(pendingNewLines, 1);
 			FlushBlankLine(arena, ref pendingNewLines, emittedAnything);
 		}
+
+		// The break after the last comment or directive went to the ambient indent; the aligned line
+		// reuses it, and moves the token back to its own column.
+		if (aligned && emittedAnything)
+			arena.AlignedLine(alignRegister, alignOffset);
 	}
 
 	/// <summary>Register holding the column of the most recent trailing comment.</summary>

@@ -50,7 +50,19 @@ internal sealed class DocPrinter
 	private bool _trimTrailingWhitespace;
 
 	/// <summary>Columns captured by <see cref="DocKind.Anchor"/>, read back by an aligned break.</summary>
-	private readonly int[] _anchors = new int[4];
+	private int[] _anchors = new int[8];
+
+	/// <summary>
+	/// Line-shift registers anchored before the current line had any text, waiting for its first.
+	/// </summary>
+	private int[] _pendingAnchors = new int[8];
+	private int _pendingAnchorCount;
+
+	/// <summary>Whether the current line has had any text written to it.</summary>
+	private bool _lineOpen;
+
+	/// <summary>Where in the source the current line's first text came from, or -1 if it was synthetic.</summary>
+	private int _lineSource;
 
 	// --- round-trip risk tracking ------------------------------------------------------------
 	private int _lastSourceEnd;
@@ -84,6 +96,8 @@ internal sealed class DocPrinter
 		_depth = 0;
 		_lastSourceEnd = -1;
 		_insideLineComment = false;
+		_lineOpen = false;
+		_pendingAnchorCount = 0;
 		RoundTripAtRisk = false;
 
 		_breaks.Run(arena);
@@ -146,6 +160,8 @@ internal sealed class DocPrinter
 				case DocKind.SrcText:
 					{
 						var text = _source.Span.Slice(doc.A, doc.B);
+						if (!_lineOpen)
+							OpenLine(text, doc.A);
 						TrackRoundTripRisk(doc, text);
 						Emit(text, doc.Flags, scope.SuppressWidth);
 						_lastSourceEnd = doc.A + doc.B;
@@ -154,17 +170,35 @@ internal sealed class DocPrinter
 					}
 
 				case DocKind.SynText:
+					if (!_lineOpen)
+						OpenLine(SyntheticText.Get(doc.A), -1);
 					Emit(SyntheticText.Get(doc.A), doc.Flags, scope.SuppressWidth);
 					i++;
 					break;
 
 				case DocKind.ExternalText:
+					if (!_lineOpen)
+						OpenLine(_arena.ExternalTexts[doc.A], -1);
 					Emit(_arena.ExternalTexts[doc.A], doc.Flags, scope.SuppressWidth);
 					i++;
 					break;
 
 				case DocKind.Anchor:
-					_anchors[doc.A] = _column;
+					if (doc.A >= _anchors.Length)
+						Array.Resize(ref _anchors, Math.Max(doc.A + 1, _anchors.Length * 2));
+					if (doc.B == Doc.AnchorAtColumn)
+						_anchors[doc.A] = _column;
+					else if (_lineOpen)
+						_anchors[doc.A] = LineShift(anchoredAtLineStart: false);
+					else
+					{
+						// Nothing on the line yet says which source line it is; the first text will.
+						_anchors[doc.A] = Doc.AnchorUnset;
+						if (_pendingAnchorCount == _pendingAnchors.Length)
+							Array.Resize(ref _pendingAnchors, _pendingAnchors.Length * 2);
+						_pendingAnchors[_pendingAnchorCount++] = doc.A;
+					}
+
 					i++;
 					break;
 
@@ -370,6 +404,7 @@ internal sealed class DocPrinter
 			});
 			_column = 0;
 			_insideLineComment = false;
+			_lineOpen = false;
 			return;
 		}
 
@@ -397,6 +432,7 @@ internal sealed class DocPrinter
 			_output.Append(_indenter.For(scope.Indent));
 			_column = _indenter.ColumnsFor(scope.Indent);
 			_insideLineComment = false;
+			_lineOpen = false;
 			return;
 		}
 
@@ -411,7 +447,17 @@ internal sealed class DocPrinter
 			// Tabs as far as they reach, then spaces for the remainder — what dotnet format writes,
 			// and the only way to land on a column no tab stop falls on while still honouring
 			// indent_style. Under `indent_style = space` the loop simply never fires.
-			var target = Math.Max(0, _anchors[doc.B]);
+			var anchor = _anchors[doc.B & ((1 << Doc.AnchorOffsetShift) - 1)];
+			_insideLineComment = false;
+			_lineOpen = false;
+			if (anchor == Doc.AnchorUnset)
+			{
+				_output.Append(_indenter.For(scope.Indent));
+				_column = _indenter.ColumnsFor(scope.Indent);
+				return;
+			}
+
+			var target = Math.Max(0, anchor + (doc.B >> Doc.AnchorOffsetShift));
 			var at = 0;
 
 			while (_useTabs && at + _tabWidth <= target)
@@ -424,7 +470,6 @@ internal sealed class DocPrinter
 				_output.Append(' ');
 
 			_column = target;
-			_insideLineComment = false;
 			return;
 		}
 
@@ -432,6 +477,65 @@ internal sealed class DocPrinter
 		_output.Append(_indenter.For(scope.Indent));
 		_column = _indenter.ColumnsFor(scope.Indent);
 		_insideLineComment = false;
+		_lineOpen = false;
+	}
+
+	/// <summary>
+	/// Notes where the current line's first text came from, and settles the line-shift anchors that
+	/// were waiting for it.
+	/// </summary>
+	/// <remarks>Whitespace does not open the line; it is not what the line starts with.</remarks>
+	private void OpenLine(ReadOnlySpan<char> text, int sourceStart)
+	{
+		var leading = 0;
+		while (leading < text.Length && text[leading] is ' ' or '\t')
+			leading++;
+
+		if (leading == text.Length)
+			return;
+
+		_lineOpen = true;
+		_lineSource = sourceStart < 0 ? -1 : sourceStart + leading;
+
+		for (var i = 0; i < _pendingAnchorCount; i++)
+			_anchors[_pendingAnchors[i]] = LineShift(anchoredAtLineStart: true);
+		_pendingAnchorCount = 0;
+	}
+
+	/// <summary>
+	/// How far the current line has moved from its source line, in columns — see
+	/// <see cref="Doc.AnchorAtLineShift"/>.
+	/// </summary>
+	/// <param name="anchoredAtLineStart">
+	/// The anchored construct opened this line itself. If it did not open its source line too, Curb
+	/// moved it here, and its continuation lines have nothing to keep their offset from.
+	/// </param>
+	private int LineShift(bool anchoredAtLineStart)
+	{
+		if (_lineSource < 0)
+			return Doc.AnchorUnset;
+
+		var source = _source.Span;
+		var lineStart = _lineSource;
+		while (lineStart > 0 && source[lineStart - 1] is ' ' or '\t')
+			lineStart--;
+
+		// Broken before mid-line, by Curb or by dotnet format alike: dotnet format leaves the lines
+		// after it at their source columns.
+		if (lineStart > 0 && source[lineStart - 1] != '\n')
+			return anchoredAtLineStart ? Doc.AnchorUnset : 0;
+
+		return IndentWidth(_output.Written[(_output.Written.LastIndexOf('\n') + 1)..]) - IndentWidth(source[lineStart.._lineSource]);
+	}
+
+	/// <summary>The width, in columns, of the spaces and tabs <paramref name="line"/> starts with.</summary>
+	private int IndentWidth(ReadOnlySpan<char> line)
+	{
+		var columns = 0;
+		for (var i = 0; i < line.Length && line[i] is ' ' or '\t'; i++)
+			columns = line[i] == '\t' ? columns - (columns % _tabWidth) + _tabWidth : columns + 1;
+
+		return columns;
 	}
 
 	/// <summary>
