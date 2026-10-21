@@ -195,29 +195,22 @@ public class OperatorTests : FormattingTest
 		}
 		""");
 
-	// The offset is only meaningful while the first operand keeps its place on its line. Here Curb
-	// moves it onto a line of its own, and an offset measured from the declaration's line pushed
-	// the continuation 27 columns past it; it breaks to the ambient indent instead, under the first.
+	// A body the author started on the arrow's line stays there (issue #102), so the first operand
+	// keeps its place and the continuation keeps the column the author aligned it to, as dotnet
+	// format leaves it. Before that, Curb moved the first operand below the arrow and these lines
+	// fell back to the ambient indent.
 	[Test]
-	public Task Broken_logical_chain_whose_first_operand_curb_moves_aligns_under_it() => Formats(
+	public Task Broken_logical_chain_after_an_arrow_keeps_its_aligned_column() => Unchanged(
 		"""
 		public class C
 		{
 		    public bool M(int a, int b) => a > 0 &&
 		                                   b > 0;
 		}
-		""",
-		"""
-		public class C
-		{
-		    public bool M(int a, int b) =>
-		        a > 0 &&
-		        b > 0;
-		}
 		""");
 
 	[Test]
-	public Task Broken_coalesce_in_a_lambda_curb_breaks_aligns_under_its_first_operand() => Formats(
+	public Task Broken_coalesce_in_a_lambda_keeps_its_aligned_column() => Unchanged(
 		"""
 		public class C
 		{
@@ -225,17 +218,6 @@ public class OperatorTests : FormattingTest
 		    {
 		        Use(x => x ??
 		                 b);
-		    }
-		}
-		""",
-		"""
-		public class C
-		{
-		    public void M(string a, string b)
-		    {
-		        Use(x =>
-		                x ??
-		                b);
 		    }
 		}
 		""");

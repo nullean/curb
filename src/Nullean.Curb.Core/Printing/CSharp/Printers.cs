@@ -2156,13 +2156,33 @@ internal static partial class Printers
 				AttributeArgumentSyntax argument => argument.Expression,
 				_ => null,
 			};
-			var ownBlock = value is not null
-				&& (EndsWithOwnBlock(value)
-					? previousEnd >= 0 && context.AuthorJoined(previousEnd, list[i].SpanStart)
-					: IndentsOwnContinuation(value) && anchorEnd >= 0 && context.AuthorJoined(anchorEnd, list[i].SpanStart));
+			var endsWithOwnBlock = value is not null && EndsWithOwnBlock(value);
+			var indentsItself = value is not null && !endsWithOwnBlock && IndentsOwnContinuation(value);
+			var ownBlock = endsWithOwnBlock
+				? previousEnd >= 0 && context.AuthorJoined(previousEnd, list[i].SpanStart)
+				: indentsItself && anchorEnd >= 0 && context.AuthorJoined(anchorEnd, list[i].SpanStart);
+
+			// The level only says where a continuation goes when there is nothing better. dotnet format
+			// leaves each one at the offset the author gave it from the line its argument starts on,
+			// moved as far as that line moved, whether that is one level, two or a hand-aligned column.
+			// Reading the level alone moved a continuation written two levels in to one.
+			var continuation = indentsItself ? ContinuationIndent(list[i], context) : -1;
 
 			using (arena.IndentIf(ownBlock, -1))
-				Node.Print(list[i], context);
+			{
+				if (continuation < 0)
+					Node.Print(list[i], context);
+				else
+				{
+					// The argument's first continuation line sits one level into the subtree, so the
+					// subtree is based a level to the left of where that line belongs.
+					var register = context.EnterContinuation();
+					arena.LineShiftAnchor(register);
+					using (arena.AlignedIndent(register, continuation - context.LevelColumns))
+						Node.Print(list[i], context);
+					context.ExitContinuation();
+				}
+			}
 
 			if (i >= list.SeparatorCount)
 				continue;
@@ -2763,6 +2783,59 @@ internal static partial class Printers
 			CastExpressionSyntax cast => IndentsOwnContinuation(cast.Expression),
 			_ => false,
 		};
+
+	/// <summary>
+	/// The source indent, in columns, of the first line inside <paramref name="node"/> after the one it
+	/// starts on, or -1 when the author kept it on one line or that line says nothing about its offset.
+	/// </summary>
+	/// <remarks>
+	/// <para>
+	/// Blank lines, comment lines and the inside of a multi-line string are passed over: only a line
+	/// that starts with a token of its own says where the author put a continuation.
+	/// </para>
+	/// <para>
+	/// A line that starts with a brace or a closing token answers -1. Those sit at the level of the
+	/// line their construct starts on, not a level in from it, so they cannot stand for the
+	/// continuation one level into the subtree, and reading one as if it did moved the argument a
+	/// level left on every run.
+	/// </para>
+	/// </remarks>
+	private static int ContinuationIndent(SyntaxNode node, PrintContext context)
+	{
+		if (!SpansLines(node, context))
+			return -1;
+
+		var text = context.Text;
+		var lines = text.Lines;
+		var end = node.Span.End;
+
+		for (var number = lines.GetLineFromPosition(node.SpanStart).LineNumber + 1; number < lines.Count; number++)
+		{
+			var line = lines[number];
+			if (line.Start >= end)
+				break;
+
+			var first = line.Start;
+			while (first < line.End && text[first] is ' ' or '\t')
+				first++;
+
+			if (first == line.End || first >= end)
+				continue;
+
+			var token = node.FindToken(first);
+			if (token.SpanStart != first)
+				continue;
+
+			return token.Kind() is SyntaxKind.OpenBraceToken
+				or SyntaxKind.CloseBraceToken
+				or SyntaxKind.CloseParenToken
+				or SyntaxKind.CloseBracketToken
+				? -1
+				: context.SourceIndent(first);
+		}
+
+		return -1;
+	}
 
 	private static bool LastArgumentEndsWithOwnBlock(BaseArgumentListSyntax? arguments) =>
 		arguments is { Arguments.Count: > 0 }

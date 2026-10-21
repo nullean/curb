@@ -24,7 +24,7 @@ public class ContinuationIndentTests : FormattingTest
 		""");
 
 	[Test]
-	public Task A_nested_call_argument_indented_twice_comes_back_to_one_level() => Formats(
+	public Task A_continuation_written_two_levels_in_stays_there() => Unchanged(
 		"""
 		public class C
 		{
@@ -35,6 +35,43 @@ public class ContinuationIndentTests : FormattingTest
 		        var flagged = items.Where(x =>
 		                x.IsEnabled &&
 		                x.IsVisible);
+		        var r = items.Select(x => x.Flag
+		                ? x.A
+		                : x.B);
+		        Foo(x =>
+		                x.Bar(
+		                    y));
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_continuation_aligned_to_a_column_stays_there() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        Outer(Inner(
+		              aligned));
+		        Foo(x => x
+		                  .Where(y => y)
+		                  .ToList());
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_reindented_statement_takes_its_two_level_continuation_along() => Formats(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		            Outer(Inner(
+		                    value));
+		    var flagged = items.Where(x => x.IsEnabled &&
+		            x.IsVisible);
 		    }
 		}
 		""",
@@ -44,13 +81,64 @@ public class ContinuationIndentTests : FormattingTest
 		    public void M()
 		    {
 		        Outer(Inner(
-		            value));
-		        var flagged = items.Where(x =>
-		            x.IsEnabled &&
-		            x.IsVisible);
+		                value));
+		        var flagged = items.Where(x => x.IsEnabled &&
+		                x.IsVisible);
 		    }
 		}
 		""");
+
+	[Test]
+	public Task A_continuation_off_the_tab_stops_keeps_its_column() => Unchanged(
+		"public class C\n{\n\tpublic void M()\n\t{\n\t\tOuter(Inner(\n\t\t\t  offstop));\n\t\tOuter(Inner(\n\t\t\t\ttwo));\n\t}\n}",
+		editorConfig: "indent_style = tab");
+
+	[Test]
+	public Task A_reindented_statement_off_the_tab_stops_moves_its_continuation_with_it() => Formats(
+		"public class C\n{\n\tpublic void M()\n\t{\n\t\t\tOuter(Inner(\n\t\t\t      reindented));\n\t}\n}",
+		"public class C\n{\n\tpublic void M()\n\t{\n\t\tOuter(Inner(\n\t\t\t  reindented));\n\t}\n}",
+		editorConfig: "indent_style = tab");
+
+	[Test]
+	public Task An_argument_starting_after_another_argument_s_continuation_keeps_its_offset() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        Foo(Bar(
+		            a), Baz(
+		            b));
+		        Outer(
+		            first, Inner(
+		                    value));
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_brace_or_a_multi_line_string_does_not_stand_for_the_continuation() => Unchanged(
+		""""
+		public class C
+		{
+		    public void M()
+		    {
+		        Foo(Bar(x =>
+		        {
+		            Run();
+		        }, a));
+		        Foo(Bar(new C
+		        {
+		            A = 1,
+		        }, a));
+		        Foo(Bar(
+		            """
+		            raw
+		            """,
+		            b));
+		    }
+		}
+		"""");
 
 	[Test]
 	public Task A_nested_call_with_several_arguments_continues_one_level_in() => Unchanged(
