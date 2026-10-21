@@ -732,8 +732,9 @@ internal static partial class Printers
 	/// leaves it, at whatever column the author chose. Joining it back onto the keyword lengthened the
 	/// line, and the continuation lines of a chain it started kept a column measured from a line that
 	/// was no longer there (issue #117). A comment ahead of the value goes on the value's column.
-	/// The value prints one level in, so a construct inside it that indents from the ambient level, a
-	/// call's arguments or an initializer's braces, stays where dotnet format leaves it too.
+	/// The value's own lines, a call's arguments or an initializer's braces, sit as far in from the
+	/// value's line as they would from the indent, however deep the author put it. Should the anchor
+	/// have nothing to measure from, the value falls back to one level in.
 	/// </remarks>
 	private static void ValueAfterKeyword(SyntaxToken keyword, ExpressionSyntax value, PrintContext context)
 	{
@@ -750,8 +751,9 @@ internal static partial class Printers
 		context.Arena.LineShiftAnchor(anchor);
 		using (context.Arena.Indent())
 		{
-			ContinuationLine(value.GetFirstToken(), anchor, context);
-			Node.Print(value, context);
+			var offset = ContinuationLine(value.GetFirstToken(), anchor, context);
+			using (context.Arena.AlignedIndent(anchor, offset))
+				Node.Print(value, context);
 		}
 
 		context.ExitContinuation();

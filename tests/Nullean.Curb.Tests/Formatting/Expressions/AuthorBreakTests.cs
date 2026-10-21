@@ -648,6 +648,108 @@ public class AuthorBreakTests : FormattingTest
 		"public class C\n{\n\tpublic bool M(bool a, bool b)\n\t{\n\t\treturn\n\t\t\t// why\n\t\t\ta\n\t\t\t&& b;\n\t}\n\n\tpublic int N(int value)\n\t{\n\t\treturn // why\n\t\t\tvalue;\n\t}\n}",
 		editorConfig: "indent_style = tab");
 
+	// A value the author indented deeper than one level keeps its own lines under it, rather than
+	// letting a call's arguments or an initializer's braces fall back to the one-level position.
+	[Test]
+	public Task A_value_indented_deeper_below_return_keeps_its_own_lines_under_it() => Unchanged(
+		"""
+		public class C
+		{
+		    public int Call(int value)
+		    {
+		        return
+		                Math.Max(
+		                    value,
+		                    1);
+		    }
+
+		    public Foo Init(int value)
+		    {
+		        return
+		                new Foo
+		                {
+		                    X = value,
+		                };
+		    }
+
+		    public void Throw()
+		    {
+		        throw
+		                new ArgumentException(
+		                    "bad");
+		    }
+
+		    public Func<int> Lambda(int value)
+		    {
+		        return
+		                () =>
+		                {
+		                    return value;
+		                };
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_value_indented_deeper_below_return_moves_with_a_reindented_statement() => Formats(
+		"""
+		public class C
+		{
+		    public int M(int value)
+		    {
+		            return
+		                    Math.Max(
+		                        value,
+		                        1);
+		    }
+
+		    public int N(int n, int value)
+		    {
+		        switch (n)
+		        {
+		            case 1: return
+		                        Math.Max(
+		                            value,
+		                            1);
+		            default:
+		                return 0;
+		        }
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public int M(int value)
+		    {
+		        return
+		                Math.Max(
+		                    value,
+		                    1);
+		    }
+
+		    public int N(int n, int value)
+		    {
+		        switch (n)
+		        {
+		            case 1:
+		                return
+		                        Math.Max(
+		                            value,
+		                            1);
+		            default:
+		                return 0;
+		        }
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_value_indented_deeper_below_return_keeps_its_own_lines_under_tabs() => Formats(
+		"public class C\n{\n\tpublic int M(int value)\n\t{\n\t\t\treturn\n\t\t\t\t\tMath.Max(\n\t\t\t\t\t\tvalue,\n\t\t\t\t\t\t1);\n\t}\n\n\tpublic Foo N(int value)\n\t{\n\t\treturn\n\t\t\t\tnew Foo\n\t\t\t\t{\n\t\t\t\t\tX = value,\n\t\t\t\t};\n\t}\n}",
+		"public class C\n{\n\tpublic int M(int value)\n\t{\n\t\treturn\n\t\t\t\tMath.Max(\n\t\t\t\t\tvalue,\n\t\t\t\t\t1);\n\t}\n\n\tpublic Foo N(int value)\n\t{\n\t\treturn\n\t\t\t\tnew Foo\n\t\t\t\t{\n\t\t\t\t\tX = value,\n\t\t\t\t};\n\t}\n}",
+		editorConfig: "indent_style = tab");
+
 	[Test]
 	public Task Deterministic_layout_joins_a_value_below_return_that_fits() => Formats(
 		"""
