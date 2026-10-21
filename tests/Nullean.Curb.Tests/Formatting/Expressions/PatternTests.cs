@@ -313,6 +313,72 @@ public class PatternTests : FormattingTest
 		}
 		""");
 
+	[Test]
+	public Task Multiline_property_pattern_after_not_is_kept() => Unchanged(
+		"""
+		public class C
+		{
+		    public bool M(object value)
+		    {
+		        return value is not
+		        {
+		            Length: 0,
+		            Count: 1,
+		        };
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Multiline_empty_property_pattern_is_kept() => Unchanged(
+		"""
+		public class C
+		{
+		    public bool M(object value)
+		    {
+		        return value is Version
+		        {
+		        } version;
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Empty_property_pattern_with_a_comment_keeps_it_at_the_members_level() => Unchanged(
+		"""
+		public class C
+		{
+		    public bool M(object value)
+		    {
+		        return value is Version
+		        {
+		            // nothing to match
+		        };
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Empty_property_pattern_brace_follows_the_initializer_brace_option() => Formats(
+		"""
+		public class C {
+		    public bool M(object value) {
+		        return value is Version
+		        {
+		        };
+		    }
+		}
+		""",
+		"""
+		public class C {
+		    public bool M(object value) {
+		        return value is Version {
+		        };
+		    }
+		}
+		""",
+		editorConfig: "csharp_new_line_before_open_brace = none");
+
 	// ---- deterministic: a pattern that fits is joined, and the comma follows the options ------------
 
 	[Test]

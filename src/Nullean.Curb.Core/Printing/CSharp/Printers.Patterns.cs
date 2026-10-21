@@ -180,11 +180,40 @@ internal static partial class Printers
 			}
 			else
 			{
+				// `Version` / `{` / `}` — an empty pattern the author opened out stays opened out, with its
+				// brace placed by the same flag as a populated one's.
 				if (hasPrecedingContent)
-					arena.Synthetic(SyntheticText.Space);
+				{
+					if (context.AuthorBroke(property.OpenBraceToken.GetPreviousToken().Span.End, property.OpenBraceToken.SpanStart))
+						BeforeOpenBrace(BraceStyle.ObjectCollectionArrayInitializers, context);
+					else
+						arena.Synthetic(SyntheticText.Space);
+				}
+
 				TokenPrinter.Print(property.OpenBraceToken, context);
-				arena.Synthetic(SyntheticText.Space);
-				TokenPrinter.Print(property.CloseBraceToken, context);
+
+				if (TokenPrinter.HasLeadingContent(property.CloseBraceToken))
+				{
+					// A comment above the closing brace is its leading trivia; printed inside the indent it
+					// sits where a member would, as an empty initializer's does.
+					using (arena.Indent())
+					{
+						arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
+						TokenPrinter.PrintLeadingTrivia(property.CloseBraceToken, context, trailingBreak: false);
+					}
+
+					using (arena.IndentIf(context.Options.IndentBraces))
+						arena.HardLine(DocFlags.Reindent);
+				}
+				else if (context.AuthorBroke(property.OpenBraceToken.Span.End, property.CloseBraceToken.SpanStart))
+				{
+					using (arena.IndentIf(context.Options.IndentBraces))
+						arena.HardLine();
+				}
+				else
+					arena.Synthetic(SyntheticText.Space);
+
+				TokenPrinter.PrintWithoutLeadingTrivia(property.CloseBraceToken, context);
 			}
 		}
 
@@ -239,7 +268,13 @@ internal static partial class Printers
 	public static void UnaryPattern(UnaryPatternSyntax node, PrintContext context)
 	{
 		TokenPrinter.Print(node.OperatorToken, context);
-		context.Arena.Synthetic(SyntheticText.Space);
+
+		// `is not` / `{ … }` — a break the author put after `not` is theirs, as one after `is` or `or` is.
+		if (context.AuthorBroke(node.OperatorToken.Span.End, node.Pattern.SpanStart))
+			context.Arena.HardLine();
+		else
+			context.Arena.Synthetic(SyntheticText.Space);
+
 		Node.Print(node.Pattern, context);
 	}
 
