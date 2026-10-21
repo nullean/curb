@@ -124,12 +124,14 @@ internal static partial class Printers
 		var breakBefore = context.AuthorBroke(node.Left.Span.End, node.OperatorToken.SpanStart);
 		var breakAfter = context.AuthorBroke(node.OperatorToken.Span.End, node.Right.SpanStart);
 
-		// The line the expression starts on is only known once printed, so its indentation is
+		// How far the line the expression starts on moved is only known once it is printed, so it is
 		// captured there — in a register of this chain's own, since an operand may hold a chain of
-		// its own that captures another before this one's continuation lines read theirs.
+		// its own that captures another before this one's continuation lines read theirs. Where Curb
+		// moves the first operand onto a line of its own there is nothing to measure from, and the
+		// continuation lines break to the ambient indent instead.
 		var anchor = breakBefore || breakAfter ? context.EnterContinuation() : -1;
 		if (anchor >= 0)
-			context.Arena.LineIndentAnchor(anchor);
+			context.Arena.LineShiftAnchor(anchor);
 
 		Node.Print(node.Left, context);
 
@@ -138,7 +140,7 @@ internal static partial class Printers
 		// reach of the align-under-a-trailing-comment rule on the next run. OnlyIfNotAtLineStart does
 		// the same on the fallback.
 		if (breakBefore)
-			ContinuationLine(node, node.OperatorToken, anchor, DocFlags.OnlyIfNotAtLineStart, context);
+			ContinuationLine(node.OperatorToken, anchor, DocFlags.OnlyIfNotAtLineStart, context);
 		else
 			Spacing.BeforeOperator(context);
 
@@ -146,7 +148,7 @@ internal static partial class Printers
 
 		if (breakAfter)
 		{
-			ContinuationLine(node, node.Right.GetFirstToken(), anchor, DocFlags.None, context);
+			ContinuationLine(node.Right.GetFirstToken(), anchor, DocFlags.None, context);
 			Node.Print(node.Right, context);
 		}
 		else
@@ -157,15 +159,15 @@ internal static partial class Printers
 	}
 
 	/// <summary>
-	/// Breaks before <paramref name="next"/>, indenting it as far from the line <paramref name="node"/>
-	/// starts on as the author did.
+	/// Breaks before <paramref name="next"/>, moving it as far as the line the expression starts on
+	/// moved.
 	/// </summary>
 	/// <remarks>
 	/// A comment or directive ahead of <paramref name="next"/> prints at the ambient indent on its own
 	/// line, so the break stays there too rather than leaving the comment stranded to the left of the
 	/// operand it introduces.
 	/// </remarks>
-	private static void ContinuationLine(SyntaxNode node, SyntaxToken next, int anchor, DocFlags fallbackFlags, PrintContext context)
+	private static void ContinuationLine(SyntaxToken next, int anchor, DocFlags fallbackFlags, PrintContext context)
 	{
 		if (TokenPrinter.HasLeadingContent(next))
 		{
@@ -173,8 +175,7 @@ internal static partial class Printers
 			return;
 		}
 
-		var offset = context.SourceIndent(next.SpanStart) - context.SourceIndent(node.SpanStart);
-		context.Arena.AlignedLine(anchor, offset);
+		context.Arena.AlignedLine(anchor, context.SourceIndent(next.SpanStart));
 	}
 
 	public static void AssignmentExpression(AssignmentExpressionSyntax node, PrintContext context)

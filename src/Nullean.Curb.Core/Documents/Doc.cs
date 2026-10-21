@@ -174,10 +174,23 @@ internal readonly struct Doc
 	public const int AnchorAtColumn = 0;
 
 	/// <summary>
-	/// <c>B</c> on a <see cref="DocKind.Anchor"/>: capture the indentation of the line the output is on,
-	/// whatever has been written after it.
+	/// <c>B</c> on a <see cref="DocKind.Anchor"/>: capture how far the line the output is on has moved
+	/// from where it sat in the source, so a source indent read back against it moves the same distance.
 	/// </summary>
-	public const int AnchorAtLineIndent = 1;
+	/// <remarks>
+	/// Captured once the line's first text is written, since that is what says which source line it is.
+	/// A line that starts with a token which sat mid-line in the source has not moved at all: the lines
+	/// after it keep their source columns, as <c>dotnet format</c> leaves them. One that starts with
+	/// synthetic text, or with the anchored construct itself moved there from mid-line, has no source
+	/// line to measure from and captures <see cref="AnchorUnset"/>.
+	/// </remarks>
+	public const int AnchorAtLineShift = 1;
+
+	/// <summary>
+	/// A register a line-shift anchor declined to fill. An aligned line reading it breaks to the
+	/// enclosing indent instead.
+	/// </summary>
+	public const int AnchorUnset = int.MinValue;
 
 	/// <summary>
 	/// How far an aligned line's <c>B</c> shifts its column offset: the low bits name the register, the

@@ -184,17 +184,20 @@ internal sealed class DocArena
 	public void Anchor(int register) => Add(new Doc(DocKind.Anchor, a: register, b: Doc.AnchorAtColumn));
 
 	/// <summary>
-	/// Captures the indentation of the line the output is currently on into <paramref name="register"/>.
+	/// Captures into <paramref name="register"/> how far the line the output is on has moved from its
+	/// source position — see <see cref="Doc.AnchorAtLineShift"/>.
 	/// </summary>
 	/// <remarks>
-	/// The line's own indentation rather than the column reached on it, for a continuation that keeps
-	/// the offset the author gave it from the line its construct started on.
+	/// For a continuation that keeps the offset the author gave it from the line its construct started
+	/// on: an <see cref="AlignedLine"/> reading the register with the continuation's source indent as
+	/// its offset lands where <c>dotnet format</c> would leave it.
 	/// </remarks>
-	public void LineIndentAnchor(int register) => Add(new Doc(DocKind.Anchor, a: register, b: Doc.AnchorAtLineIndent));
+	public void LineShiftAnchor(int register) => Add(new Doc(DocKind.Anchor, a: register, b: Doc.AnchorAtLineShift));
 
 	/// <summary>
 	/// A hard break that indents to a column captured by <see cref="Anchor"/>, shifted by
-	/// <paramref name="offset"/> columns.
+	/// <paramref name="offset"/> columns. A register <see cref="LineShiftAnchor"/> left unset breaks to
+	/// the enclosing indent instead.
 	/// </summary>
 	public void AlignedLine(int register, int offset = 0) =>
 		Add(new Doc(DocKind.Line, a: (int)LineType.Hard, b: register | (offset << Doc.AnchorOffsetShift), flags: DocFlags.AlignToAnchor));

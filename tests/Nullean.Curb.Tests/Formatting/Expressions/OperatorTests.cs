@@ -195,6 +195,79 @@ public class OperatorTests : FormattingTest
 		}
 		""");
 
+	// The offset is only meaningful while the first operand keeps its place on its line. Here Curb
+	// moves it onto a line of its own, and an offset measured from the declaration's line pushed
+	// the continuation 27 columns past it; it breaks to the ambient indent instead, under the first.
+	[Test]
+	public Task Broken_logical_chain_whose_first_operand_curb_moves_aligns_under_it() => Formats(
+		"""
+		public class C
+		{
+		    public bool M(int a, int b) => a > 0 &&
+		                                   b > 0;
+		}
+		""",
+		"""
+		public class C
+		{
+		    public bool M(int a, int b) =>
+		        a > 0 &&
+		        b > 0;
+		}
+		""");
+
+	[Test]
+	public Task Broken_coalesce_in_a_lambda_curb_breaks_aligns_under_its_first_operand() => Formats(
+		"""
+		public class C
+		{
+		    public void M(string a, string b)
+		    {
+		        Use(x => x ??
+		                 b);
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M(string a, string b)
+		    {
+		        Use(x =>
+		                x ??
+		                b);
+		    }
+		}
+		""");
+
+	// Expanding the accessor breaks before `return`, which sat mid-line. dotnet format leaves the
+	// line after it at its source column rather than moving it by however far `return` moved.
+	[Test]
+	public Task Broken_logical_chain_in_an_expanded_block_keeps_its_source_column() => Formats(
+		"""
+		public class C
+		{
+		    public bool P
+		    {
+		        get { return A > 0 &&
+		                     B > 0; }
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public bool P
+		    {
+		        get
+		        {
+		            return A > 0 &&
+		                     B > 0;
+		        }
+		    }
+		}
+		""");
+
 	[Test]
 	public Task Is_and_as_operators() => Unchanged(
 		"""
