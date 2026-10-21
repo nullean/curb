@@ -2156,8 +2156,24 @@ internal static partial class Printers
 			if (context.AuthorJoined(list[i].Span.End, list[i + 1].SpanStart))
 				Spacing.AfterComma(context);
 			else
-				arena.HardLine();
+				BreakBetweenMembers(list[i].Span.End, list[i + 1], context);
 		}
+	}
+
+	/// <summary>
+	/// The hard break between two members of a list, with the blank line the author left there.
+	/// </summary>
+	/// <remarks>
+	/// The same rule as between statements: at most one blank line survives, capped by
+	/// <c>csharp_keep_blank_lines_in_code</c>, and none just inside the brackets, which the list's own
+	/// edges never ask for. Only a break that is certain carries one. A width-driven break may print
+	/// as a space, and a blank line there would force the list open, so it is dropped with the rest of
+	/// the author's layout.
+	/// </remarks>
+	internal static void BreakBetweenMembers(int previousEnd, SyntaxNode next, PrintContext context)
+	{
+		context.Arena.HardLine();
+		context.BlankLines(context.CodeSeparation(previousEnd, EffectiveStart(next)));
 	}
 
 	/// <summary>

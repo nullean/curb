@@ -233,4 +233,227 @@ public class BlankLineTests : FormattingTest
 		    }
 		}
 		""");
+
+	[Test]
+	public Task A_blank_line_between_list_members_is_kept() => Formats(
+		// Initializer, switch arm, collection and argument members follow the rule statements do. dotnet
+		// format keeps every blank line here; Curb keeps one between members and drops those just inside
+		// the brackets, as it does in a block.
+		"""
+		public class C
+		{
+		    public void M(int y)
+		    {
+		        var o = new Version
+		        {
+
+		            Major = 1,
+
+
+
+		            Minor = 2,
+
+		        };
+		        var x = y switch
+		        {
+
+		            1 => 1,
+
+
+		            _ => 2,
+
+		        };
+		        int[] l =
+		        [
+
+		            1,
+
+
+		            2,
+
+		        ];
+		        Use(
+
+		            1,
+
+
+		            2);
+		    }
+
+		    private void Use(int a, int b) { }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M(int y)
+		    {
+		        var o = new Version
+		        {
+		            Major = 1,
+
+		            Minor = 2,
+		        };
+		        var x = y switch
+		        {
+		            1 => 1,
+
+		            _ => 2,
+		        };
+		        int[] l =
+		        [
+		            1,
+
+		            2,
+		        ];
+		        Use(
+		            1,
+
+		            2);
+		    }
+
+		    private void Use(int a, int b) { }
+		}
+		""");
+
+	[Test]
+	public Task A_blank_line_after_a_commented_list_member_is_kept() => Unchanged(
+		// The trailing comment ends its own line. The blank line after it is the author's, and survives the
+		// same as one after a member with no comment.
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        var o = new Version
+		        {
+		            Major = 1, // one
+
+		            Minor = 2, // two
+
+		            // about the build
+		            Build = 3,
+		        };
+		        Use(
+		            1, // one
+
+		            2);
+		    }
+
+		    private void Use(int a, int b) { }
+		}
+		""");
+
+	[Test]
+	public Task A_blank_line_between_nested_initializer_members_is_kept() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        var o = new Outer
+		        {
+		            Inner = new Inner
+		            {
+		                A = 1,
+
+		                B = 2,
+		            },
+
+		            Other = 3,
+		        };
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_blank_line_between_list_members_is_kept_with_tabs() => Unchanged(
+		"""
+		public class C
+		{
+			public void M()
+			{
+				var o = new Version
+				{
+					Major = 1,
+
+					Minor = 2,
+				};
+			}
+		}
+		""",
+		editorConfig: "indent_style = tab");
+
+	[Test]
+	public Task Keep_blank_lines_in_code_caps_list_members_too() => Formats(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        var o = new Version
+		        {
+		            Major = 1,
+
+		            Minor = 2,
+		        };
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        var o = new Version
+		        {
+		            Major = 1,
+		            Minor = 2,
+		        };
+		    }
+		}
+		""",
+		editorConfig: "csharp_keep_blank_lines_in_code = 0");
+
+	[Test]
+	public Task A_list_joined_by_width_loses_its_blank_lines() => Formats(
+		// With a width the layout is decided from the tokens. A blank line cannot survive a list printed
+		// on one line, and keeping it would force the list open, so only a break that is certain carries
+		// one: a switch expression's arms always break, and keep it.
+		"""
+		public class C
+		{
+		    public int M(int y)
+		    {
+		        var o = new Version
+		        {
+		            Major = 1,
+
+		            Minor = 2,
+		        };
+		        return y switch
+		        {
+		            1 => 1,
+
+		            _ => 2,
+		        };
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public int M(int y)
+		    {
+		        var o = new Version { Major = 1, Minor = 2, };
+		        return y switch
+		        {
+		            1 => 1,
+
+		            _ => 2,
+		        };
+		    }
+		}
+		""",
+		editorConfig: "max_line_length = 120");
 }
