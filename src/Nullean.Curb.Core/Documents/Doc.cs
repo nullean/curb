@@ -187,6 +187,15 @@ internal readonly struct Doc
 	/// <summary><c>B</c> on a <see cref="LineType.Literal"/> line: write <c>\r\n</c> whatever the configuration says.</summary>
 	public const int CrLfEnding = 2;
 
+	/// <summary>
+	/// <c>B</c> on a <see cref="LineType.Hard"/> line: this break ends a trailing <c>//</c> comment's line.
+	/// </summary>
+	/// <remarks>
+	/// The next break after it is the same break, so it reuses the line rather than opening a blank
+	/// one. See <see cref="DocArena.LineCommentBreak"/>.
+	/// </remarks>
+	public const int EndsLineComment = 1;
+
 	public readonly DocKind Kind;
 	public readonly DocFlags Flags;
 

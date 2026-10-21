@@ -19,6 +19,16 @@ internal static class SyntheticText
 	public const int Semicolon = 5;
 	public const int Arrow = 6;
 
+	/// <summary>
+	/// A space that is written only if the next thing printed is not already one.
+	/// </summary>
+	/// <remarks>
+	/// For the gap after an inline <c>/* */</c> comment. The comment cannot know whether the printer
+	/// will put a space in front of what follows: it does after <c>=</c> and does not after <c>(</c>.
+	/// Writing its own space as well doubled the gap to <c>= /* c */  value</c>.
+	/// </remarks>
+	public const int MergingSpace = 7;
+
 	public static readonly string[] Table =
 	[
 		"",
@@ -28,6 +38,7 @@ internal static class SyntheticText
 		"}",
 		";",
 		"=>",
+		" ",
 	];
 
 	public static string Get(int id) => Table[id];

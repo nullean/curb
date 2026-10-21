@@ -57,6 +57,18 @@ internal sealed class DocPrinter
 	private bool _insideLineComment;
 
 	/// <summary>
+	/// True from the break that ends a trailing <c>//</c> comment until anything else is written.
+	/// </summary>
+	/// <remarks>
+	/// The next break in that window is the same break as the comment's, so it re-indents the line
+	/// the comment opened instead of opening another. See <see cref="DocArena.LineCommentBreak"/>.
+	/// </remarks>
+	private bool _lineCommentBroke;
+
+	/// <summary>A <see cref="SyntheticText.MergingSpace"/> not yet written.</summary>
+	private bool _pendingSpace;
+
+	/// <summary>
 	/// True when this document could have changed the token stream, so the output is worth
 	/// re-parsing.
 	/// </summary>
@@ -84,6 +96,8 @@ internal sealed class DocPrinter
 		_depth = 0;
 		_lastSourceEnd = -1;
 		_insideLineComment = false;
+		_lineCommentBroke = false;
+		_pendingSpace = false;
 		RoundTripAtRisk = false;
 
 		_breaks.Run(arena);
@@ -146,6 +160,8 @@ internal sealed class DocPrinter
 				case DocKind.SrcText:
 					{
 						var text = _source.Span.Slice(doc.A, doc.B);
+						// Before the weld check, which reads the character this text lands after.
+						WritePendingSpace(text, scope.SuppressWidth);
 						TrackRoundTripRisk(doc, text);
 						Emit(text, doc.Flags, scope.SuppressWidth);
 						_lastSourceEnd = doc.A + doc.B;
@@ -154,7 +170,19 @@ internal sealed class DocPrinter
 					}
 
 				case DocKind.SynText:
-					Emit(SyntheticText.Get(doc.A), doc.Flags, scope.SuppressWidth);
+					// A space meant to follow the token on its own line has nothing left to separate:
+					// the comment's break already wrote the next line's indent. Written anyway, it
+					// pushed a `{` under csharp_new_line_before_open_brace = none one column right.
+					if (_lineCommentBroke && doc.A is SyntheticText.Space or SyntheticText.MergingSpace)
+					{
+						i++;
+						break;
+					}
+
+					if (doc.A == SyntheticText.MergingSpace)
+						_pendingSpace = true;
+					else
+						Emit(SyntheticText.Get(doc.A), doc.Flags, scope.SuppressWidth);
 					i++;
 					break;
 
@@ -169,6 +197,7 @@ internal sealed class DocPrinter
 					break;
 
 				case DocKind.Trim:
+					_pendingSpace = false;
 					_column -= _output.TrimTrailingWhitespace();
 					i++;
 					break;
@@ -352,6 +381,10 @@ internal sealed class DocPrinter
 		if (doc.GroupId != 0 && _groupModes[doc.GroupId] != PrintMode.Break)
 			return;
 
+		// Only the first line after a trailing comment's break merges into it, whatever that line does.
+		var mergesIntoCommentBreak = _lineCommentBroke;
+		_lineCommentBroke = false;
+
 		if (doc.Flags.HasFlag(DocFlags.OnlyIfNotAtLineStart) && _output.AtLineStart())
 			return;
 
@@ -370,13 +403,24 @@ internal sealed class DocPrinter
 			});
 			_column = 0;
 			_insideLineComment = false;
+			_pendingSpace = false;
 			return;
 		}
 
 		if (scope.Mode is PrintMode.Flat or PrintMode.ForceFlat)
 		{
+			// The same stray space as a synthetic one at the start of the comment's fresh line, and
+			// still the first thing after it, so a break that follows merges as it would have.
+			if (mergesIntoCommentBreak)
+			{
+				_lineCommentBroke = true;
+				return;
+			}
+
 			if (type is LineType.Normal or LineType.Hard)
 			{
+				// The space this line writes is the one a pending space was waiting to merge with.
+				_pendingSpace = false;
 				_output.Append(' ');
 				if (!scope.SuppressWidth)
 					_column++;
@@ -384,10 +428,15 @@ internal sealed class DocPrinter
 			return;
 		}
 
+		_pendingSpace = false;
+
 		if (_trimTrailingWhitespace && !doc.Flags.HasFlag(DocFlags.NoTrim))
 			_output.TrimTrailingWhitespace();
 
-		if (doc.Flags.HasFlag(DocFlags.Reindent))
+		// A trailing comment already ended this line, so a break here would open a blank one. Reuse
+		// it at this break's own indent, which a closing brace needs: the comment broke to the
+		// members' level, the brace belongs one out.
+		if (doc.Flags.HasFlag(DocFlags.Reindent) || (mergesIntoCommentBreak && !doc.Flags.HasFlag(DocFlags.AlignToAnchor)))
 		{
 			// Reuse the current line when nothing has been written to it, so trivia that already
 			// broke does not turn into a blank line.
@@ -432,6 +481,7 @@ internal sealed class DocPrinter
 		_output.Append(_indenter.For(scope.Indent));
 		_column = _indenter.ColumnsFor(scope.Indent);
 		_insideLineComment = false;
+		_lineCommentBroke = type == LineType.Hard && doc.B == Doc.EndsLineComment;
 	}
 
 	/// <summary>
@@ -475,6 +525,8 @@ internal sealed class DocPrinter
 
 	private void Emit(ReadOnlySpan<char> text, DocFlags flags, bool suppressWidth)
 	{
+		WritePendingSpace(text, suppressWidth);
+		_lineCommentBroke = false;
 		_output.Append(text);
 
 		// Directives are emitted but never counted: an #if must not push the code around it into
@@ -483,6 +535,24 @@ internal sealed class DocPrinter
 			return;
 
 		_column += TextWidth(text);
+	}
+
+	/// <summary>
+	/// Writes a <see cref="SyntheticText.MergingSpace"/> still waiting, unless <paramref name="text"/>
+	/// brings its own space.
+	/// </summary>
+	private void WritePendingSpace(ReadOnlySpan<char> text, bool suppressWidth)
+	{
+		if (!_pendingSpace || text.IsEmpty)
+			return;
+
+		_pendingSpace = false;
+		if (text[0] == ' ')
+			return;
+
+		_output.Append(' ');
+		if (!suppressWidth)
+			_column++;
 	}
 
 	private PrintMode ResolveGroupMode(int index, in Doc doc, in Scope scope)

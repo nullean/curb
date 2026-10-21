@@ -368,4 +368,271 @@ public class CommentTests : FormattingTest
 		    public void M() { }
 		}
 		""");
+
+	// ---- the line under a trailing comment ---------------------------------------------------------
+	//
+	// Every expectation below was checked against dotnet format whitespace.
+
+	[Test]
+	public Task A_comment_under_a_trailing_comment_stays_at_the_member_column() => Unchanged(
+		// dotnet format only re-lays trivia that is out of shape. Each comment here already sits where
+		// the member after it does, so it is left there rather than pulled under the trailing comment.
+		"""
+		public class C
+		{
+		    enum E
+		    {
+		        A, // one
+		        // before b
+		        B,
+		    }
+
+		    object M(int x)
+		    {
+		        var o = new Version
+		        {
+		            Major = 1, // one
+		            // before minor
+		            Minor = 2,
+		        };
+		        var s = x switch
+		        {
+		            1 => 1, // one
+		            // before the discard
+		            _ => 2,
+		        };
+		        int[] l =
+		        [
+		            1, // one
+		            // before two
+		            2,
+		        ];
+		        Call(); // one
+		        // before the next call
+		        // and a second line
+		        Call();
+		        return o;
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_comment_under_a_trailing_comment_that_has_to_move_aligns_under_it() => Formats(
+		// Once the run is out of shape, dotnet format moves all of it under the trailing comment, even
+		// a line that was already at the statement column.
+		"""
+		public class C
+		{
+		    void M()
+		    {
+		        Call(); // one
+		   // too far left
+		        Call();
+		        Call(); // one
+		        // at the statement column
+		                // under the trailing comment
+		        Call();
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    void M()
+		    {
+		        Call(); // one
+		                // too far left
+		        Call();
+		        Call(); // one
+		                // at the statement column
+		                // under the trailing comment
+		        Call();
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Only_a_line_comment_aligns_under_a_trailing_line_comment() => Formats(
+		// A block or doc comment under a trailing `//`, or a `//` under a trailing `/* */`, goes to the
+		// statement column. Curb used to align all of them.
+		"""
+		public class C
+		{
+		    void M()
+		    {
+		        Call(); // one
+		                /* block */
+		        Call();
+		        Call(); /* one */
+		                // line
+		        Call();
+		        Call(); // one
+		                // line
+		   /* block after a line */
+		        Call();
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    void M()
+		    {
+		        Call(); // one
+		        /* block */
+		        Call();
+		        Call(); /* one */
+		        // line
+		        Call();
+		        Call(); // one
+		                // line
+		        /* block after a line */
+		        Call();
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_trailing_line_comment_does_not_open_a_blank_line_after_it() => Unchanged(
+		// The comment ends its own line. The break the list printer emits after it used to open a
+		// second one, which left a blank line after every commented attribute, member and argument.
+		"""
+		public class C
+		{
+		    enum E
+		    {
+		        A, // one
+		        B // two
+		    }
+
+		    [A] // one
+		    [B] // two
+		    public void M(int y)
+		    {
+		        var o = new Version
+		        {
+		            Major = 1, // one
+		            Minor = 2 // two
+		        };
+		        var x = y switch
+		        {
+		            1 => 1, // one
+		            _ => 2, // two
+		        };
+		        int[] l =
+		        [
+		            1, // one
+		            2 // two
+		        ];
+		        Call(
+		            1, // one
+		            2); // two
+		    }
+
+		    [A] // one
+		    public int P { get; set; }
+
+		    private static readonly int[,] Patterns = {
+		        { 2, 1, 1, 2, 3, 2, 0, 0 }, // 1
+		        { 2, 3, 3, 1, 1, 1, 2, 0 } // 2
+		    };
+		}
+		""");
+
+	[Test]
+	public Task A_trailing_line_comment_does_not_open_a_blank_line_after_it_with_a_width() => Unchanged(
+		"""
+		public class C
+		{
+		    [TestCase(2024, 2, 31)] // first
+		    [TestCase(2024, 4, 31)] // second
+		    public void SomeTest(int year, int month, int expected)
+		    {
+		        var o = new Version
+		        {
+		            Major = 1, // one
+		            // before minor
+		            Minor = 2,
+		        };
+		    }
+		}
+		""",
+		editorConfig: "max_line_length = 120");
+
+	[Test]
+	public Task A_trailing_line_comment_before_an_opening_brace_leaves_it_on_the_next_line() => Unchanged(
+		// The brace's own break merges into the comment's, so no blank line opens between them.
+		"""
+		public class C // c
+		{
+		    public int M(int value) // m
+		    {
+		        if (value > 0) // i
+		        {
+		            return 1;
+		        }
+		        return 0;
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_trailing_line_comment_before_an_opening_brace_keeps_it_on_the_next_line_under_none() => Unchanged(
+		// The comment has already ended the line the brace would have joined, so it stays on the next
+		// line at the header's indent. The space csharp_new_line_before_open_brace = none puts in front
+		// of it used to land at the start of that line.
+		"""
+		public class C // c
+		{
+		    public int M(int value) // m
+		    {
+		        if (value > 0) // i
+		        {
+		            return 1;
+		        }
+		        return 0;
+		    }
+		}
+		""",
+		editorConfig: "csharp_new_line_before_open_brace = none");
+
+	[Test]
+	public Task An_inline_block_comment_before_a_value_keeps_one_space_after_it() => Unchanged(
+		// The comment's own trailing space and the space the printer puts in front of the value are the
+		// same space, so only one is written.
+		"""
+		public class C
+		{
+		    private int _field = /* lead */ 1;
+
+		    public int Body() => /* lead */ 1;
+
+		    public int M(int a)
+		    {
+		        var x = /* lead */ a;
+		        x = /* lead */ a;
+		        Use(/* lead */ a);
+		        Use(a, /* lead */ a);
+		        Use(a + /* lead */ a);
+		        return /* lead */ a;
+		    }
+
+		    private void Use(int a, int b = 0) { }
+		}
+		""");
+
+	[Test]
+	public Task An_inline_block_comment_before_a_value_keeps_one_space_after_it_with_a_width() => Unchanged(
+		"""
+		public class C
+		{
+		    public int M(int a)
+		    {
+		        var x = /* lead */ a;
+		        Use(a, /* lead */ a);
+		        return /* lead */ a;
+		    }
+		}
+		""",
+		editorConfig: "max_line_length = 120");
 }

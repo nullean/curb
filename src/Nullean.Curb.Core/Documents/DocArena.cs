@@ -86,6 +86,18 @@ internal sealed class DocArena
 	/// <summary>Always a newline; forces enclosing groups to break.</summary>
 	public void HardLine(DocFlags flags = DocFlags.None) => AddLine(LineType.Hard, flags);
 
+	/// <summary>The hard line that ends a trailing <c>//</c> comment.</summary>
+	/// <remarks>
+	/// The comment has to end its line, but the printer that owns the token usually breaks after it
+	/// too, and two breaks open a blank line that the next run then preserves. Each printer used to
+	/// guard its own break against that, and every list, attribute and argument printer that did not
+	/// grew a blank line after a commented element. This break instead tells the layout printer that
+	/// the next break, whoever emits it, is the same one: that break reuses the line and only
+	/// re-indents it.
+	/// </remarks>
+	public void LineCommentBreak() =>
+		Add(new Doc(DocKind.Line, a: (int)LineType.Hard, b: Doc.EndsLineComment));
+
 	/// <summary>Always a newline emitted at column 0, for content that must not be re-indented.</summary>
 	public void LiteralLine(DocFlags flags = DocFlags.None) => AddLine(LineType.Literal, flags);
 

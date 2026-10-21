@@ -215,11 +215,16 @@ internal static class TokenPrinter
 					// The whole run aligns, not only the comment that starts it. Aligning the first
 					// and dropping the rest to the statement indent is neither what dotnet format
 					// writes nor stable: the ragged result read back differently on the next run.
-					var startsAligned = !emittedAnything
+					//
+					// Only a // comment aligns, and only under a trailing //. A block or doc comment, or
+					// anything under a trailing /* */, goes to the statement indent as usual.
+					var isLineComment = trivia.IsKind(SyntaxKind.SingleLineCommentTrivia);
+					var startsAligned = isLineComment
+						&& !emittedAnything
 						&& priorNewLines == 0
-						&& AlignsUnderTrailingComment(trivia, context);
+						&& AlignsUnderTrailingComment(token, trivia, context);
 
-					if (startsAligned || (alignedRun && priorNewLines <= 1))
+					if (startsAligned || (alignedRun && isLineComment && priorNewLines <= 1))
 					{
 						arena.AlignedLine(TrailingCommentAnchor);
 						alignedRun = true;
@@ -380,13 +385,14 @@ internal static class TokenPrinter
 	private const int TrailingCommentAnchor = 0;
 
 	/// <summary>
-	/// True when this comment sits on the line directly below one that ended in a trailing comment.
+	/// True when this comment sits on the line directly below one that ended in a trailing <c>//</c>
+	/// comment, and the comments in front of <paramref name="token"/> are not already where it is.
 	/// </summary>
 	/// <remarks>
 	/// Walking to the previous token allocates, so it is asked only of a token that actually carries
 	/// a leading comment — which is uncommon, and never in the middle of an expression.
 	/// </remarks>
-	private static bool AlignsUnderTrailingComment(SyntaxTrivia comment, PrintContext context)
+	private static bool AlignsUnderTrailingComment(SyntaxToken token, SyntaxTrivia comment, PrintContext context)
 	{
 		var previous = context.PreviousToken;
 		if (previous.RawKind == 0)
@@ -397,14 +403,14 @@ internal static class TokenPrinter
 			return false;
 
 		var last = trailing[^1];
-		if (!last.IsKind(SyntaxKind.SingleLineCommentTrivia) && !last.IsKind(SyntaxKind.MultiLineCommentTrivia))
+		if (!last.IsKind(SyntaxKind.SingleLineCommentTrivia))
 		{
 			// A line ending stays in the trailing trivia after the comment, so look past one.
 			if (trailing.Count < 2)
 				return false;
 
 			last = trailing[^2];
-			if (!last.IsKind(SyntaxKind.SingleLineCommentTrivia) && !last.IsKind(SyntaxKind.MultiLineCommentTrivia))
+			if (!last.IsKind(SyntaxKind.SingleLineCommentTrivia))
 				return false;
 		}
 
@@ -413,8 +419,49 @@ internal static class TokenPrinter
 			return false;
 
 		var lines = context.Text.Lines;
-		return lines.GetLineFromPosition(comment.SpanStart).LineNumber
-			== lines.GetLineFromPosition(last.SpanStart).LineNumber + 1;
+		if (lines.GetLineFromPosition(comment.SpanStart).LineNumber
+			!= lines.GetLineFromPosition(last.SpanStart).LineNumber + 1)
+			return false;
+
+		return !CommentsSitAtTokenColumn(token, context);
+	}
+
+	/// <summary>
+	/// True when every comment in front of <paramref name="token"/> starts its line at the column the
+	/// token does.
+	/// </summary>
+	/// <remarks>
+	/// dotnet format re-lays the trivia between two tokens only when it is out of shape, and only
+	/// then aligns a comment under a trailing one. Trivia whose comments all sit where the token
+	/// does is already in shape, so they stay at that column, which is the member or statement
+	/// column. Aligning them anyway also failed to settle: inside a list the next run read the
+	/// comment as separated from the trailing one and moved it back (issue #110).
+	///
+	/// Read from the source, so it differs from dotnet format only for a token that is itself
+	/// mis-indented, which dotnet format counts as out of shape and Curb does not. Either answer is
+	/// a fixed point: once printed, the token sits at its indent and the comments at it or under
+	/// the trailing comment.
+	/// </remarks>
+	private static bool CommentsSitAtTokenColumn(SyntaxToken token, PrintContext context)
+	{
+		var lines = context.Text.Lines;
+		var tokenStart = token.SpanStart;
+		var tokenColumn = tokenStart - lines.GetLineFromPosition(tokenStart).Start;
+
+		foreach (var trivia in token.LeadingTrivia)
+		{
+			if (!trivia.IsKind(SyntaxKind.SingleLineCommentTrivia)
+				&& !trivia.IsKind(SyntaxKind.MultiLineCommentTrivia)
+				&& !trivia.IsKind(SyntaxKind.SingleLineDocumentationCommentTrivia)
+				&& !trivia.IsKind(SyntaxKind.MultiLineDocumentationCommentTrivia))
+				continue;
+
+			var start = trivia.FullSpan.Start;
+			if (start - lines.GetLineFromPosition(start).Start != tokenColumn)
+				return false;
+		}
+
+		return true;
 	}
 
 	internal static void PrintTrailingTrivia(SyntaxToken token, PrintContext context)
@@ -449,12 +496,14 @@ internal static class TokenPrinter
 					if (trivia.IsKind(SyntaxKind.SingleLineCommentTrivia))
 					{
 						// A // comment runs to end of line, so whatever follows must start a new one.
-						context.Arena.HardLine();
+						// The break the enclosing printer emits next is merged into this one.
+						context.Arena.LineCommentBreak();
 					}
 					else
 					{
-						// A /* */ comment can have code after it on the same line; keep them apart.
-						context.Arena.Synthetic(SyntheticText.Space);
+						// A /* */ comment can have code after it on the same line; keep them apart,
+						// with the one space the printer may already be about to write.
+						context.Arena.Synthetic(SyntheticText.MergingSpace);
 					}
 					break;
 
