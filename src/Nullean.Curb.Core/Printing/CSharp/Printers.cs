@@ -1262,11 +1262,20 @@ internal static partial class Printers
 	/// mixed per construct. Printers call this rather than emitting a break of their own, so wiring
 	/// a new construct into the option is a one-line change here rather than a hunt.
 	/// </remarks>
-	internal static void BeforeOpenBrace(BraceStyle construct, PrintContext context)
+	/// <param name="construct">Which csharp_new_line_before_open_brace flag governs the brace.</param>
+	/// <param name="context">Per-file printing state.</param>
+	/// <param name="body">
+	/// The statement body the brace opens, when it hangs off a control-flow header. Only needed for
+	/// the space a brace kept on the header's line takes; see <see cref="SpaceBeforeBody"/>.
+	/// </param>
+	internal static void BeforeOpenBrace(BraceStyle construct, PrintContext context, SyntaxNode? body = null)
 	{
 		if (!context.Options.NewLineBeforeOpenBrace.HasFlag(construct))
 		{
-			context.Arena.Synthetic(SyntheticText.Space);
+			if (body is null)
+				context.Arena.Synthetic(SyntheticText.Space);
+			else
+				SpaceBeforeBody(body, context);
 			return;
 		}
 
@@ -1390,6 +1399,11 @@ internal static partial class Printers
 	/// <c>csharp_empty_block_style = together_same_line</c> only — <c>together</c> collapses the pair
 	/// through <see cref="CollapsesEmptyBraces"/> but leaves it wherever the brace option puts it, which
 	/// is the distinction ReSharper itself draws between the two values.
+	/// <para>
+	/// A statement body is the exception: with <c>csharp_preserve_single_line_statements = false</c>,
+	/// <see cref="PrintStatementBody"/> declines the join, because dotnet format moves that pair back
+	/// down and the two tools would otherwise undo each other on every run (issue #131).
+	/// </para>
 	/// </remarks>
 	internal static bool JoinsEmptyBracesToHeader(SyntaxNode body, PrintContext context) =>
 		context.Options.EmptyBlockStyle == EmptyBlockStyle.TogetherSameLine && IsEmptyBraces(body);
@@ -1795,20 +1809,28 @@ internal static partial class Printers
 	/// when the body is not empty, and when <c>csharp_empty_block_style</c> is set — an explicit opinion
 	/// beats an implicit one.
 	/// </param>
+	/// <param name="isClause">
+	/// True for a <c>catch</c> or <c>finally</c> block. Every other body here belongs to a statement,
+	/// and <c>csharp_preserve_single_line_statements = false</c> keeps it off its header's line even when
+	/// it is an empty <c>{ }</c> that would otherwise join it (issue #131); dotnet format moves an empty
+	/// try, unsafe or embedded block down and leaves a clause's on its keyword's line.
+	/// </param>
 	internal static void PrintStatementBody(
 		SyntaxNode body,
 		BraceStyle construct,
 		PrintContext context,
-		bool alwaysJoinsEmpty = false)
+		bool alwaysJoinsEmpty = false,
+		bool isClause = false)
 	{
 		var forcesEmptyJoin = alwaysJoinsEmpty && context.Options.EmptyBlockStyle is null && IsEmptyBraces(body);
-		var joinsHeader = forcesEmptyJoin || JoinsEmptyBracesToHeader(body, context);
+		var joinsHeader = (forcesEmptyJoin || JoinsEmptyBracesToHeader(body, context))
+			&& (isClause || context.Options.PreserveSingleLineStatements);
 		var flat = joinsHeader || KeepsOneLine(body, context) || CollapsesEmptyBraces(body, context);
 
 		if (joinsHeader)
-			context.Arena.Synthetic(SyntheticText.Space);
+			SpaceBeforeBody(body, context);
 		else
-			BeforeOpenBrace(construct, context);
+			BeforeOpenBrace(construct, context, body);
 
 		using (context.Arena.ForceFlatIf(flat))
 			Node.Print(body, context);
@@ -2589,6 +2611,23 @@ internal static partial class Printers
 		{
 			if (trivia.IsKind(SyntaxKind.SingleLineCommentTrivia))
 				return true;
+		}
+
+		return false;
+	}
+
+	/// <summary>
+	/// True when a token's trailing trivia ends in a <c>/* */</c> comment, which already wrote the
+	/// space after itself.
+	/// </summary>
+	internal static bool EndsWithBlockComment(SyntaxToken token)
+	{
+		var trailing = token.TrailingTrivia;
+		for (var i = trailing.Count - 1; i >= 0; i--)
+		{
+			if (trailing[i].IsKind(SyntaxKind.WhitespaceTrivia))
+				continue;
+			return trailing[i].IsKind(SyntaxKind.MultiLineCommentTrivia);
 		}
 
 		return false;
