@@ -973,20 +973,7 @@ internal static partial class Printers
 		// print flat and would leave the list with no break opportunity of its own.
 		if (hugs && node.Arguments.Count > 1 && EndsWithBlockBodiedCallback(node.Arguments[^1].Expression))
 		{
-			Spacing.InsideCallParens(context);
-			for (var i = 0; i < node.Arguments.Count - 1; i++)
-			{
-				Node.Print(node.Arguments[i], context);
-				Spacing.BeforeComma(context);
-				TokenPrinter.Print(node.Arguments.GetSeparator(i), context);
-				Spacing.AfterComma(context);
-			}
-
-			context.OwnBlockGroup = 0;
-			Node.Print(node.Arguments[^1], context);
-			Spacing.InsideCallParens(context);
-			TokenPrinter.Print(node.CloseParenToken, context);
-			context.ArgumentListGroup = context.OwnBlockGroup;
+			HugTrailingCallback(node, context);
 			return;
 		}
 
@@ -1036,6 +1023,68 @@ internal static partial class Printers
 
 		TokenPrinter.Print(node.CloseParenToken, context);
 		context.ArgumentListGroup = node.Arguments.Count > 0 ? group : (ushort)0;
+	}
+
+	/// <summary>
+	/// Prints an argument list whose last argument is a block-bodied callback, hugging the callback's
+	/// block rather than wrapping the list in a group and an indent.
+	/// </summary>
+	/// <remarks>
+	/// A break the author put between two arguments stays, and the argument after it keeps the column
+	/// the author gave it, moved as far as the line the list starts on moved — where dotnet format
+	/// leaves it. Joining those arguments onto the first line left the callback's block below a line
+	/// it no longer started on (issue #144). The column comes from the line-shift anchor rather than
+	/// the list's level: the ordinary path's level moved an argument the author placed after a
+	/// trailing comment.
+	/// </remarks>
+	private static void HugTrailingCallback(ArgumentListSyntax node, PrintContext context)
+	{
+		var arena = context.Arena;
+		var arguments = node.Arguments;
+
+		var register = -1;
+		for (var i = 0; i < arguments.Count - 1; i++)
+		{
+			if (!context.AuthorBroke(arguments[i].Span.End, arguments[i + 1].SpanStart))
+				continue;
+
+			register = context.EnterContinuation();
+			arena.LineShiftAnchor(register);
+			break;
+		}
+
+		Spacing.InsideCallParens(context);
+
+		// The column the current argument's line was aligned to, once a break has moved it.
+		var offset = int.MinValue;
+		for (var i = 0; i < arguments.Count; i++)
+		{
+			if (i == arguments.Count - 1)
+				context.OwnBlockGroup = 0;
+
+			// An argument on a line the author broke to sits as far in from that line as it would from
+			// the indent, as a chain operand does after its continuation line.
+			using (offset == int.MinValue ? default : arena.AlignedIndent(register, offset))
+				Node.Print(arguments[i], context);
+
+			if (i == arguments.Count - 1)
+				break;
+
+			Spacing.BeforeComma(context);
+			TokenPrinter.Print(arguments.GetSeparator(i), context);
+
+			if (register >= 0 && context.AuthorBroke(arguments[i].Span.End, arguments[i + 1].SpanStart))
+				offset = ContinuationLine(arguments[i + 1].GetFirstToken(), register, context);
+			else
+				Spacing.AfterComma(context);
+		}
+
+		if (register >= 0)
+			context.ExitContinuation();
+
+		Spacing.InsideCallParens(context);
+		TokenPrinter.Print(node.CloseParenToken, context);
+		context.ArgumentListGroup = context.OwnBlockGroup;
 	}
 
 	public static void Argument(ArgumentSyntax node, PrintContext context)

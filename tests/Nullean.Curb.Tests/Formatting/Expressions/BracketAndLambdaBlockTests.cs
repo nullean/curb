@@ -406,6 +406,162 @@ public class BracketAndLambdaBlockTests : FormattingTest
 		}
 		""");
 
+	// Issue #144: a block callback after a break between two arguments keeps that break, at the
+	// column the author gave the argument.
+
+	[Test]
+	public Task A_callback_after_a_break_between_arguments_keeps_the_break() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        On("click",
+		            () =>
+		            {
+		                Run();
+		            });
+		        On("click",
+		            "button", () =>
+		            {
+		                Run();
+		            });
+		        On("click", "button",
+		            () =>
+		            {
+		                Run();
+		            });
+		        On("click", // why
+		            () =>
+		            {
+		                Run();
+		            });
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_callback_after_a_break_keeps_the_author_s_column() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        On("click",
+		                () =>
+		                {
+		                    Run();
+		                });
+		        On("click",
+		            () =>
+		                {
+		                    Run();
+		                });
+		        Outer(Inner("click",
+		            () =>
+		            {
+		                Run();
+		            }));
+		        Outer("a",
+		            Inner("click",
+		                () =>
+		                {
+		                    Run();
+		                }));
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_callback_first_or_before_a_trailing_argument_keeps_its_breaks() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        On(() =>
+		        {
+		            Run();
+		        },
+		            "click");
+		        On("click",
+		            () =>
+		            {
+		                Run();
+		            },
+		            "x");
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_callback_after_a_break_takes_its_brace_onto_a_line_of_its_own() => Formats(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        On("click",
+		            () => {
+		                Run();
+		            });
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        On("click",
+		            () =>
+		            {
+		                Run();
+		            });
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_reindented_statement_takes_its_callback_with_it() => Formats(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		            On("click",
+		                () =>
+		                {
+		                    Run();
+		                });
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        On("click",
+		            () =>
+		            {
+		                Run();
+		            });
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_callback_after_a_break_keeps_its_column_with_tabs() => Unchanged(
+		"public class C\n{\n\tpublic void M()\n\t{\n\t\tOn(\"click\",\n\t\t\t() =>\n\t\t\t{\n\t\t\t\tRun();\n\t\t\t});\n\t\tOn(\"click\",\n\t\t   () =>\n\t\t   {\n\t\t\t   Run();\n\t\t   });\n\t}\n}",
+		editorConfig: "indent_style = tab");
+
+	[Test]
+	public Task A_reindented_statement_takes_its_callback_with_it_with_tabs() => Formats(
+		"public class C\n{\n\tpublic void M()\n\t{\n\t\t\tOn(\"click\",\n\t\t\t\t() =>\n\t\t\t\t{\n\t\t\t\t\tRun();\n\t\t\t\t});\n\t}\n}",
+		"public class C\n{\n\tpublic void M()\n\t{\n\t\tOn(\"click\",\n\t\t\t() =>\n\t\t\t{\n\t\t\t\tRun();\n\t\t\t});\n\t}\n}",
+		editorConfig: "indent_style = tab");
+
 	[Test]
 	public Task A_reindented_statement_takes_its_lambda_block_with_it() => Formats(
 		"""
