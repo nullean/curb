@@ -644,7 +644,7 @@ internal static partial class Printers
 							Node.Print(node.Expressions[i], context);
 						else
 						{
-							using (arena.AlignedIndent(anchor, offset))
+							using (arena.AlignedIndent(anchor, ElementIndent(node.Expressions[i], offset, context)))
 								Node.Print(node.Expressions[i], context);
 						}
 
@@ -753,6 +753,48 @@ internal static partial class Printers
 
 			return int.MinValue;
 		}
+	}
+
+	/// <summary>
+	/// The offset an element's own lines are based on, for an element the author put on a line of its own
+	/// at <paramref name="offset"/>.
+	/// </summary>
+	/// <remarks>
+	/// <para>
+	/// dotnet format leaves an element's own lines where the author put them. It does not move them with
+	/// the element: `Create(` one, two or three columns off the grid keeps its arguments where they were
+	/// (issue #138). Basing them on the element's column moved them off the grid with it.
+	/// </para>
+	/// <para>
+	/// So a call or creation whose own arguments the author opened out after its `(` is based on where
+	/// they put the first argument, a level to its left, the way an argument's continuation is read on the
+	/// argument-list side. Only its own list: a nested call's arguments are a level further in than the
+	/// outer list says, and reading them as the outer list's moved them a level right on every run. Any
+	/// other element's lines follow the element.
+	/// </para>
+	/// </remarks>
+	private static int ElementIndent(SyntaxNode element, int offset, PrintContext context)
+	{
+		var expression = element switch
+		{
+			ExpressionElementSyntax item => item.Expression,
+			ExpressionSyntax value => value,
+			_ => null,
+		};
+
+		var arguments = expression switch
+		{
+			InvocationExpressionSyntax invocation => invocation.ArgumentList,
+			BaseObjectCreationExpressionSyntax creation => creation.ArgumentList,
+			_ => null,
+		};
+
+		if (arguments is not { Arguments.Count: > 0 }
+			|| !context.AuthorJoined(element.SpanStart, arguments.OpenParenToken.SpanStart)
+			|| !context.AuthorBroke(arguments.OpenParenToken.Span.End, arguments.Arguments[0].SpanStart))
+			return offset;
+
+		return context.SourceIndent(arguments.Arguments[0].SpanStart) - context.LevelColumns;
 	}
 
 	/// <summary>True for an initializer whose elements are brace-wrapped, as a dictionary's are.</summary>
@@ -883,7 +925,7 @@ internal static partial class Printers
 				return;
 			}
 
-			using (arena.AlignedIndent(anchor, offset))
+			using (arena.AlignedIndent(anchor, ElementIndent(element, offset, context)))
 				Node.Print(element, context);
 		}
 

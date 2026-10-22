@@ -361,6 +361,67 @@ public class CollectionBreakTests : FormattingTest
 		}
 		""");
 
+	/// <summary>
+	/// An element off the indent grid keeps its column, and its own lines keep theirs rather than
+	/// following it off the grid. See <see href="https://github.com/nullean/curb/issues/138">issue #138</see>.
+	/// </summary>
+	[Test]
+	public Task An_off_grid_element_leaves_its_argument_lines_where_they_are() => Unchanged(
+		"""
+		public class C
+		{
+		    public object[] M()
+		    {
+		        var items = new object[]
+		        {
+		             Create(
+		                1,
+		                2),
+		            Create(
+		                3,
+		                4),
+		        };
+		        return items;
+		    }
+
+		    private static object Create(int a, int b) => a + b;
+		}
+		""");
+
+	[Test]
+	public Task Elements_two_and_three_columns_off_the_grid_leave_their_argument_lines_where_they_are() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        var a = new object[]
+		        {
+		              Create(
+		                3,
+		                4),
+		               Create(
+		                5,
+		                6),
+		        };
+		        object[] b =
+		        [
+		             Create(
+		                 1,
+		                 2),
+		              Create(
+		                  3,
+		                  4),
+		        ];
+		    }
+		}
+		""");
+
+	[Test]
+	public Task An_off_grid_element_leaves_its_argument_lines_where_they_are_with_tabs() => Unchanged(
+		"public class C\n{\n\tpublic void M()\n\t{\n\t\tvar a = new object[]\n\t\t{\n\t\t\t Create(\n\t\t\t\t1,\n\t\t\t\t2),\n\t\t\t  Create(\n\t\t\t\t3,\n\t\t\t\t4),\n\t\t};\n\t}\n}",
+		editorConfig: "indent_style = tab");
+
 	[Test]
 	public Task Initializer_continuation_lines_keep_the_column_the_author_gave_them() => Unchanged(
 		"""
