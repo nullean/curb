@@ -197,10 +197,13 @@ internal static partial class Printers
 	/// <see cref="ContinuationLine"/> between two collection or initializer members the author put on
 	/// separate lines, with the blank line they left there, as <see cref="BreakBetweenMembers"/> keeps one.
 	/// </summary>
-	/// <remarks>The blank lines go first, so the aligned break is the one the member lands on.</remarks>
+	/// <remarks>
+	/// The break and the blank lines go first, and the aligned line then reuses the line they end on,
+	/// since an aligned break reuses a line nothing has been written to.
+	/// </remarks>
 	private static int MemberContinuationLine(int previousEnd, SyntaxNode next, int anchor, PrintContext context)
 	{
-		context.BlankLines(context.CodeSeparation(previousEnd, EffectiveStart(next)));
+		BreakBetweenMembers(previousEnd, next, context);
 		return ContinuationLine(next.GetFirstToken(), anchor, context, element: true);
 	}
 

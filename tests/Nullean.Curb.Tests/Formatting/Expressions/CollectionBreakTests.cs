@@ -559,6 +559,33 @@ public class CollectionBreakTests : FormattingTest
 		""");
 
 	/// <summary>
+	/// A blank line between two elements kept at the author's column survives, as it does between
+	/// elements on the indent (see <c>BlankLineTests</c>), after a trailing comment too.
+	/// </summary>
+	[Test]
+	public Task A_blank_line_between_elements_kept_at_their_column_is_kept() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        int[] a = [1,
+
+		                   2];
+		        var b = new List<int> { 1, // one
+
+		            2 };
+		        int[] c =
+		        [
+		            1,
+
+		              2,
+		        ];
+		    }
+		}
+		""");
+
+	/// <summary>
 	/// <c>dotnet format</c> opens out an object initializer that spans lines, so this one still does.
 	/// </summary>
 	[Test]
