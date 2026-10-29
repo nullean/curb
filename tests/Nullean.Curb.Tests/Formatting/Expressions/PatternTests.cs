@@ -693,6 +693,49 @@ public class PatternTests : FormattingTest
 		""",
 		editorConfig: "csharp_new_line_before_open_brace = none");
 
+	[Test]
+	public Task Line_comments_in_a_property_pattern_add_no_blank_lines() => Formats(
+		"""
+		public class C
+		{
+		    public void M(object o)
+		    {
+		        var g = o is
+		        { // open
+		            A: 1, // first
+		            B: 2 // last
+		        };
+		        var h = o is Person
+		        { // open
+		            A: 1, // first
+		            B: 2, // last
+		        };
+		        var k = o is // c
+		            { A: 1 };
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M(object o)
+		    {
+		        var g = o is
+		        { // open
+		            A: 1, // first
+		            B: 2 // last
+		        };
+		        var h = o is Person
+		        { // open
+		            A: 1, // first
+		            B: 2, // last
+		        };
+		        var k = o is // c
+		        { A: 1 };
+		    }
+		}
+		""");
+
 	// ---- deterministic: a pattern that fits is joined, and the comma follows the options ------------
 
 	[Test]
