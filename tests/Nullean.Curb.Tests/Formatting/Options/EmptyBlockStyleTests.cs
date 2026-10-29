@@ -111,6 +111,50 @@ public class EmptyBlockStyleTests : FormattingTest
 		resharper_csharp_empty_block_style = together_same_line
 		""");
 
+	// dotnet format splits a joined control body when csharp_preserve_single_line_statements is off, so
+	// joining it would not be a fixed point. elastic/docs-builder's `while (…) { }` spin loops.
+	[Test]
+	public Task Statements_off_leaves_an_empty_control_block_on_its_own_line() => Formats(
+		"""
+		public class C
+		{
+		    public void M(bool a)
+		    {
+		        while (a) { }
+		        if (a)
+		        {
+		        }
+		        else { }
+		        try { }
+		        catch { }
+		        finally { }
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M(bool a)
+		    {
+		        while (a)
+		        { }
+		        if (a)
+		        { }
+		        else
+		        { }
+		        try
+		        { }
+		        catch { }
+		        finally { }
+		    }
+		}
+		""",
+		editorConfig: """
+		csharp_new_line_before_open_brace = all
+		csharp_preserve_single_line_statements = false
+		resharper_csharp_empty_block_style = together_same_line
+		""");
+
 	// ---- together: collapses but does not move the brace -------------------------------------------
 
 	[Test]

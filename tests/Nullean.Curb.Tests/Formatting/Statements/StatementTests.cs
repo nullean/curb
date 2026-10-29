@@ -213,7 +213,9 @@ public class StatementTests : FormattingTest
 	/// is always <c>{ }</c>, whatever the source had and whatever the preserve options say. Unlike a
 	/// non-empty clause (below), this is <em>not</em> matching dotnet format — dotnet format is lazy
 	/// about all three in every direction, so there is nothing of its to match, and <c>{ }</c> reads
-	/// better than the alternative either way.
+	/// better than the alternative either way. The one exception is an empty <c>try</c> under
+	/// <c>csharp_preserve_single_line_statements = false</c>, which dotnet format does split — see
+	/// <see cref="An_empty_try_stays_off_its_keyword_when_statements_are_not_preserved"/>.
 	/// See <see href="https://github.com/nullean/curb/issues/25">issue #25</see>.
 	/// </summary>
 	[Test]
@@ -246,6 +248,37 @@ public class StatementTests : FormattingTest
 		    }
 		}
 		""");
+
+	// dotnet format moves `try { }` apart with statements off but leaves `catch { }` and `finally { }`.
+	[Test]
+	public Task An_empty_try_stays_off_its_keyword_when_statements_are_not_preserved() => Formats(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        try
+		        {
+		        }
+		        catch
+		        {
+		        }
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        try
+		        {
+		        }
+		        catch { }
+		    }
+		}
+		""",
+		editorConfig: "csharp_preserve_single_line_statements = false");
 
 	[Test]
 	public Task An_empty_catch_the_author_expanded_still_collapses() => Formats(
