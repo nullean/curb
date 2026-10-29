@@ -641,9 +641,9 @@ public class CommentTests : FormattingTest
 	// Every expectation below was checked against dotnet format whitespace, which leaves each input
 	// unchanged.
 	//
-	// Only the `_with_a_width` variant depends on the BreakPropagation exemption. With no width the
-	// arm keeps its line through AuthorJoined on the arrow anyway (#104), so the other two pass with
-	// or without it; they guard the shape, not the mechanism.
+	// With no width, a plain arm keeps its line through AuthorJoined on the arrow anyway (#104), so the
+	// first two cases pass with or without the BreakPropagation exemption; they guard the shape, not
+	// the mechanism. The `_with_a_width` variants, and the ternary case with no width, fail without it.
 
 	[Test]
 	public Task A_trailing_comment_on_the_last_switch_arm_keeps_it_on_one_line() => Unchanged(
@@ -770,6 +770,31 @@ public class CommentTests : FormattingTest
 		        };
 		    }
 		}
+		""");
+
+	[Test]
+	public Task A_trailing_comment_after_a_last_ternary_leaves_it_on_one_line() => Unchanged(
+		// No author break is read here: the ternary's own group held the comment as its last content, so
+		// its line break opened the ternary at `?` and `:`.
+		"""
+		public class C
+		{
+		    public int M(int y)
+		    {
+		        var o = new O
+		        {
+		            A = 1,
+		            B = y > 1 ? 1 : 2 // b
+		        };
+		        return y switch
+		        {
+		            1 => 1,
+		            _ => y > 1 ? 1 : 2 // two
+		        };
+		    }
+		}
+
+		public class O { public int A; public int B; }
 		""");
 
 	[Test]
