@@ -773,6 +773,48 @@ public class CommentTests : FormattingTest
 		""");
 
 	[Test]
+	public Task A_switch_arm_broken_before_the_arrow_stays_broken() => Unchanged(
+		// The arrow used to join the pattern's line whether or not a comment followed the arm.
+		"""
+		public class C
+		{
+		    public int M(int y)
+		    {
+		        return y switch
+		        {
+		            1
+		                => 1,
+		            > 1 when y < 10 // guarded
+		                => 2,
+		            > 10 when y < 100
+		                => 3,
+		            _ when y > 1000
+		                => 4 // four
+		        };
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_switch_arm_broken_before_the_arrow_stays_broken_with_tabs() => Unchanged(
+		"""
+		public class C
+		{
+			public int M(int y)
+			{
+				return y switch
+				{
+					> 10 when y < 100
+						=> 3,
+					_ when y > 1000
+						=> 4 // four
+				};
+			}
+		}
+		""",
+		editorConfig: "indent_style = tab");
+
+	[Test]
 	public Task An_inline_block_comment_against_a_closing_brace_stays_against_it() => Unchanged(
 		// The comment always wrote a space after itself, so `{ /* ignore */}` gained one (issue #128).
 		// One the source has is still kept.

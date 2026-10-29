@@ -1195,8 +1195,28 @@ internal static partial class Printers
 			Node.Print(node.WhenClause.Condition, context);
 		}
 
-		arena.Synthetic(SyntheticText.Space);
-		TokenPrinter.Print(node.EqualsGreaterThanToken, context);
+		// An arrow the author put below the pattern stays below it, one level in, as dotnet format leaves
+		// it. Joined, `_ when a > 3` / `=> 2` lost a break the author chose. The body then lays out from
+		// the arrow's line.
+		var arrowBroken = context.AuthorBroke(
+			node.WhenClause?.Condition.Span.End ?? node.Pattern.Span.End, node.EqualsGreaterThanToken.SpanStart);
+
+		using (arena.IndentIf(arrowBroken))
+		{
+			if (arrowBroken)
+				arena.HardLine(DocFlags.Reindent);
+			else
+				arena.Synthetic(SyntheticText.Space);
+
+			TokenPrinter.Print(node.EqualsGreaterThanToken, context);
+			SwitchExpressionArmBody(node, context);
+		}
+	}
+
+	/// <summary>The part of a switch expression arm after its <c>=&gt;</c>.</summary>
+	private static void SwitchExpressionArmBody(SwitchExpressionArmSyntax node, PrintContext context)
+	{
+		var arena = context.Arena;
 
 		// A nested switch expression hugs the arrow, as it does an expression body's. It always breaks,
 		// so the group below would always push it onto a line of its own, which dotnet format never does.
