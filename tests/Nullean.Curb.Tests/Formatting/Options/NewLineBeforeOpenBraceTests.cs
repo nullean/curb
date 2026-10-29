@@ -775,6 +775,146 @@ public class NewLineBeforeOpenBraceTests : FormattingTest
 		csharp_new_line_before_open_brace = types
 		""");
 
+	// ---- switch expressions ----------------------------------------------------------------------
+	//
+	// dotnet format files a switch expression's brace under the initializers flag, and moves it in both
+	// directions whatever the author wrote: off joins it to `switch`, on gives it a line of its own.
+
+	[Test]
+	public Task None_pulls_a_switch_expression_brace_up_onto_switch() => Formats(
+		"""
+		public class C
+		{
+		    public int M(int value, int other)
+		    {
+		        return value switch
+		        {
+		            1 => 1,
+		            _ => other switch
+		            {
+		                2 => 2,
+		                _ => 0,
+		            },
+		        };
+		    }
+		}
+		""",
+		"""
+		public class C {
+		    public int M(int value, int other) {
+		        return value switch {
+		            1 => 1,
+		            _ => other switch {
+		                2 => 2,
+		                _ => 0,
+		            },
+		        };
+		    }
+		}
+		""",
+		editorConfig: "csharp_new_line_before_open_brace = none");
+
+	[Test]
+	public Task None_keeps_a_break_the_author_put_before_a_nested_switch_expression() => Formats(
+		"""
+		public class C
+		{
+		    public int M(int value, int other)
+		    {
+		        var a = value switch
+		        {
+		            1 => 1,
+		            _ =>
+		                other switch
+		                {
+		                    2 => 2,
+		                    _ => 0,
+		                },
+		        };
+		        return a;
+		    }
+		}
+		""",
+		"""
+		public class C {
+		    public int M(int value, int other) {
+		        var a = value switch {
+		            1 => 1,
+		            _ =>
+		                other switch {
+		                    2 => 2,
+		                    _ => 0,
+		                },
+		        };
+		        return a;
+		    }
+		}
+		""",
+		editorConfig: "csharp_new_line_before_open_brace = none");
+
+	[Test]
+	public Task A_switch_expression_brace_answers_to_the_initializers_flag() => Formats(
+		"""
+		public class C
+		{
+		    public int M(int value, int other)
+		    {
+		        return value switch {
+		            1 => 1,
+		            _ => other switch {
+		                2 => 2,
+		                _ => 0,
+		            },
+		        };
+		    }
+		}
+		""",
+		"""
+		public class C {
+		    public int M(int value, int other) {
+		        return value switch
+		        {
+		            1 => 1,
+		            _ => other switch
+		            {
+		                2 => 2,
+		                _ => 0,
+		            },
+		        };
+		    }
+		}
+		""",
+		editorConfig: "csharp_new_line_before_open_brace = object_collection_array_initializers");
+
+	[Test]
+	public Task Initializers_excluded_keeps_a_switch_expression_brace_on_switch() => Formats(
+		"""
+		public class C
+		{
+		    public int M(int value)
+		    {
+		        return value switch
+		        {
+		            1 => 1,
+		            _ => 0,
+		        };
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public int M(int value)
+		    {
+		        return value switch {
+		            1 => 1,
+		            _ => 0,
+		        };
+		    }
+		}
+		""",
+		editorConfig: "csharp_new_line_before_open_brace = types,methods,control_blocks,lambdas");
+
 	// ---- anonymous types -------------------------------------------------------------------------
 
 	[Test]

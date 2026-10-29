@@ -1000,36 +1000,42 @@ internal static partial class Printers
 		arena.Synthetic(SyntheticText.Space);
 		TokenPrinter.Print(node.SwitchKeyword, context);
 
-		using (arena.IndentIf(context.Options.IndentBraces))
-			arena.HardLine();
+		// dotnet format files this brace under the initializers flag, and moves it either way regardless
+		// of where the author put it.
+		BeforeOpenBrace(BraceStyle.ObjectCollectionArrayInitializers, context);
 
 		TokenPrinter.Print(node.OpenBraceToken, context);
 
 		var rewritesComma = RewritesTrailingComma(node.Arms, node.CloseBraceToken, context);
 
-		using (arena.Indent())
+		// The arms and the closing brace indent from the line the opening brace sits on, so when
+		// csharp_indent_braces moved that brace in, everything after it moves in with it.
+		using (arena.IndentIf(IndentsOpenBrace(BraceStyle.ObjectCollectionArrayInitializers, context)))
 		{
-			for (var i = 0; i < node.Arms.Count; i++)
+			using (arena.Indent())
 			{
-				arena.HardLine();
-				Node.Print(node.Arms[i], context);
+				for (var i = 0; i < node.Arms.Count; i++)
+				{
+					arena.HardLine();
+					Node.Print(node.Arms[i], context);
 
-				if (rewritesComma && i == node.Arms.Count - 1)
-					continue;
+					if (rewritesComma && i == node.Arms.Count - 1)
+						continue;
 
-				if (i < node.Arms.SeparatorCount)
-					TokenPrinter.Print(node.Arms.GetSeparator(i), context);
+					if (i < node.Arms.SeparatorCount)
+						TokenPrinter.Print(node.Arms.GetSeparator(i), context);
+				}
+
+				// A switch expression is always laid out broken, so the flat branch never applies.
+				if (rewritesComma)
+					PrintTrailingComma(context);
 			}
 
-			// A switch expression is always laid out broken, so the flat branch never applies.
-			if (rewritesComma)
-				PrintTrailingComma(context);
+			using (arena.IndentIf(context.Options.IndentBraces))
+				arena.HardLine();
+
+			TokenPrinter.Print(node.CloseBraceToken, context);
 		}
-
-		using (arena.IndentIf(context.Options.IndentBraces))
-			arena.HardLine();
-
-		TokenPrinter.Print(node.CloseBraceToken, context);
 	}
 
 	public static void SwitchExpressionArm(SwitchExpressionArmSyntax node, PrintContext context)
@@ -1048,6 +1054,17 @@ internal static partial class Printers
 
 		arena.Synthetic(SyntheticText.Space);
 		TokenPrinter.Print(node.EqualsGreaterThanToken, context);
+
+		// A nested switch expression hugs the arrow, as it does an expression body's. It always breaks,
+		// so the group below would always push it onto a line of its own, which dotnet format never does.
+		// A break the author put there is still theirs.
+		if (node.Expression is SwitchExpressionSyntax
+			&& !context.AuthorBroke(node.EqualsGreaterThanToken.Span.End, node.Expression.SpanStart))
+		{
+			arena.Synthetic(SyntheticText.Space);
+			Node.Print(node.Expression, context);
+			return;
+		}
 
 		// Same as a lambda's body: one the author started on the arrow's line stays there.
 		if (context.AuthorJoined(node.EqualsGreaterThanToken.Span.End, node.Expression.SpanStart))

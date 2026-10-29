@@ -1285,6 +1285,17 @@ internal static partial class Printers
 	}
 
 	/// <summary>
+	/// True when <see cref="BeforeOpenBrace"/> put the brace on a line of its own and indented it there.
+	/// </summary>
+	/// <remarks>
+	/// For a construct whose contents dotnet format indents from the brace's own line rather than from the
+	/// header's, so that they follow a brace <c>csharp_indent_braces</c> moved in. Only the switch
+	/// expression asks this today.
+	/// </remarks>
+	internal static bool IndentsOpenBrace(BraceStyle construct, PrintContext context) =>
+		context.Options.IndentBraces && context.Options.NewLineBeforeOpenBrace.HasFlag(construct);
+
+	/// <summary>
 	/// Emits a construct's braced body, keeping it on one line when the author wrote it on one.
 	/// </summary>
 	/// <remarks>
@@ -1810,7 +1821,7 @@ internal static partial class Printers
 		bool alwaysJoinsEmpty = false)
 	{
 		var forcesEmptyJoin = alwaysJoinsEmpty && context.Options.EmptyBlockStyle is null && IsEmptyBraces(body);
-		var joinsHeader = forcesEmptyJoin || JoinsEmptyBracesToHeader(body, context);
+		var joinsHeader = (forcesEmptyJoin || JoinsEmptyBracesToHeader(body, context)) && HeaderJoinSurvives(body, context);
 		var flat = joinsHeader || KeepsOneLine(body, context) || CollapsesEmptyBraces(body, context);
 
 		if (joinsHeader)
@@ -1821,6 +1832,20 @@ internal static partial class Printers
 		using (context.Arena.ForceFlatIf(flat))
 			Node.Print(body, context);
 	}
+
+	/// <summary>
+	/// Whether dotnet format leaves a body joined to its control-flow header where Curb put it.
+	/// </summary>
+	/// <remarks>
+	/// With <c>csharp_preserve_single_line_statements = false</c> dotnet format moves the body of every
+	/// embedded statement, <c>try</c>, <c>unsafe</c> and <c>do</c> back onto its own line, empty or not —
+	/// <c>while (a) { }</c> becomes <c>while (a)</c> then <c>{ }</c>. It leaves a <c>catch</c> or
+	/// <c>finally</c> block where it is. Joining one it would split is not a fixed point, so neither
+	/// <c>together_same_line</c> nor the empty-try default may: elastic/docs-builder's
+	/// <c>while (…) { }</c> spin loops cost three corpus files.
+	/// </remarks>
+	private static bool HeaderJoinSurvives(SyntaxNode body, PrintContext context) =>
+		context.Options.PreserveSingleLineStatements || body.Parent is CatchClauseSyntax or FinallyClauseSyntax;
 
 	/// <summary>
 	/// The <see cref="BeforeOpenBrace"/> variant for braces that only move to their own line when
