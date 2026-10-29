@@ -568,21 +568,39 @@ internal static partial class Printers
 			arena.LineShiftAnchor(anchor);
 		}
 
+		// The creation is an element of a collection kept as the author broke it, and they put this brace
+		// on a line of its own: the brace keeps that line's offset and the lines inside follow it. The
+		// indent here put them a level in from the collection's line — see BrokenCollectionElement. One
+		// that keeps exactly its breaks already places every line it has against an anchor of its own.
+		var elementBrace = -1;
+		if (leadingLine
+			&& context.TryTakeElementBraceAlignment(node.OpenBraceToken, out var elementRegister)
+			&& !exactly)
+			elementBrace = elementRegister;
+
 		// Outside the group below, because it has to resolve against the owner's break rather than this
 		// initializer's — see BeforeOpenBraceWhenOwnerBroke. This is the deterministic half of the
 		// `ownerSpansLines` question further down: that one reads where the author put the brace, which
 		// is right in preservation mode and unavailable in deterministic mode, and this one reads the
 		// decision the argument list took on this run, which is available in both.
-		if (leadingLine && !oneMemberPerLine)
+		if (leadingLine && !oneMemberPerLine && elementBrace < 0)
 			BeforeOpenBraceWhenOwnerBroke(BraceStyle.ObjectCollectionArrayInitializers, ownerGroup, context);
 
 		// Named and published so an enclosing construct can aim at it — see PrintContext.OwnBlockGroup.
 		var group = arena.NextGroupId();
 		context.OwnBlockGroup = group;
 
+		// Its line breaks outside the group, so that an initializer the author kept on that one line,
+		// `{ Name = "a" }`, is not opened out by it.
+		var aligned = default(DocScope);
+		if (elementBrace >= 0)
+			aligned = arena.AlignedIndent(elementBrace, ContinuationLine(node.OpenBraceToken, elementBrace, context));
+
+		using (aligned)
 		using (arena.Group(group))
 		{
-			if (leadingLine)
+			// An element's brace is already on its line, above.
+			if (leadingLine && elementBrace < 0)
 			{
 				// `new HttpClient(new Handler { … }) { Timeout = t }` — once the creation it belongs to
 				// has been opened out, the initializer takes a line of its own rather than trailing
@@ -640,13 +658,10 @@ internal static partial class Printers
 					var offset = InsideBrace(node.OpenBraceToken.Span.End, node.Expressions[0].GetFirstToken());
 					for (var i = 0; i < node.Expressions.Count; i++)
 					{
-						if (offset == int.MinValue)
+						if (anchor < 0)
 							Node.Print(node.Expressions[i], context);
 						else
-						{
-							using (arena.AlignedIndent(anchor, ElementIndent(node.Expressions[i], offset, context)))
-								Node.Print(node.Expressions[i], context);
-						}
+							BrokenCollectionElement(node.Expressions[i], anchor, offset, context);
 
 						offset = int.MinValue;
 						if (i >= node.Expressions.SeparatorCount)
@@ -756,8 +771,49 @@ internal static partial class Printers
 	}
 
 	/// <summary>
+	/// Prints one element of a collection expression or initializer that keeps the author's breaks, whose
+	/// lines read <paramref name="anchor"/>.
+	/// </summary>
+	/// <param name="element">The element to print.</param>
+	/// <param name="anchor">The register the collection's broken lines read.</param>
+	/// <param name="offset">
+	/// The offset of the line of its own the author put the element on, or <see cref="int.MinValue"/> when it
+	/// shares a line with the bracket or with the element before it.
+	/// </param>
+	/// <param name="context">Per-file printing state.</param>
+	/// <remarks>
+	/// A creation whose initializer brace the author put on a line of its own keeps that line where they put
+	/// it too, as dotnet format does: `{ new Person` / `{ Name = "a" } }` left the brace a level in from
+	/// the line the collection opens on, where the source has it at the line's own level.
+	/// </remarks>
+	private static void BrokenCollectionElement(SyntaxNode element, int anchor, int offset, PrintContext context)
+	{
+		var expression = element switch
+		{
+			ExpressionElementSyntax item => item.Expression,
+			ExpressionSyntax value => value,
+			_ => null,
+		};
+
+		if (expression is BaseObjectCreationExpressionSyntax { Initializer: { } initializer }
+			&& context.AuthorBroke(initializer.OpenBraceToken.GetPreviousToken().Span.End, initializer.OpenBraceToken.SpanStart))
+			context.AlignElementBrace(initializer.OpenBraceToken, anchor);
+
+		var indent = ElementIndent(expression, offset, context);
+		if (indent == int.MinValue)
+		{
+			Node.Print(element, context);
+			return;
+		}
+
+		using (context.Arena.AlignedIndent(anchor, indent))
+			Node.Print(element, context);
+	}
+
+	/// <summary>
 	/// The offset an element's own lines are based on, for an element the author put on a line of its own
-	/// at <paramref name="offset"/>.
+	/// at <paramref name="offset"/>, or that shares a line when <paramref name="offset"/> is
+	/// <see cref="int.MinValue"/>.
 	/// </summary>
 	/// <remarks>
 	/// <para>
@@ -768,20 +824,15 @@ internal static partial class Printers
 	/// <para>
 	/// So a call or creation whose own arguments the author opened out after its `(` is based on where
 	/// they put the first argument, a level to its left, the way an argument's continuation is read on the
-	/// argument-list side. Only its own list: a nested call's arguments are a level further in than the
-	/// outer list says, and reading them as the outer list's moved them a level right on every run. Any
-	/// other element's lines follow the element.
+	/// argument-list side. That holds for an element sharing the bracket's line as well: `[Make(` / `1),`
+	/// moved `1` to a level in from the statement wherever the author aligned it. Only its own list: a
+	/// nested call's arguments are a level further in than the outer list says, and reading them as the
+	/// outer list's moved them a level right on every run. Any other element's lines follow the element,
+	/// which is <see cref="int.MinValue"/> for one that shares a line: it follows that line.
 	/// </para>
 	/// </remarks>
-	private static int ElementIndent(SyntaxNode element, int offset, PrintContext context)
+	private static int ElementIndent(ExpressionSyntax? expression, int offset, PrintContext context)
 	{
-		var expression = element switch
-		{
-			ExpressionElementSyntax item => item.Expression,
-			ExpressionSyntax value => value,
-			_ => null,
-		};
-
 		var arguments = expression switch
 		{
 			InvocationExpressionSyntax invocation => invocation.ArgumentList,
@@ -790,7 +841,7 @@ internal static partial class Printers
 		};
 
 		if (arguments is not { Arguments.Count: > 0 }
-			|| !context.AuthorJoined(element.SpanStart, arguments.OpenParenToken.SpanStart)
+			|| !context.AuthorJoined(expression!.SpanStart, arguments.OpenParenToken.SpanStart)
 			|| !context.AuthorBroke(arguments.OpenParenToken.Span.End, arguments.Arguments[0].SpanStart))
 			return offset;
 
@@ -916,17 +967,12 @@ internal static partial class Printers
 		if (anchor >= 0)
 			context.ExitContinuation();
 
-		// An element on a line of its own: its own lines follow it.
 		void PrintElement(CollectionElementSyntax element, int offset)
 		{
-			if (offset == int.MinValue)
-			{
+			if (anchor < 0)
 				Node.Print(element, context);
-				return;
-			}
-
-			using (arena.AlignedIndent(anchor, ElementIndent(element, offset, context)))
-				Node.Print(element, context);
+			else
+				BrokenCollectionElement(element, anchor, offset, context);
 		}
 
 		// An edge the author left joined stays joined. A breakable line there broke as soon as any element

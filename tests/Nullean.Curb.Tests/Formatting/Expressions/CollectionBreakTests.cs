@@ -422,6 +422,95 @@ public class CollectionBreakTests : FormattingTest
 		"public class C\n{\n\tpublic void M()\n\t{\n\t\tvar a = new object[]\n\t\t{\n\t\t\t Create(\n\t\t\t\t1,\n\t\t\t\t2),\n\t\t\t  Create(\n\t\t\t\t3,\n\t\t\t\t4),\n\t\t};\n\t}\n}",
 		editorConfig: "indent_style = tab");
 
+	/// <summary>
+	/// An element that shares the bracket's line leaves its argument lines where the author put them too,
+	/// rather than one level in from the statement.
+	/// </summary>
+	[Test]
+	public Task An_element_on_the_bracket_line_leaves_its_argument_lines_where_they_are() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        int[] a = [Make(
+		                       1),
+		            2];
+		        int[] b = [Make(
+		            1),
+		            2];
+		        int[] c = [0, Make(
+		                          1),
+		            2];
+		        var d = new List<int> { Make(
+		                                    1),
+		            2 };
+		        int[] e = [Make(
+		                       Inner(
+		                           1)),
+		            2];
+		    }
+		}
+		""");
+
+	[Test]
+	public Task An_element_on_the_bracket_line_leaves_its_argument_lines_where_they_are_with_tabs() => Unchanged(
+		"public class C\n{\n\tpublic void M()\n\t{\n\t\tint[] a = [Make(\n\t\t\t1),\n\t\t\t2];\n\t\tint[] b = [Make(\n\t\t\t\t1),\n\t\t\t2];\n\t}\n}",
+		editorConfig: "indent_style = tab");
+
+	/// <summary>
+	/// A creation element whose initializer brace the author put on a line of its own leaves that brace
+	/// where they put it, with the initializer's lines following it, and keeps an initializer they wrote on
+	/// that one line on it.
+	/// </summary>
+	[Test]
+	public Task A_nested_object_initializer_in_a_collection_stays_where_the_author_put_it() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        var a = new List<Person> { new Person
+		        { Name = "a", } };
+		        var b = new List<Person> { new Person
+		            { Name = "a", } };
+		        var c = new List<Person> { new Person
+		        {
+		            Name = "a",
+		        } };
+		        var d = new List<Person> { new Person
+		        { Name = "a", }, new Person
+		        { Name = "b", } };
+		        var e = new List<Person> { new()
+		        {
+		            Name = "a",
+		        } };
+		        var f = new List<Person> { new Person(1)
+		        {
+		            Name = "a",
+		        } };
+		        List<Person> g = [new Person
+		        {
+		            Name = "a",
+		        }];
+		        var h = new List<Person>
+		        {
+		            new Person
+		            { Name = "a", },
+		            new Person
+		                {
+		                    Name = "b",
+		                },
+		        };
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_nested_object_initializer_in_a_collection_stays_where_the_author_put_it_with_tabs() => Unchanged(
+		"public class C\n{\n\tpublic void M()\n\t{\n\t\tvar a = new List<Person> { new Person\n\t\t{ Name = \"a\", } };\n\t\tvar c = new List<Person> { new Person\n\t\t{\n\t\t\tName = \"a\",\n\t\t} };\n\t}\n}",
+		editorConfig: "indent_style = tab");
+
 	[Test]
 	public Task Initializer_continuation_lines_keep_the_column_the_author_gave_them() => Unchanged(
 		"""

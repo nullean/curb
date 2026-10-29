@@ -293,6 +293,34 @@ internal sealed class PrintContext(DocArena arena, SourceText text, FormatOption
 		return true;
 	}
 
+	private int _elementBracePosition = -1;
+	private int _elementBraceRegister;
+
+	/// <summary>
+	/// Places the initializer brace <paramref name="brace"/> on its source line's offset from the line
+	/// <paramref name="register"/> reads, for an element of a collection kept as the author broke it.
+	/// </summary>
+	/// <remarks>
+	/// The element prints its own initializer several printers further down, so this is matched on
+	/// position, like <see cref="AlignLeadingTrivia"/>.
+	/// </remarks>
+	public void AlignElementBrace(SyntaxToken brace, int register)
+	{
+		_elementBracePosition = brace.SpanStart;
+		_elementBraceRegister = register;
+	}
+
+	/// <summary>Consumes what <see cref="AlignElementBrace"/> recorded, if it was for <paramref name="brace"/>.</summary>
+	public bool TryTakeElementBraceAlignment(SyntaxToken brace, out int register)
+	{
+		register = _elementBraceRegister;
+		if (_elementBracePosition != brace.SpanStart)
+			return false;
+
+		_elementBracePosition = -1;
+		return true;
+	}
+
 	/// <summary>
 	/// Benchmark-only: make unhandled nodes emit one document per token instead of one verbatim span
 	/// per line.
