@@ -936,7 +936,17 @@ internal static partial class Printers
 		// happened to spread over lines drops the group as well as the indent, leaving a long
 		// argument no break opportunity at all — it came back out as one over-long line, which the
 		// next run then broke again.
-		if (node.Arguments.Count == 1 && EndsWithOwnBlock(node.Arguments[0].Expression))
+		//
+		// Both hugging paths print the list's ends joined, so a list the author broke after `(` or
+		// before `)` goes the ordinary way, which keeps those breaks: `Register(` / `() =>` was joined
+		// onto one line (issue #135). A break between two arguments is left to the hugging path, which
+		// keeps one a trailing comment forces at the column the author had; the ordinary path would
+		// move that argument to the list's level.
+		var hugs = node.Arguments.Count > 0
+			&& !context.AuthorBroke(node.OpenParenToken.Span.End, node.Arguments[0].SpanStart)
+			&& !context.AuthorBroke(node.Arguments[^1].Span.End, node.CloseParenToken.SpanStart);
+
+		if (hugs && node.Arguments.Count == 1 && EndsWithOwnBlock(node.Arguments[0].Expression))
 		{
 			Spacing.InsideCallParens(context);
 			context.OwnBlockGroup = 0;
@@ -958,22 +968,9 @@ internal static partial class Printers
 		// EndsWithOwnBlock above: with several arguments already inline, only a genuine block
 		// guarantees a break exists to hug against — a `with` or object initializer tail could still
 		// print flat and would leave the list with no break opportunity of its own.
-		if (node.Arguments.Count > 1 && EndsWithBlockBodiedCallback(node.Arguments[^1].Expression))
+		if (hugs && node.Arguments.Count > 1 && EndsWithBlockBodiedCallback(node.Arguments[^1].Expression))
 		{
-			Spacing.InsideCallParens(context);
-			for (var i = 0; i < node.Arguments.Count - 1; i++)
-			{
-				Node.Print(node.Arguments[i], context);
-				Spacing.BeforeComma(context);
-				TokenPrinter.Print(node.Arguments.GetSeparator(i), context);
-				Spacing.AfterComma(context);
-			}
-
-			context.OwnBlockGroup = 0;
-			Node.Print(node.Arguments[^1], context);
-			Spacing.InsideCallParens(context);
-			TokenPrinter.Print(node.CloseParenToken, context);
-			context.ArgumentListGroup = context.OwnBlockGroup;
+			HugTrailingCallback(node, context);
 			return;
 		}
 
@@ -1023,6 +1020,68 @@ internal static partial class Printers
 
 		TokenPrinter.Print(node.CloseParenToken, context);
 		context.ArgumentListGroup = node.Arguments.Count > 0 ? group : (ushort)0;
+	}
+
+	/// <summary>
+	/// Prints an argument list whose last argument is a block-bodied callback, hugging the callback's
+	/// block rather than wrapping the list in a group and an indent.
+	/// </summary>
+	/// <remarks>
+	/// A break the author put between two arguments stays, and the argument after it keeps the column
+	/// the author gave it, moved as far as the line the list starts on moved — where dotnet format
+	/// leaves it. Joining those arguments onto the first line left the callback's block below a line
+	/// it no longer started on (issue #144). The column comes from the line-shift anchor rather than
+	/// the list's level: the ordinary path's level moved an argument the author placed after a
+	/// trailing comment.
+	/// </remarks>
+	private static void HugTrailingCallback(ArgumentListSyntax node, PrintContext context)
+	{
+		var arena = context.Arena;
+		var arguments = node.Arguments;
+
+		var register = -1;
+		for (var i = 0; i < arguments.Count - 1; i++)
+		{
+			if (!context.AuthorBroke(arguments[i].Span.End, arguments[i + 1].SpanStart))
+				continue;
+
+			register = context.EnterContinuation();
+			arena.LineShiftAnchor(register);
+			break;
+		}
+
+		Spacing.InsideCallParens(context);
+
+		// The column the current argument's line was aligned to, once a break has moved it.
+		var offset = int.MinValue;
+		for (var i = 0; i < arguments.Count; i++)
+		{
+			if (i == arguments.Count - 1)
+				context.OwnBlockGroup = 0;
+
+			// An argument on a line the author broke to sits as far in from that line as it would from
+			// the indent, as a chain operand does after its continuation line.
+			using (offset == int.MinValue ? default : arena.AlignedIndent(register, offset))
+				Node.Print(arguments[i], context);
+
+			if (i == arguments.Count - 1)
+				break;
+
+			Spacing.BeforeComma(context);
+			TokenPrinter.Print(arguments.GetSeparator(i), context);
+
+			if (register >= 0 && context.AuthorBroke(arguments[i].Span.End, arguments[i + 1].SpanStart))
+				offset = ContinuationLine(arguments[i + 1].GetFirstToken(), register, context);
+			else
+				Spacing.AfterComma(context);
+		}
+
+		if (register >= 0)
+			context.ExitContinuation();
+
+		Spacing.InsideCallParens(context);
+		TokenPrinter.Print(node.CloseParenToken, context);
+		context.ArgumentListGroup = context.OwnBlockGroup;
 	}
 
 	public static void Argument(ArgumentSyntax node, PrintContext context)
@@ -1291,6 +1350,26 @@ internal static partial class Printers
 		// by emitting the break from a deeper scope rather than by moving the token afterwards.
 		using (context.Arena.IndentIf(context.Options.IndentBraces))
 			context.Arena.HardLine();
+	}
+
+	/// <summary>
+	/// The source column of a block's opening brace when the author put it on a line of its own and
+	/// <see cref="BeforeOpenBrace"/> will too, or -1.
+	/// </summary>
+	/// <remarks>
+	/// -1 under <c>csharp_indent_braces</c>: that break comes from a level deeper than the block, so a
+	/// column read for the block would land the brace a level right of where the author had it, and
+	/// further right on every run.
+	/// </remarks>
+	internal static int OwnLineBraceColumn(BlockSyntax block, BraceStyle construct, PrintContext context)
+	{
+		if (!context.Options.NewLineBeforeOpenBrace.HasFlag(construct) || context.Options.IndentBraces)
+			return -1;
+
+		var open = block.OpenBraceToken;
+		return context.AuthorBroke(open.GetPreviousToken().Span.End, open.SpanStart)
+			? context.SourceIndent(open.SpanStart)
+			: -1;
 	}
 
 	/// <summary>

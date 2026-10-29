@@ -67,6 +67,14 @@ internal sealed class DocPrinter
 	/// <summary>Where in the source the current line's first text came from, or -1 if it was synthetic.</summary>
 	private int _lineSource;
 
+	/// <summary>
+	/// For each line written so far whose first text came from the source: where in the source that
+	/// text starts, and the line's indent in columns. Read back by a source-line anchor.
+	/// </summary>
+	private int[] _lineStarts = new int[256];
+	private int[] _lineIndents = new int[256];
+	private int _lineCount;
+
 	// --- round-trip risk tracking ------------------------------------------------------------
 	private int _lastSourceEnd;
 	private bool _insideLineComment;
@@ -101,6 +109,7 @@ internal sealed class DocPrinter
 		_insideLineComment = false;
 		_lineOpen = false;
 		_pendingAnchorCount = 0;
+		_lineCount = 0;
 		RoundTripAtRisk = false;
 
 		_breaks.Run(arena);
@@ -191,6 +200,8 @@ internal sealed class DocPrinter
 						Array.Resize(ref _anchors, Math.Max(doc.A + 1, _anchors.Length * 2));
 					if (doc.B == Doc.AnchorAtColumn)
 						_anchors[doc.A] = _column;
+					else if (doc.B < 0)
+						_anchors[doc.A] = IndentOfLineStartingAt(Doc.SourceLinePosition(doc.B));
 					else if (_lineOpen)
 						_anchors[doc.A] = LineShift(anchoredAtLineStart: false);
 					else
@@ -535,6 +546,42 @@ internal sealed class DocPrinter
 		for (var i = 0; i < _pendingAnchorCount; i++)
 			_anchors[_pendingAnchors[i]] = LineShift(anchoredAtLineStart: true);
 		_pendingAnchorCount = 0;
+
+		// Only a line whose indent is all in _column: text that brings whitespace of its own is not
+		// what a source-line anchor asks about.
+		if (_lineSource < 0 || leading > 0)
+			return;
+
+		if (_lineCount == _lineStarts.Length)
+		{
+			Array.Resize(ref _lineStarts, _lineCount * 2);
+			Array.Resize(ref _lineIndents, _lineCount * 2);
+		}
+
+		_lineStarts[_lineCount] = _lineSource;
+		_lineIndents[_lineCount] = _column;
+		_lineCount++;
+	}
+
+	/// <summary>
+	/// The indent of the line already written that starts with the source text at
+	/// <paramref name="position"/>, or <see cref="Doc.AnchorUnset"/> when none does.
+	/// </summary>
+	/// <remarks>
+	/// Searched from the newest line back. Lines come out in source order, so the search stops at the
+	/// first line that starts before <paramref name="position"/>: the construct then starts mid-line.
+	/// </remarks>
+	private int IndentOfLineStartingAt(int position)
+	{
+		for (var i = _lineCount - 1; i >= 0; i--)
+		{
+			if (_lineStarts[i] == position)
+				return _lineIndents[i];
+			if (_lineStarts[i] < position)
+				break;
+		}
+
+		return Doc.AnchorUnset;
 	}
 
 	/// <summary>
