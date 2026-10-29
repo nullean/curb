@@ -88,6 +88,21 @@ internal static partial class Printers
 	{
 		var arena = context.Arena;
 		arena.Synthetic(SyntheticText.Space);
+
+		// A value the author put below the `=` stays there. The group further down cannot keep it: with
+		// no width it never breaks, so `_comparers =` / `new(…)` was joined — issue #102. The `=` prints
+		// inside the indent so that a trailing `// note` on it ends its line at the value's level.
+		if (!BringsOwnBlock(node.Value) && context.AuthorBroke(node.EqualsToken.Span.End, node.Value.SpanStart))
+		{
+			using (arena.Indent())
+			{
+				TokenPrinter.Print(node.EqualsToken, context);
+				arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
+				Node.Print(node.Value, context);
+			}
+			return;
+		}
+
 		TokenPrinter.Print(node.EqualsToken, context);
 
 		// A value that brings its own braces or brackets already positions its contents, so adding a
@@ -464,6 +479,31 @@ internal static partial class Printers
 
 		Spacing.BeforeCallParens(context);
 		TokenPrinter.Print(node.ArgumentList.OpenParenToken, context);
+
+		// An argument list the author broke keeps their breaks, as an invocation's does. Printed flat
+		// it was joined onto one line however long — issue #102.
+		var arguments = node.ArgumentList.Arguments;
+		if (arguments.Count > 0 && SpansLines(node.ArgumentList, context))
+		{
+			using (context.Arena.Indent())
+			{
+				if (context.AuthorBroke(node.ArgumentList.OpenParenToken.Span.End, arguments[0].SpanStart))
+					context.Arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
+				else
+					Spacing.InsideCallParens(context);
+
+				PrintSeparated(arguments, context, asWritten: true, node.ArgumentList.OpenParenToken.Span.End);
+			}
+
+			if (context.AuthorBroke(arguments[^1].Span.End, node.ArgumentList.CloseParenToken.SpanStart))
+				context.Arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
+			else
+				Spacing.InsideCallParens(context);
+
+			TokenPrinter.Print(node.ArgumentList.CloseParenToken, context);
+			return;
+		}
+
 		if (node.ArgumentList.Arguments.Count == 0)
 			Spacing.InsideEmptyCallParens(context);
 		else

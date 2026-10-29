@@ -142,7 +142,8 @@ internal enum DocFlags : byte
 
 	/// <summary>
 	/// Indent this break to a column captured by a <see cref="DocKind.Anchor"/> rather than to the
-	/// enclosing scope's level. The line's <c>B</c> names the register.
+	/// enclosing scope's level. The line's <c>B</c> names the register. On a <see cref="DocKind.Indent"/>,
+	/// shift the subtree's indent to that column instead of by a number of levels.
 	/// </summary>
 	AlignToAnchor = 1 << 7,
 }
@@ -169,6 +170,34 @@ internal readonly struct Doc
 {
 	/// <summary>Sentinel for <see cref="DocKind.Indent"/> meaning "dedent to column 0".</summary>
 	public const int IndentToRoot = int.MinValue;
+
+	/// <summary><c>B</c> on a <see cref="DocKind.Anchor"/>: capture the column the output has reached.</summary>
+	public const int AnchorAtColumn = 0;
+
+	/// <summary>
+	/// <c>B</c> on a <see cref="DocKind.Anchor"/>: capture how far the line the output is on has moved
+	/// from where it sat in the source, so a source indent read back against it moves the same distance.
+	/// </summary>
+	/// <remarks>
+	/// Captured once the line's first text is written, since that is what says which source line it is.
+	/// A line that starts with a token which sat mid-line in the source has not moved at all: the lines
+	/// after it keep their source columns, as <c>dotnet format</c> leaves them. One that starts with
+	/// synthetic text, or with the anchored construct itself moved there from mid-line, has no source
+	/// line to measure from and captures <see cref="AnchorUnset"/>.
+	/// </remarks>
+	public const int AnchorAtLineShift = 1;
+
+	/// <summary>
+	/// A register a line-shift anchor declined to fill. An aligned line reading it breaks to the
+	/// enclosing indent instead.
+	/// </summary>
+	public const int AnchorUnset = int.MinValue;
+
+	/// <summary>
+	/// How far an aligned line's <c>B</c> shifts its column offset: the low bits name the register, the
+	/// rest are a signed number of columns to add to it.
+	/// </summary>
+	public const int AnchorOffsetShift = 8;
 
 	/// <summary>
 	/// <c>B</c> on a <see cref="LineType.Literal"/> line: write the configured <c>end_of_line</c>.

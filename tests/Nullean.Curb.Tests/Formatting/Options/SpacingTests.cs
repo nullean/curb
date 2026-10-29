@@ -516,6 +516,164 @@ public class SpacingTests : FormattingTest
 		""",
 		editorConfig: "csharp_space_after_semicolon_in_for_statement = false");
 
+	/// <summary>
+	/// A space before a semicolon belongs to the clause in front of it, so an empty clause neither
+	/// takes one nor doubles the space after the previous semicolon. See
+	/// <see href="https://github.com/nullean/curb/issues/133">issue #133</see>.
+	/// </summary>
+	[Test]
+	public Task An_empty_for_clause_takes_no_space_before_its_semicolon() => Formats(
+		"""
+		public class C
+		{
+		    public void M(bool a, int i)
+		    {
+		        for (;;) { }
+		        for (; a;) { }
+		        for (var j = 0; ; j++) { }
+		        for (var j = 0; j < 3;) { }
+		        for (; ; i++) { }
+		        for (var j = 0;;) { }
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M(bool a, int i)
+		    {
+		        for ( ; ; ) { }
+		        for (; a ;) { }
+		        for (var j = 0 ; ; j++) { }
+		        for (var j = 0 ; j < 3 ;) { }
+		        for (; ; i++) { }
+		        for (var j = 0 ; ;) { }
+		    }
+		}
+		""",
+		editorConfig: "csharp_space_before_semicolon_in_for_statement = true");
+
+	[Test]
+	public Task An_empty_for_clause_with_the_space_on_the_other_side() => Formats(
+		"""
+		public class C
+		{
+		    public void M(bool a, int i)
+		    {
+		        for (; a;) { }
+		        for (var j = 0; ; j++) { }
+		        for (; ; i++) { }
+		        for (; i < 3; i++) { }
+		        for (var j = 0;;) { }
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M(bool a, int i)
+		    {
+		        for (;a ;) { }
+		        for (var j = 0 ;;j++) { }
+		        for (;;i++) { }
+		        for (;i < 3 ;i++) { }
+		        for (var j = 0 ;;) { }
+		    }
+		}
+		""",
+		editorConfig: """
+		csharp_space_before_semicolon_in_for_statement = true
+		csharp_space_after_semicolon_in_for_statement = false
+		""");
+
+	/// <summary>
+	/// Roslyn's rule for a header with no clauses spaces whatever follows its <c>)</c> as though it
+	/// came after one of the semicolons, so without that space <c>{ }</c> on the header's line is
+	/// glued to it. Matched rather than recorded as a divergence: it is what IDE0055 asks for, and
+	/// <c>for (;;) { }</c> would be reported as a violation in the editor.
+	/// </summary>
+	[Test]
+	public Task An_empty_for_header_hugs_a_body_on_its_line_without_the_space() => Formats(
+		"""
+		public class C
+		{
+		    public void M(int i)
+		    {
+		        for (; ; ) { }
+		        for (; ; ) i++;
+		        for (; ; ) ;
+		        for (; ; )
+		        { }
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M(int i)
+		    {
+		        for (;;){ }
+		        for (;;)i++;
+		        for (;;);
+		        for (;;)
+		        { }
+		    }
+		}
+		""",
+		editorConfig: "csharp_space_after_semicolon_in_for_statement = false");
+
+	[Test]
+	public Task An_empty_for_header_with_both_spacing_options_flipped() => Formats(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        for (; ; ) { }
+		        for (; ; ) ;
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        for ( ; ;){ }
+		        for ( ; ;) ;
+		    }
+		}
+		""",
+		editorConfig: """
+		csharp_space_before_semicolon_in_for_statement = true
+		csharp_space_after_semicolon_in_for_statement = false
+		""");
+
+	[Test]
+	public Task An_empty_for_header_hugs_an_end_of_line_brace_without_the_space() => Formats(
+		"""
+		public class C {
+		    public void M() {
+		        for (; ; ) {
+		            Call();
+		        }
+		    }
+		}
+		""",
+		"""
+		public class C {
+		    public void M() {
+		        for (;;){
+		            Call();
+		        }
+		    }
+		}
+		""",
+		editorConfig: """
+		csharp_new_line_before_open_brace = none
+		csharp_space_after_semicolon_in_for_statement = false
+		""");
+
 	// ---- csharp_space_after_unary_operator --------------------------------------------------------
 
 	[Test]

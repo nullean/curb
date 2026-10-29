@@ -43,7 +43,7 @@ internal static partial class Printers
 		// csharp_preserve_single_line_blocks: `if (a) { return; }` stays whole even with that off.
 		if (context.Options.PreserveSingleLineStatements && context.AuthorJoined(headerEnd, statement.Span.End))
 		{
-			arena.Synthetic(SyntheticText.Space);
+			SpaceBeforeBody(statement, context);
 			using (arena.ForceFlat())
 				Node.Print(statement, context);
 			return;
@@ -60,6 +60,19 @@ internal static partial class Printers
 			arena.HardLine();
 			Node.Print(statement, context);
 		}
+	}
+
+	/// <summary>The space between a header and a body that stays on the header's line.</summary>
+	/// <remarks>
+	/// One space, except after <c>for (;;)</c>, which Roslyn spaces by its empty-header rule; see
+	/// <see cref="Spacing.AfterEmptyForHeader"/>.
+	/// </remarks>
+	private static void SpaceBeforeBody(SyntaxNode body, PrintContext context)
+	{
+		if (body.Parent is ForStatementSyntax header && header.Statement == body && IsEmptyForHeader(header))
+			Spacing.AfterEmptyForHeader(body is EmptyStatementSyntax, context);
+		else
+			context.Arena.Synthetic(SyntheticText.Space);
 	}
 
 	/// <summary>
@@ -122,7 +135,7 @@ internal static partial class Printers
 	{
 		var arena = context.Arena;
 
-		BeforeOpenBrace(BraceStyle.ControlBlocks, context);
+		BeforeOpenBrace(BraceStyle.ControlBlocks, context, statement);
 		arena.Synthetic(SyntheticText.OpenBrace);
 
 		using (arena.Indent(context.Options.IndentBlockContents ? 1 : 0))
@@ -290,9 +303,42 @@ internal static partial class Printers
 	{
 		TokenPrinter.Print(node.DoKeyword, context);
 		EmbeddedStatement(node.Statement, node.DoKeyword.Span.End, context);
-		context.Arena.HardLine();
+
+		if (!WhileJoinsBody(node, context))
+			context.Arena.HardLine();
+		else if (!EndsWithBlockComment(node.Statement is BlockSyntax block ? block.CloseBraceToken : node.Statement.GetLastToken()))
+			context.Arena.Synthetic(SyntheticText.Space);
+
 		ConditionHeader(node.WhileKeyword, node.OpenParenToken, node.Condition, node.CloseParenToken, context);
 		TokenPrinter.Print(node.SemicolonToken, context);
+	}
+
+	/// <summary>
+	/// True when the <c>while</c> of a <c>do</c> stays on the line its body ends on (issue #132).
+	/// </summary>
+	/// <remarks>
+	/// <para>
+	/// After a <c>}</c>, Roslyn asks for no line break and keeps whatever the author wrote, so
+	/// <c>} while (x);</c> and a <c>while</c> on its own line are both fixed points. There is no option
+	/// for it. A line comment after the brace has already ended the line, which the source shows too.
+	/// </para>
+	/// <para>
+	/// After an unbraced body's <c>;</c> it asks for a line break, which only the whole statement
+	/// staying on one line under <c>csharp_preserve_single_line_statements</c> suppresses. Braces Curb
+	/// is about to add get a line of their own, so the <c>while</c> follows them down.
+	/// </para>
+	/// <para>
+	/// Deterministic layout has no author to ask and puts <c>while</c> on its own line, as it always did.
+	/// </para>
+	/// </remarks>
+	private static bool WhileJoinsBody(DoStatementSyntax node, PrintContext context)
+	{
+		if (node.Statement is BlockSyntax block)
+			return context.AuthorJoined(block.CloseBraceToken.Span.End, node.WhileKeyword.SpanStart);
+
+		return !WantsBraces(node.Statement, context)
+			&& context.Options.PreserveSingleLineStatements
+			&& context.AuthorJoined(node.SpanStart, node.Span.End);
 	}
 
 	public static void ForStatement(ForStatementSyntax node, PrintContext context)
@@ -300,23 +346,66 @@ internal static partial class Printers
 		TokenPrinter.Print(node.ForKeyword, context);
 		Spacing.AfterControlFlowKeyword(context);
 		TokenPrinter.Print(node.OpenParenToken, context);
+
+		if (IsEmptyForHeader(node))
+			PrintEmptyForHeader(node, context);
+		else
+			PrintForHeader(node, context);
+
+		TokenPrinter.Print(node.CloseParenToken, context);
+		EmbeddedStatement(node.Statement, node.CloseParenToken.Span.End, context);
+	}
+
+	/// <summary>True for <c>for (;;)</c>, which Roslyn spaces by a rule of its own.</summary>
+	private static bool IsEmptyForHeader(ForStatementSyntax node) =>
+		node is { Declaration: null, Initializers.Count: 0, Condition: null, Incrementors.Count: 0 };
+
+	/// <summary>
+	/// Emits the inside of <c>for (;;)</c>: <c>for (; ; )</c> by default.
+	/// </summary>
+	/// <remarks>
+	/// The parenthesis option plays no part: Roslyn's empty-header rule comes before it and reads only
+	/// the two semicolon options, so <c>(</c> takes the before-semicolon space and <c>)</c> the
+	/// after-semicolon one.
+	/// </remarks>
+	private static void PrintEmptyForHeader(ForStatementSyntax node, PrintContext context)
+	{
+		Spacing.BeforeForSemicolon(context);
+		TokenPrinter.Print(node.FirstSemicolonToken, context);
+		Spacing.BetweenEmptyForSemicolons(context);
+		TokenPrinter.Print(node.SecondSemicolonToken, context);
+		Spacing.AfterForSemicolon(context);
+	}
+
+	/// <summary>Emits the inside of a <c>for</c> header with at least one clause.</summary>
+	/// <remarks>
+	/// A space before a semicolon belongs to the clause in front of it, and an empty clause has none:
+	/// <c>(</c> or the previous semicolon meets it directly. After a semicolon the space is written
+	/// even when the next clause is empty, except before <c>)</c>, which only the parenthesis option
+	/// spaces. That is how dotnet format writes <c>for (; a;)</c> and <c>for (var i = 0; ;)</c>.
+	/// </remarks>
+	private static void PrintForHeader(ForStatementSyntax node, PrintContext context)
+	{
 		Spacing.InsideControlFlowParens(context);
 
 		Node.Print(node.Declaration, context);
 		foreach (var initializer in node.Initializers)
 			Node.Print(initializer, context);
 
-		// The spacing goes around the semicolon whether or not a clause follows it, which is what
-		// gives an empty header the `for (; ; )` shape dotnet format produces.
-		Spacing.BeforeForSemicolon(context);
+		if (node.Declaration is not null || node.Initializers.Count > 0)
+			Spacing.BeforeForSemicolon(context);
 		TokenPrinter.Print(node.FirstSemicolonToken, context);
 		Spacing.AfterForSemicolon(context);
-		if (node.Condition is not null)
-			Node.Print(node.Condition, context);
 
-		Spacing.BeforeForSemicolon(context);
+		if (node.Condition is not null)
+		{
+			Node.Print(node.Condition, context);
+			Spacing.BeforeForSemicolon(context);
+		}
 		TokenPrinter.Print(node.SecondSemicolonToken, context);
-		Spacing.AfterForSemicolon(context);
+
+		if (node.Incrementors.Count > 0)
+			Spacing.AfterForSemicolon(context);
 		for (var i = 0; i < node.Incrementors.Count; i++)
 		{
 			Node.Print(node.Incrementors[i], context);
@@ -327,8 +416,6 @@ internal static partial class Printers
 		}
 
 		Spacing.InsideControlFlowParens(context);
-		TokenPrinter.Print(node.CloseParenToken, context);
-		EmbeddedStatement(node.Statement, node.CloseParenToken.Span.End, context);
 	}
 
 	public static void ForEachStatement(ForEachStatementSyntax node, PrintContext context)
@@ -402,7 +489,9 @@ internal static partial class Printers
 
 		TokenPrinter.Print(node.TryKeyword, context);
 		// Same reasoning as catch and finally, below: dotnet format is lazy about an empty try block
-		// too, in both directions, so an unconditional `{ }` is the cleaner default here as well.
+		// too, in both directions, so an unconditional `{ }` is the cleaner default here as well. The
+		// one exception is csharp_preserve_single_line_statements = false, under which dotnet format
+		// does move it off the keyword; PrintStatementBody honours that for a try but not a clause.
 		PrintStatementBody(node.Block, BraceStyle.ControlBlocks, context, alwaysJoinsEmpty: true);
 
 		foreach (var catchClause in node.Catches)
@@ -551,6 +640,12 @@ internal static partial class Printers
 	{
 		var arena = context.Arena;
 
+		// A case label is not a statement, so dotnet format moves its continuation lines as far as the
+		// line `switch` starts on moved, not as far as the label itself moved — see CaseLabelContinuation.
+		var labelAnchor = HasBrokenPatternLabel(node, context) ? context.EnterContinuation() : -1;
+		if (labelAnchor >= 0)
+			arena.LineShiftAnchor(labelAnchor);
+
 		TokenPrinter.Print(node.SwitchKeyword, context);
 		Spacing.AfterControlFlowKeyword(context);
 
@@ -580,11 +675,29 @@ internal static partial class Printers
 			else
 				BeforeOpenBrace(BraceStyle.ControlBlocks, context);
 
-			PrintSwitchBody(node, context);
+			PrintSwitchBody(node, labelAnchor, context);
 		}
+
+		if (labelAnchor >= 0)
+			context.ExitContinuation();
 	}
 
-	private static void PrintSwitchBody(SwitchStatementSyntax node, PrintContext context)
+	/// <summary>Whether any of the switch's pattern labels spans lines the author broke.</summary>
+	private static bool HasBrokenPatternLabel(SwitchStatementSyntax node, PrintContext context)
+	{
+		foreach (var section in node.Sections)
+		{
+			foreach (var label in section.Labels)
+			{
+				if (label is CasePatternSwitchLabelSyntax && SpansLines(label, context))
+					return true;
+			}
+		}
+
+		return false;
+	}
+
+	private static void PrintSwitchBody(SwitchStatementSyntax node, int labelAnchor, PrintContext context)
 	{
 		var arena = context.Arena;
 		TokenPrinter.Print(node.OpenBraceToken, context);
@@ -620,7 +733,10 @@ internal static partial class Printers
 					else
 						arena.HardLine();
 
+					var outerLabelAnchor = context.CaseLabelContinuation;
+					context.CaseLabelContinuation = labelAnchor;
 					Node.Print(label, context);
+					context.CaseLabelContinuation = outerLabelAnchor;
 					labelEnd = label.Span.End;
 					firstLabel = false;
 				}
@@ -682,10 +798,7 @@ internal static partial class Printers
 	{
 		TokenPrinter.Print(node.ThrowKeyword, context);
 		if (node.Expression is not null)
-		{
-			context.Arena.Synthetic(SyntheticText.Space);
-			Node.Print(node.Expression, context);
-		}
+			ValueAfterKeyword(node.ThrowKeyword, node.Expression, context);
 		TokenPrinter.Print(node.SemicolonToken, context);
 	}
 
@@ -695,11 +808,44 @@ internal static partial class Printers
 		context.Arena.Synthetic(SyntheticText.Space);
 		TokenPrinter.Print(node.ReturnOrBreakKeyword, context);
 		if (node.Expression is not null)
+			ValueAfterKeyword(node.ReturnOrBreakKeyword, node.Expression, context);
+		TokenPrinter.Print(node.SemicolonToken, context);
+	}
+
+	/// <summary>
+	/// Prints the value a <c>return</c>, <c>throw</c> or <c>yield return</c> introduces: after a space,
+	/// or on the line below where the author put it there.
+	/// </summary>
+	/// <remarks>
+	/// A value below the keyword moves as far as the keyword's line moved, which is where dotnet format
+	/// leaves it, at whatever column the author chose. Joining it back onto the keyword lengthened the
+	/// line, and the continuation lines of a chain it started kept a column measured from a line that
+	/// was no longer there (issue #117). A comment ahead of the value goes on the value's column.
+	/// The value's own lines, a call's arguments or an initializer's braces, sit as far in from the
+	/// value's line as they would from the indent, however deep the author put it. Should the anchor
+	/// have nothing to measure from, the value falls back to one level in.
+	/// </remarks>
+	private static void ValueAfterKeyword(SyntaxToken keyword, ExpressionSyntax value, PrintContext context)
+	{
+		if (!context.AuthorBroke(keyword.Span.End, value.SpanStart))
 		{
 			context.Arena.Synthetic(SyntheticText.Space);
-			Node.Print(node.Expression, context);
+			Node.Print(value, context);
+			return;
 		}
-		TokenPrinter.Print(node.SemicolonToken, context);
+
+		// The keyword's line is already open, so the anchor measures it now. A keyword that sat
+		// mid-line in the source measures as unmoved, and the value keeps its source column.
+		var anchor = context.EnterContinuation();
+		context.Arena.LineShiftAnchor(anchor);
+		using (context.Arena.Indent())
+		{
+			var offset = ContinuationLine(value.GetFirstToken(), anchor, context);
+			using (context.Arena.AlignedIndent(anchor, offset))
+				Node.Print(value, context);
+		}
+
+		context.ExitContinuation();
 	}
 
 	/// <summary>Covers <c>break;</c>, <c>continue;</c> and the empty statement.</summary>

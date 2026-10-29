@@ -97,6 +97,42 @@ public class ParenthesisSpacingTests : FormattingTest
 		""",
 		editorConfig: "csharp_space_between_parentheses = control_flow_statements");
 
+	/// <summary>
+	/// An empty incrementor gets the one space inside <c>)</c>, not that plus the one after its
+	/// semicolon, and a header with no clauses gets none: Roslyn spaces it by its own rule, which
+	/// reads only the semicolon options. See
+	/// <see href="https://github.com/nullean/curb/issues/133">issue #133</see>.
+	/// </summary>
+	[Test]
+	public Task Control_flow_parentheses_around_an_empty_for_clause() => Formats(
+		"""
+		public class C
+		{
+		    public void M(bool a, int i)
+		    {
+		        for (;;) { }
+		        for (; a;) { }
+		        for (var j = 0; j < 3;) { }
+		        for (var j = 0;;) { }
+		        for (;;i++) { }
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M(bool a, int i)
+		    {
+		        for (; ; ) { }
+		        for ( ; a; ) { }
+		        for ( var j = 0; j < 3; ) { }
+		        for ( var j = 0; ; ) { }
+		        for ( ; ; i++ ) { }
+		    }
+		}
+		""",
+		editorConfig: "csharp_space_between_parentheses = control_flow_statements");
+
 	[Test]
 	public Task Catch_its_filter_and_do_while_count_as_control_flow() => Formats(
 		"""
