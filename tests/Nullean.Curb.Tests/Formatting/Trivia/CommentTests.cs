@@ -640,6 +640,10 @@ public class CommentTests : FormattingTest
 
 	// Every expectation below was checked against dotnet format whitespace, which leaves each input
 	// unchanged.
+	//
+	// Only the `_with_a_width` variant depends on the BreakPropagation exemption. With no width the
+	// arm keeps its line through AuthorJoined on the arrow anyway (#104), so the other two pass with
+	// or without it; they guard the shape, not the mechanism.
 
 	[Test]
 	public Task A_trailing_comment_on_the_last_switch_arm_keeps_it_on_one_line() => Unchanged(
