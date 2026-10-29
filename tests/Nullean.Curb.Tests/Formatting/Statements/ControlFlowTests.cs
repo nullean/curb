@@ -256,8 +256,8 @@ public class ControlFlowTests : FormattingTest
 		    }
 		}
 		""",
-		// dotnet format spaces an empty header out rather than collapsing it, and the two
-		// csharp_space_*_semicolon_in_for_statement options apply whether or not a clause follows.
+		// dotnet format spaces an empty header out rather than collapsing it. Roslyn has a rule of its
+		// own for a header with no clauses at all; see the next case for one with only some.
 		"""
 		public class C
 		{
@@ -267,6 +267,45 @@ public class ControlFlowTests : FormattingTest
 		        {
 		            Call();
 		        }
+		    }
+		}
+		""");
+
+	/// <summary>
+	/// An empty incrementor takes no space before <c>)</c> unless every clause is empty. See
+	/// <see href="https://github.com/nullean/curb/issues/133">issue #133</see>.
+	/// </summary>
+	[Test]
+	public Task For_loop_with_some_clauses_empty() => Formats(
+		"""
+		public class C
+		{
+		    public void M(bool a, int i)
+		    {
+		        for (;;) { }
+		        for (; a; ) { }
+		        for (var j = 0; ; j++) { }
+		        for (var j = 0; j < 3; ) { }
+		        for (;;i++) { }
+		        for (var j = 0;;) { }
+		        for (;;);
+		        for (; a;) ;
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M(bool a, int i)
+		    {
+		        for (; ; ) { }
+		        for (; a;) { }
+		        for (var j = 0; ; j++) { }
+		        for (var j = 0; j < 3;) { }
+		        for (; ; i++) { }
+		        for (var j = 0; ;) { }
+		        for (; ; );
+		        for (; a;) ;
 		    }
 		}
 		""");
@@ -346,6 +385,99 @@ public class ControlFlowTests : FormattingTest
 		    }
 		}
 		""");
+
+	/// <summary>
+	/// The <c>while</c> of a <c>do</c> stays on the closing brace's line when the author put it there.
+	/// See <see href="https://github.com/nullean/curb/issues/132">issue #132</see>.
+	/// </summary>
+	/// <remarks>
+	/// Roslyn has no option for this gap. It asks for no line break between <c>}</c> and <c>while</c>
+	/// and keeps whatever the author wrote, so both shapes are fixed points of <c>dotnet format</c>.
+	/// </remarks>
+	[Test]
+	public Task Do_while_loop_keeps_while_on_the_closing_brace_line() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        do
+		        {
+		            Call();
+		        } while (condition);
+
+		        do
+		        { } while (condition);
+
+		        do
+		        {
+		            Call();
+		        } /* again */ while (condition);
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Do_while_loop_written_on_one_line_stays_there() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        do { } while (condition);
+
+		        do { Call(); } while (condition);
+
+		        do Call(); while (condition);
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Do_while_loop_after_a_line_comment_keeps_its_own_line() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        do { Call(); } // again
+		        while (condition);
+
+		        do
+		            Call();
+		        while (condition);
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Do_while_loop_under_deterministic_layout_puts_while_on_its_own_line() => Formats(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        do
+		        {
+		            Call();
+		        } while (condition);
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        do
+		        {
+		            Call();
+		        }
+		        while (condition);
+		    }
+		}
+		""",
+		editorConfig: "max_line_length = 120");
 
 	[Test]
 	public Task Nested_loops_are_indented() => Unchanged(
