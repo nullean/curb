@@ -306,7 +306,7 @@ internal static partial class Printers
 
 		if (!WhileJoinsBody(node, context))
 			context.Arena.HardLine();
-		else if (!EndsWithBlockComment(node.WhileKeyword.GetPreviousToken()))
+		else if (!EndsWithBlockComment(node.Statement is BlockSyntax block ? block.CloseBraceToken : node.Statement.GetLastToken()))
 			context.Arena.Synthetic(SyntheticText.Space);
 
 		ConditionHeader(node.WhileKeyword, node.OpenParenToken, node.Condition, node.CloseParenToken, context);
