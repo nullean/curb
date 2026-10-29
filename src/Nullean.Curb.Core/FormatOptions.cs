@@ -400,6 +400,11 @@ public readonly record struct FormatOptions
 	/// and <c>Multiline</c> is the opposite opt-in: it forces an empty pair the author or preservation would
 	/// have kept joined apart onto two lines instead.
 	/// </para>
+	/// <para>
+	/// <c>TogetherSameLine</c> yields to <see cref="PreserveSingleLineStatements"/> = false for a statement's
+	/// own body. dotnet format reads that key and moves the body, an empty <c>{ }</c> included, off its
+	/// header's line, so joining it there would never settle (issue #131).
+	/// </para>
 	/// </remarks>
 	public EmptyBlockStyle? EmptyBlockStyle { get; init; }
 

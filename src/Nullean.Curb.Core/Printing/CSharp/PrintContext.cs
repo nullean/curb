@@ -232,6 +232,11 @@ internal sealed class PrintContext(DocArena arena, SourceText text, FormatOption
 	/// <summary>
 	/// Claims an anchor register for one broken binary expression, nested inside any already claimed.
 	/// </summary>
+	/// <remarks>
+	/// An aligned line packs its register below <see cref="Doc.AnchorOffsetShift"/> and its offset above
+	/// it, so a register of 256 or more would corrupt the offset. Nothing here bounds the depth: the
+	/// recursion limit in <see cref="Node"/> (200) fails first. Raising that limit needs a check here.
+	/// </remarks>
 	public int EnterContinuation() => FirstContinuationRegister + _continuationDepth++;
 
 	/// <summary>Releases the register <see cref="EnterContinuation"/> claimed last.</summary>

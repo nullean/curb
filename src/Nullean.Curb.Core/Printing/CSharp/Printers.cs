@@ -897,10 +897,7 @@ internal static partial class Printers
 	{
 		TokenPrinter.Print(node.ReturnKeyword, context);
 		if (node.Expression is not null)
-		{
-			context.Arena.Synthetic(SyntheticText.Space);
-			Node.Print(node.Expression, context);
-		}
+			ValueAfterKeyword(node.ReturnKeyword, node.Expression, context);
 		TokenPrinter.Print(node.SemicolonToken, context);
 	}
 
@@ -1273,11 +1270,20 @@ internal static partial class Printers
 	/// mixed per construct. Printers call this rather than emitting a break of their own, so wiring
 	/// a new construct into the option is a one-line change here rather than a hunt.
 	/// </remarks>
-	internal static void BeforeOpenBrace(BraceStyle construct, PrintContext context)
+	/// <param name="construct">Which csharp_new_line_before_open_brace flag governs the brace.</param>
+	/// <param name="context">Per-file printing state.</param>
+	/// <param name="body">
+	/// The statement body the brace opens, when it hangs off a control-flow header. Only needed for
+	/// the space a brace kept on the header's line takes; see <see cref="SpaceBeforeBody"/>.
+	/// </param>
+	internal static void BeforeOpenBrace(BraceStyle construct, PrintContext context, SyntaxNode? body = null)
 	{
 		if (!context.Options.NewLineBeforeOpenBrace.HasFlag(construct))
 		{
-			context.Arena.Synthetic(SyntheticText.Space);
+			if (body is null)
+				context.Arena.Synthetic(SyntheticText.Space);
+			else
+				SpaceBeforeBody(body, context);
 			return;
 		}
 
@@ -1286,6 +1292,17 @@ internal static partial class Printers
 		using (context.Arena.IndentIf(context.Options.IndentBraces))
 			context.Arena.HardLine();
 	}
+
+	/// <summary>
+	/// True when <see cref="BeforeOpenBrace"/> put the brace on a line of its own and indented it there.
+	/// </summary>
+	/// <remarks>
+	/// For a construct whose contents dotnet format indents from the brace's own line rather than from the
+	/// header's, so that they follow a brace <c>csharp_indent_braces</c> moved in. Only the switch
+	/// expression asks this today.
+	/// </remarks>
+	internal static bool IndentsOpenBrace(BraceStyle construct, PrintContext context) =>
+		context.Options.IndentBraces && context.Options.NewLineBeforeOpenBrace.HasFlag(construct);
 
 	/// <summary>
 	/// Emits a construct's braced body, keeping it on one line when the author wrote it on one.
@@ -1401,6 +1418,11 @@ internal static partial class Printers
 	/// <c>csharp_empty_block_style = together_same_line</c> only — <c>together</c> collapses the pair
 	/// through <see cref="CollapsesEmptyBraces"/> but leaves it wherever the brace option puts it, which
 	/// is the distinction ReSharper itself draws between the two values.
+	/// <para>
+	/// A statement body is the exception: with <c>csharp_preserve_single_line_statements = false</c>,
+	/// <see cref="PrintStatementBody"/> declines the join, because dotnet format moves that pair back
+	/// down and the two tools would otherwise undo each other on every run (issue #131).
+	/// </para>
 	/// </remarks>
 	internal static bool JoinsEmptyBracesToHeader(SyntaxNode body, PrintContext context) =>
 		context.Options.EmptyBlockStyle == EmptyBlockStyle.TogetherSameLine && IsEmptyBraces(body);
@@ -1813,17 +1835,31 @@ internal static partial class Printers
 		bool alwaysJoinsEmpty = false)
 	{
 		var forcesEmptyJoin = alwaysJoinsEmpty && context.Options.EmptyBlockStyle is null && IsEmptyBraces(body);
-		var joinsHeader = forcesEmptyJoin || JoinsEmptyBracesToHeader(body, context);
+		var joinsHeader = (forcesEmptyJoin || JoinsEmptyBracesToHeader(body, context)) && HeaderJoinSurvives(body, context);
 		var flat = joinsHeader || KeepsOneLine(body, context) || CollapsesEmptyBraces(body, context);
 
 		if (joinsHeader)
-			context.Arena.Synthetic(SyntheticText.Space);
+			SpaceBeforeBody(body, context);
 		else
-			BeforeOpenBrace(construct, context);
+			BeforeOpenBrace(construct, context, body);
 
 		using (context.Arena.ForceFlatIf(flat))
 			Node.Print(body, context);
 	}
+
+	/// <summary>
+	/// Whether dotnet format leaves a body joined to its control-flow header where Curb put it.
+	/// </summary>
+	/// <remarks>
+	/// With <c>csharp_preserve_single_line_statements = false</c> dotnet format moves the body of every
+	/// embedded statement, <c>try</c>, <c>unsafe</c> and <c>do</c> back onto its own line, empty or not —
+	/// <c>while (a) { }</c> becomes <c>while (a)</c> then <c>{ }</c>. It leaves a <c>catch</c> or
+	/// <c>finally</c> block where it is. Joining one it would split is not a fixed point, so neither
+	/// <c>together_same_line</c> nor the empty-try default may: elastic/docs-builder's
+	/// <c>while (…) { }</c> spin loops cost three corpus files.
+	/// </remarks>
+	private static bool HeaderJoinSurvives(SyntaxNode body, PrintContext context) =>
+		context.Options.PreserveSingleLineStatements || body.Parent is CatchClauseSyntax or FinallyClauseSyntax;
 
 	/// <summary>
 	/// The <see cref="BeforeOpenBrace"/> variant for braces that only move to their own line when
@@ -2634,6 +2670,23 @@ internal static partial class Printers
 		{
 			if (trivia.IsKind(SyntaxKind.SingleLineCommentTrivia))
 				return true;
+		}
+
+		return false;
+	}
+
+	/// <summary>
+	/// True when a token's trailing trivia ends in a <c>/* */</c> comment, which already wrote the
+	/// space after itself.
+	/// </summary>
+	internal static bool EndsWithBlockComment(SyntaxToken token)
+	{
+		var trailing = token.TrailingTrivia;
+		for (var i = trailing.Count - 1; i >= 0; i--)
+		{
+			if (trailing[i].IsKind(SyntaxKind.WhitespaceTrivia))
+				continue;
+			return trailing[i].IsKind(SyntaxKind.MultiLineCommentTrivia);
 		}
 
 		return false;

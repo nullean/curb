@@ -111,6 +111,117 @@ public class EmptyBlockStyleTests : FormattingTest
 		resharper_csharp_empty_block_style = together_same_line
 		""");
 
+	/// <summary>
+	/// <c>csharp_preserve_single_line_statements = false</c> keeps a statement's body off its header's
+	/// line, and <c>dotnet format</c> applies that to an empty <c>{ }</c> too. See
+	/// <see href="https://github.com/nullean/curb/issues/131">issue #131</see>.
+	/// </summary>
+	/// <remarks>
+	/// Joining the pair anyway made the two tools undo each other on every run. The pair still
+	/// collapses; it just sits where <c>csharp_new_line_before_open_brace</c> puts it, as under
+	/// <c>together</c>.
+	/// </remarks>
+	[Test]
+	public Task An_empty_statement_body_stays_off_its_header_line_when_statements_are_not_preserved() => Formats(
+		"""
+		public class C
+		{
+		    public void M(int[] items, bool ready, object gate)
+		    {
+		        while (!ready) { }
+		        for (var i = 0; i < 10; i++) { }
+		        foreach (var item in items) { }
+		        if (ready) { } else { }
+		        lock (gate) { }
+		        do { } while (!ready);
+		        while (!ready)
+		        {
+		        }
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M(int[] items, bool ready, object gate)
+		    {
+		        while (!ready)
+		        { }
+		        for (var i = 0; i < 10; i++)
+		        { }
+		        foreach (var item in items)
+		        { }
+		        if (ready)
+		        { }
+		        else
+		        { }
+		        lock (gate)
+		        { }
+		        do
+		        { } while (!ready);
+		        while (!ready)
+		        { }
+		    }
+		}
+		""",
+		editorConfig: """
+		csharp_preserve_single_line_statements = false
+		csharp_empty_block_style = together_same_line
+		""");
+
+	[Test]
+	public Task An_empty_try_or_unsafe_block_stays_off_its_keyword_line_too() => Formats(
+		"""
+		public class C
+		{
+		    public unsafe void M()
+		    {
+		        try { } finally { }
+		        unsafe { }
+		    }
+		}
+		""",
+		// The catch and finally keep theirs: dotnet format leaves a clause's empty pair on its line
+		// with the option off, and joining it is what together_same_line asks for.
+		"""
+		public class C
+		{
+		    public unsafe void M()
+		    {
+		        try
+		        { }
+		        finally { }
+		        unsafe
+		        { }
+		    }
+		}
+		""",
+		editorConfig: """
+		csharp_preserve_single_line_statements = false
+		csharp_empty_block_style = together_same_line
+		""");
+
+	[Test]
+	public Task A_member_body_still_joins_when_statements_are_not_preserved() => Formats(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M() { }
+		}
+		""",
+		editorConfig: """
+		csharp_preserve_single_line_statements = false
+		csharp_empty_block_style = together_same_line
+		""");
+
 	// ---- together: collapses but does not move the brace -------------------------------------------
 
 	[Test]
