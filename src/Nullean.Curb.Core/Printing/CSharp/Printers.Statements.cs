@@ -829,6 +829,20 @@ internal static partial class Printers
 	{
 		if (!context.AuthorBroke(keyword.Span.End, value.SpanStart))
 		{
+			// Under a width the author's break is not read, but a trailing `// comment` still ends the
+			// keyword's line. The value goes one level in, as a value after `=` does, rather than at
+			// the column the comment's break left it: the statement's.
+			if (EndsWithLineComment(keyword))
+			{
+				using (context.Arena.Indent())
+				{
+					context.Arena.HardLine();
+					Node.Print(value, context);
+				}
+
+				return;
+			}
+
 			context.Arena.Synthetic(SyntheticText.Space);
 			Node.Print(value, context);
 			return;

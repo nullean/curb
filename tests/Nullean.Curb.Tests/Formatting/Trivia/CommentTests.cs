@@ -635,4 +635,96 @@ public class CommentTests : FormattingTest
 		}
 		""",
 		editorConfig: "max_line_length = 120");
+
+	// ---- the line a trailing comment breaks ----------------------------------------------------------
+
+	// dotnet format leaves every one of these continuations where the author put it, so each output
+	// below is a fixed point of it.
+
+	[Test]
+	public Task A_continuation_after_a_trailing_comment_stays_one_level_in() => Unchanged(
+		"""
+		public class C : Base, // base
+		    IFoo, // foo
+		    IBar
+		{
+		    public IEnumerable<int> M(int a)
+		    {
+		        var y = // eq
+		            a;
+		        y = // assign
+		            a;
+		        yield return // y
+		            a;
+		        throw // t
+		            new E();
+		    }
+
+		    public int N(int a)
+		    {
+		        return // r
+		            a;
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_continuation_after_a_trailing_comment_stays_one_level_in_with_a_width() => Unchanged(
+		// The break is the comment's, not the author's, so a width does not read it away. It used to put
+		// the continuation at the statement's column: the comment's break was the only one there, and a
+		// break after it that printed flat left the line where the comment's indent had put it.
+		"""
+		public class C : Base, // base
+		    IFoo, // foo
+		    IBar
+		{
+		    public IEnumerable<int> M(int a)
+		    {
+		        var y = // eq
+		            a;
+		        y = // assign
+		            a;
+		        yield return // y
+		            a;
+		        throw // t
+		            new E();
+		    }
+
+		    public int N(int a)
+		    {
+		        return // r
+		            a;
+		    }
+		}
+		""",
+		editorConfig: "max_line_length = 120");
+
+	[Test]
+	public Task A_continuation_after_a_trailing_comment_moves_one_level_in() => Formats(
+		"""
+		public class C : Base, // base
+		IFoo
+		{
+		    public int M(int a)
+		    {
+		        var y = // eq
+		        a;
+		        return // r
+		        y;
+		    }
+		}
+		""",
+		"""
+		public class C : Base, // base
+		    IFoo
+		{
+		    public int M(int a)
+		    {
+		        var y = // eq
+		            a;
+		        return // r
+		            y;
+		    }
+		}
+		""");
 }
