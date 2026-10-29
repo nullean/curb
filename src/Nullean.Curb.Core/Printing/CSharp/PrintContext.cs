@@ -343,6 +343,9 @@ internal sealed class PrintContext(DocArena arena, SourceText text, FormatOption
 	public bool AuthorJoined(int start, int end) =>
 		Options.KeepExistingLinebreaks && OnSameLine(start, end);
 
+	/// <summary>The columns one indent level occupies: a tab's width, or <c>indent_size</c> spaces.</summary>
+	public int LevelColumns => Options.UseTabs ? Math.Max(1, Options.TabWidth) : Options.IndentSize;
+
 	/// <summary>The indentation, in columns, of the source line holding <paramref name="position"/>.</summary>
 	/// <remarks>Not a break decision, so it reads the source directly: it asks where a line starts, not whether it does.</remarks>
 	public int SourceIndent(int position)

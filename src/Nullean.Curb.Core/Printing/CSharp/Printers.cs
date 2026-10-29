@@ -936,7 +936,17 @@ internal static partial class Printers
 		// happened to spread over lines drops the group as well as the indent, leaving a long
 		// argument no break opportunity at all — it came back out as one over-long line, which the
 		// next run then broke again.
-		if (node.Arguments.Count == 1 && EndsWithOwnBlock(node.Arguments[0].Expression))
+		//
+		// Both hugging paths print the list's ends joined, so a list the author broke after `(` or
+		// before `)` goes the ordinary way, which keeps those breaks: `Register(` / `() =>` was joined
+		// onto one line (issue #135). A break between two arguments is left to the hugging path, which
+		// keeps one a trailing comment forces at the column the author had; the ordinary path would
+		// move that argument to the list's level.
+		var hugs = node.Arguments.Count > 0
+			&& !context.AuthorBroke(node.OpenParenToken.Span.End, node.Arguments[0].SpanStart)
+			&& !context.AuthorBroke(node.Arguments[^1].Span.End, node.CloseParenToken.SpanStart);
+
+		if (hugs && node.Arguments.Count == 1 && EndsWithOwnBlock(node.Arguments[0].Expression))
 		{
 			Spacing.InsideCallParens(context);
 			context.OwnBlockGroup = 0;
@@ -958,22 +968,9 @@ internal static partial class Printers
 		// EndsWithOwnBlock above: with several arguments already inline, only a genuine block
 		// guarantees a break exists to hug against — a `with` or object initializer tail could still
 		// print flat and would leave the list with no break opportunity of its own.
-		if (node.Arguments.Count > 1 && EndsWithBlockBodiedCallback(node.Arguments[^1].Expression))
+		if (hugs && node.Arguments.Count > 1 && EndsWithBlockBodiedCallback(node.Arguments[^1].Expression))
 		{
-			Spacing.InsideCallParens(context);
-			for (var i = 0; i < node.Arguments.Count - 1; i++)
-			{
-				Node.Print(node.Arguments[i], context);
-				Spacing.BeforeComma(context);
-				TokenPrinter.Print(node.Arguments.GetSeparator(i), context);
-				Spacing.AfterComma(context);
-			}
-
-			context.OwnBlockGroup = 0;
-			Node.Print(node.Arguments[^1], context);
-			Spacing.InsideCallParens(context);
-			TokenPrinter.Print(node.CloseParenToken, context);
-			context.ArgumentListGroup = context.OwnBlockGroup;
+			HugTrailingCallback(node, context);
 			return;
 		}
 
@@ -1023,6 +1020,68 @@ internal static partial class Printers
 
 		TokenPrinter.Print(node.CloseParenToken, context);
 		context.ArgumentListGroup = node.Arguments.Count > 0 ? group : (ushort)0;
+	}
+
+	/// <summary>
+	/// Prints an argument list whose last argument is a block-bodied callback, hugging the callback's
+	/// block rather than wrapping the list in a group and an indent.
+	/// </summary>
+	/// <remarks>
+	/// A break the author put between two arguments stays, and the argument after it keeps the column
+	/// the author gave it, moved as far as the line the list starts on moved — where dotnet format
+	/// leaves it. Joining those arguments onto the first line left the callback's block below a line
+	/// it no longer started on (issue #144). The column comes from the line-shift anchor rather than
+	/// the list's level: the ordinary path's level moved an argument the author placed after a
+	/// trailing comment.
+	/// </remarks>
+	private static void HugTrailingCallback(ArgumentListSyntax node, PrintContext context)
+	{
+		var arena = context.Arena;
+		var arguments = node.Arguments;
+
+		var register = -1;
+		for (var i = 0; i < arguments.Count - 1; i++)
+		{
+			if (!context.AuthorBroke(arguments[i].Span.End, arguments[i + 1].SpanStart))
+				continue;
+
+			register = context.EnterContinuation();
+			arena.LineShiftAnchor(register);
+			break;
+		}
+
+		Spacing.InsideCallParens(context);
+
+		// The column the current argument's line was aligned to, once a break has moved it.
+		var offset = int.MinValue;
+		for (var i = 0; i < arguments.Count; i++)
+		{
+			if (i == arguments.Count - 1)
+				context.OwnBlockGroup = 0;
+
+			// An argument on a line the author broke to sits as far in from that line as it would from
+			// the indent, as a chain operand does after its continuation line.
+			using (offset == int.MinValue ? default : arena.AlignedIndent(register, offset))
+				Node.Print(arguments[i], context);
+
+			if (i == arguments.Count - 1)
+				break;
+
+			Spacing.BeforeComma(context);
+			TokenPrinter.Print(arguments.GetSeparator(i), context);
+
+			if (register >= 0 && context.AuthorBroke(arguments[i].Span.End, arguments[i + 1].SpanStart))
+				offset = ContinuationLine(arguments[i + 1].GetFirstToken(), register, context);
+			else
+				Spacing.AfterComma(context);
+		}
+
+		if (register >= 0)
+			context.ExitContinuation();
+
+		Spacing.InsideCallParens(context);
+		TokenPrinter.Print(node.CloseParenToken, context);
+		context.ArgumentListGroup = context.OwnBlockGroup;
 	}
 
 	public static void Argument(ArgumentSyntax node, PrintContext context)
@@ -1291,6 +1350,26 @@ internal static partial class Printers
 		// by emitting the break from a deeper scope rather than by moving the token afterwards.
 		using (context.Arena.IndentIf(context.Options.IndentBraces))
 			context.Arena.HardLine();
+	}
+
+	/// <summary>
+	/// The source column of a block's opening brace when the author put it on a line of its own and
+	/// <see cref="BeforeOpenBrace"/> will too, or -1.
+	/// </summary>
+	/// <remarks>
+	/// -1 under <c>csharp_indent_braces</c>: that break comes from a level deeper than the block, so a
+	/// column read for the block would land the brace a level right of where the author had it, and
+	/// further right on every run.
+	/// </remarks>
+	internal static int OwnLineBraceColumn(BlockSyntax block, BraceStyle construct, PrintContext context)
+	{
+		if (!context.Options.NewLineBeforeOpenBrace.HasFlag(construct) || context.Options.IndentBraces)
+			return -1;
+
+		var open = block.OpenBraceToken;
+		return context.AuthorBroke(open.GetPreviousToken().Span.End, open.SpanStart)
+			? context.SourceIndent(open.SpanStart)
+			: -1;
 	}
 
 	/// <summary>
@@ -2180,17 +2259,45 @@ internal static partial class Printers
 			// compensating. That is stable and it is the conservative direction; whether it is also
 			// right is a corpus question, not one to guess at here.
 			//
-			// A ternary the author broke anchors the same way: its `?` and `:` lines indent once from
-			// the line it starts on, not twice — issue #102. Only on the `(` line, though: one sharing
-			// a later line with another argument is already at the list's depth.
+			// Any argument that indents its own continuation lines anchors the same way: a nested call,
+			// a member chain, a lambda or a broken ternary continues one level in from the line it
+			// starts on, not one level in from the list — issues #102 and #108. Only on the `(` line,
+			// though: one starting on a later line is already at the list's depth. An attribute's
+			// arguments anchor exactly as an invocation's do.
 			var previousEnd = i == 0 ? anchorEnd : list[i - 1].Span.End;
-			var ownBlock = list[i] is ArgumentSyntax { Expression: var value }
-				&& (value is ConditionalExpressionSyntax
-					? anchorEnd >= 0 && context.AuthorJoined(anchorEnd, list[i].SpanStart)
-					: EndsWithOwnBlock(value) && previousEnd >= 0 && context.AuthorJoined(previousEnd, list[i].SpanStart));
+			var value = list[i] switch
+			{
+				ArgumentSyntax argument => argument.Expression,
+				AttributeArgumentSyntax argument => argument.Expression,
+				_ => null,
+			};
+			var endsWithOwnBlock = value is not null && EndsWithOwnBlock(value);
+			var indentsItself = value is not null && !endsWithOwnBlock && IndentsOwnContinuation(value);
+			var ownBlock = endsWithOwnBlock
+				? previousEnd >= 0 && context.AuthorJoined(previousEnd, list[i].SpanStart)
+				: indentsItself && anchorEnd >= 0 && context.AuthorJoined(anchorEnd, list[i].SpanStart);
+
+			// The level only says where a continuation goes when there is nothing better. dotnet format
+			// leaves each one at the offset the author gave it from the line its argument starts on,
+			// moved as far as that line moved, whether that is one level, two or a hand-aligned column.
+			// Reading the level alone moved a continuation written two levels in to one.
+			var continuation = indentsItself ? ContinuationIndent(list[i], context) : -1;
 
 			using (arena.IndentIf(ownBlock, -1))
-				Node.Print(list[i], context);
+			{
+				if (continuation < 0)
+					Node.Print(list[i], context);
+				else
+				{
+					// The argument's first continuation line sits one level into the subtree, so the
+					// subtree is based a level to the left of where that line belongs.
+					var register = context.EnterContinuation();
+					arena.LineShiftAnchor(register);
+					using (arena.AlignedIndent(register, continuation - context.LevelColumns))
+						Node.Print(list[i], context);
+					context.ExitContinuation();
+				}
+			}
 
 			if (i >= list.SeparatorCount)
 				continue;
@@ -2794,6 +2901,87 @@ internal static partial class Printers
 
 			_ => BringsOwnBlock(expression),
 		};
+
+	/// <summary>
+	/// True for an argument whose own layout indents its continuation lines a level in from where it
+	/// starts: a call or creation through its argument list, a member chain at its dots, a ternary at
+	/// its <c>?</c> and <c>:</c>, and a lambda through its body.
+	/// </summary>
+	/// <remarks>
+	/// A binary expression is the exception that keeps this a list rather than "anything": its
+	/// operands continue at the level it is printed at, so inside an argument list they already sit
+	/// one level in, and taking the list's level back off would put <c>Foo(a &amp;&amp;</c> /
+	/// <c>b)</c> at the statement's own indent.
+	/// </remarks>
+	private static bool IndentsOwnContinuation(ExpressionSyntax expression) =>
+		expression switch
+		{
+			InvocationExpressionSyntax
+				or ObjectCreationExpressionSyntax
+				or ImplicitObjectCreationExpressionSyntax
+				or MemberAccessExpressionSyntax
+				or ElementAccessExpressionSyntax
+				or ConditionalAccessExpressionSyntax
+				or ConditionalExpressionSyntax => true,
+			AnonymousFunctionExpressionSyntax { ExpressionBody: not null } => true,
+			AwaitExpressionSyntax awaitExpression => IndentsOwnContinuation(awaitExpression.Expression),
+			PrefixUnaryExpressionSyntax prefix => IndentsOwnContinuation(prefix.Operand),
+			CastExpressionSyntax cast => IndentsOwnContinuation(cast.Expression),
+			_ => false,
+		};
+
+	/// <summary>
+	/// The source indent, in columns, of the first line inside <paramref name="node"/> after the one it
+	/// starts on, or -1 when the author kept it on one line or that line says nothing about its offset.
+	/// </summary>
+	/// <remarks>
+	/// <para>
+	/// Blank lines, comment lines and the inside of a multi-line string are passed over: only a line
+	/// that starts with a token of its own says where the author put a continuation.
+	/// </para>
+	/// <para>
+	/// A line that starts with a brace or a closing token answers -1. Those sit at the level of the
+	/// line their construct starts on, not a level in from it, so they cannot stand for the
+	/// continuation one level into the subtree, and reading one as if it did moved the argument a
+	/// level left on every run.
+	/// </para>
+	/// </remarks>
+	private static int ContinuationIndent(SyntaxNode node, PrintContext context)
+	{
+		if (!SpansLines(node, context))
+			return -1;
+
+		var text = context.Text;
+		var lines = text.Lines;
+		var end = node.Span.End;
+
+		for (var number = lines.GetLineFromPosition(node.SpanStart).LineNumber + 1; number < lines.Count; number++)
+		{
+			var line = lines[number];
+			if (line.Start >= end)
+				break;
+
+			var first = line.Start;
+			while (first < line.End && text[first] is ' ' or '\t')
+				first++;
+
+			if (first == line.End || first >= end)
+				continue;
+
+			var token = node.FindToken(first);
+			if (token.SpanStart != first)
+				continue;
+
+			return token.Kind() is SyntaxKind.OpenBraceToken
+				or SyntaxKind.CloseBraceToken
+				or SyntaxKind.CloseParenToken
+				or SyntaxKind.CloseBracketToken
+				? -1
+				: context.SourceIndent(first);
+		}
+
+		return -1;
+	}
 
 	private static bool LastArgumentEndsWithOwnBlock(BaseArgumentListSyntax? arguments) =>
 		arguments is { Arguments.Count: > 0 }
