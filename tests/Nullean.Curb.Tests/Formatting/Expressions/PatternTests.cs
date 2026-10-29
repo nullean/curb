@@ -934,6 +934,65 @@ public class PatternTests : FormattingTest
 		}
 		""");
 
+	// A switch expression's arm, or a lambda block's statement, in a `when` clause measures from its
+	// own line, not from the switch statement the label belongs to.
+	[Test]
+	public Task Pattern_continuation_nested_in_a_when_clause_measures_from_its_own_line() => Formats(
+		"""
+		public class C
+		{
+		    public bool M(object o)
+		    {
+		        switch (o)
+		        {
+		            case int i when o switch
+		            {
+		                        string s => s is
+		                            null,
+		                _ => false
+		            }:
+		                return true;
+		            case byte b when Check(x =>
+		            {
+		                        return x is
+		                            null;
+		            }):
+		                return true;
+		        }
+		        return false;
+		    }
+
+		    bool Check(System.Func<object, bool> f) => f(null);
+		}
+		""",
+		"""
+		public class C
+		{
+		    public bool M(object o)
+		    {
+		        switch (o)
+		        {
+		            case int i when o switch
+		            {
+		                string s => s is
+		                    null,
+		                _ => false
+		            }:
+		                return true;
+		            case byte b when Check(x =>
+		            {
+		                return x is
+		                    null;
+		            }):
+		                return true;
+		        }
+		        return false;
+		    }
+
+		    bool Check(System.Func<object, bool> f) => f(null);
+		}
+		""");
+
 	[Test]
 	public Task Nested_pattern_continuation_lines_keep_their_offsets() => Formats(
 		"""

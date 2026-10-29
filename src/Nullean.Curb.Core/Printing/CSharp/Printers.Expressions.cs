@@ -1147,6 +1147,11 @@ internal static partial class Printers
 
 		var rewritesComma = RewritesTrailingComma(node.Arms, node.CloseBraceToken, context);
 
+		// An arm measures its continuation lines from the arm, even in a case label's `when` clause,
+		// where they would otherwise read the switch statement's register.
+		var outerLabelAnchor = context.CaseLabelContinuation;
+		context.CaseLabelContinuation = -1;
+
 		// The arms and the closing brace indent from the line the opening brace sits on, so when
 		// csharp_indent_braces moved that brace in, everything after it moves in with it.
 		using (arena.IndentIf(IndentsOpenBrace(BraceStyle.ObjectCollectionArrayInitializers, context)))
@@ -1179,6 +1184,8 @@ internal static partial class Printers
 
 			TokenPrinter.Print(node.CloseBraceToken, context);
 		}
+
+		context.CaseLabelContinuation = outerLabelAnchor;
 	}
 
 	public static void SwitchExpressionArm(SwitchExpressionArmSyntax node, PrintContext context)
