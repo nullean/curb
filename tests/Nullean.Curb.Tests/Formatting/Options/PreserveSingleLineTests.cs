@@ -374,6 +374,66 @@ public class PreserveSingleLineTests : FormattingTest
 		""",
 		editorConfig: "csharp_preserve_single_line_statements = false");
 
+	/// <summary>
+	/// An empty try block is joined to its keyword by default, and moves off it with this option off,
+	/// as dotnet format moves it. Its catch and finally clauses keep theirs.
+	/// </summary>
+	[Test]
+	public Task Disabling_it_moves_an_empty_try_block_off_its_keyword() => Formats(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        try { } catch { }
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        try
+		        { }
+		        catch { }
+		    }
+		}
+		""",
+		editorConfig: "csharp_preserve_single_line_statements = false");
+
+	/// <summary>
+	/// The body of a <c>do</c> moves off its keyword, and the <c>while</c> stays on the closing brace's
+	/// line where the author put it. See <see href="https://github.com/nullean/curb/issues/132">issue #132</see>.
+	/// </summary>
+	[Test]
+	public Task Disabling_it_moves_a_do_body_but_leaves_its_while_on_the_brace() => Formats(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        do { Spin(); } while (!ready);
+		        do Spin(); while (!ready);
+		    }
+		}
+		""",
+		// Without braces the while has no brace to sit on, and dotnet format breaks before it.
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        do
+		        { Spin(); } while (!ready);
+		        do
+		            Spin();
+		        while (!ready);
+		    }
+		}
+		""",
+		editorConfig: "csharp_preserve_single_line_statements = false");
+
 	[Test]
 	public Task A_one_line_switch_needs_both_options() => Formats(
 		"""

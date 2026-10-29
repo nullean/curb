@@ -420,6 +420,359 @@ public class AuthorBreakTests : FormattingTest
 		}
 		""");
 
+	// Issue #117: a value the author put on the line after `return` was joined onto it.
+	[Test]
+	public Task A_value_below_return_keeps_its_line_and_column() => Unchanged(
+		"""
+		public class C
+		{
+		    public int Simple(int value)
+		    {
+		        return
+		            value * 2;
+		    }
+
+		    public int Deeper(int value)
+		    {
+		        return
+		                value * 2;
+		    }
+
+		    public int Level(int value)
+		    {
+		        return
+		        value * 2;
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_chain_below_return_keeps_its_lines() => Unchanged(
+		"""
+		public class C
+		{
+		    public bool Leading(bool a, bool b)
+		    {
+		        return
+		            a
+		            && b;
+		    }
+
+		    public bool Trailing(bool a, bool b)
+		    {
+		        return
+		            a &&
+		            b;
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_value_below_yield_return_or_throw_keeps_its_line() => Unchanged(
+		"""
+		public class C
+		{
+		    public IEnumerable<int> Yield(int value)
+		    {
+		        yield return
+		            value;
+		    }
+
+		    public void Throw()
+		    {
+		        throw
+		            new InvalidOperationException();
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_call_below_return_keeps_its_argument_indent() => Unchanged(
+		"""
+		public class C
+		{
+		    public int Call(int value)
+		    {
+		        return
+		            Math.Max(
+		                value,
+		                1);
+		    }
+
+		    public int Brackets(int value)
+		    {
+		        return
+		            new[]
+		            {
+		                value,
+		            }.Length;
+		    }
+		}
+		""");
+
+	// The comment before the first operand is the shape issue #115 left open: it and the operand
+	// printed at the statement's column.
+	[Test]
+	public Task A_comment_before_a_value_below_return_keeps_its_column() => Unchanged(
+		"""
+		public class C
+		{
+		    public int Value(int value)
+		    {
+		        return
+		            // why
+		            value;
+		    }
+
+		    public bool Chain(bool a, bool b)
+		    {
+		        return
+		            // why
+		            a
+		            && b;
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_trailing_comment_after_return_keeps_the_value_at_its_column() => Unchanged(
+		"""
+		public class C
+		{
+		    public int Value(int value)
+		    {
+		        return // why
+		            value;
+		    }
+
+		    public bool Chain(bool a, bool b)
+		    {
+		        return // why
+		            a
+		            && b;
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_value_below_return_moves_with_a_reindented_statement() => Formats(
+		"""
+		public class C
+		{
+		    public int M(int value)
+		    {
+		            return
+		                value * 2;
+		    }
+
+		    public bool N(bool a, bool b)
+		    {
+		      return
+		          a
+		          && b;
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public int M(int value)
+		    {
+		        return
+		            value * 2;
+		    }
+
+		    public bool N(bool a, bool b)
+		    {
+		        return
+		            a
+		            && b;
+		    }
+		}
+		""");
+
+	// Curb breaks before a `return` that sat mid-line. dotnet format leaves the value at its source
+	// column rather than moving it by however far `return` moved.
+	[Test]
+	public Task A_value_below_a_mid_line_return_keeps_its_source_column() => Formats(
+		"""
+		public class C
+		{
+		    public int M(int n, int value)
+		    {
+		        switch (n)
+		        {
+		            case 1: return
+		                        value;
+		            default:
+		                return 0;
+		        }
+		    }
+
+		    public int P
+		    {
+		        get { return
+		                  Value; }
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public int M(int n, int value)
+		    {
+		        switch (n)
+		        {
+		            case 1:
+		                return
+		                        value;
+		            default:
+		                return 0;
+		        }
+		    }
+
+		    public int P
+		    {
+		        get
+		        {
+		            return
+		                  Value;
+		        }
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_value_below_return_keeps_its_line_under_tabs() => Formats(
+		"public class C\n{\n\tpublic bool M(bool a, bool b)\n\t{\n\t\t\treturn\n\t\t\t\t// why\n\t\t\t\ta\n\t\t\t\t&& b;\n\t}\n\n\tpublic int N(int value)\n\t{\n\t\treturn // why\n\t\t\tvalue;\n\t}\n}",
+		"public class C\n{\n\tpublic bool M(bool a, bool b)\n\t{\n\t\treturn\n\t\t\t// why\n\t\t\ta\n\t\t\t&& b;\n\t}\n\n\tpublic int N(int value)\n\t{\n\t\treturn // why\n\t\t\tvalue;\n\t}\n}",
+		editorConfig: "indent_style = tab");
+
+	// A value the author indented deeper than one level keeps its own lines under it, rather than
+	// letting a call's arguments or an initializer's braces fall back to the one-level position.
+	[Test]
+	public Task A_value_indented_deeper_below_return_keeps_its_own_lines_under_it() => Unchanged(
+		"""
+		public class C
+		{
+		    public int Call(int value)
+		    {
+		        return
+		                Math.Max(
+		                    value,
+		                    1);
+		    }
+
+		    public Foo Init(int value)
+		    {
+		        return
+		                new Foo
+		                {
+		                    X = value,
+		                };
+		    }
+
+		    public void Throw()
+		    {
+		        throw
+		                new ArgumentException(
+		                    "bad");
+		    }
+
+		    public Func<int> Lambda(int value)
+		    {
+		        return
+		                () =>
+		                {
+		                    return value;
+		                };
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_value_indented_deeper_below_return_moves_with_a_reindented_statement() => Formats(
+		"""
+		public class C
+		{
+		    public int M(int value)
+		    {
+		            return
+		                    Math.Max(
+		                        value,
+		                        1);
+		    }
+
+		    public int N(int n, int value)
+		    {
+		        switch (n)
+		        {
+		            case 1: return
+		                        Math.Max(
+		                            value,
+		                            1);
+		            default:
+		                return 0;
+		        }
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public int M(int value)
+		    {
+		        return
+		                Math.Max(
+		                    value,
+		                    1);
+		    }
+
+		    public int N(int n, int value)
+		    {
+		        switch (n)
+		        {
+		            case 1:
+		                return
+		                        Math.Max(
+		                            value,
+		                            1);
+		            default:
+		                return 0;
+		        }
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_value_indented_deeper_below_return_keeps_its_own_lines_under_tabs() => Formats(
+		"public class C\n{\n\tpublic int M(int value)\n\t{\n\t\t\treturn\n\t\t\t\t\tMath.Max(\n\t\t\t\t\t\tvalue,\n\t\t\t\t\t\t1);\n\t}\n\n\tpublic Foo N(int value)\n\t{\n\t\treturn\n\t\t\t\tnew Foo\n\t\t\t\t{\n\t\t\t\t\tX = value,\n\t\t\t\t};\n\t}\n}",
+		"public class C\n{\n\tpublic int M(int value)\n\t{\n\t\treturn\n\t\t\t\tMath.Max(\n\t\t\t\t\tvalue,\n\t\t\t\t\t1);\n\t}\n\n\tpublic Foo N(int value)\n\t{\n\t\treturn\n\t\t\t\tnew Foo\n\t\t\t\t{\n\t\t\t\t\tX = value,\n\t\t\t\t};\n\t}\n}",
+		editorConfig: "indent_style = tab");
+
+	[Test]
+	public Task Deterministic_layout_joins_a_value_below_return_that_fits() => Formats(
+		"""
+		public class C
+		{
+		    public int M(int value)
+		    {
+		        return
+		            value * 2;
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public int M(int value)
+		    {
+		        return value * 2;
+		    }
+		}
+		""",
+		editorConfig: "max_line_length = 120");
+
 	[Test]
 	public Task Deterministic_layout_still_joins_what_fits() => Formats(
 		"""

@@ -195,12 +195,10 @@ public class OperatorTests : FormattingTest
 		}
 		""");
 
-	// A body the author started on the arrow's line stays there (issue #102), so the first operand
-	// keeps its place and the continuation keeps the column the author aligned it to, as dotnet
-	// format leaves it. Before that, Curb moved the first operand below the arrow and these lines
-	// fell back to the ambient indent.
+	// A chain the author started on the arrow line stays there, so its continuation keeps the
+	// author's column, as it does after `return`. dotnet format leaves both unchanged.
 	[Test]
-	public Task Broken_logical_chain_after_an_arrow_keeps_its_aligned_column() => Unchanged(
+	public Task Broken_logical_chain_on_the_arrow_line_keeps_its_continuation() => Unchanged(
 		"""
 		public class C
 		{
@@ -210,7 +208,7 @@ public class OperatorTests : FormattingTest
 		""");
 
 	[Test]
-	public Task Broken_coalesce_in_a_lambda_keeps_its_aligned_column() => Unchanged(
+	public Task Broken_coalesce_in_a_lambda_keeps_its_continuation() => Unchanged(
 		"""
 		public class C
 		{
@@ -221,6 +219,38 @@ public class OperatorTests : FormattingTest
 		    }
 		}
 		""");
+
+	// Issue #116: a chain the author started on the arrow line of a member or a switch arm gained a
+	// break after the arrow, and its continuation dropped to one indent under it.
+	[Test]
+	public Task Broken_logical_chain_after_an_arrow_keeps_its_place() => Unchanged(
+		"""
+		public class C
+		{
+		    public bool Both(bool a, bool b) => a &&
+		                                        b;
+
+		    public bool Leading(bool a, bool b) => a
+		                                           || b;
+
+		    public bool Arm(int n, bool a, bool b)
+		    {
+		        return n switch
+		        {
+		            1 => a &&
+		                 b,
+		            2 => a
+		                 ?? b,
+		            _ => false,
+		        };
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Broken_logical_chain_after_an_arrow_keeps_its_place_under_tabs() => Unchanged(
+		"public class C\n{\n\tpublic bool Both(bool a, bool b) => a &&\n\t\t\t\t\t\t\t\t\t\tb;\n\n\tpublic bool Arm(int n, bool a, bool b)\n\t{\n\t\treturn n switch\n\t\t{\n\t\t\t1 => a &&\n\t\t\t\t b,\n\t\t\t_ => false,\n\t\t};\n\t}\n}",
+		editorConfig: "indent_style = tab");
 
 	// Expanding the accessor breaks before `return`, which sat mid-line. dotnet format leaves the
 	// line after it at its source column rather than moving it by however far `return` moved.

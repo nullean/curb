@@ -64,6 +64,37 @@ internal static class Spacing
 			context.Arena.Synthetic(SyntheticText.Space);
 	}
 
+	/// <summary>Between the two semicolons of a <c>for</c> header with no clauses at all.</summary>
+	/// <remarks>
+	/// Roslyn spaces an empty header by a rule of its own, and that rule writes the space here when
+	/// either option asks for it. A header with any clause spaces this gap as an ordinary
+	/// after-semicolon position instead.
+	/// </remarks>
+	public static void BetweenEmptyForSemicolons(PrintContext context)
+	{
+		if (context.Options.SpaceBeforeSemicolonInForStatement || context.Options.SpaceAfterSemicolonInForStatement)
+			context.Arena.Synthetic(SyntheticText.Space);
+	}
+
+	/// <summary>
+	/// Between the <c>)</c> of a <c>for</c> header with no clauses and a body on the same line.
+	/// </summary>
+	/// <remarks>
+	/// Roslyn's empty-header rule catches the <c>)</c> as well as the two semicolons, so it spaces
+	/// whatever follows as though it followed a semicolon: <c>for (;;){ }</c> and <c>for (;;)i++;</c>
+	/// under <c>csharp_space_after_semicolon_in_for_statement = false</c>, and an empty statement's
+	/// <c>;</c> as though it were a third semicolon of the header. Almost certainly an accident, but it
+	/// is the shape IDE0055 asks for, so it is matched.
+	/// </remarks>
+	public static void AfterEmptyForHeader(bool bodyIsEmptyStatement, PrintContext context)
+	{
+		var space = bodyIsEmptyStatement
+			? context.Options.SpaceBeforeSemicolonInForStatement
+			: context.Options.SpaceAfterSemicolonInForStatement;
+		if (space)
+			context.Arena.Synthetic(SyntheticText.Space);
+	}
+
 	/// <summary>Before a member-access dot.</summary>
 	public static void BeforeDot(PrintContext context)
 	{
