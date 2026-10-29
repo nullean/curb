@@ -425,8 +425,9 @@ public class IndentationTests : FormattingTest
 		""",
 		editorConfig: "csharp_indent_braces = true");
 
+	// dotnet format indents a switch expression's arms from the line its `{` sits on, and closes it a
+	// level in from there. Once the brace has a line of its own, arms and closing brace move twice.
 	[Test]
-	[Skip("dotnet format also shifts a switch expression's arms and closes it two levels in; Curb moves only the braces, as it does everywhere else")]
 	public Task A_switch_expression_shifts_its_arms_too() => Formats(
 		"""
 		public class C
@@ -455,6 +456,74 @@ public class IndentationTests : FormattingTest
 		    }
 		""",
 		editorConfig: "csharp_indent_braces = true");
+
+	[Test]
+	public Task A_nested_switch_expression_shifts_from_its_own_brace() => Formats(
+		"""
+		public class C
+		{
+		    public int M(int x, int y)
+		    {
+		        return x switch
+		        {
+		            1 => 1,
+		            _ => y switch
+		            {
+		                2 => 2,
+		                _ => 0,
+		            },
+		        };
+		    }
+		}
+		""",
+		"""
+		public class C
+		    {
+		    public int M(int x, int y)
+		        {
+		        return x switch
+		            {
+		                1 => 1,
+		                _ => y switch
+		                    {
+		                        2 => 2,
+		                        _ => 0,
+		                        },
+		                };
+		        }
+		    }
+		""",
+		editorConfig: "csharp_indent_braces = true");
+
+	[Test]
+	public Task A_switch_expression_brace_on_switch_leaves_its_arms_alone() => Formats(
+		"""
+		public class C
+		{
+		    public int M(int x)
+		    {
+		        return x switch
+		        {
+		            1 => 1,
+		            _ => 0,
+		        };
+		    }
+		}
+		""",
+		"""
+		public class C {
+		    public int M(int x) {
+		        return x switch {
+		            1 => 1,
+		            _ => 0,
+		            };
+		        }
+		    }
+		""",
+		editorConfig: """
+		csharp_indent_braces = true
+		csharp_new_line_before_open_brace = none
+		""");
 
 	// ---- csharp_indent_labels ---------------------------------------------------------------------
 
