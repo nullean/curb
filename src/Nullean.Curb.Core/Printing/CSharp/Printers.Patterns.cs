@@ -14,53 +14,108 @@ internal static partial class Printers
 		context.Arena.Synthetic(SyntheticText.Space);
 		TokenPrinter.Print(node.IsKeyword, context);
 
-		// A bare recursive pattern (`is { ... }`, no type or positional clause ahead of the brace) that
-		// the author kept on the `is` line owns the gap to its own opening brace: that gap answers the
-		// same fits question as whether the property list wraps, so RecursivePattern controls it with a
-		// fits-aware line instead of a fixed space — see BareRecursivePatternOwnsLeadingBrace.
-		if (BareRecursivePatternOwnsLeadingBrace(node.Pattern, context))
-		{
-			Node.Print(node.Pattern, context);
-			return;
-		}
-
 		// A break the author put after `is` is theirs, the same as one between two alternatives of the
 		// pattern that follows. Without this, `x is` / `A or` / `B` kept its `or` breaks and lost the
 		// first one, which reads worse than either preserving all of them or none.
-		if (context.AuthorBroke(node.IsKeyword.Span.End, node.Pattern.SpanStart))
-			BreakBeforePattern(node.Pattern, context);
-		else
-			context.Arena.Synthetic(SyntheticText.Space);
-
+		GapBeforePattern(node.IsKeyword, node.Pattern, joinsBraceUnderNone: true, context);
 		Node.Print(node.Pattern, context);
 	}
 
 	/// <summary>
-	/// The break an author put ahead of a pattern. A pattern that opens with its own brace has that brace
-	/// placed by this break, so <c>csharp_indent_braces</c> moves it in a level, as BeforeOpenBrace does.
+	/// The gap between <paramref name="before"/> (`is`, `not`, `and`, `or` or a subpattern's colon) and
+	/// the pattern that follows it.
 	/// </summary>
-	private static void BreakBeforePattern(PatternSyntax pattern, PrintContext context)
+	/// <remarks>
+	/// A pattern whose leading brace places itself (see <see cref="BareRecursivePatternOwnsLeadingBrace"/>)
+	/// gets nothing here. A break the author put there is theirs; one ahead of a property pattern's brace
+	/// places that brace, so it follows <c>csharp_new_line_before_open_brace</c>. With the initializer
+	/// flag off, dotnet format joins the brace back onto `is` or a colon, as it does onto a type, but
+	/// leaves a break after `not`, `and` or `or` where the author put it.
+	/// </remarks>
+	private static void GapBeforePattern(SyntaxToken before, PatternSyntax pattern, bool joinsBraceUnderNone, PrintContext context)
 	{
-		var opensWithBrace = pattern is RecursivePatternSyntax { Type: null, PositionalPatternClause: null, PropertyPatternClause: not null };
-		using (context.Arena.IndentIf(opensWithBrace && context.Options.IndentBraces))
+		if (PatternOwnsLeadingBrace(pattern, context))
+			return;
+
+		if (!context.AuthorBroke(before.Span.End, pattern.SpanStart))
+		{
+			context.Arena.Synthetic(SyntheticText.Space);
+			return;
+		}
+
+		if (!OpensWithPropertyBrace(pattern))
+		{
+			context.Arena.HardLine();
+			return;
+		}
+
+		if (!context.Options.NewLineBeforeOpenBrace.HasFlag(BraceStyle.ObjectCollectionArrayInitializers))
+		{
+			// A comment on the line before the brace ends that line, so there is nothing to join onto.
+			if (joinsBraceUnderNone && !TokenPrinter.HasLeadingContent(pattern.GetFirstToken()) && !EndsWithLineComment(before))
+				context.Arena.Synthetic(SyntheticText.Space);
+			else
+				context.Arena.HardLine();
+			return;
+		}
+
+		// The brace lands where this break leaves it, so csharp_indent_braces moves it in a level, as
+		// BeforeOpenBrace does.
+		using (context.Arena.IndentIf(context.Options.IndentBraces))
 			context.Arena.HardLine();
 	}
 
 	/// <summary>
-	/// True for the exact shape RecursivePattern defers its leading brace-line to: a property-only
-	/// pattern directly under an <c>is</c> expression, with nothing between the `is` keyword and the
-	/// pattern in the source. Author-broken input keeps the caller's forced line instead, matching every
-	/// other pattern shape.
+	/// Whether the first token of <paramref name="pattern"/> is a property pattern's <c>{</c>: a bare
+	/// property pattern, or an <c>and</c>/<c>or</c> chain that starts with one.
 	/// </summary>
-	private static bool BareRecursivePatternOwnsLeadingBrace(PatternSyntax pattern, PrintContext context) =>
-		pattern is RecursivePatternSyntax
+	private static bool OpensWithPropertyBrace(PatternSyntax pattern) =>
+		pattern.GetFirstToken().Parent is PropertyPatternClauseSyntax { Parent: RecursivePatternSyntax { Type: null, PositionalPatternClause: null } };
+
+	/// <summary>
+	/// Whether <paramref name="pattern"/> starts with a property pattern's brace that places itself, so the
+	/// caller prints nothing ahead of it. See <see cref="BareRecursivePatternOwnsLeadingBrace"/>.
+	/// </summary>
+	private static bool PatternOwnsLeadingBrace(PatternSyntax pattern, PrintContext context) =>
+		pattern.GetFirstToken().Parent is PropertyPatternClauseSyntax { Parent: RecursivePatternSyntax first }
+		&& BareRecursivePatternOwnsLeadingBrace(first, context);
+
+	/// <summary>
+	/// True for the exact shape RecursivePattern defers its leading brace-line to: a property-only
+	/// pattern right after `is`, `not`, `and`, `or` or a subpattern's colon, possibly as the first
+	/// alternative of an <c>and</c>/<c>or</c> chain, with nothing between that token and the brace in the
+	/// source. Author-broken input keeps the caller's forced line instead, matching every other pattern shape.
+	/// </summary>
+	/// <remarks>
+	/// The gap answers the same fits question as whether the property list wraps: dotnet format moves the
+	/// brace to its own line whenever the pattern spans lines, after any of those tokens. A plain space
+	/// from the caller could never move.
+	/// </remarks>
+	private static bool BareRecursivePatternOwnsLeadingBrace(RecursivePatternSyntax pattern, PrintContext context)
+	{
+		if (pattern is not { Type: null, PositionalPatternClause: null, PropertyPatternClause.Subpatterns.Count: > 0 })
+			return false;
+
+		// Up through the chains it starts, to the node that prints the gap ahead of it.
+		SyntaxNode child = pattern;
+		var parent = pattern.Parent;
+		while (parent is BinaryPatternSyntax chain && chain.Left == child)
 		{
-			Type: null,
-			PositionalPatternClause: null,
-			PropertyPatternClause.Subpatterns.Count: > 0,
-			Parent: IsPatternExpressionSyntax isExpression,
+			child = chain;
+			parent = chain.Parent;
 		}
-		&& !context.AuthorBroke(isExpression.IsKeyword.Span.End, pattern.SpanStart);
+
+		var before = parent switch
+		{
+			IsPatternExpressionSyntax isExpression => isExpression.IsKeyword,
+			SubpatternSyntax { ExpressionColon: { } colon } => colon.ColonToken,
+			UnaryPatternSyntax unary => unary.OperatorToken,
+			BinaryPatternSyntax chain => chain.OperatorToken,
+			_ => default,
+		};
+
+		return before.RawKind != 0 && !context.AuthorBroke(before.Span.End, pattern.SpanStart);
+	}
 
 	public static void DeclarationPattern(DeclarationPatternSyntax node, PrintContext context)
 	{
@@ -117,9 +172,9 @@ internal static partial class Printers
 				// format moves it to its own line whenever that list doesn't fit, the same way an
 				// initializer's brace does. A plain space before an unconditionally-printed brace, as
 				// before, could never move: the group guarding the list only ever affected what came
-				// after the brace, not the brace itself. A bare pattern directly under `is` gets the same
-				// treatment for the `is`-to-brace gap — see BareRecursivePatternOwnsLeadingBrace, whose
-				// caller (IsPatternExpression) skips its own separator in exactly this case.
+				// after the brace, not the brace itself. A bare pattern after `is`, `not`, `and`, `or` or a
+				// subpattern's colon gets the same treatment for the gap to its brace — see
+				// BareRecursivePatternOwnsLeadingBrace, whose callers skip their own separator in exactly this case.
 				var ownsLeadingGap = hasPrecedingContent || BareRecursivePatternOwnsLeadingBrace(node, context);
 
 				// A pattern the author opened out keeps their breaks, as an initializer does. Without
@@ -249,10 +304,7 @@ internal static partial class Printers
 			TokenPrinter.Print(node.ExpressionColon.ColonToken, context);
 
 			// `Address:` / `{ … }` — a nested pattern the author put on a line of its own stays there.
-			if (context.AuthorBroke(node.ExpressionColon.ColonToken.Span.End, node.Pattern.SpanStart))
-				BreakBeforePattern(node.Pattern, context);
-			else
-				context.Arena.Synthetic(SyntheticText.Space);
+			GapBeforePattern(node.ExpressionColon.ColonToken, node.Pattern, joinsBraceUnderNone: true, context);
 		}
 
 		Node.Print(node.Pattern, context);
@@ -273,12 +325,7 @@ internal static partial class Printers
 			context.Arena.Synthetic(SyntheticText.Space);
 
 		TokenPrinter.Print(node.OperatorToken, context);
-
-		if (context.AuthorBroke(node.OperatorToken.Span.End, node.Right.SpanStart))
-			BreakBeforePattern(node.Right, context);
-		else
-			context.Arena.Synthetic(SyntheticText.Space);
-
+		GapBeforePattern(node.OperatorToken, node.Right, joinsBraceUnderNone: false, context);
 		Node.Print(node.Right, context);
 	}
 
@@ -287,11 +334,7 @@ internal static partial class Printers
 		TokenPrinter.Print(node.OperatorToken, context);
 
 		// `is not` / `{ … }` — a break the author put after `not` is theirs, as one after `is` or `or` is.
-		if (context.AuthorBroke(node.OperatorToken.Span.End, node.Pattern.SpanStart))
-			BreakBeforePattern(node.Pattern, context);
-		else
-			context.Arena.Synthetic(SyntheticText.Space);
-
+		GapBeforePattern(node.OperatorToken, node.Pattern, joinsBraceUnderNone: false, context);
 		Node.Print(node.Pattern, context);
 	}
 

@@ -500,6 +500,199 @@ public class PatternTests : FormattingTest
 		""",
 		editorConfig: "csharp_indent_braces = true");
 
+	[Test]
+	public Task Property_pattern_brace_after_a_colon_not_or_and_takes_its_own_line() => Formats(
+		// dotnet format moves the brace of a pattern that spans lines onto its own line after any of
+		// these, not only after a type or `is`.
+		"""
+		public class C
+		{
+		    public void M(object o)
+		    {
+		        var a = o is Person
+		        {
+		            Name: "x",
+		            Address: {
+		                City: "y",
+		                Zip: 1
+		            }
+		        };
+		        var b = o is not {
+		            Length: 1
+		        };
+		        var c = o is null or {
+		            Length: 1
+		        };
+		        var d = o is { A: 1 } and {
+		            B: 1
+		        };
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M(object o)
+		    {
+		        var a = o is Person
+		        {
+		            Name: "x",
+		            Address:
+		            {
+		                City: "y",
+		                Zip: 1
+		            }
+		        };
+		        var b = o is not
+		        {
+		            Length: 1
+		        };
+		        var c = o is null or
+		        {
+		            Length: 1
+		        };
+		        var d = o is { A: 1 } and
+		        {
+		            B: 1
+		        };
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Property_pattern_chain_that_spans_lines_puts_each_brace_on_its_own_line() => Formats(
+		"""
+		public class C
+		{
+		    public void M(object o)
+		    {
+		        var t = o is {
+		            A: 1 } or {
+		            A: 2 };
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M(object o)
+		    {
+		        var t = o is
+		        {
+		            A: 1
+		        } or
+		        {
+		            A: 2
+		        };
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Property_pattern_on_one_line_after_a_colon_not_or_and_stays_put() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M(object o)
+		    {
+		        var a = o is Person
+		        {
+		            Address: { City: "y" }
+		        };
+		        var b = o is not { Length: 1 };
+		        var c = o is null or { Length: 1 };
+		        var d = o is { A: 1 } and { B: 1 };
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Property_pattern_brace_joins_a_broken_is_or_colon_under_none() => Formats(
+		// With the initializer flag off, dotnet format joins the brace onto `is`, a type or a colon, but
+		// leaves a break after `not` or `or` where the author put it.
+		"""
+		class C {
+		    void M(object o) {
+		        var f = o is
+		            { A: 1 };
+		        var f2 = o is
+		        {
+		            A: 1,
+		            B: 2
+		        };
+		        var a = o is Person
+		        {
+		            Name: "x",
+		            Address:
+		            {
+		                City: "y"
+		            }
+		        };
+		        var a2 = o is Person {
+		            Address:
+		                { City: "y" }
+		        };
+		        var b = o is not
+		        {
+		            Length: 1
+		        };
+		        var c = o is null or
+		        {
+		            Length: 1
+		        };
+		        var x = o is
+		        { Length: 1 } or
+		        { Length: 2 };
+		        var y = o is Person {
+		            Address:
+		            { City: "y" } or
+		            { City: "z" }
+		        };
+		        var n = o is not {
+		            A: 1
+		        };
+		    }
+		}
+		""",
+		"""
+		class C {
+		    void M(object o) {
+		        var f = o is { A: 1 };
+		        var f2 = o is {
+		            A: 1,
+		            B: 2
+		        };
+		        var a = o is Person {
+		            Name: "x",
+		            Address: {
+		                City: "y"
+		            }
+		        };
+		        var a2 = o is Person {
+		            Address: { City: "y" }
+		        };
+		        var b = o is not
+		        {
+		            Length: 1
+		        };
+		        var c = o is null or
+		        {
+		            Length: 1
+		        };
+		        var x = o is { Length: 1 } or
+		        { Length: 2 };
+		        var y = o is Person {
+		            Address: { City: "y" } or
+		            { City: "z" }
+		        };
+		        var n = o is not {
+		            A: 1
+		        };
+		    }
+		}
+		""",
+		editorConfig: "csharp_new_line_before_open_brace = none");
+
 	// ---- deterministic: a pattern that fits is joined, and the comma follows the options ------------
 
 	[Test]
