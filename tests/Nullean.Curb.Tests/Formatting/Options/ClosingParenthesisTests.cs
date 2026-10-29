@@ -1110,9 +1110,6 @@ public class ClosingParenthesisTests : FormattingTest
 		// the comment as swallowing gamma into itself and refuses to round-trip. This is the
 		// corpus-caught case (elastic/docs-builder's SupportedLanguages.cs), reduced to arguments —
 		// initializer elements hit the identical path.
-		//
-		// The blank line after `// first` is unrelated and predates this key: the same construct
-		// with no wrap_if_long key at all already inserts it, in both this and the non-fill path.
 		"""
 		public class C
 		{
@@ -1133,7 +1130,6 @@ public class ClosingParenthesisTests : FormattingTest
 		    {
 		        Call(
 		            alpha, // first
-
 		            beta, gamma
 		        );
 		    }

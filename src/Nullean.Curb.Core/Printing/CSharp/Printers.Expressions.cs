@@ -628,7 +628,7 @@ internal static partial class Printers
 
 						// A trailing separator is followed by the closing line, not by another one.
 						if (i < node.Expressions.Count - 1)
-							Separator(node.Expressions[i].Span.End, node.Expressions[i + 1].SpanStart);
+							Separator(node.Expressions[i].Span.End, node.Expressions[i + 1]);
 					}
 
 					if (rewritesComma)
@@ -685,10 +685,10 @@ internal static partial class Printers
 		}
 
 		// Between two members: a hard line, or the ordinary comma separator.
-		void Separator(int from, int to)
+		void Separator(int from, ExpressionSyntax next)
 		{
-			if (openItOut || (asWritten && context.AuthorBroke(from, to)))
-				arena.HardLine();
+			if (openItOut || (asWritten && context.AuthorBroke(from, next.SpanStart)))
+				BreakBetweenMembers(from, next, context);
 			else if (asWritten)
 				Spacing.AfterComma(context);
 			else
@@ -793,7 +793,7 @@ internal static partial class Printers
 					else if (context.AuthorJoined(node.Elements[i].Span.End, node.Elements[i + 1].SpanStart))
 						Spacing.AfterComma(context);
 					else
-						arena.HardLine();
+						BreakBetweenMembers(node.Elements[i].Span.End, node.Elements[i + 1], context);
 				}
 
 				if (rewritesComma)
@@ -1155,7 +1155,11 @@ internal static partial class Printers
 			{
 				for (var i = 0; i < node.Arms.Count; i++)
 				{
-					arena.HardLine();
+					// Arms always break, so the first is the only one with no blank line to keep.
+					if (i == 0)
+						arena.HardLine();
+					else
+						BreakBetweenMembers(node.Arms[i - 1].Span.End, node.Arms[i], context);
 					Node.Print(node.Arms[i], context);
 
 					if (rewritesComma && i == node.Arms.Count - 1)
