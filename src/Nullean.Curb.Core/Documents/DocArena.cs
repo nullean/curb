@@ -181,11 +181,39 @@ internal sealed class DocArena
 		Open(new Doc(DocKind.Indent, b: levels, groupId: groupId));
 
 	/// <summary>Captures the current output column into <paramref name="register"/>.</summary>
-	public void Anchor(int register) => Add(new Doc(DocKind.Anchor, a: register));
+	public void Anchor(int register) => Add(new Doc(DocKind.Anchor, a: register, b: Doc.AnchorAtColumn));
 
-	/// <summary>A hard break that indents to a column captured by <see cref="Anchor"/>.</summary>
-	public void AlignedLine(int register) =>
-		Add(new Doc(DocKind.Line, a: (int)LineType.Hard, b: register, flags: DocFlags.AlignToAnchor));
+	/// <summary>
+	/// Captures into <paramref name="register"/> how far the line the output is on has moved from its
+	/// source position — see <see cref="Doc.AnchorAtLineShift"/>.
+	/// </summary>
+	/// <remarks>
+	/// For a continuation that keeps the offset the author gave it from the line its construct started
+	/// on: an <see cref="AlignedLine"/> reading the register with the continuation's source indent as
+	/// its offset lands where <c>dotnet format</c> would leave it.
+	/// </remarks>
+	public void LineShiftAnchor(int register) => Add(new Doc(DocKind.Anchor, a: register, b: Doc.AnchorAtLineShift));
+
+	/// <summary>
+	/// A hard break that indents to a column captured by <see cref="Anchor"/>, shifted by
+	/// <paramref name="offset"/> columns. A register <see cref="LineShiftAnchor"/> left unset breaks to
+	/// the enclosing indent instead.
+	/// </summary>
+	public void AlignedLine(int register, int offset = 0) =>
+		Add(new Doc(DocKind.Line, a: (int)LineType.Hard, b: register | (offset << Doc.AnchorOffsetShift), flags: DocFlags.AlignToAnchor));
+
+	/// <summary>
+	/// Shifts the subtree so its lines sit as far in from the column an <see cref="AlignedLine"/> with
+	/// the same <paramref name="register"/> and <paramref name="offset"/> lands on as they would from the
+	/// enclosing indent. A register <see cref="LineShiftAnchor"/> left unset shifts nothing.
+	/// </summary>
+	/// <remarks>
+	/// Prettier's <c>align</c>, for an operand that follows an aligned break: without it the operand's
+	/// own lines — an initializer's braces, a call's arguments — fell back to the enclosing indent,
+	/// to the left of the line they belong to.
+	/// </remarks>
+	public DocScope AlignedIndent(int register, int offset) =>
+		Open(new Doc(DocKind.Indent, b: register | (offset << Doc.AnchorOffsetShift), flags: DocFlags.AlignToAnchor));
 
 	/// <summary>
 	/// A break opportunity that lands on a captured column when it is taken, and is a space when it

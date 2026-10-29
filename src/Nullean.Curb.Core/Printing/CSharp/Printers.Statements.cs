@@ -551,6 +551,12 @@ internal static partial class Printers
 	{
 		var arena = context.Arena;
 
+		// A case label is not a statement, so dotnet format moves its continuation lines as far as the
+		// line `switch` starts on moved, not as far as the label itself moved — see CaseLabelContinuation.
+		var labelAnchor = HasBrokenPatternLabel(node, context) ? context.EnterContinuation() : -1;
+		if (labelAnchor >= 0)
+			arena.LineShiftAnchor(labelAnchor);
+
 		TokenPrinter.Print(node.SwitchKeyword, context);
 		Spacing.AfterControlFlowKeyword(context);
 
@@ -580,11 +586,29 @@ internal static partial class Printers
 			else
 				BeforeOpenBrace(BraceStyle.ControlBlocks, context);
 
-			PrintSwitchBody(node, context);
+			PrintSwitchBody(node, labelAnchor, context);
 		}
+
+		if (labelAnchor >= 0)
+			context.ExitContinuation();
 	}
 
-	private static void PrintSwitchBody(SwitchStatementSyntax node, PrintContext context)
+	/// <summary>Whether any of the switch's pattern labels spans lines the author broke.</summary>
+	private static bool HasBrokenPatternLabel(SwitchStatementSyntax node, PrintContext context)
+	{
+		foreach (var section in node.Sections)
+		{
+			foreach (var label in section.Labels)
+			{
+				if (label is CasePatternSwitchLabelSyntax && SpansLines(label, context))
+					return true;
+			}
+		}
+
+		return false;
+	}
+
+	private static void PrintSwitchBody(SwitchStatementSyntax node, int labelAnchor, PrintContext context)
 	{
 		var arena = context.Arena;
 		TokenPrinter.Print(node.OpenBraceToken, context);
@@ -620,7 +644,10 @@ internal static partial class Printers
 					else
 						arena.HardLine();
 
+					var outerLabelAnchor = context.CaseLabelContinuation;
+					context.CaseLabelContinuation = labelAnchor;
 					Node.Print(label, context);
+					context.CaseLabelContinuation = outerLabelAnchor;
 					labelEnd = label.Span.End;
 					firstLabel = false;
 				}
@@ -682,10 +709,7 @@ internal static partial class Printers
 	{
 		TokenPrinter.Print(node.ThrowKeyword, context);
 		if (node.Expression is not null)
-		{
-			context.Arena.Synthetic(SyntheticText.Space);
-			Node.Print(node.Expression, context);
-		}
+			ValueAfterKeyword(node.ThrowKeyword, node.Expression, context);
 		TokenPrinter.Print(node.SemicolonToken, context);
 	}
 
@@ -695,11 +719,44 @@ internal static partial class Printers
 		context.Arena.Synthetic(SyntheticText.Space);
 		TokenPrinter.Print(node.ReturnOrBreakKeyword, context);
 		if (node.Expression is not null)
+			ValueAfterKeyword(node.ReturnOrBreakKeyword, node.Expression, context);
+		TokenPrinter.Print(node.SemicolonToken, context);
+	}
+
+	/// <summary>
+	/// Prints the value a <c>return</c>, <c>throw</c> or <c>yield return</c> introduces: after a space,
+	/// or on the line below where the author put it there.
+	/// </summary>
+	/// <remarks>
+	/// A value below the keyword moves as far as the keyword's line moved, which is where dotnet format
+	/// leaves it, at whatever column the author chose. Joining it back onto the keyword lengthened the
+	/// line, and the continuation lines of a chain it started kept a column measured from a line that
+	/// was no longer there (issue #117). A comment ahead of the value goes on the value's column.
+	/// The value's own lines, a call's arguments or an initializer's braces, sit as far in from the
+	/// value's line as they would from the indent, however deep the author put it. Should the anchor
+	/// have nothing to measure from, the value falls back to one level in.
+	/// </remarks>
+	private static void ValueAfterKeyword(SyntaxToken keyword, ExpressionSyntax value, PrintContext context)
+	{
+		if (!context.AuthorBroke(keyword.Span.End, value.SpanStart))
 		{
 			context.Arena.Synthetic(SyntheticText.Space);
-			Node.Print(node.Expression, context);
+			Node.Print(value, context);
+			return;
 		}
-		TokenPrinter.Print(node.SemicolonToken, context);
+
+		// The keyword's line is already open, so the anchor measures it now. A keyword that sat
+		// mid-line in the source measures as unmoved, and the value keeps its source column.
+		var anchor = context.EnterContinuation();
+		context.Arena.LineShiftAnchor(anchor);
+		using (context.Arena.Indent())
+		{
+			var offset = ContinuationLine(value.GetFirstToken(), anchor, context);
+			using (context.Arena.AlignedIndent(anchor, offset))
+				Node.Print(value, context);
+		}
+
+		context.ExitContinuation();
 	}
 
 	/// <summary>Covers <c>break;</c>, <c>continue;</c> and the empty statement.</summary>

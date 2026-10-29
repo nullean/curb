@@ -76,7 +76,9 @@ internal static class DocDumper
 
 				case DocKind.Indent:
 					output.Append("indent ")
-						.Append(doc.B == Doc.IndentToRoot ? "to-root" : doc.B.ToString(System.Globalization.CultureInfo.InvariantCulture))
+						.Append(doc.Flags.HasFlag(DocFlags.AlignToAnchor) ? "aligned"
+							: doc.B == Doc.IndentToRoot ? "to-root"
+							: doc.B.ToString(System.Globalization.CultureInfo.InvariantCulture))
 						.AppendLine();
 					Write(arena, source, output, i + 1, i + doc.Length, depth + 1);
 					break;
