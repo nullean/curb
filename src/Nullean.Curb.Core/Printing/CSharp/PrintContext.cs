@@ -1,3 +1,4 @@
+using System.Buffers;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
@@ -13,11 +14,15 @@ namespace Nullean.Curb.Printing.CSharp;
 /// copying it would be both wasteful and wrong. The options it holds are a struct and are read
 /// through helpers, never poked at directly by a printer.
 /// </remarks>
-internal sealed class PrintContext(DocArena arena, SourceText text, FormatOptions options)
+internal sealed class PrintContext(DocArena arena, SourceText text, string source, FormatOptions options)
 {
 	public DocArena Arena { get; } = arena;
 
 	public SourceText Text { get; } = text;
+
+	/// <summary>The string <see cref="Text"/> was made from, for reading a run of it as a span.</summary>
+	/// <remarks>Indexing <see cref="SourceText"/> is a virtual call per character.</remarks>
+	private readonly string _source = source;
 
 	public FormatOptions Options { get; } = options;
 
@@ -366,18 +371,13 @@ internal sealed class PrintContext(DocArena arena, SourceText text, FormatOption
 		// where looking for a line break is far cheaper than a binary search over the line starts.
 		if (start <= end && end - start <= ShortGap)
 		{
-			var text = Text;
-			for (var i = start; i < end; i++)
-			{
-				var c = text[i];
-				if (c is '\n' or '\u0085' or '\u2028' or '\u2029')
-					return false;
-				// A `\r\n` pair is one break, and the `\n` half still belongs to the line it ends.
-				if (c == '\r')
-					return i + 1 == end && end < text.Length && text[end] == '\n';
-			}
+			var gap = _source.AsSpan(start, end - start);
+			var at = gap.IndexOfAny(LineBreaks);
+			if (at < 0)
+				return true;
 
-			return true;
+			// A `\r\n` pair is one break, and the `\n` half still belongs to the line it ends.
+			return gap[at] == '\r' && at == gap.Length - 1 && end < _source.Length && _source[end] == '\n';
 		}
 
 		var line = Text.Lines.GetLineFromPosition(start);
@@ -386,7 +386,10 @@ internal sealed class PrintContext(DocArena arena, SourceText text, FormatOption
 	}
 
 	/// <summary>The longest gap <see cref="OnSameLine"/> scans for a line break instead of looking its lines up.</summary>
-	private const int ShortGap = 64;
+	private const int ShortGap = 256;
+
+	/// <summary>The characters <see cref="SourceText"/> ends a line on.</summary>
+	private static readonly SearchValues<char> LineBreaks = SearchValues.Create("\r\n\u0085\u2028\u2029");
 
 	/// <summary>The author put a break between these positions, and Curb honours it.</summary>
 	/// <remarks>
