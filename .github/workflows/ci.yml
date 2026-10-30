@@ -26,39 +26,41 @@ concurrency:
 permissions:
   contents: read
 
-# ── Cost gating ─────────────────────────────────────────────────────────────────
+# ── What runs when ──────────────────────────────────────────────────────────────
 #
-# This repo is private, so runner minutes are billed and the multipliers matter:
-# macOS 10x, Windows 2x, Linux 1x. A full run costs ~40 billed minutes; a PR
-# run costs ~6. The gap comes from two sources:
+# The repository is public, so GitHub-hosted runners cost nothing. What the gating below buys is wall-clock
+# time on a pull request, and fewer jobs queued for the organisation's concurrent runners.
 #
-#   1. The AOT matrix. Five RIDs on every PR burns ~22 billed minutes on legs
-#      that produce packages nobody sees — the upload is already gated on push.
-#      On pull requests, only linux-x64 runs (AOT must link and execute; that is
-#      proved; the other four RIDs get the same proof on every push to main).
+#   1. The AOT matrix. On pull requests only linux-x64 runs (AOT must link and execute; that is proved);
+#      the other four RIDs get the same proof on every push to main, where packages are produced.
 #
-#   2. Six heavy corpus steps that together account for ~12 of the 15 wall-clock
-#      minutes in the corpus job. They are correct and they belong in CI — they
-#      just do not need to run on every single commit. They run on every push to
-#      main that is also a tag, on the weekly schedule, and on workflow_dispatch.
-#      Everything else (safety checks, idempotency, cache assertions, smoke tests)
-#      runs on every trigger.
+#   2. The corpus gates. The fast ones run on every trigger, in "Corpus and conformance" (the required
+#      check). The rest are correct and belong in CI, but do not need to run on every commit: they run on
+#      tag pushes, the weekly schedule and workflow_dispatch (CURB_FULL_GATES). Run one after another in a
+#      single job they took 54 minutes; split into parallel jobs a full run takes ~17 (measured on one run each).
 #
-#      Steps gated on CURB_FULL_GATES:
-#        - Conformance with dotnet format              (32 s, no-width path)
-#        - Conformance with a width of 120 columns     (29 s, non-default width)
-#        - Conformance with the preservation opt-out   (31 s, non-default mode)
-#        - Churn, all three configurations             (35 s, reported not gated)
-#        - Speed and allocations                       (46 s, allocation ratio gate)
-#        - Cleaning a real solution leaves it building (468 s, two analyzer builds)
+#      Steps gated on CURB_FULL_GATES, in the corpus job:
+#        - Conformance with dotnet format              (~17 s, no-width path)
+#        - Conformance with a width of 120 columns     (~13 s, non-default width)
+#        - Conformance with the preservation opt-out   (~13 s, non-default mode)
+#        - Churn, all three configurations             (~9 s, reported not gated)
+#        - Speed and allocations                       (~5 s, allocation ratio gate; reuses CURB_EXE)
+#      Jobs of their own, full gates only, in parallel with the corpus job:
+#        - Cleaning a real solution leaves it building (cleanupconformance, ~9 min job)
+#        - IDE0055 under a real build, four shards     (verifyexpectationside0055, 7-13 min each;
+#          runner speed varied more than shard size did)
 #
 #      Step NOT gated (stays on every trigger):
 #        - Conformance with a width (deterministic, the default)
 #          This is the primary correctness claim held at --minimum 100 on the
 #          default path. It must not be conditional.
 #
-# The weekly run is a strict superset of a push-to-main run. A tag push is also
-# full, so no release ships against gates that last ran up to six days ago.
+# The weekly run is a strict superset of a push-to-main run. A tag push is also full, so the gates have run
+# on the commit being released — though the publishing job (build) waits only for the AOT legs, not for
+# the corpus jobs, so a release can publish before they finish or even if they fail.
+#
+# Every job that needs the corpus gets it from `./build.sh clonecorpus`, so where it comes from is decided in
+# one place (cloneCorpus in build/scripts/Targets.fs). Today that is elastic/docs-builder at HEAD.
 
 env:
   CURB_FULL_GATES: >-
@@ -214,7 +216,7 @@ jobs:
       # The product claim, as a number that must not go down.
       #
       # Two files out of 1,196 differ, both the arrow-clause anchor recorded in the plan's §1d.
-      # Gated weekly: the no-width conformance path is slower to regress and adds 32 s per run.
+      # Gated weekly: the no-width conformance path is slower to regress and adds ~17 s per run.
       - name: Conformance with dotnet format
         if: env.CURB_FULL_GATES == 'true'
         run: ./build.sh conformance -s true --corpus /tmp/corpus --minimum 100
@@ -350,7 +352,8 @@ jobs:
       # case that actually fixed something gets its own throwaway project — batching them into one would
       # make two unrelated cases both naming `class Widget` in `namespace N` a compile error rather than
       # the two independent snippets the source intended — and dotnet format style --verify-no-changes
-      # says whether Curb's fix is a fixed point.
+      # says whether Curb's fix is a fixed point. One `dotnet format style` per processor at a time, each case
+      # in its own directory with its own obj: 74-121 s here, where running them one after another took 109-222 s.
       - name: Cleanup expectations survive dotnet format style
         run: ./build.sh verifycleanupexpectations -s true
 
