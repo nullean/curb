@@ -354,9 +354,39 @@ internal sealed class PrintContext(DocArena arena, SourceText text, FormatOption
 	/// this reachable made that a review rule; hiding it makes it a compile error. Anything genuinely
 	/// needing the raw answer — how far apart two comments are — reads <c>Text.Lines</c> itself, as
 	/// <c>TokenPrinter</c> does.
+	/// <para>
+	/// One line lookup rather than two: <c>end</c> is on <c>start</c>'s line exactly when it falls inside that
+	/// line's span, line break included — or sits at the very end of a last line that has no break.
+	/// <c>TextLine.LineNumber</c> is itself another binary search, so comparing line numbers cost four.
+	/// </para>
 	/// </remarks>
-	private bool OnSameLine(int start, int end) =>
-		Text.Lines.GetLineFromPosition(start).LineNumber == Text.Lines.GetLineFromPosition(end).LineNumber;
+	private bool OnSameLine(int start, int end)
+	{
+		// Most questions are about the few characters between two adjacent tokens — `, ` or ` (` —
+		// where looking for a line break is far cheaper than a binary search over the line starts.
+		if (start <= end && end - start <= ShortGap)
+		{
+			var text = Text;
+			for (var i = start; i < end; i++)
+			{
+				var c = text[i];
+				if (c is '\n' or '\u0085' or '\u2028' or '\u2029')
+					return false;
+				// A `\r\n` pair is one break, and the `\n` half still belongs to the line it ends.
+				if (c == '\r')
+					return i + 1 == end && end < text.Length && text[end] == '\n';
+			}
+
+			return true;
+		}
+
+		var line = Text.Lines.GetLineFromPosition(start);
+		return end >= line.Start
+			&& (end < line.EndIncludingLineBreak || (end == line.End && line.End == line.EndIncludingLineBreak));
+	}
+
+	/// <summary>The longest gap <see cref="OnSameLine"/> scans for a line break instead of looking its lines up.</summary>
+	private const int ShortGap = 64;
 
 	/// <summary>The author put a break between these positions, and Curb honours it.</summary>
 	/// <remarks>
@@ -418,8 +448,8 @@ internal sealed class PrintContext(DocArena arena, SourceText text, FormatOption
 	{
 		if (endOfPrevious < 0 || startOfNext <= endOfPrevious)
 			return 0;
-		var previousLine = Text.Lines.GetLineFromPosition(endOfPrevious).LineNumber;
-		var nextLine = Text.Lines.GetLineFromPosition(startOfNext).LineNumber;
+		var previousLine = Text.Lines.IndexOf(endOfPrevious);
+		var nextLine = Text.Lines.IndexOf(startOfNext);
 		return Math.Max(0, nextLine - previousLine - 1);
 	}
 
