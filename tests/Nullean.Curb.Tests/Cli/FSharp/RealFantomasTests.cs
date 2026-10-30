@@ -8,11 +8,14 @@ namespace Nullean.Curb.Tests.Cli.FSharp;
 
 /// <summary>
 /// The one place the real Fantomas is run: the wire format and the CLI report are Fantomas's to change, and
-/// only this notices when they do. Skipped, with the reason, where Fantomas 8.1.0 is not restored
-/// (<c>dotnet tool restore</c> in a folder whose manifest pins it, or <c>./build.sh fsharpsmoketest</c>).
+/// only this notices when they do. Skipped, with the reason, where Fantomas 8.1.0 is not restored:
+/// <c>dotnet tool restore --tool-manifest tests/Nullean.Curb.Tests/Cli/FSharp/Fixture/dotnet-tools.json</c>
+/// restores it. On CI, where the build job does exactly that, a missing Fantomas fails instead of skipping,
+/// so these cannot quietly stop running.
 /// </summary>
 public class RealFantomasTests
 {
+	/// <summary>The version <c>Fixture/dotnet-tools.json</c> pins.</summary>
 	private const string Version = "8.1.0";
 
 	private static (FileSystem Fs, string Root) Workspace()
@@ -20,7 +23,13 @@ public class RealFantomasTests
 		var fs = new FileSystem();
 		var tool = new FantomasResolver(fs, ToolEnvironment.Current)
 			.Resolve(new FantomasManifest("/dotnet-tools.json", "fantomas", Version, false)).Tool;
-		Skip.When(tool?.EntryPoint is null, $"Fantomas {Version} is not restored on this machine");
+		if (tool?.EntryPoint is null)
+		{
+			var reason = $"Fantomas {Version} is not restored on this machine";
+			if (Environment.GetEnvironmentVariable("CI") == "true")
+				throw new InvalidOperationException($"{reason}; the CI build job restores it from Fixture/dotnet-tools.json");
+			Skip.Test(reason);
+		}
 
 		var root = fs.Directory.CreateTempSubdirectory("curb-fantomas-").FullName;
 		fs.File.WriteAllText(fs.Path.Combine(root, "dotnet-tools.json"), FantomasToolTests.Manifest(Version, isRoot: true));

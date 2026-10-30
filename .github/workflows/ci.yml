@@ -416,6 +416,12 @@ jobs:
       - name: Build
         run: ./build.sh build -s true
 
+      # The tests that run the real Fantomas, through its daemon and its command line, skip where it is not
+      # restored. Here it is, from the fixture manifest that pins the version they expect, and they fail
+      # rather than skip when CI=true.
+      - name: Restore the Fantomas the F# tests run against
+        run: dotnet tool restore --tool-manifest tests/Nullean.Curb.Tests/Cli/FSharp/Fixture/dotnet-tools.json
+
       - name: Test
         run: ./build.sh test -s true
 
