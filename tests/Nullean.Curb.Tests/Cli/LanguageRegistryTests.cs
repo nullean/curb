@@ -33,18 +33,23 @@ public class LanguageRegistryTests
 	}
 
 	[Test]
-	public async Task The_default_registry_adds_xml_for_project_and_solution_files()
+	public async Task The_default_registry_adds_xml_for_project_and_solution_files_and_fsharp()
 	{
-		var registry = LanguageRegistry.Default;
+		var registry = LanguageRegistry.Default(new MockFileSystem());
 
-		registry.Count.Should().Be(2);
+		registry.Count.Should().Be(3);
 		registry.SearchPattern.Should().Be("*");
 		registry.IndexOf("/repo/A.cs").Should().Be(0);
 		registry.IndexOf("/repo/A.csproj").Should().Be(1);
 		registry.IndexOf("/repo/Directory.Build.TARGETS").Should().Be(1);
 		registry.IndexOf("/repo/A.slnx").Should().Be(1);
 		registry.IndexOf("/repo/nuget.config").Should().Be(1);
+		registry.IndexOf("/repo/A.fsproj").Should().Be(1);
+		registry.IndexOf("/repo/A.fs").Should().Be(2);
+		registry.IndexOf("/repo/A.fsi").Should().Be(2);
+		registry.IndexOf("/repo/build.fsx").Should().Be(2);
 		registry.IndexOf("/repo/A.sln").Should().Be(-1);
+		registry.IndexOf("/repo/A.ml").Should().Be(-1, "OCaml shares the extension, so Curb does not claim it");
 		await Task.CompletedTask;
 	}
 

@@ -263,8 +263,8 @@ internal sealed class CurbCommands
 	/// C# alone when the MSBuild integration is calling, which must never format the project files a
 	/// build is reading; every language otherwise.
 	/// </summary>
-	private static LanguageRegistry LanguagesFor(FileInfo? msbuildListFile) =>
-		msbuildListFile is null ? LanguageRegistry.Default : LanguageRegistry.CSharpOnly;
+	private LanguageRegistry LanguagesFor(FileInfo? msbuildListFile) =>
+		msbuildListFile is null ? LanguageRegistry.Default(_fileSystem) : LanguageRegistry.CSharpOnly;
 
 	/// <summary>
 	/// Merges <c>--files</c> with the contents of <c>--msbuild-list-file</c> (one path per line, blank

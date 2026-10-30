@@ -14,6 +14,12 @@ public enum FormatStatus
 
 	/// <summary>The syntax nests deeper than Curb will follow.</summary>
 	TooDeep,
+
+	/// <summary>
+	/// The formatter was asked and declined the file by its own rules, such as a match in Fantomas's
+	/// <c>.fantomasignore</c>. Left as it was and counted as skipped.
+	/// </summary>
+	Ignored,
 }
 
 /// <summary>The outcome of formatting one file.</summary>

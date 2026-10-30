@@ -68,6 +68,17 @@ internal abstract class LanguageOptions
 	public virtual bool Claimed => true;
 
 	/// <summary>
+	/// Why a file that is not <see cref="Claimed"/> was declined, when the repository would want to know;
+	/// null to decline it silently.
+	/// </summary>
+	/// <remarks>
+	/// Said once per run with a count, never per file. F# uses it when no tool manifest declares Fantomas:
+	/// unlike XML switched off on purpose, nobody chose that, so the files leaving without a word would
+	/// look like Curb not knowing F# exists.
+	/// </remarks>
+	public virtual string? DeclinedReason => null;
+
+	/// <summary>
 	/// Settings the options were bound from beyond the file's merged ones, hashed into the cache key
 	/// with them; null when there are none.
 	/// </summary>
@@ -122,20 +133,32 @@ internal interface ILanguageWorker : IDisposable
 /// starts once per run rather than once per file.
 /// </summary>
 /// <remarks>
-/// Declared so the seam has its shape before anything implements it. <see cref="LanguageRegistry"/>
-/// refuses one until <see cref="FormattingRun"/> routes files to it.
+/// <para>
+/// <see cref="FormattingRun"/> reads, decodes, consults the cache and applies the skip rules exactly as for
+/// a language it formats itself, then hands everything left over in one call, after the in-process files
+/// are done. What comes back goes through the same write: Curb writes the file, with its own byte-order
+/// mark, and only a file the tool handed back unchanged is recorded in the cache.
+/// </para>
+/// <para>
+/// A result of <see cref="FormatStatus.Ignored"/> counts as skipped. An <see cref="Exception"/> means the
+/// tool could not run at all; every file handed over is failed with its message, said once.
+/// </para>
 /// </remarks>
 internal interface IExternalLanguage : IFormattingLanguage
 {
 	/// <summary>Formats or checks <paramref name="files"/>, returning one result per file, in the same order.</summary>
-	/// <param name="files">The files that missed the cache and were not skipped.</param>
+	/// <param name="files">The files that missed the cache and were not skipped. Never empty: a run with none never calls this.</param>
 	/// <param name="produceText">False for <c>check</c>.</param>
 	/// <param name="cancellationToken">Stops the tool.</param>
 	Task<FormatResult[]> FormatBatchAsync(IReadOnlyList<ExternalFile> files, bool produceText, CancellationToken cancellationToken);
+
+	/// <summary>What the language or its tool wants said once at the end of the run, such as a setting the tool did not recognise.</summary>
+	IReadOnlyCollection<string> Warnings { get; }
 }
 
 /// <summary>One file handed to an <see cref="IExternalLanguage"/>.</summary>
 /// <param name="Path">Where it lives, for a tool that resolves its own configuration from it.</param>
 /// <param name="Source">The decoded text, without its byte-order mark.</param>
 /// <param name="Options">What <see cref="IFormattingLanguage.BindOptions"/> returned for it.</param>
-internal readonly record struct ExternalFile(string Path, string Source, LanguageOptions Options);
+/// <param name="Bytes">The file exactly as it was read, for a tool that can only write in place and has to be undone.</param>
+internal readonly record struct ExternalFile(string Path, string Source, LanguageOptions Options, ReadOnlyMemory<byte> Bytes);
