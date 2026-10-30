@@ -30,6 +30,59 @@ let private execQuiet binary (args: string list) =
     let result = Proc.Start(StartArguments(binary, List.toArray args, ConsoleOutWriter = quiet), Threading.CancellationToken.None)
     result.ExitCode, result.ConsoleOut |> Seq.map (fun l -> l.Line) |> String.concat "\n"
 
+/// The native CLI a CI job already published, named by CURB_EXE, or None to build it here.
+///
+/// A corpus job runs the CLI a dozen times over. Publishing it once and pointing every target at the
+/// result saves a `dotnet run` up-to-date check per call and a fresh AOT publish per smoke test. Unset —
+/// the usual local case — every target builds what it needs exactly as it always did.
+let private prebuiltCurb =
+    lazy(
+        match Environment.GetEnvironmentVariable "CURB_EXE" with
+        | null | "" -> None
+        | path ->
+            let full = Path.GetFullPath path
+            if not (File.Exists full) then failwithf "CURB_EXE names %s, which does not exist" full
+            printfn "using the CLI CURB_EXE names: %s" full
+            Some full
+    )
+
+/// The command line that runs the CLI with `args`: CURB_EXE's binary when it is set, otherwise
+/// `dotnet run` against the Release build.
+let private curbCommand (args: string list) =
+    match prebuiltCurb.Value with
+    | Some exe -> exe, args
+    | None -> "dotnet", ["run"; "--project"; "src/Nullean.Curb.Cli"; "-c"; "Release"; "--"] @ args
+
+let private execCurb (args: string list) =
+    let binary, arguments = curbCommand args
+    exec binary arguments
+
+/// Runs the CLI with `args`, echoing its output as it arrives the way Proc.Start does, and returns the exit
+/// code and the output lines.
+///
+/// Not Proc.Start, which subscribes to a process's output after starting it: one that has already exited
+/// by then fails with ObjectDisposedException, and the native CLI answers `options --list-keys` in a few
+/// milliseconds. `dotnet run` never exited that fast, which is why this did not show before CURB_EXE.
+let private startCurb (args: string list) =
+    let binary, arguments = curbCommand args
+    let info = Diagnostics.ProcessStartInfo(binary)
+    for argument in arguments do info.ArgumentList.Add argument
+    info.RedirectStandardOutput <- true
+    info.RedirectStandardError <- true
+    let lines = Collections.Concurrent.ConcurrentQueue<string>()
+    use proc = new Diagnostics.Process(StartInfo = info)
+    let received (e: Diagnostics.DataReceivedEventArgs) =
+        if not (isNull e.Data) then
+            lines.Enqueue e.Data
+            Console.WriteLine e.Data
+    proc.OutputDataReceived.Add received
+    proc.ErrorDataReceived.Add received
+    proc.Start() |> ignore
+    proc.BeginOutputReadLine()
+    proc.BeginErrorReadLine()
+    proc.WaitForExit()
+    proc.ExitCode, lines.ToArray()
+
 /// dotnet/sdk#53783: on a cold tool-resolver cache (every fresh CI runner, every fresh container),
 /// restoring 2+ RID-specific tool packages in one manifest can misattribute one package's
 /// DotnetToolSettings.xml to another, failing with "The command ... is not contained in the
@@ -195,7 +248,7 @@ let private conformance (arguments:ParseResults<Arguments>) =
     // Curb chose; --reflow keeps the corpus's own widths, which is the configuration people run.
     configureCorpus arguments work
 
-    exec "dotnet" ["run"; "--project"; "src/Nullean.Curb.Cli"; "-c"; "Release"; "--"; "format"; work] |> ignore
+    execCurb ["format"; work] |> ignore
     copyTree work reference
     exec "dotnet" ["format"; "whitespace"; reference; "--folder"] |> ignore
 
@@ -256,7 +309,7 @@ let private churn (arguments:ParseResults<Arguments>) =
         |> Array.map (fun file -> file, File.ReadAllText file)
         |> Map.ofArray
 
-    exec "dotnet" ["run"; "--project"; "src/Nullean.Curb.Cli"; "-c"; "Release"; "--"; "format"; work] |> ignore
+    execCurb ["format"; work] |> ignore
 
     let lineCount (text:string) = text.Split('\n').Length
     let changed =
@@ -292,6 +345,32 @@ let private churn (arguments:ParseResults<Arguments>) =
         failwithf "churn %.2f%% is above the permitted %.2f%%" percentage ceiling
     | _ -> ()
 
+/// Publishes the native binary for this machine and returns its path, for perf to time and the smoke
+/// tests to point Curb_Exe at — or returns CURB_EXE's, when a CI job already published one.
+let private publishNativeCurb () =
+    match prebuiltCurb.Value with
+    | Some exe -> exe
+    | None ->
+        let rid =
+            let os =
+                if OperatingSystem.IsWindows() then "win"
+                elif OperatingSystem.IsMacOS() then "osx"
+                else "linux"
+            let arch =
+                match Runtime.InteropServices.RuntimeInformation.ProcessArchitecture with
+                | Runtime.InteropServices.Architecture.Arm64 -> "arm64"
+                | Runtime.InteropServices.Architecture.X64 -> "x64"
+                | other -> failwithf "no RID mapping for %O" other
+            sprintf "%s-%s" os arch
+
+        printfn "publishing native AOT for %s" rid
+        exec "dotnet" ["publish"; "src/Nullean.Curb.Cli"; "-c"; "Release"; "-r"; rid] |> ignore
+
+        let name = if OperatingSystem.IsWindows() then "curb.exe" else "curb"
+        let binary = Path.GetFullPath(Path.Combine(".artifacts", "publish", "Nullean.Curb.Cli", sprintf "release_%s" rid, name))
+        if not (File.Exists binary) then failwithf "expected a native binary at %s" binary
+        binary
+
 /// Times the shipped binary over a corpus.
 ///
 /// This target exists because measuring `dotnet run` is misleading and easy to do by accident: a
@@ -308,25 +387,7 @@ let private perf (arguments:ParseResults<Arguments>) =
         | None -> failwith "perf needs --corpus <path> pointing at a C# checkout"
     if not corpus.Exists then failwithf "corpus %s does not exist" corpus.FullName
 
-    let rid =
-        let os =
-            if OperatingSystem.IsWindows() then "win"
-            elif OperatingSystem.IsMacOS() then "osx"
-            else "linux"
-        let arch =
-            match Runtime.InteropServices.RuntimeInformation.ProcessArchitecture with
-            | Runtime.InteropServices.Architecture.Arm64 -> "arm64"
-            | Runtime.InteropServices.Architecture.X64 -> "x64"
-            | other -> failwithf "no RID mapping for %O" other
-        sprintf "%s-%s" os arch
-
-    printfn "publishing native AOT for %s" rid
-    exec "dotnet" ["publish"; "src/Nullean.Curb.Cli"; "-c"; "Release"; "-r"; rid] |> ignore
-
-    let binary =
-        let name = if OperatingSystem.IsWindows() then "curb.exe" else "curb"
-        Path.Combine(".artifacts", "publish", "Nullean.Curb.Cli", sprintf "release_%s" rid, name)
-    if not (File.Exists binary) then failwithf "expected a native binary at %s" binary
+    let binary = publishNativeCurb ()
 
     // The first run pays for a cold file cache, so take the best of several rather than the mean.
     let runs =
@@ -367,26 +428,6 @@ let private perf (arguments:ParseResults<Arguments>) =
 ///
 /// A third build covers the cache, which is the other half of the incrementality story and the half
 /// nothing else would catch.
-/// Publishes the native binary for this machine and returns its path, for the smoke tests to point
-/// Curb_Exe at.
-let private publishNativeCurb () =
-    let rid =
-        let os =
-            if OperatingSystem.IsWindows() then "win"
-            elif OperatingSystem.IsMacOS() then "osx"
-            else "linux"
-        let arch =
-            match Runtime.InteropServices.RuntimeInformation.ProcessArchitecture with
-            | Runtime.InteropServices.Architecture.Arm64 -> "arm64"
-            | Runtime.InteropServices.Architecture.X64 -> "x64"
-            | other -> failwithf "no RID mapping for %O" other
-        sprintf "%s-%s" os arch
-
-    exec "dotnet" ["publish"; "src/Nullean.Curb.Cli"; "-c"; "Release"; "-r"; rid] |> ignore
-
-    let name = if OperatingSystem.IsWindows() then "curb.exe" else "curb"
-    Path.GetFullPath(Path.Combine(".artifacts", "publish", "Nullean.Curb.Cli", sprintf "release_%s" rid, name))
-
 let private msbuildSmoketest (arguments:ParseResults<Arguments>) =
     let binary = publishNativeCurb ()
 
@@ -552,9 +593,9 @@ let private cleanupConformance (arguments:ParseResults<Arguments>) =
     // The rules Curb owns, asked for rather than restated. A second copy of the list here would drift from
     // the catalog, and the drift would look like a passing gate.
     let ownedIds =
-        let result = Proc.Start("dotnet", [| "run"; "--project"; "src/Nullean.Curb.Cli"; "-c"; "Release"; "--"; "rules"; "--cleanup-ids" |])
-        result.ConsoleOut
-        |> Seq.map (fun l -> l.Line.Trim())
+        let _, lines = startCurb ["rules"; "--cleanup-ids"]
+        lines
+        |> Seq.map (fun l -> l.Trim())
         |> Seq.filter (fun l -> l.StartsWith("IDE", StringComparison.Ordinal))
         |> Seq.tryHead
         |> Option.defaultWith (fun () -> failwith "could not read the cleanup rule ids from `curb rules --cleanup-ids`")
@@ -757,10 +798,10 @@ let private cleanupConformance (arguments:ParseResults<Arguments>) =
     printfn "  before: %s" (tally before)
 
     printfn "cleaning"
-    let cleanup = Proc.Start("dotnet", [| "run"; "--project"; "src/Nullean.Curb.Cli"; "-c"; "Release"; "--"; "cleanup"; work.FullName |])
-    let cleanupOutput = cleanup.ConsoleOut |> Seq.map (fun l -> l.Line) |> String.concat "\n"
+    let cleanupCode, cleanupLines = startCurb ["cleanup"; work.FullName]
+    let cleanupOutput = cleanupLines |> String.concat "\n"
     printfn "%s" cleanupOutput
-    if cleanup.ExitCode <> 0 then failwith "curb cleanup failed on the corpus"
+    if cleanupCode <> 0 then failwith "curb cleanup failed on the corpus"
 
     // Churn, published rather than asserted, the way layout-decisions requires of anything that rewrites
     // files. Taken from cleanup's own summary rather than from git, so the copy does not need to carry the
@@ -941,8 +982,8 @@ let private xmlSafety (arguments:ParseResults<Arguments>) =
     let skipped = before |> Array.choose (fun (p, r) -> match r with Error reason -> Some(p, reason) | Ok _ -> None)
 
     let run command =
-        let result = Proc.Start("dotnet", [| "run"; "--project"; "src/Nullean.Curb.Cli"; "-c"; "Release"; "--"; command; work |])
-        let output = result.ConsoleOut |> Seq.map (fun l -> l.Line) |> String.concat "\n"
+        let _, lines = startCurb [command; work]
+        let output = lines |> String.concat "\n"
         printfn "%s" output
         output
 
@@ -1027,6 +1068,8 @@ let private cleanupSafety (arguments:ParseResults<Arguments>) =
 /// formatter cannot: it could silence a rule instead of fixing it, and it could rewrite a repository
 /// that never asked for anything.
 let private cleanupSmoketest (arguments:ParseResults<Arguments>) =
+    // Deliberately not CURB_EXE's native binary: this is the one smoke test that runs the framework-dependent
+    // curb.dll, through Curb_Dll, which is what the MSBuild package invokes by default.
     exec "dotnet" ["publish"; "src/Nullean.Curb.Cli"; "-c"; "Release"; "-o"; ".artifacts/cleanup-smoketest/curb"
                    "-p:PublishAot=false"; "-p:SelfContained=false"] |> ignore
 
@@ -1192,9 +1235,9 @@ let private loadDivergences tool : Map<string, Divergence> =
 /// sitting in every dumped case's `.editorconfig` file.
 let private checkOptionCoverage (dump: string) (cases: string[]) =
     let implemented =
-        let result = Proc.Start("dotnet", [| "run"; "--project"; "src/Nullean.Curb.Cli"; "-c"; "Release"; "--"; "options"; "--list-keys" |])
-        result.ConsoleOut
-        |> Seq.map (fun l -> l.Line.Trim())
+        let _, lines = startCurb ["options"; "--list-keys"]
+        lines
+        |> Seq.map (fun l -> l.Trim())
         |> Seq.filter (fun l -> l.Length > 0)
         |> Seq.collect (fun l -> l.Split(' '))
         |> Seq.filter (fun s -> s.Length > 0)
