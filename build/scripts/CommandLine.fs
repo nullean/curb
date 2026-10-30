@@ -48,6 +48,7 @@ type Arguments =
     | [<Inherit>] Preserve
     | [<Inherit>] Width of int
     | [<Inherit>] Maximum of double
+    | [<Inherit>] Shard of string
     | [<Inherit;AltCommandLine("-s")>] SingleTarget of bool
     | [<Inherit>] Token of string
     | [<Inherit>] Push
@@ -71,6 +72,7 @@ with
             | Corpus _ -> "path to a checkout (or a directory of checkouts for compare)"
             | Minimum _ -> "fail if conformance falls below this percentage"
             | Maximum _ -> "fail if churn rises above this percentage of files"
+            | Shard _ -> "verifyexpectationside0055 only: check shard i of n (e.g. 1/4); a case's shard is a stable hash of its test name, so the n shards together cover every case exactly once"
             | MaxAllocationRatio _ -> "fail if perf allocates more than this multiple of the source size"
             | MsbuildSmoketest -> "prove the MSBuild integration runs before the compiler"
             | FsharpSmoketest -> "prove the MSBuild integration formats an F# project through its pinned Fantomas, and skips when nothing changed"

@@ -1386,6 +1386,24 @@ let private isolateCaseOutput (caseDir: string) =
           "</Project>" ]
         |> String.concat "\n")
 
+/// `--shard i/n` as (i, n), 1-based, or None when the whole set is wanted.
+let private shardFrom (arguments:ParseResults<Arguments>) =
+    match arguments.TryGetResult Shard with
+    | None -> None
+    | Some text ->
+        match text.Split('/') with
+        | [| i; n |] ->
+            match Int32.TryParse i, Int32.TryParse n with
+            | (true, i), (true, n) when n >= 1 && i >= 1 && i <= n -> Some (i, n)
+            | _ -> failwithf "--shard must be i/n with 1 <= i <= n, not %s" text
+        | _ -> failwithf "--shard must be i/n with 1 <= i <= n, not %s" text
+
+/// Which of `n` shards a key belongs to, 0-based. SHA-256 rather than String.GetHashCode, which .NET
+/// randomises per process: every shard is a separate CI job, and they have to agree.
+let private shardOfKey (key: string) (n: int) =
+    let hash = Security.Cryptography.SHA256.HashData(Text.Encoding.UTF8.GetBytes key)
+    int (BitConverter.ToUInt32(hash, 0) % uint32 n)
+
 /// Slow, and it needs the SDK, so it is its own target rather than part of `test`.
 let rec private verifyExpectations (arguments:ParseResults<Arguments>) =
     let dump = Path.Combine(Paths.Output.FullName, "expectations")
@@ -2052,13 +2070,35 @@ and private verifyExpectationsIde0055 (arguments:ParseResults<Arguments>) =
     Environment.SetEnvironmentVariable("CURB_EXPECTATION_DUMP", null)
 
     let cases = Directory.GetDirectories dump
-    printfn "checking %d expectations against a real dotnet build (IDE0055), one project per case" cases.Length
     if cases.Length = 0 then failwith "no expectations were written — is the dump still wired into the harness?"
 
     let read (name: string) (d: string) = File.ReadAllText(Path.Combine(d, name)).TrimEnd('\n', '\r')
     let testCaseOf (d: string) =
         let path = Path.Combine(d, "TestCase.txt")
         if File.Exists path then (File.ReadAllText path).Trim() else "?"
+
+    // CI splits this gate across parallel jobs (`--shard i/n`), each dumping the suite for itself. The
+    // dump's directory numbers come from tests finishing in parallel, so they differ from run to run and
+    // cannot say which shard a case is in; the test name can. Hashing the name rather than the case keeps
+    // every case of one test in the same shard, which the registry check below relies on: an entry is
+    // keyed by test name, and is only stale if no case of that test reproduces it.
+    let shard = shardFrom arguments
+    let inShard (testCase: string) =
+        match shard with
+        | None -> true
+        | Some (i, n) -> shardOfKey testCase n = i - 1
+
+    let total = cases.Length
+    let cases = cases |> Array.filter (testCaseOf >> inShard)
+    match shard with
+    | None -> ()
+    | Some (i, n) ->
+        printfn "shard %d/%d: %d of %d expectations" i n cases.Length total
+        // The shard's test names, for proving the shards partition the suite: their union over i = 1..n
+        // must be every test name, with none in two shards.
+        let listing = Path.Combine(Paths.Output.FullName, sprintf "expectations-ide0055-shard-%d-of-%d.txt" i n)
+        File.WriteAllLines(listing, cases |> Array.map testCaseOf |> Array.distinct |> Array.sort)
+    printfn "checking %d expectations against a real dotnet build (IDE0055), one project per case" cases.Length
 
     let project = Path.Combine(dump, "project")
     Directory.CreateDirectory project |> ignore
@@ -2131,7 +2171,8 @@ and private verifyExpectationsIde0055 (arguments:ParseResults<Arguments>) =
     |> ignore
     let results = results.ToArray()
 
-    let divergences = loadDivergences "ide0055"
+    // Only this shard's entries: one whose test runs in another shard is that shard's to call stale.
+    let divergences = loadDivergences "ide0055" |> Map.filter (fun case _ -> inShard case)
     let notFixedPoint =
         results
         |> Array.filter snd

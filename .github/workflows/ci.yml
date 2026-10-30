@@ -157,10 +157,8 @@ jobs:
   corpus:
     runs-on: ubuntu-latest
     name: Corpus and conformance
-    # The full gates build real projects twice over (cleanupconformance, then one project per expectation),
-    # and a hosted runner's speed varies: one run took 11.5 minutes for the cleanup step, the next 19.
-    # 45 minutes stopped fitting once the expectation count grew past ~1,200.
-    timeout-minutes: ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')) && 75 || 20 }}
+    # The two slow full gates have jobs of their own below, so this one takes about as long on every trigger.
+    timeout-minutes: 20
 
     steps:
       - uses: actions/checkout@v6
@@ -328,40 +326,6 @@ jobs:
       - name: No wrong verdict damages a file
         run: ./build.sh cleanupsafety -s true --corpus /tmp/corpus
 
-      # The other half, and the only gate that can catch a fix which compiles but is wrong: the corpus is
-      # built, cleaned, and built again. cleanupsafety never compiles anything, so it cannot reach this.
-      #
-      # Measured on elastic/docs-builder: 394 sites across a 1,201-file solution, 398 fixes in 304 files, and
-      # the solution still builds — with 4 sites left, all of them ones Curb declined out loud because the
-      # file has a `#if`.
-      #
-      # Three things had to be forced before it measured anything, each of which made it pass while proving
-      # nothing: RunAnalyzersDuringBuild, which the corpus turns off outside CI; EnforceCodeStyleInBuild as a
-      # *global* property, since the SDK picks its analysers before Directory.Build.targets is read; and
-      # neutralising the corpus's own `dotnet_diagnostic.IDE0005.severity = none`, because an .editorconfig
-      # entry for a specific rule outranks a .globalconfig one whatever global_level says.
-      # Gated weekly: two analyzer-enabled solution builds of a foreign 1,200-file repo — 468 s, half the
-      # corpus job. cleanupsafety and cleanupsmoketest still run on every trigger; only the full
-      # build-clean-rebuild cycle is deferred.
-      - name: Cleaning a real solution leaves it building
-        if: env.CURB_FULL_GATES == 'true'
-        run: ./build.sh cleanupconformance -s true --corpus /tmp/corpus
-
-      # Being a fixed point of dotnet format whitespace (below) is not the same claim as passing a
-      # real, analyzer-driven build — issue #77 was both a fixed point of dotnet format whitespace AND
-      # a hard IDE0055 failure under `dotnet build -p:EnforceCodeStyleInBuild=true`, with no
-      # .editorconfig escape hatch, because IDE0055's CSharpIndentBlockFormattingRule resolves
-      # indentation from full block context in a way the plain whitespace rewriter never exercises.
-      # Gated to this tier, not every PR: one project per case (batching all ~900 into one build turned
-      # out to have its own, much sharper failure mode — a severe diagnostic anywhere in a shared
-      # compilation silently drops IDE0055 reporting for every OTHER file too, and a formatter's own
-      # test suite exists specifically to exercise the unusual/borderline C# shapes that trigger it) —
-      # ~9 minutes even with bounded parallelism, closer to cleanupconformance's cost than the fast
-      # checks below it.
-      - name: Expectations report no IDE0055 under a real build
-        if: env.CURB_FULL_GATES == 'true'
-        run: ./build.sh verifyexpectationside0055 -s true
-
       # Every expectation the suite asserts, written out and run through dotnet format. Until this
       # existed only the corpus proved the fixed-point property; the hand-written expectations proved
       # only that Curb agrees with itself, so one written from a wrong belief would pass forever — it
@@ -399,6 +363,84 @@ jobs:
           ./build.sh options -s true
           git diff --exit-code -- docs/reference \
             || (echo "::error::docs/reference is out of date — run ./build.sh options and commit the result" && exit 1)
+
+  # ── Full gates that need a job of their own ─────────────────────────────────
+  # Both used to be steps of the corpus job, and between them took 45 of its 54 minutes. They only run on
+  # full-gate triggers; the condition is CURB_FULL_GATES spelled out, because a job's `if` cannot read the
+  # workflow's env.
+
+  # The other half of cleanupsafety, and the only gate that can catch a fix which compiles but is wrong: the
+  # corpus is built with one violation seeded per rule, cleaned, and built again. cleanupsafety never
+  # compiles anything, so it cannot reach this.
+  #
+  # Measured on elastic/docs-builder: 489 sites across a 1,201-file solution, 487 fixes in 373 files, and the
+  # solution still builds, with 5 sites left, all of them ones Curb declined out loud because the file has a
+  # `#if`.
+  #
+  # Three things had to be forced before it measured anything, each of which made it pass while proving
+  # nothing: RunAnalyzersDuringBuild, which the corpus turns off outside CI; EnforceCodeStyleInBuild as a
+  # *global* property, since the SDK picks its analysers before Directory.Build.targets is read; and
+  # neutralising the corpus's own `dotnet_diagnostic.IDE0005.severity = none`, because an .editorconfig
+  # entry for a specific rule outranks a .globalconfig one whatever global_level says.
+  #
+  # Two analyser-enabled builds of a foreign 1,200-file solution, and a hosted runner's speed varies: one
+  # run took 11.5 minutes for the gate when it had three builds, the next 19. Hence the margin.
+  cleanup-conformance:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    name: Cleaning a real solution leaves it building
+    timeout-minutes: 40
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      - name: Check out the corpus
+        run: git clone --depth 1 https://github.com/elastic/docs-builder.git /tmp/corpus
+
+      - name: Cleaning a real solution leaves it building
+        run: ./build.sh cleanupconformance -s true --corpus /tmp/corpus
+
+  # Being a fixed point of dotnet format whitespace (verifyexpectations, in the corpus job) is not the same
+  # claim as passing a real, analyzer-driven build: issue #77 was both a fixed point of dotnet format
+  # whitespace AND a hard IDE0055 failure under `dotnet build -p:EnforceCodeStyleInBuild=true`, with no
+  # .editorconfig escape hatch, because IDE0055's CSharpIndentBlockFormattingRule resolves indentation from
+  # full block context in a way the plain whitespace rewriter never exercises.
+  #
+  # One project per case (batching all ~1,200 into one build turned out to have its own, much sharper
+  # failure mode: a severe diagnostic anywhere in a shared compilation silently drops IDE0055 reporting for
+  # every OTHER file too, and a formatter's own test suite exists specifically to exercise the unusual and
+  # borderline C# shapes that trigger it). That is ~30 minutes of builds on one hosted runner, so it runs as
+  # four shards. Each shard dumps the suite itself and checks the cases whose test name hashes to it; the
+  # four together cover every case exactly once (see verifyExpectationsIde0055 in Targets.fs).
+  ide0055:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    name: IDE0055 under a real build (shard ${{ matrix.shard }}/4)
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false   # one shard's failure says nothing about the other three's cases
+      matrix:
+        shard: [1, 2, 3, 4]
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      # The gate dumps its cases by running the test suite, and with CI=true the suite's F# tests fail rather
+      # than skip when the Fantomas they pin is missing. The corpus job gets it from the F# smoke test's
+      # restore; this job runs nothing else, so it restores it the way the build job does.
+      - name: Restore the Fantomas the F# tests run against
+        run: dotnet tool restore --tool-manifest tests/Nullean.Curb.Tests/Cli/FSharp/Fixture/dotnet-tools.json
+
+      - name: Expectations report no IDE0055 under a real build
+        run: ./build.sh verifyexpectationside0055 -s true --shard ${{ matrix.shard }}/4
 
   # ── Managed build / test / pack / publish ───────────────────────────────────
   build:
