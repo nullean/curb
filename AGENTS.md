@@ -35,10 +35,11 @@ Microsoft.Testing.Platform, so they are launched with `dotnet run`, not `dotnet 
 | `src/Nullean.Curb.Cli` | The `curb` tool. Native-AOT, packed per RID. |
 | `tests/Nullean.Curb.Tests` | Golden files, option matrix, document-IR units, `MockFileSystem` tests. |
 | `tests/Nullean.Curb.Benchmarks` | BenchmarkDotNet, `[MemoryDiagnoser]`. |
-| `src/curb` | Props and targets only, nothing compiled. Runs the formatter before `CoreCompile`, and asks the compiler for an error log. |
+| `src/Nullean.Curb.MSBuild` | The `curb` MSBuild package: props and targets only, nothing compiled. Runs the formatter before `CoreCompile`, and asks the compiler for an error log. |
 | `examples/curb-aot-smoketest` | Publishes AOT and runs; the CI gate on every RID. Never packed. |
 | `examples/curb-msbuild-smoketest` | Proves the formatter runs before `CoreCompile`. Not in the solution. |
 | `examples/curb-cleanup-smoketest` | Proves cleanup fixes what a build reported, and only that. Not in the solution. |
+| `tools/Nullean.Curb.OptionDocs` | Generates `docs/reference/` from the option catalog. `./build.sh options`; CI fails when it is stale. |
 | `build/scripts` | F# Bullseye build runner. |
 
 ## Non-negotiables
@@ -126,9 +127,8 @@ the diagnostic does not carry, it is not a cleanup rule — record why and stop.
    on its first run that no unit test reached**, listed in that document. `cleanupconformance` is the other
    half and the only one that compiles anything, so it is the only one that can catch a fix which compiles
    but is wrong — it caught an IDE0007/IDE0034 interaction producing CS8716. Nothing below these two rungs
-   green-lights a rule that changes tokens — the same discipline `docs/contribute/layout-decisions.md`
-   holds formatting to, for the same reason (see the note below — that file does not exist in this
-   checkout and needs recovering or rewriting; do not treat the link below as live until it does).
+   green-lights a rule that changes tokens — the same discipline the layout-decisions note holds
+   formatting to, for the same reason (see below for where it lives).
 
 A refusal is a first-class outcome, not an error. Report it with its reason so "Curb declined" is
 distinguishable from "Curb is broken."
@@ -200,18 +200,13 @@ Practical consequences when adding an option:
 - Measure both modes. `conformance` and `churn` take `--reflow`, `--preserve` and `--width`; with the
   corpus's own width, `--reflow` *is* the default path and `--preserve` is the opt-out.
 
-**Before adding any option that moves a line break, read `docs/contribute/layout-decisions.md`.** In
+**Before adding any option that moves a line break, read the layout-decisions note:**
+`git show 2d6a4c9^:docs/contribute/_layout-decisions.md`. It is kept out of the published docs on purpose. In
 preservation mode a layout rule may read the tokens and layout the author owns, and never layout Curb
 itself decides. That one mistake has killed more features than every other cause combined; the note
 carries the measurements so they are not re-derived, and records which of them deterministic mode has
 since brought back.
 
-> **Drift note:** `docs/contribute/layout-decisions.md` does not exist in this checkout (there is no
-> `docs/contribute/` directory) even though it is cited twice in this file as the authoritative record of
-> those measurements. Either it was lost in the docs reorganisation that produced `docs/design-principles/`
-> and `docs/workflow/`, or it was never written. Recover it from history or rewrite it from the measurements
-> still described in `docs/design-principles/reflow.md` before relying on the citations above — this file
-> does not attempt to reconstruct it.
 
 ## Style
 
