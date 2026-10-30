@@ -76,6 +76,23 @@ internal static partial class Printers
 	}
 
 	/// <summary>
+	/// True when a block below <c>for (;;)</c> stays below it although the brace option would join it.
+	/// </summary>
+	/// <remarks>
+	/// Roslyn's empty-header rule for <c>for (;;)</c> also owns the gap after its <c>)</c>, and it only
+	/// adjusts spaces, so the brace option never gets to remove a line break there: with
+	/// <c>csharp_new_line_before_open_brace = none</c>, dotnet format leaves <c>{</c> on the line below
+	/// <c>for (; ; )</c> as well as on its line, while it joins the one below <c>while (a)</c> or
+	/// <c>for (; a;)</c>. Joining it was not a fixed point (issue #153). A brace the option already puts on
+	/// its own line never asks; braces Curb adds are left to the option.
+	/// </remarks>
+	private static bool KeepsBraceBelowEmptyForHeader(SyntaxNode? body, PrintContext context) =>
+		body is BlockSyntax { Parent: ForStatementSyntax header } block
+		&& header.Statement == block
+		&& IsEmptyForHeader(header)
+		&& context.AuthorBroke(header.CloseParenToken.Span.End, block.OpenBraceToken.SpanStart);
+
+	/// <summary>
 	/// Whether this body should be given braces it was not written with.
 	/// </summary>
 	/// <remarks>

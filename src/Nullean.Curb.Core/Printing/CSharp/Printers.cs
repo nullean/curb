@@ -1348,11 +1348,12 @@ internal static partial class Printers
 	/// <param name="context">Per-file printing state.</param>
 	/// <param name="body">
 	/// The statement body the brace opens, when it hangs off a control-flow header. Only needed for
-	/// the space a brace kept on the header's line takes; see <see cref="SpaceBeforeBody"/>.
+	/// the space a brace kept on the header's line takes; see <see cref="SpaceBeforeBody"/>. And for the
+	/// one header whose line break the option does not own; see <see cref="KeepsBraceBelowEmptyForHeader"/>.
 	/// </param>
 	internal static void BeforeOpenBrace(BraceStyle construct, PrintContext context, SyntaxNode? body = null)
 	{
-		if (!context.Options.NewLineBeforeOpenBrace.HasFlag(construct))
+		if (!context.Options.NewLineBeforeOpenBrace.HasFlag(construct) && !KeepsBraceBelowEmptyForHeader(body, context))
 		{
 			if (body is null)
 				context.Arena.Synthetic(SyntheticText.Space);
