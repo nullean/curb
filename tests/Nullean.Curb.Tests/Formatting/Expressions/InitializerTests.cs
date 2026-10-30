@@ -54,7 +54,6 @@ public class InitializerTests : FormattingTest
 		""");
 
 	[Test]
-	[Skip("reflow off collapses a multi-line construct onto one line; dotnet format never joins lines")]
 	public Task Object_initializer_across_lines_puts_the_brace_on_its_own_line() => Unchanged(
 		"""
 		public class C
