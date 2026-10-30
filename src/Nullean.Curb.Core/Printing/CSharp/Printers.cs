@@ -957,9 +957,13 @@ internal static partial class Printers
 		// onto one line (issue #135). A break between two arguments is left to the hugging path, which
 		// keeps one a trailing comment forces at the column the author had; the ordinary path would
 		// move that argument to the list's level.
+		//
+		// Both gaps lie between the parentheses, so a list kept on one line answers without reading the
+		// arguments' spans.
 		var hugs = node.Arguments.Count > 0
-			&& !context.AuthorBroke(node.OpenParenToken.Span.End, node.Arguments[0].SpanStart)
-			&& !context.AuthorBroke(node.Arguments[^1].Span.End, node.CloseParenToken.SpanStart);
+			&& (!context.AuthorBroke(node.OpenParenToken.Span.End, node.CloseParenToken.SpanStart)
+				|| (!context.AuthorBroke(node.OpenParenToken.Span.End, node.Arguments[0].SpanStart)
+					&& !context.AuthorBroke(node.Arguments[^1].Span.End, node.CloseParenToken.SpanStart)));
 		var hugsOwnBlock = hugs && node.Arguments.Count == 1 && EndsWithOwnBlock(node.Arguments[0].Expression);
 
 		// Several arguments where the LAST is a genuinely block-bodied callback — `On("click", () =>
@@ -973,7 +977,7 @@ internal static partial class Printers
 
 		// Captured ahead of the `(`: a trailing `// note` on it ends the line, and an anchor after that
 		// would measure the next line, which nothing has been written to yet.
-		var lineShift = hugsOwnBlock || hugsCallback ? -1 : EnterArgumentLines(node.Arguments, node.OpenParenToken.Span.End, context);
+		var lineShift = hugsOwnBlock || hugsCallback ? -1 : EnterArgumentLines(node.Arguments, node.OpenParenToken.Span.End, node.CloseParenToken.SpanStart, context);
 		TokenPrinter.Print(node.OpenParenToken, context);
 
 		if (hugsOwnBlock)
@@ -2394,8 +2398,13 @@ internal static partial class Printers
 	/// Breaking to the list's level pulled the deeper ones back — issue #143. A caller given a register
 	/// releases it with <see cref="PrintContext.ExitContinuation"/>.
 	/// </remarks>
-	private static int EnterArgumentLines(SeparatedSyntaxList<ArgumentSyntax> arguments, int openEnd, PrintContext context)
+	private static int EnterArgumentLines(SeparatedSyntaxList<ArgumentSyntax> arguments, int openEnd, int closeStart, PrintContext context)
 	{
+		// Every gap asked about below lies between the brackets, so a list the author kept on one line
+		// answers without reading a single argument's span — which is most lists.
+		if (!context.AuthorBroke(openEnd, closeStart))
+			return -1;
+
 		var previousEnd = openEnd;
 		for (var i = 0; i < arguments.Count; i++)
 		{

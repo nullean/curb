@@ -1319,7 +1319,7 @@ internal static partial class Printers
 		// Each argument line keeps the offset the author gave it, as an invocation's does — issue #143.
 		// Captured ahead of the `[`, as ArgumentList captures it ahead of the `(`.
 		var arguments = node.Arguments;
-		var lineShift = EnterArgumentLines(arguments, node.OpenBracketToken.Span.End, context);
+		var lineShift = EnterArgumentLines(arguments, node.OpenBracketToken.Span.End, node.CloseBracketToken.SpanStart, context);
 		TokenPrinter.Print(node.OpenBracketToken, context);
 
 		// A bracketed list the author broke keeps their breaks, as an invocation's or an attribute's
