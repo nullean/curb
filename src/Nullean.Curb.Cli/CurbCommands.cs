@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.IO.Abstractions;
 using Nullean.Argh;
+using Nullean.Curb.Cli.Languages;
 using Nullean.Curb.Cli.Languages.CSharp;
 using Nullean.Curb.EditorConfig;
 using Nullean.Curb.Options;
@@ -37,7 +38,9 @@ internal sealed class CurbCommands
 		string? cache = null,
 		bool noVerify = false
 	) =>
-		FormattingRun.Execute(_fileSystem, path, write: true, verify: !noVerify, explicitFiles: ResolveExplicitFiles(files, msbuildListFile), cachePath: cache).ExitCode;
+		FormattingRun.Execute(
+			_fileSystem, path, write: true, verify: !noVerify, explicitFiles: ResolveExplicitFiles(files, msbuildListFile), cachePath: cache,
+			languages: LanguagesFor(msbuildListFile)).ExitCode;
 
 	/// <summary>Exit non-zero if anything would change.</summary>
 	/// <param name="path">A file or directory to check.</param>
@@ -73,7 +76,8 @@ internal sealed class CurbCommands
 			coverageReport: coverage,
 			explicitFiles: ResolveExplicitFiles(files, msbuildListFile),
 			cachePath: cache,
-			unformattedListPath: unformattedListFile?.FullName
+			unformattedListPath: unformattedListFile?.FullName,
+			languages: LanguagesFor(msbuildListFile)
 		).ExitCode;
 
 	/// <summary>
@@ -254,6 +258,13 @@ internal sealed class CurbCommands
 
 		return 0;
 	}
+
+	/// <summary>
+	/// C# alone when the MSBuild integration is calling, which must never format the project files a
+	/// build is reading; every language otherwise.
+	/// </summary>
+	private static LanguageRegistry LanguagesFor(FileInfo? msbuildListFile) =>
+		msbuildListFile is null ? LanguageRegistry.Default : LanguageRegistry.CSharpOnly;
 
 	/// <summary>
 	/// Merges <c>--files</c> with the contents of <c>--msbuild-list-file</c> (one path per line, blank

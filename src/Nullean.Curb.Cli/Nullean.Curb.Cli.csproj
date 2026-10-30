@@ -53,6 +53,7 @@
     <ProjectReference Include="../Nullean.Curb.Core/Nullean.Curb.Core.csproj" />
     <ProjectReference Include="../Nullean.Curb.Cleanup/Nullean.Curb.Cleanup.csproj" />
     <ProjectReference Include="../Nullean.Curb.EditorConfig/Nullean.Curb.EditorConfig.csproj" />
+    <ProjectReference Include="../Nullean.Curb.Xml/Nullean.Curb.Xml.csproj" />
   </ItemGroup>
 
   <!-- The CLI is the only project that does IO against a real directory tree, so the formatting cache

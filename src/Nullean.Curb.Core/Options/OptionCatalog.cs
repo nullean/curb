@@ -213,20 +213,32 @@ public static class OptionCatalog
 			"csharp_space_around_ternary_operator",
 		]).ToFrozenSet(StringComparer.Ordinal);
 
+	/// <summary>
+	/// The keys only XML files read. Kept apart from <see cref="ImplementedKeys"/>, which is what C#'s
+	/// option coverage check and <c>curb options</c> enumerate.
+	/// </summary>
+	public static readonly FrozenSet<string> XmlKeys = new[]
+	{
+		"curb_xml_format",
+		"curb_xml_extensions",
+		"xml_max_blank_lines_between_tags",
+		"xml_space_before_self_closing",
+		"xml_attribute_indent",
+	}.ToFrozenSet(StringComparer.Ordinal);
+
 	/// <summary>True for a key Curb knows about, whether or not it is implemented yet.</summary>
 	/// <summary>
 	/// The implemented keys that apply to <paramref name="language"/>: its own, plus the shared core keys.
 	/// </summary>
 	/// <remarks>
-	/// Every implemented key so far is C#'s or shared, so for <see cref="OptionLanguage.CSharp"/> this is
-	/// <see cref="ImplementedKeys"/> itself. It is the list a language's coverage check and option
-	/// reference work from once a second language has keys of its own.
+	/// For <see cref="OptionLanguage.CSharp"/> this is <see cref="ImplementedKeys"/> itself; for
+	/// <see cref="OptionLanguage.Xml"/> it is the core keys and <see cref="XmlKeys"/>.
 	/// </remarks>
 	public static IEnumerable<string> ImplementedKeysFor(OptionLanguage language) =>
 		OptionDescriptor.All
 			.Where(descriptor => descriptor.Language == OptionLanguage.Shared || descriptor.Language == language)
 			.Select(descriptor => descriptor.Key)
-			.Where(ImplementedKeys.Contains);
+			.Where(key => ImplementedKeys.Contains(key) || XmlKeys.Contains(key));
 
 	public static bool IsKnown(string key) => CoreKeys.Contains(key) || FormattingKeys.Contains(key);
 

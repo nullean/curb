@@ -14,6 +14,8 @@ public enum OptionGroup
 	ModifiersAndBraces,
 	TrailingCommas,
 	Suppression,
+	XmlFiles,
+	XmlLayout,
 }
 
 /// <summary>Which files an option applies to.</summary>
@@ -52,10 +54,15 @@ public sealed record OptionDescriptor(
 {
 	/// <summary>Which files the key applies to.</summary>
 	/// <remarks>
-	/// Derived rather than spelled out on every entry below: the core keys are the only shared ones and
-	/// every other key so far is C#'s. A key for another language sets it explicitly.
+	/// Derived from the group rather than spelled out on every entry below: the core keys are the only
+	/// shared ones, the XML groups are XML's, and every other key is C#'s.
 	/// </remarks>
-	public OptionLanguage Language { get; init; } = Group == OptionGroup.Core ? OptionLanguage.Shared : OptionLanguage.CSharp;
+	public OptionLanguage Language { get; init; } = Group switch
+	{
+		OptionGroup.Core => OptionLanguage.Shared,
+		OptionGroup.XmlFiles or OptionGroup.XmlLayout => OptionLanguage.Xml,
+		_ => OptionLanguage.CSharp,
+	};
 
 	/// <summary>All implemented option descriptors, one per key.</summary>
 	public static IReadOnlyList<OptionDescriptor> All { get; } = Build();
@@ -208,5 +215,12 @@ public sealed record OptionDescriptor(
 		new("generated_code", OptionGroup.Suppression, ["true", "false"], "false", "Skip this file entirely. Curb never formats files marked as generated.", "basic_method"),
 		new("dotnet_diagnostic.ide0055.severity", OptionGroup.Suppression, ["none", "silent", "suggestion", "warning", "error"], "warning", "Set this to none to opt a file out of formatting.", "basic_method"),
 		new("file_header_template", OptionGroup.Suppression, ["<template>", "unset"], "(not set)", "Insert or correct a // comment header at the top of the file. Supports {fileName}. IDE0073.", "basic_method"),
+
+		// ---- XML (5) ------------------------------------------------------------------------
+		new("curb_xml_format", OptionGroup.XmlFiles, ["true", "false"], "true", "Format project, props, targets, solution and nuget.config files. false leaves them unread.", "xml_project"),
+		new("curb_xml_extensions", OptionGroup.XmlFiles, ["<extensions>"], "(not set)", "Further extensions to format as generic XML, comma-separated, such as .xml or .runsettings.", "xml_project"),
+		new("xml_max_blank_lines_between_tags", OptionGroup.XmlLayout, ["<integer>"], "1", "The most blank lines kept between two tags of element-only content.", "xml_project"),
+		new("xml_space_before_self_closing", OptionGroup.XmlLayout, ["true", "false"], "(not set)", "Space before />. Unset keeps what each tag has, except in .slnx files, which always get one.", "xml_project"),
+		new("xml_attribute_indent", OptionGroup.XmlLayout, ["single_indent", "double_indent", "align_by_first_attribute"], "(not set)", "Where an attribute on a line of its own starts. Unset keeps its offset from its element as written.", "xml_attributes"),
 	];
 }

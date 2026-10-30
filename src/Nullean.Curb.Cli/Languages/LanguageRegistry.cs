@@ -1,4 +1,5 @@
 using Nullean.Curb.Cli.Languages.CSharp;
+using Nullean.Curb.Cli.Languages.Xml;
 
 namespace Nullean.Curb.Cli.Languages;
 
@@ -11,7 +12,17 @@ namespace Nullean.Curb.Cli.Languages;
 internal sealed class LanguageRegistry
 {
 	/// <summary>The languages <c>curb format</c> and <c>curb check</c> cover.</summary>
-	public static LanguageRegistry Default { get; } = new(CSharpLanguage.Instance);
+	/// <remarks>
+	/// XML claims only the files a repository opted in with <c>curb_xml_format</c>, so registering it
+	/// changes nothing for one that did not.
+	/// </remarks>
+	public static LanguageRegistry Default { get; } = new(CSharpLanguage.Instance, XmlLanguage.Instance);
+
+	/// <summary>
+	/// C# alone, for the MSBuild integration: a build formats the files it compiles, never the project
+	/// files driving it.
+	/// </summary>
+	public static LanguageRegistry CSharpOnly { get; } = new(CSharpLanguage.Instance);
 
 	private readonly IInProcessLanguage[] _languages;
 

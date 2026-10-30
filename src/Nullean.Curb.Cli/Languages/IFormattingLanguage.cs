@@ -52,6 +52,17 @@ internal abstract class LanguageOptions
 
 	/// <summary>The configuration asked for the file not to be formatted at all.</summary>
 	public abstract bool Excluded { get; }
+
+	/// <summary>
+	/// False when the language declines the file before the run begins: it is never read and never
+	/// counted, as though the walk had not found it.
+	/// </summary>
+	/// <remarks>
+	/// For a language a repository has to opt into, such as XML behind <c>curb_xml_format</c>. Counting
+	/// every project file as skipped in a repository that never asked for them would be noise, and
+	/// <see cref="Excluded"/> is for a file that did ask to be left alone.
+	/// </remarks>
+	public virtual bool Claimed => true;
 }
 
 /// <summary>A language Curb formats itself, with one <see cref="ILanguageWorker"/> per thread.</summary>
