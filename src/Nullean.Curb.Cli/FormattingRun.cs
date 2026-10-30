@@ -3,16 +3,19 @@ using System.Globalization;
 using System.IO.Abstractions;
 using System.Text;
 using System.Threading.Channels;
+using Nullean.Curb.Cli.Languages;
 using Nullean.Curb.EditorConfig;
 
 namespace Nullean.Curb.Cli;
 
 /// <summary>Formats or checks a directory tree.</summary>
 /// <remarks>
-/// Files are processed in parallel with one <see cref="CSharpFormatter"/> per worker, since a
-/// formatter owns pooled buffers and is not thread-safe. Configuration is resolved through a single
-/// shared <see cref="CurbEditorConfig"/>, whose per-directory caching means a repository resolves
-/// its <c>.editorconfig</c> chain once per folder rather than once per file.
+/// Files are processed in parallel with one <see cref="ILanguageWorker"/> per language per thread, since
+/// a worker owns pooled buffers and is not thread-safe. Which language a file belongs to is the
+/// <see cref="LanguageRegistry"/>'s call; everything else here is shared by every language.
+/// Configuration is resolved through a single shared <see cref="CurbEditorConfig"/>, whose
+/// per-directory caching means a repository resolves its <c>.editorconfig</c> chain once per folder
+/// rather than once per file.
 /// </remarks>
 internal static class FormattingRun
 {
@@ -56,6 +59,7 @@ internal static class FormattingRun
 	/// each file that actually needs reformatting instead of to the project. Ignored when <paramref
 	/// name="write"/> is <see langword="true"/>: a format run leaves nothing unformatted to list.
 	/// </param>
+	/// <param name="languages">Which languages the run covers. <see cref="LanguageRegistry.Default"/> when absent.</param>
 	public static FormattingRunSummary Execute(
 		IFileSystem fileSystem,
 		string target,
@@ -65,8 +69,11 @@ internal static class FormattingRun
 		bool coverageReport = false,
 		string[]? explicitFiles = null,
 		string? cachePath = null,
-		string? unformattedListPath = null)
+		string? unformattedListPath = null,
+		LanguageRegistry? languages = null)
 	{
+		languages ??= LanguageRegistry.Default;
+
 		// On by default for both commands: the printer tracks whether it actually put a token
 		// boundary at risk, so on code that does not, the second parse never happens.
 		var verifyRoundTrip = verify ?? true;
@@ -91,12 +98,12 @@ internal static class FormattingRun
 			// parameter's own doc comment — and a shared Directory.Build.props reaches every project
 			// that imports it, C# or not. @(Compile) for an .fsproj is real .fs paths, not an empty
 			// group, so nothing upstream of here already excludes them.
-			files = [.. explicitFiles.Where(IsFormattable)];
+			files = [.. explicitFiles.Where(path => IsFormattable(languages, path))];
 		else
 		{
 			var root = fileSystem.Path.GetFullPath(target);
 			files = fileSystem.Directory.Exists(root)
-				? [.. fileSystem.Directory.EnumerateFiles(root, "*.cs", SearchOption.AllDirectories).Where(IsFormattable)]
+				? [.. fileSystem.Directory.EnumerateFiles(root, languages.SearchPattern, SearchOption.AllDirectories).Where(path => IsFormattable(languages, path))]
 				: [root];
 		}
 
@@ -113,14 +120,19 @@ internal static class FormattingRun
 		// The options fingerprint has to be taken here for the same reason, and it is only taken at all
 		// when there is a cache to key. The path is absolutised for the cache alone, so the messages and
 		// the writes below still say whatever the caller asked for.
-		var work = new (string Path, FormatOptions Options, string CacheKey, UInt128 OptionsHash)[files.Length];
+		var work = new (string Path, int Language, LanguageOptions Options, string CacheKey, UInt128 OptionsHash)[files.Length];
 		var fingerprinter = cache is null ? null : new OptionsFingerprinter();
 		for (var i = 0; i < files.Length; i++)
 		{
 			var configuration = editorConfig.For(files[i]);
+
+			// A file given as the target itself never went through the extension filter, and has always
+			// been formatted as C# regardless; the first language keeps it that way.
+			var language = Math.Max(0, languages.IndexOf(files[i]));
 			work[i] = (
 				files[i],
-				EditorConfigOptionsBinder.Bind(configuration),
+				language,
+				languages[language].BindOptions(configuration),
 				cache is null ? "" : fileSystem.Path.GetFullPath(files[i]),
 				fingerprinter?.Of(configuration) ?? default);
 		}
@@ -133,7 +145,7 @@ internal static class FormattingRun
 		long printedTokens = 0;
 		long totalTokens = 0;
 		var reparsed = 0;
-		var unhandled = new Dictionary<int, int>();
+		var unhandled = new Dictionary<(int Language, int Kind), int>();
 		var messages = new System.Collections.Concurrent.ConcurrentBag<string>();
 		var unformatted = write || unformattedListPath is null ? null : new System.Collections.Concurrent.ConcurrentBag<string>();
 
@@ -146,7 +158,7 @@ internal static class FormattingRun
 		//
 		// The two hashes ride along because the reader has already computed the content one to ask the
 		// cache; recomputing it in the worker to record the answer would hash every file twice.
-		var channel = Channel.CreateBounded<(string Path, FormatOptions Options, byte[] Bytes, string CacheKey, UInt128 ContentHash, UInt128 OptionsHash)>(
+		var channel = Channel.CreateBounded<(string Path, int Language, LanguageOptions Options, byte[] Bytes, string CacheKey, UInt128 ContentHash, UInt128 OptionsHash)>(
 			new BoundedChannelOptions(32) { SingleWriter = false, SingleReader = false });
 
 		// 4 reader tasks mirror the old gate width. Each races for the next index via an atomic
@@ -175,7 +187,7 @@ internal static class FormattingRun
 
 				// await WriteAsync so the thread is released (rather than blocked) when the channel
 				// is full; the reader backs off without pinning a thread-pool thread.
-				await channel.Writer.WriteAsync((item.Path, item.Options, bytes, item.CacheKey, contentHash, item.OptionsHash));
+				await channel.Writer.WriteAsync((item.Path, item.Language, item.Options, bytes, item.CacheKey, contentHash, item.OptionsHash));
 			}
 		})).ToArray();
 
@@ -183,15 +195,11 @@ internal static class FormattingRun
 		Task.WhenAll(readerTasks).ContinueWith(t =>
 			channel.Writer.TryComplete(t.IsFaulted ? t.Exception?.InnerException : null));
 
-		// One CSharpFormatter per OS thread: a formatter owns pooled buffers and is not thread-safe.
-		// ThreadLocal initialises on first access per thread; the bag collects them for teardown.
-		var formatterBag = new System.Collections.Concurrent.ConcurrentBag<CSharpFormatter>();
-		var threadFormatter = new ThreadLocal<CSharpFormatter>(() =>
-		{
-			var f = new CSharpFormatter { UnhandledByKind = coverageReport ? [] : null };
-			formatterBag.Add(f);
-			return f;
-		});
+		// One worker per language per OS thread: a worker owns pooled buffers and is not thread-safe.
+		// ThreadLocal initialises each thread's slots on first access, and a slot is filled the first time
+		// that thread meets the language; the bag collects every worker for teardown.
+		var workerBag = new System.Collections.Concurrent.ConcurrentBag<(int Language, ILanguageWorker Worker)>();
+		var threadWorkers = new ThreadLocal<ILanguageWorker?[]>(() => new ILanguageWorker?[languages.Count]);
 
 		// Parallel.ForEachAsync consumes the IAsyncEnumerable produced by ReadAllAsync; it
 		// completes only after the channel is drained and the Writer has been marked complete.
@@ -200,7 +208,7 @@ internal static class FormattingRun
 			new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount },
 			(item, _) =>
 			{
-				var formatter = threadFormatter.Value!;
+				var workers = threadWorkers.Value!;
 
 				// A bug in the printer, or a failed write — a read-only file, a permission error —
 				// is one file's problem, not the run's. Isolated per item rather than left to escape
@@ -212,16 +220,25 @@ internal static class FormattingRun
 					var hadBom = item.Bytes.Length >= 3 && item.Bytes[0] == 0xEF && item.Bytes[1] == 0xBB && item.Bytes[2] == 0xBF;
 					var source = Utf8.GetString(hadBom ? item.Bytes.AsSpan(3) : item.Bytes);
 
+					var language = languages[item.Language];
+
 					// The file said not to format it: `generated_code = true`, an IDE0055 severity of
 					// none, or an `<auto-generated>` header. Counted rather than passed over silently,
 					// so a file that quietly stopped being formatted is visible in the summary.
-					if (item.Options.Excluded || CSharpSource.HasGeneratedHeader(source))
+					if (item.Options.Excluded || language.SkipSource(source))
 					{
 						Interlocked.Increment(ref skipped);
 						return ValueTask.CompletedTask;
 					}
 
-					var result = formatter.Format(
+					var worker = workers[item.Language];
+					if (worker is null)
+					{
+						worker = workers[item.Language] = language.CreateWorker(collectUnhandled: coverageReport);
+						workerBag.Add((item.Language, worker));
+					}
+
+					var result = worker.Format(
 						source, item.Options, fileSystem.Path.GetFileName(item.Path),
 						produceText: write, expandUnhandled: expandUnhandled, verifyRoundTrip: verifyRoundTrip);
 
@@ -241,7 +258,7 @@ internal static class FormattingRun
 						default:
 							// A mark that has to be added or removed is a change to the file even when
 							// every byte after it is identical, and dotnet format treats it as one.
-							var wantsBom = item.Options.Charset switch
+							var wantsBom = item.Options.Layout.Charset switch
 							{
 								Charset.Utf8Bom => true,
 								Charset.Utf8 => false,
@@ -288,22 +305,22 @@ internal static class FormattingRun
 				return ValueTask.CompletedTask;
 			}).GetAwaiter().GetResult();
 
-		threadFormatter.Dispose();
-		foreach (var formatter in formatterBag)
+		threadWorkers.Dispose();
+		foreach (var (language, worker) in workerBag)
 		{
-			Interlocked.Add(ref reparsed, formatter.RoundTripsChecked);
-			if (formatter.UnhandledByKind is { } byKind)
+			Interlocked.Add(ref reparsed, worker.RoundTripsChecked);
+			if (worker.UnhandledByKind is { } byKind)
 			{
 				lock (unhandled)
 				{
 					foreach (var (kind, count) in byKind)
 					{
-						unhandled.TryGetValue(kind, out var existing);
-						unhandled[kind] = existing + count;
+						unhandled.TryGetValue((language, kind), out var existing);
+						unhandled[(language, kind)] = existing + count;
 					}
 				}
 			}
-			formatter.Dispose();
+			worker.Dispose();
 		}
 
 		stopwatch.Stop();
@@ -348,10 +365,10 @@ internal static class FormattingRun
 		{
 			Console.WriteLine();
 			Console.WriteLine("# tokens still emitted verbatim, by syntax kind");
-			foreach (var (kind, count) in unhandled.OrderByDescending(p => p.Value).Take(25))
+			foreach (var (key, count) in unhandled.OrderByDescending(p => p.Value).Take(25))
 			{
 				Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
-					$"  {count,8}  {(Microsoft.CodeAnalysis.CSharp.SyntaxKind)kind}"));
+					$"  {count,8}  {languages[key.Language].DescribeUnhandledKind(key.Kind)}"));
 			}
 			Console.WriteLine();
 		}
@@ -372,13 +389,14 @@ internal static class FormattingRun
 	}
 
 	/// <summary>
-	/// C# source outside a build-output folder. The directory walk already narrows to this with its
-	/// own <c>"*.cs"</c> glob before the bin/obj half of this ever runs; the extension half exists for
-	/// <paramref name="path"/>s an explicit file list handed over unfiltered, which is what a
-	/// non-C# project reaching Curb through a shared build import looks like from here.
+	/// A file some registered language owns, outside a build-output folder. The directory walk already
+	/// narrows to this with the registry's own glob before the bin/obj half of this ever runs; the
+	/// extension half exists for <paramref name="path"/>s an explicit file list handed over unfiltered,
+	/// which is what a project in a language Curb does not cover, reaching Curb through a shared build
+	/// import, looks like from here.
 	/// </summary>
-	private static bool IsFormattable(string path) =>
-		path.EndsWith(".cs", StringComparison.OrdinalIgnoreCase)
+	private static bool IsFormattable(LanguageRegistry languages, string path) =>
+		languages.IndexOf(path) >= 0
 		&& !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal)
 		&& !path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.Ordinal);
 }
