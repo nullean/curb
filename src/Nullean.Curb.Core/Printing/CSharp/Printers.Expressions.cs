@@ -596,12 +596,30 @@ internal static partial class Printers
 			&& !exactly)
 			elementBrace = elementRegister;
 
+		// `new HttpClient(new Handler { … }) { Timeout = t }` — once the creation it belongs to has been
+		// opened out, the initializer takes a line of its own rather than trailing the closing parenthesis.
+		//
+		// Asked of the source, not of what the printer is about to produce. dotnet format can key this on
+		// the creation spanning lines because it never reflows, so its answer cannot change; Curb's reflow
+		// can open a creation out on one run, which would flip the answer on the next and stop the file
+		// settling. Where the author put the brace is fixed, so it is that which decides.
+		var ownerSpansLines = leadingLine
+			&& node.Parent is not null
+			&& context.AuthorBroke(node.Parent.SpanStart, node.SpanStart);
+
+		// The creation spans lines and the initializer does not: `new List<int>` / `{ 1, 2 }`. dotnet
+		// format leaves the members on the brace's line, so the brace's break goes outside the group.
+		// Inside, it broke the group and opened the members out one per line (issue #136).
+		var ownerBrokeAlone = ownerSpansLines && !spansLines && elementBrace < 0;
+
 		// Outside the group below, because it has to resolve against the owner's break rather than this
 		// initializer's — see BeforeOpenBraceWhenOwnerBroke. This is the deterministic half of the
-		// `ownerSpansLines` question further down: that one reads where the author put the brace, which
-		// is right in preservation mode and unavailable in deterministic mode, and this one reads the
-		// decision the argument list took on this run, which is available in both.
-		if (leadingLine && !oneMemberPerLine && elementBrace < 0)
+		// `ownerSpansLines` question above: that one reads where the author put the brace, which is right
+		// in preservation mode and unavailable in deterministic mode, and this one reads the decision the
+		// argument list took on this run, which is available in both.
+		if (ownerBrokeAlone)
+			BeforeOpenBrace(BraceStyle.ObjectCollectionArrayInitializers, context);
+		else if (leadingLine && !oneMemberPerLine && elementBrace < 0)
 			BeforeOpenBraceWhenOwnerBroke(BraceStyle.ObjectCollectionArrayInitializers, ownerGroup, context);
 
 		// Named and published so an enclosing construct can aim at it — see PrintContext.OwnBlockGroup.
@@ -617,21 +635,9 @@ internal static partial class Printers
 		using (aligned)
 		using (arena.Group(group))
 		{
-			// An element's brace is already on its line, above.
-			if (leadingLine && elementBrace < 0)
+			// An element's brace is already on its line, above, and so is one whose owner alone broke.
+			if (leadingLine && elementBrace < 0 && !ownerBrokeAlone)
 			{
-				// `new HttpClient(new Handler { … }) { Timeout = t }` — once the creation it belongs to
-				// has been opened out, the initializer takes a line of its own rather than trailing
-				// the closing parenthesis.
-				//
-				// Asked of the source, not of what the printer is about to produce. dotnet format can
-				// key this on the creation spanning lines because it never reflows, so its answer
-				// cannot change; Curb's reflow can open a creation out on one run, which would flip
-				// the answer on the next and stop the file settling. Where the author put the brace
-				// is fixed, so it is that which decides.
-				var ownerSpansLines = node.Parent is not null
-					&& context.AuthorBroke(node.Parent.SpanStart, node.SpanStart);
-
 				if (exactly && ownerSpansLines)
 					ContinuationLine(node.OpenBraceToken, anchor, context);
 				else if (openItOut
@@ -1208,17 +1214,28 @@ internal static partial class Printers
 		// Same rule as the object initializer above: one member per line *when the type is
 		// opened out*, not a reason to open it. dotnet format leaves `new { P = 1, Q = 2 }` alone
 		// with either key set.
-		var openItOut = oneMemberPerLine && SpansLines(node, context);
-		var asWritten = !oneMemberPerLine && SpansLines(node, context);
+		//
+		// Measured from the brace, not from `new`: `new` / `{ P = 1, Q = 2 }` broke only before the brace,
+		// and dotnet format leaves it so. Opening it out from there kept the members together inside
+		// braces of their own lines, which dotnet format then split one per line (issue #136).
+		var braceLineOnly = context.AuthorBroke(node.NewKeyword.Span.End, node.OpenBraceToken.SpanStart)
+			&& !context.AuthorBroke(node.OpenBraceToken.SpanStart, node.CloseBraceToken.Span.End);
+		var openItOut = oneMemberPerLine && !braceLineOnly && SpansLines(node, context);
+		var asWritten = !oneMemberPerLine && !braceLineOnly && SpansLines(node, context);
 		var rewritesComma = RewritesTrailingComma(node.Initializers, node.CloseBraceToken, context);
 
 		TokenPrinter.Print(node.NewKeyword, context);
+
+		// Outside the group, for the same reason as an initializer's: the break the author made is not
+		// one of the members'.
+		if (braceLineOnly)
+			BeforeOpenBrace(BraceStyle.AnonymousTypes, context);
 
 		using (arena.Group())
 		{
 			if (openItOut || (asWritten && context.AuthorBroke(node.NewKeyword.Span.End, node.OpenBraceToken.SpanStart)))
 				BeforeOpenBrace(BraceStyle.AnonymousTypes, context);
-			else
+			else if (!braceLineOnly)
 				BeforeOpenBraceWhenBroken(BraceStyle.AnonymousTypes, context);
 
 			TokenPrinter.Print(node.OpenBraceToken, context);

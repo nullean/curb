@@ -859,4 +859,59 @@ public class CollectionBreakTests : FormattingTest
 	public Task A_dictionary_initializer_keeps_its_brace_below_new_with_tabs() => Unchanged(
 		"public class C\n{\n\tpublic void M()\n\t{\n\t\tvar lookup = new Dictionary<string, int>\n\t\t{\n\t\t\t{ \"a\", 1 },\n\t\t};\n\t}\n}",
 		editorConfig: "indent_style = tab");
+
+	/// <summary>
+	/// An initializer whose brace the author put on a line of its own, with every member on that line, stays as
+	/// written. See <see href="https://github.com/nullean/curb/issues/136">issue #136</see>.
+	/// </summary>
+	[Test]
+	public Task An_initializer_broken_only_before_its_brace_keeps_its_members_on_the_brace_line() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        var list = new List<int>
+		        { 1, 2 };
+		        var array = new[]
+		        { 1, 2 };
+		        var sized = new int[]
+		        { 1, 2 };
+		        var options = new Options
+		        { Retries = 3 };
+		        Options implicitly = new()
+		        { Retries = 3 };
+		        var withArguments = new List<int>(2)
+		        { 1, 2 };
+		        var anonymous = new
+		        { A = 1, B = 2 };
+		        Use(new List<int>
+		        { 1, 2 });
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_wrapped_creation_moves_a_one_line_initializer_below_it_without_opening_it_out() => Formats(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        var options = new Options(1,
+		            2) { Retries = 3 };
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        var options = new Options(1,
+		            2)
+		        { Retries = 3 };
+		    }
+		}
+		""");
 }
