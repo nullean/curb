@@ -87,4 +87,732 @@ public class PatternTests : FormattingTest
 		}
 		""",
 		editorConfig: "max_line_length = 40");
+
+	// ---- preservation: a pattern the author opened out stays opened out -----------------------------
+
+	[Test]
+	public Task Multiline_property_pattern_with_a_trailing_comma_is_kept() => Unchanged(
+		"""
+		public class C
+		{
+		    public bool M(object value)
+		    {
+		        return value is Version
+		        {
+		            Major: 1,
+		            Minor: 2,
+		        } version;
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Multiline_property_pattern_is_kept() => Unchanged(
+		"""
+		public class C
+		{
+		    public bool M(object value)
+		    {
+		        return value is Version
+		        {
+		            Major: 1,
+		            Minor: 2
+		        };
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Multiline_bare_property_pattern_is_kept() => Unchanged(
+		"""
+		public class C
+		{
+		    public bool M(object value)
+		    {
+		        return value is
+		        {
+		            Length: 0,
+		            Count: 1,
+		        };
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Nested_multiline_property_pattern_is_kept() => Unchanged(
+		"""
+		public class C
+		{
+		    public bool M(object value)
+		    {
+		        return value is Person
+		        {
+		            Name: "x",
+		            Address:
+		            {
+		                City: "y",
+		                Zip: "z",
+		            },
+		        };
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Property_pattern_members_the_author_kept_together_stay_together() => Unchanged(
+		"""
+		public class C
+		{
+		    public bool M(object value)
+		    {
+		        return value is Version
+		        {
+		            Major: 1, Minor: 2,
+		            Build: 3,
+		        };
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Multiline_positional_pattern_is_kept() => Unchanged(
+		"""
+		public class C
+		{
+		    public bool M(object value)
+		    {
+		        return value is Point(
+		            1,
+		            2) point;
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Positional_pattern_keeps_a_break_between_subpatterns() => Unchanged(
+		"""
+		public class C
+		{
+		    public bool M(object value)
+		    {
+		        return value is Point(1,
+		            2) point;
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Property_pattern_braces_open_out_once_its_members_span_lines() => Formats(
+		// dotnet format moves both edges onto lines of their own, as it does an initializer's.
+		"""
+		public class C
+		{
+		    public bool M(object value)
+		    {
+		        return value is Version { Major: 1,
+		            Minor: 2 };
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public bool M(object value)
+		    {
+		        return value is Version
+		        {
+		            Major: 1,
+		            Minor: 2
+		        };
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Property_pattern_brace_follows_the_initializer_brace_option() => Formats(
+		"""
+		public class C {
+		    public bool M(object value) {
+		        return value is Version { Major: 1,
+		            Minor: 2 };
+		    }
+		}
+		""",
+		"""
+		public class C {
+		    public bool M(object value) {
+		        return value is Version {
+		            Major: 1,
+		            Minor: 2
+		        };
+		    }
+		}
+		""",
+		editorConfig: "csharp_new_line_before_open_brace = none");
+
+	[Test]
+	public Task Property_pattern_after_a_broken_positional_pattern_is_kept() => Unchanged(
+		"""
+		public class C
+		{
+		    public bool M(object value)
+		    {
+		        return value is Point(
+		            1,
+		            2)
+		        {
+		            X: 1,
+		            Y: 2,
+		        };
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Multiline_list_pattern_is_kept() => Unchanged(
+		"""
+		public class C
+		{
+		    public bool M(int[] values)
+		    {
+		        return values is
+		        [
+		            1,
+		            2,
+		        ];
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Multiline_property_pattern_in_a_switch_arm_is_kept() => Unchanged(
+		"""
+		public class C
+		{
+		    public int M(object value) => value switch
+		    {
+		        Version
+		        {
+		            Major: 1,
+		            Minor: 2,
+		        } => 1,
+		        _ => 0,
+		    };
+		}
+		""");
+
+	[Test]
+	public Task Single_line_property_pattern_with_a_trailing_comma_has_one_space_before_its_brace() => Unchanged(
+		"""
+		public class C
+		{
+		    public bool M(object value)
+		    {
+		        return value is Version { Major: 1, Minor: 2, } version;
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Multiline_property_pattern_after_not_is_kept() => Unchanged(
+		"""
+		public class C
+		{
+		    public bool M(object value)
+		    {
+		        return value is not
+		        {
+		            Length: 0,
+		            Count: 1,
+		        };
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Multiline_empty_property_pattern_is_kept() => Unchanged(
+		"""
+		public class C
+		{
+		    public bool M(object value)
+		    {
+		        return value is Version
+		        {
+		        } version;
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Empty_property_pattern_with_a_comment_keeps_it_at_the_members_level() => Unchanged(
+		"""
+		public class C
+		{
+		    public bool M(object value)
+		    {
+		        return value is Version
+		        {
+		            // nothing to match
+		        };
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Empty_property_pattern_brace_follows_the_initializer_brace_option() => Formats(
+		"""
+		public class C {
+		    public bool M(object value) {
+		        return value is Version
+		        {
+		        };
+		    }
+		}
+		""",
+		"""
+		public class C {
+		    public bool M(object value) {
+		        return value is Version {
+		        };
+		    }
+		}
+		""",
+		editorConfig: "csharp_new_line_before_open_brace = none");
+
+	[Test]
+	public Task Property_pattern_under_indent_braces_matches_dotnet_format() => Formats(
+		// dotnet format indents the brace a level, the members a level past it, and the closing brace
+		// to the members' column, the same at every depth.
+		"""
+		public class C
+		{
+		    public bool M(object value)
+		    {
+		        var a = value is Version
+		        {
+		            Major: 1,
+		            Minor: 2,
+		        } v;
+		        var b = value is
+		        {
+		            Length: 0,
+		        };
+		        var c = value is Version { Major: 1,
+		            Minor: 2 };
+		        return value is Person
+		        {
+		            Name: "x",
+		            Address:
+		            {
+		                City: "y",
+		            },
+		            Home: Address
+		            {
+		                Zip: 1,
+		            },
+		        };
+		    }
+		}
+		""",
+		"""
+		public class C
+		    {
+		    public bool M(object value)
+		        {
+		        var a = value is Version
+		            {
+		                Major: 1,
+		                Minor: 2,
+		                } v;
+		        var b = value is
+		            {
+		                Length: 0,
+		                };
+		        var c = value is Version
+		            {
+		                Major: 1,
+		                Minor: 2
+		                };
+		        return value is Person
+		            {
+		                Name: "x",
+		                Address:
+		                    {
+		                        City: "y",
+		                        },
+		                Home: Address
+		                    {
+		                        Zip: 1,
+		                        },
+		                };
+		        }
+		    }
+		""",
+		editorConfig: "csharp_indent_braces = true");
+
+	[Test]
+	public Task Empty_property_pattern_and_patterns_after_not_and_or_under_indent_braces() => Formats(
+		"""
+		public class C
+		{
+		    public bool M(object value)
+		    {
+		        var a = value is not
+		        {
+		            Length: 0,
+		        };
+		        var b = value is string or
+		        {
+		            Length: 0,
+		        };
+		        var c = value is Version
+		        {
+		        } w;
+		        return value is Version
+		        {
+		            // none
+		        };
+		    }
+		}
+		""",
+		"""
+		public class C
+		    {
+		    public bool M(object value)
+		        {
+		        var a = value is not
+		            {
+		                Length: 0,
+		                };
+		        var b = value is string or
+		            {
+		                Length: 0,
+		                };
+		        var c = value is Version
+		            {
+		                } w;
+		        return value is Version
+		            {
+		                // none
+		                };
+		        }
+		    }
+		""",
+		editorConfig: "csharp_indent_braces = true");
+
+	[Test]
+	public Task Property_pattern_brace_after_a_colon_not_or_and_takes_its_own_line() => Formats(
+		// dotnet format moves the brace of a pattern that spans lines onto its own line after any of
+		// these, not only after a type or `is`.
+		"""
+		public class C
+		{
+		    public void M(object o)
+		    {
+		        var a = o is Person
+		        {
+		            Name: "x",
+		            Address: {
+		                City: "y",
+		                Zip: 1
+		            }
+		        };
+		        var b = o is not {
+		            Length: 1
+		        };
+		        var c = o is null or {
+		            Length: 1
+		        };
+		        var d = o is { A: 1 } and {
+		            B: 1
+		        };
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M(object o)
+		    {
+		        var a = o is Person
+		        {
+		            Name: "x",
+		            Address:
+		            {
+		                City: "y",
+		                Zip: 1
+		            }
+		        };
+		        var b = o is not
+		        {
+		            Length: 1
+		        };
+		        var c = o is null or
+		        {
+		            Length: 1
+		        };
+		        var d = o is { A: 1 } and
+		        {
+		            B: 1
+		        };
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Property_pattern_chain_that_spans_lines_puts_each_brace_on_its_own_line() => Formats(
+		"""
+		public class C
+		{
+		    public void M(object o)
+		    {
+		        var t = o is {
+		            A: 1 } or {
+		            A: 2 };
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M(object o)
+		    {
+		        var t = o is
+		        {
+		            A: 1
+		        } or
+		        {
+		            A: 2
+		        };
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Property_pattern_on_one_line_after_a_colon_not_or_and_stays_put() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M(object o)
+		    {
+		        var a = o is Person
+		        {
+		            Address: { City: "y" }
+		        };
+		        var b = o is not { Length: 1 };
+		        var c = o is null or { Length: 1 };
+		        var d = o is { A: 1 } and { B: 1 };
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Property_pattern_brace_joins_a_broken_is_or_colon_under_none() => Formats(
+		// With the initializer flag off, dotnet format joins the brace onto `is`, a type or a colon, but
+		// leaves a break after `not` or `or` where the author put it.
+		"""
+		class C {
+		    void M(object o) {
+		        var f = o is
+		            { A: 1 };
+		        var f2 = o is
+		        {
+		            A: 1,
+		            B: 2
+		        };
+		        var a = o is Person
+		        {
+		            Name: "x",
+		            Address:
+		            {
+		                City: "y"
+		            }
+		        };
+		        var a2 = o is Person {
+		            Address:
+		                { City: "y" }
+		        };
+		        var b = o is not
+		        {
+		            Length: 1
+		        };
+		        var c = o is null or
+		        {
+		            Length: 1
+		        };
+		        var x = o is
+		        { Length: 1 } or
+		        { Length: 2 };
+		        var y = o is Person {
+		            Address:
+		            { City: "y" } or
+		            { City: "z" }
+		        };
+		        var n = o is not {
+		            A: 1
+		        };
+		    }
+		}
+		""",
+		"""
+		class C {
+		    void M(object o) {
+		        var f = o is { A: 1 };
+		        var f2 = o is {
+		            A: 1,
+		            B: 2
+		        };
+		        var a = o is Person {
+		            Name: "x",
+		            Address: {
+		                City: "y"
+		            }
+		        };
+		        var a2 = o is Person {
+		            Address: { City: "y" }
+		        };
+		        var b = o is not
+		        {
+		            Length: 1
+		        };
+		        var c = o is null or
+		        {
+		            Length: 1
+		        };
+		        var x = o is { Length: 1 } or
+		        { Length: 2 };
+		        var y = o is Person {
+		            Address: { City: "y" } or
+		            { City: "z" }
+		        };
+		        var n = o is not {
+		            A: 1
+		        };
+		    }
+		}
+		""",
+		editorConfig: "csharp_new_line_before_open_brace = none");
+
+	[Test]
+	public Task Line_comments_in_a_property_pattern_add_no_blank_lines() => Formats(
+		"""
+		public class C
+		{
+		    public void M(object o)
+		    {
+		        var g = o is
+		        { // open
+		            A: 1, // first
+		            B: 2 // last
+		        };
+		        var h = o is Person
+		        { // open
+		            A: 1, // first
+		            B: 2, // last
+		        };
+		        var k = o is // c
+		            { A: 1 };
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M(object o)
+		    {
+		        var g = o is
+		        { // open
+		            A: 1, // first
+		            B: 2 // last
+		        };
+		        var h = o is Person
+		        { // open
+		            A: 1, // first
+		            B: 2, // last
+		        };
+		        var k = o is // c
+		        { A: 1 };
+		    }
+		}
+		""");
+
+	// ---- deterministic: a pattern that fits is joined, and the comma follows the options ------------
+
+	[Test]
+	public Task Collapsed_property_pattern_keeps_one_space_before_its_brace() => Formats(
+		"""
+		public class C
+		{
+		    public bool M(object value)
+		    {
+		        return value is Version
+		        {
+		            Major: 1,
+		            Minor: 2,
+		        } version;
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public bool M(object value)
+		    {
+		        return value is Version { Major: 1, Minor: 2, } version;
+		    }
+		}
+		""",
+		editorConfig: "max_line_length = 100");
+
+	[Test]
+	public Task Collapsed_property_pattern_drops_its_comma_under_the_multiline_option() => Formats(
+		"""
+		public class C
+		{
+		    public bool M(object value)
+		    {
+		        return value is Version
+		        {
+		            Major: 1,
+		            Minor: 2,
+		        } version;
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public bool M(object value)
+		    {
+		        return value is Version { Major: 1, Minor: 2 } version;
+		    }
+		}
+		""",
+		editorConfig: "max_line_length = 100\ncsharp_trailing_comma_in_multiline_lists = true");
+
+	[Test]
+	public Task Broken_property_pattern_gains_a_comma_under_the_multiline_option() => Formats(
+		"""
+		public class C
+		{
+		    public bool M(object value)
+		    {
+		        return value is Version { Major: 1, Minor: 2 } version;
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public bool M(object value)
+		    {
+		        return value is Version
+		        {
+		            Major: 1,
+		            Minor: 2,
+		        } version;
+		    }
+		}
+		""",
+		editorConfig: "max_line_length = 40\ncsharp_trailing_comma_in_multiline_lists = true");
 }

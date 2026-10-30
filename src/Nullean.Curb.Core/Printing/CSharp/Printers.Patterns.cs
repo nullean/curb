@@ -1,6 +1,7 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Nullean.Curb.Documents;
+using Nullean.Curb.Options;
 
 namespace Nullean.Curb.Printing.CSharp;
 
@@ -13,42 +14,108 @@ internal static partial class Printers
 		context.Arena.Synthetic(SyntheticText.Space);
 		TokenPrinter.Print(node.IsKeyword, context);
 
-		// A bare recursive pattern (`is { ... }`, no type or positional clause ahead of the brace) that
-		// the author kept on the `is` line owns the gap to its own opening brace: that gap answers the
-		// same fits question as whether the property list wraps, so RecursivePattern controls it with a
-		// fits-aware line instead of a fixed space — see BareRecursivePatternOwnsLeadingBrace.
-		if (BareRecursivePatternOwnsLeadingBrace(node.Pattern, context))
-		{
-			Node.Print(node.Pattern, context);
-			return;
-		}
-
 		// A break the author put after `is` is theirs, the same as one between two alternatives of the
 		// pattern that follows. Without this, `x is` / `A or` / `B` kept its `or` breaks and lost the
 		// first one, which reads worse than either preserving all of them or none.
-		if (context.AuthorBroke(node.IsKeyword.Span.End, node.Pattern.SpanStart))
-			context.Arena.HardLine();
-		else
-			context.Arena.Synthetic(SyntheticText.Space);
-
+		GapBeforePattern(node.IsKeyword, node.Pattern, joinsBraceUnderNone: true, context);
 		Node.Print(node.Pattern, context);
 	}
 
 	/// <summary>
-	/// True for the exact shape RecursivePattern defers its leading brace-line to: a property-only
-	/// pattern directly under an <c>is</c> expression, with nothing between the `is` keyword and the
-	/// pattern in the source. Author-broken input keeps the caller's forced line instead, matching every
-	/// other pattern shape.
+	/// The gap between <paramref name="before"/> (`is`, `not`, `and`, `or` or a subpattern's colon) and
+	/// the pattern that follows it.
 	/// </summary>
-	private static bool BareRecursivePatternOwnsLeadingBrace(PatternSyntax pattern, PrintContext context) =>
-		pattern is RecursivePatternSyntax
+	/// <remarks>
+	/// A pattern whose leading brace places itself (see <see cref="BareRecursivePatternOwnsLeadingBrace"/>)
+	/// gets nothing here. A break the author put there is theirs; one ahead of a property pattern's brace
+	/// places that brace, so it follows <c>csharp_new_line_before_open_brace</c>. With the initializer
+	/// flag off, dotnet format joins the brace back onto `is` or a colon, as it does onto a type, but
+	/// leaves a break after `not`, `and` or `or` where the author put it.
+	/// </remarks>
+	private static void GapBeforePattern(SyntaxToken before, PatternSyntax pattern, bool joinsBraceUnderNone, PrintContext context)
+	{
+		if (PatternOwnsLeadingBrace(pattern, context))
+			return;
+
+		if (!context.AuthorBroke(before.Span.End, pattern.SpanStart))
 		{
-			Type: null,
-			PositionalPatternClause: null,
-			PropertyPatternClause.Subpatterns.Count: > 0,
-			Parent: IsPatternExpressionSyntax isExpression,
+			context.Arena.Synthetic(SyntheticText.Space);
+			return;
 		}
-		&& !context.AuthorBroke(isExpression.IsKeyword.Span.End, pattern.SpanStart);
+
+		if (!OpensWithPropertyBrace(pattern))
+		{
+			context.Arena.HardLine();
+			return;
+		}
+
+		if (!context.Options.NewLineBeforeOpenBrace.HasFlag(BraceStyle.ObjectCollectionArrayInitializers))
+		{
+			// A comment on the line before the brace ends that line, so there is nothing to join onto.
+			if (joinsBraceUnderNone && !TokenPrinter.HasLeadingContent(pattern.GetFirstToken()) && !EndsWithLineComment(before))
+				context.Arena.Synthetic(SyntheticText.Space);
+			else
+				context.Arena.HardLine();
+			return;
+		}
+
+		// The brace lands where this break leaves it, so csharp_indent_braces moves it in a level, as
+		// BeforeOpenBrace does.
+		using (context.Arena.IndentIf(context.Options.IndentBraces))
+			context.Arena.HardLine();
+	}
+
+	/// <summary>
+	/// Whether the first token of <paramref name="pattern"/> is a property pattern's <c>{</c>: a bare
+	/// property pattern, or an <c>and</c>/<c>or</c> chain that starts with one.
+	/// </summary>
+	private static bool OpensWithPropertyBrace(PatternSyntax pattern) =>
+		pattern.GetFirstToken().Parent is PropertyPatternClauseSyntax { Parent: RecursivePatternSyntax { Type: null, PositionalPatternClause: null } };
+
+	/// <summary>
+	/// Whether <paramref name="pattern"/> starts with a property pattern's brace that places itself, so the
+	/// caller prints nothing ahead of it. See <see cref="BareRecursivePatternOwnsLeadingBrace"/>.
+	/// </summary>
+	private static bool PatternOwnsLeadingBrace(PatternSyntax pattern, PrintContext context) =>
+		pattern.GetFirstToken().Parent is PropertyPatternClauseSyntax { Parent: RecursivePatternSyntax first }
+		&& BareRecursivePatternOwnsLeadingBrace(first, context);
+
+	/// <summary>
+	/// True for the exact shape RecursivePattern defers its leading brace-line to: a property-only
+	/// pattern right after `is`, `not`, `and`, `or` or a subpattern's colon, possibly as the first
+	/// alternative of an <c>and</c>/<c>or</c> chain, with nothing between that token and the brace in the
+	/// source. Author-broken input keeps the caller's forced line instead, matching every other pattern shape.
+	/// </summary>
+	/// <remarks>
+	/// The gap answers the same fits question as whether the property list wraps: dotnet format moves the
+	/// brace to its own line whenever the pattern spans lines, after any of those tokens. A plain space
+	/// from the caller could never move.
+	/// </remarks>
+	private static bool BareRecursivePatternOwnsLeadingBrace(RecursivePatternSyntax pattern, PrintContext context)
+	{
+		if (pattern is not { Type: null, PositionalPatternClause: null, PropertyPatternClause.Subpatterns.Count: > 0 })
+			return false;
+
+		// Up through the chains it starts, to the node that prints the gap ahead of it.
+		SyntaxNode child = pattern;
+		var parent = pattern.Parent;
+		while (parent is BinaryPatternSyntax chain && chain.Left == child)
+		{
+			child = chain;
+			parent = chain.Parent;
+		}
+
+		var before = parent switch
+		{
+			IsPatternExpressionSyntax isExpression => isExpression.IsKeyword,
+			SubpatternSyntax { ExpressionColon: { } colon } => colon.ColonToken,
+			UnaryPatternSyntax unary => unary.OperatorToken,
+			BinaryPatternSyntax chain => chain.OperatorToken,
+			_ => default,
+		};
+
+		return before.RawKind != 0 && !context.AuthorBroke(before.Span.End, pattern.SpanStart);
+	}
 
 	public static void DeclarationPattern(DeclarationPatternSyntax node, PrintContext context)
 	{
@@ -66,16 +133,31 @@ internal static partial class Printers
 
 		if (node.PositionalPatternClause is not null)
 		{
+			// A break the author put inside the parentheses is theirs; dotnet format leaves them all.
 			var positional = node.PositionalPatternClause;
+			var subpatterns = positional.Subpatterns;
+			var asWritten = SpansLines(positional, context);
 			TokenPrinter.Print(positional.OpenParenToken, context);
-			for (var i = 0; i < positional.Subpatterns.Count; i++)
+			using (arena.Indent())
 			{
-				Node.Print(positional.Subpatterns[i], context);
-				if (i >= positional.Subpatterns.SeparatorCount)
-					continue;
-				TokenPrinter.Print(positional.Subpatterns.GetSeparator(i), context);
-				arena.Synthetic(SyntheticText.Space);
+				if (subpatterns.Count > 0 && asWritten && context.AuthorBroke(positional.OpenParenToken.Span.End, subpatterns[0].SpanStart))
+					arena.HardLine();
+
+				for (var i = 0; i < subpatterns.Count; i++)
+				{
+					Node.Print(subpatterns[i], context);
+					if (i >= subpatterns.SeparatorCount)
+						continue;
+					TokenPrinter.Print(subpatterns.GetSeparator(i), context);
+					if (asWritten && context.AuthorBroke(subpatterns[i].Span.End, subpatterns[i + 1].SpanStart))
+						arena.HardLine();
+					else
+						arena.Synthetic(SyntheticText.Space);
+				}
 			}
+
+			if (subpatterns.Count > 0 && asWritten && context.AuthorBroke(subpatterns[^1].Span.End, positional.CloseParenToken.SpanStart))
+				arena.HardLine();
 			TokenPrinter.Print(positional.CloseParenToken, context);
 		}
 
@@ -90,38 +172,120 @@ internal static partial class Printers
 				// format moves it to its own line whenever that list doesn't fit, the same way an
 				// initializer's brace does. A plain space before an unconditionally-printed brace, as
 				// before, could never move: the group guarding the list only ever affected what came
-				// after the brace, not the brace itself. A bare pattern directly under `is` gets the same
-				// treatment for the `is`-to-brace gap — see BareRecursivePatternOwnsLeadingBrace, whose
-				// caller (IsPatternExpression) skips its own separator in exactly this case.
+				// after the brace, not the brace itself. A bare pattern after `is`, `not`, `and`, `or` or a
+				// subpattern's colon gets the same treatment for the gap to its brace — see
+				// BareRecursivePatternOwnsLeadingBrace, whose callers skip their own separator in exactly this case.
 				var ownsLeadingGap = hasPrecedingContent || BareRecursivePatternOwnsLeadingBrace(node, context);
+
+				// A pattern the author opened out keeps their breaks, as an initializer does. Without
+				// this the group only ever asked whether the list fits, and with no width everything
+				// fits, so preservation mode joined a pattern dotnet format leaves alone.
+				var asWritten = SpansLines(property, context);
+				var subpatterns = property.Subpatterns;
+				var rewritesComma = RewritesTrailingComma(subpatterns, property.CloseBraceToken, context);
+
 				using (arena.Group())
 				{
+					// dotnet format places this brace by the initializer flag of csharp_new_line_before_open_brace,
+					// and only once the braces span lines: `Version { Major: 1,` / `Minor: 2 }` opens out fully.
 					if (ownsLeadingGap)
-						arena.Line();
+					{
+						var beforeBrace = property.OpenBraceToken.GetPreviousToken().Span.End;
+						if (asWritten && context.AuthorBroke(beforeBrace, property.OpenBraceToken.SpanStart))
+							BeforeOpenBrace(BraceStyle.ObjectCollectionArrayInitializers, context);
+						else
+							BeforeOpenBraceWhenBroken(BraceStyle.ObjectCollectionArrayInitializers, context);
+					}
+
 					TokenPrinter.Print(property.OpenBraceToken, context);
+
+					// Under csharp_indent_braces dotnet format puts the members a level in from the indented
+					// brace and the closing brace at their column, not back under the opening one.
+					using (arena.IndentIf(context.Options.IndentBraces))
 					using (arena.Indent())
 					{
-						arena.Line();
-						for (var i = 0; i < property.Subpatterns.Count; i++)
+						InsideBrace(property.OpenBraceToken.Span.End, subpatterns[0].SpanStart);
+						for (var i = 0; i < subpatterns.Count; i++)
 						{
-							Node.Print(property.Subpatterns[i], context);
-							if (i >= property.Subpatterns.SeparatorCount)
+							Node.Print(subpatterns[i], context);
+							if (i >= subpatterns.SeparatorCount)
 								continue;
-							TokenPrinter.Print(property.Subpatterns.GetSeparator(i), context);
-							arena.Line();
+
+							// The source's own trailing comma gives way when the options decide this one.
+							if (rewritesComma && i == subpatterns.Count - 1)
+								continue;
+
+							TokenPrinter.Print(subpatterns.GetSeparator(i), context);
+
+							// A trailing separator is followed by the closing line, not by another one —
+							// both used to print, which joined as `Minor: 2,  }`.
+							if (i >= subpatterns.Count - 1)
+								continue;
+
+							if (!asWritten)
+								arena.Line();
+							else if (context.AuthorBroke(subpatterns[i].Span.End, subpatterns[i + 1].SpanStart))
+								arena.HardLine();
+							else
+								arena.Synthetic(SyntheticText.Space);
 						}
+
+						if (rewritesComma)
+							PrintTrailingComma(context);
 					}
-					arena.Line();
+
+					using (arena.IndentIf(context.Options.IndentBraces, levels: 2))
+						InsideBrace(property.CloseBraceToken.GetPreviousToken().Span.End, property.CloseBraceToken.SpanStart);
 					TokenPrinter.Print(property.CloseBraceToken, context);
+				}
+
+				// Just inside the braces, which open out with the group: dotnet format moves both edges of
+				// `{ Major: 1,` / `Minor: 2 }` onto lines of their own, as it does an initializer's.
+				void InsideBrace(int from, int to)
+				{
+					if (asWritten && context.AuthorBroke(from, to))
+						arena.HardLine();
+					else
+						arena.Line();
 				}
 			}
 			else
 			{
+				// `Version` / `{` / `}` — an empty pattern the author opened out stays opened out, with its
+				// brace placed by the same flag as a populated one's.
 				if (hasPrecedingContent)
-					arena.Synthetic(SyntheticText.Space);
+				{
+					if (context.AuthorBroke(property.OpenBraceToken.GetPreviousToken().Span.End, property.OpenBraceToken.SpanStart))
+						BeforeOpenBrace(BraceStyle.ObjectCollectionArrayInitializers, context);
+					else
+						arena.Synthetic(SyntheticText.Space);
+				}
+
 				TokenPrinter.Print(property.OpenBraceToken, context);
-				arena.Synthetic(SyntheticText.Space);
-				TokenPrinter.Print(property.CloseBraceToken, context);
+
+				if (TokenPrinter.HasLeadingContent(property.CloseBraceToken))
+				{
+					// A comment above the closing brace is its leading trivia; printed inside the indent it
+					// sits where a member would, as an empty initializer's does.
+					using (arena.IndentIf(context.Options.IndentBraces))
+					using (arena.Indent())
+					{
+						arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
+						TokenPrinter.PrintLeadingTrivia(property.CloseBraceToken, context, trailingBreak: false);
+					}
+
+					using (arena.IndentIf(context.Options.IndentBraces, levels: 2))
+						arena.HardLine(DocFlags.Reindent);
+				}
+				else if (context.AuthorBroke(property.OpenBraceToken.Span.End, property.CloseBraceToken.SpanStart))
+				{
+					using (arena.IndentIf(context.Options.IndentBraces, levels: 2))
+						arena.HardLine();
+				}
+				else
+					arena.Synthetic(SyntheticText.Space);
+
+				TokenPrinter.PrintWithoutLeadingTrivia(property.CloseBraceToken, context);
 			}
 		}
 
@@ -138,7 +302,9 @@ internal static partial class Printers
 		{
 			Node.Print(node.ExpressionColon.Expression, context);
 			TokenPrinter.Print(node.ExpressionColon.ColonToken, context);
-			context.Arena.Synthetic(SyntheticText.Space);
+
+			// `Address:` / `{ … }` — a nested pattern the author put on a line of its own stays there.
+			GapBeforePattern(node.ExpressionColon.ColonToken, node.Pattern, joinsBraceUnderNone: true, context);
 		}
 
 		Node.Print(node.Pattern, context);
@@ -159,19 +325,16 @@ internal static partial class Printers
 			context.Arena.Synthetic(SyntheticText.Space);
 
 		TokenPrinter.Print(node.OperatorToken, context);
-
-		if (context.AuthorBroke(node.OperatorToken.Span.End, node.Right.SpanStart))
-			context.Arena.HardLine();
-		else
-			context.Arena.Synthetic(SyntheticText.Space);
-
+		GapBeforePattern(node.OperatorToken, node.Right, joinsBraceUnderNone: false, context);
 		Node.Print(node.Right, context);
 	}
 
 	public static void UnaryPattern(UnaryPatternSyntax node, PrintContext context)
 	{
 		TokenPrinter.Print(node.OperatorToken, context);
-		context.Arena.Synthetic(SyntheticText.Space);
+
+		// `is not` / `{ … }` — a break the author put after `not` is theirs, as one after `is` or `or` is.
+		GapBeforePattern(node.OperatorToken, node.Pattern, joinsBraceUnderNone: false, context);
 		Node.Print(node.Pattern, context);
 	}
 
@@ -186,36 +349,69 @@ internal static partial class Printers
 	{
 		var arena = context.Arena;
 		TokenPrinter.Print(node.OpenBracketToken, context);
-		Spacing.InsideBrackets(context);
 
 		var rewritesComma = RewritesTrailingComma(node.Patterns, node.CloseBracketToken, context);
 
-		for (var i = 0; i < node.Patterns.Count; i++)
+		// Printed flat unless the author opened it out, in which case their breaks stay — the same rule
+		// a collection expression follows. The group is what a trailing comma's IfBreak resolves against.
+		var asWritten = SpansLines(node, context);
+
+		using (arena.Group())
 		{
-			Node.Print(node.Patterns[i], context);
-			if (i >= node.Patterns.SeparatorCount)
-				continue;
+			using (arena.Indent())
+			{
+				if (node.Patterns.Count > 0)
+					Edge(node.OpenBracketToken.Span.End, node.Patterns[0].SpanStart);
+				else
+					Spacing.InsideBrackets(context);
 
-			if (rewritesComma && i == node.Patterns.Count - 1)
-				continue;
+				for (var i = 0; i < node.Patterns.Count; i++)
+				{
+					Node.Print(node.Patterns[i], context);
+					if (i >= node.Patterns.SeparatorCount)
+						continue;
 
-			Spacing.BeforeComma(context);
-			TokenPrinter.Print(node.Patterns.GetSeparator(i), context);
-			Spacing.AfterComma(context);
+					if (rewritesComma && i == node.Patterns.Count - 1)
+						continue;
+
+					Spacing.BeforeComma(context);
+					TokenPrinter.Print(node.Patterns.GetSeparator(i), context);
+
+					// A trailing comma runs straight into the closing bracket, not `, ]`.
+					if (i >= node.Patterns.Count - 1)
+						continue;
+
+					if (asWritten && context.AuthorBroke(node.Patterns[i].Span.End, node.Patterns[i + 1].SpanStart))
+						arena.HardLine();
+					else
+						Spacing.AfterComma(context);
+				}
+
+				if (rewritesComma)
+					PrintTrailingComma(context);
+			}
+
+			if (node.Patterns.Count > 0)
+				Edge(node.CloseBracketToken.GetPreviousToken().Span.End, node.CloseBracketToken.SpanStart);
+			else
+				Spacing.InsideBrackets(context);
 		}
 
-		// A list pattern is always printed flat, so only the single-line option can reach it.
-		if (rewritesComma)
-			PrintTrailingComma(context);
-
-		Spacing.InsideBrackets(context);
 		TokenPrinter.Print(node.CloseBracketToken, context);
 
-		if (node.Designation is null)
-			return;
+		if (node.Designation is not null)
+		{
+			arena.Synthetic(SyntheticText.Space);
+			Node.Print(node.Designation, context);
+		}
 
-		arena.Synthetic(SyntheticText.Space);
-		Node.Print(node.Designation, context);
+		void Edge(int from, int to)
+		{
+			if (asWritten && context.AuthorBroke(from, to))
+				arena.HardLine();
+			else
+				Spacing.InsideBrackets(context);
+		}
 	}
 
 	public static void ParenthesizedPattern(ParenthesizedPatternSyntax node, PrintContext context)
