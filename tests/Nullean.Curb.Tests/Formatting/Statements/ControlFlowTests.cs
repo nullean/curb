@@ -310,6 +310,45 @@ public class ControlFlowTests : FormattingTest
 		}
 		""");
 
+	/// <summary>
+	/// The commas between initializers that are not a declaration are printed, so the file formats
+	/// rather than failing verification. See
+	/// <see href="https://github.com/nullean/curb/issues/150">issue #150</see>.
+	/// </summary>
+	[Test]
+	public Task For_loop_with_two_initializers() => Formats(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        int i, j;
+		        for (i = 0, j = 10; i < j; i++, j--)
+		        {
+		        }
+		        for (i = 0,j = 10; i < j; i++,j--)
+		        {
+		        }
+		    }
+		}
+		""",
+		// dotnet format leaves the first header alone and gives the second's commas a space each.
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        int i, j;
+		        for (i = 0, j = 10; i < j; i++, j--)
+		        {
+		        }
+		        for (i = 0, j = 10; i < j; i++, j--)
+		        {
+		        }
+		    }
+		}
+		""");
+
 	[Test]
 	public Task Foreach_loop() => Unchanged(
 		"""

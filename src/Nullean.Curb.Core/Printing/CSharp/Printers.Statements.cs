@@ -388,9 +388,18 @@ internal static partial class Printers
 	{
 		Spacing.InsideControlFlowParens(context);
 
+		// The separators are printed here, as the incrementors' are below: an initializer list is a bare
+		// separated list with no node of its own to print them, so `for (i = 0, j = 10; …)` lost its
+		// comma and verification refused the file (issue #150). A declaration's declarators print theirs.
 		Node.Print(node.Declaration, context);
-		foreach (var initializer in node.Initializers)
-			Node.Print(initializer, context);
+		for (var i = 0; i < node.Initializers.Count; i++)
+		{
+			Node.Print(node.Initializers[i], context);
+			if (i >= node.Initializers.SeparatorCount)
+				continue;
+			TokenPrinter.Print(node.Initializers.GetSeparator(i), context);
+			context.Arena.Synthetic(SyntheticText.Space);
+		}
 
 		if (node.Declaration is not null || node.Initializers.Count > 0)
 			Spacing.BeforeForSemicolon(context);
