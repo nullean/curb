@@ -203,8 +203,9 @@ internal static partial class Printers
 	/// </remarks>
 	private static int MemberContinuationLine(int previousEnd, SyntaxNode next, int anchor, PrintContext context)
 	{
-		BreakBetweenMembers(previousEnd, next, context);
-		return ContinuationLine(next.GetFirstToken(), anchor, context, element: true);
+		var first = next.GetFirstToken();
+		BreakBeforeFirstToken(previousEnd, first, context);
+		return ContinuationLine(first, anchor, context, element: true);
 	}
 
 	public static void AssignmentExpression(AssignmentExpressionSyntax node, PrintContext context)
@@ -1320,7 +1321,7 @@ internal static partial class Printers
 		// Each argument line keeps the offset the author gave it, as an invocation's does — issue #143.
 		// Captured ahead of the `[`, as ArgumentList captures it ahead of the `(`.
 		var arguments = node.Arguments;
-		var lineShift = EnterArgumentLines(arguments, node.OpenBracketToken.Span.End, context);
+		var lineShift = EnterArgumentLines(arguments, node.OpenBracketToken.Span.End, node.CloseBracketToken.SpanStart, context);
 		TokenPrinter.Print(node.OpenBracketToken, context);
 
 		// A bracketed list the author broke keeps their breaks, as an invocation's or an attribute's

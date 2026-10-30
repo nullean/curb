@@ -23,9 +23,13 @@ internal sealed class BreakPropagation
 	private int[] _hardPrefix = [];
 
 	/// <summary>
-	/// For each boundary <c>i</c>, the index of the last doc before it that prints anything, or -1.
+	/// The indices, ascending, of the trailing-comment breaks that count as unconditional breaks.
 	/// </summary>
-	private int[] _lastContent = [];
+	/// <remarks>
+	/// Rare enough that pass 2 looks one up only for a group already found to break, rather than pass 1
+	/// recording the last content doc at every boundary for every group to read.
+	/// </remarks>
+	private readonly List<int> _commentBreaks = [];
 
 	private ulong[] _broken = [];
 	private int[] _forceFlatEnds = [];
@@ -55,15 +59,14 @@ internal sealed class BreakPropagation
 
 		var docs = arena.Docs;
 		_groupIndices.Clear();
+		_commentBreaks.Clear();
 
 		// ---- pass 1: prefix sum of unconditional breaks -----------------------------------------
 		// A hard line inside a ForceFlat does not break anything, because ForceFlat wins. A literal
 		// line does, even there: its newline is content, not layout.
 		var forceFlatDepth = 0;
 		var running = 0;
-		var lastContent = -1;
 		_hardPrefix[0] = 0;
-		_lastContent[0] = -1;
 
 		for (var i = 0; i < count; i++)
 		{
@@ -86,13 +89,13 @@ internal sealed class BreakPropagation
 				&& (forceFlatDepth == 0 || (doc.Kind == DocKind.Line && doc.LineType == LineType.Literal));
 
 			if (counts)
+			{
 				running++;
+				if (IsLineCommentBreak(doc))
+					_commentBreaks.Add(i);
+			}
 
 			_hardPrefix[i + 1] = running;
-
-			if (doc.Kind is DocKind.SrcText or DocKind.SynText or DocKind.ExternalText or DocKind.Line or DocKind.BreakParent)
-				lastContent = i;
-			_lastContent[i + 1] = lastContent;
 		}
 
 		// ---- pass 2: a group breaks if its subtree contains any --------------------------------
@@ -108,13 +111,41 @@ internal sealed class BreakPropagation
 			// inside it: nothing of the group follows it. Counting it forced the group open, so a comment
 			// after the last switch arm broke the arm after `=>` (issue #127). The printer still breaks
 			// it in a flat group, and the next break outside merges into it.
-			var last = _lastContent[end];
-			if (hard > 0 && last >= i && IsLineCommentBreak(docs[last]) && _hardPrefix[last + 1] > _hardPrefix[last])
+			if (hard > 0 && EndsOnCommentBreak(docs, i, end))
 				hard--;
 
 			if (hard > 0)
 				_broken[i >> 6] |= 1UL << (i & 63);
 		}
+	}
+
+	/// <summary>
+	/// True when the last doc in <c>[start, end)</c> that prints anything is a trailing-comment break
+	/// that counts as an unconditional break.
+	/// </summary>
+	/// <remarks>
+	/// That doc can only be the last counted comment break before <paramref name="end"/>, and it is the
+	/// last content exactly when nothing that prints follows it inside the range. What follows a
+	/// comment's break is nearly always the next token, so the scan stops almost at once.
+	/// </remarks>
+	private bool EndsOnCommentBreak(ReadOnlySpan<Doc> docs, int start, int end)
+	{
+		var found = _commentBreaks.BinarySearch(end);
+		var index = (found >= 0 ? found : ~found) - 1;
+		if (index < 0)
+			return false;
+
+		var last = _commentBreaks[index];
+		if (last < start)
+			return false;
+
+		for (var k = last + 1; k < end; k++)
+		{
+			if (docs[k].Kind is DocKind.SrcText or DocKind.SynText or DocKind.ExternalText or DocKind.Line or DocKind.BreakParent)
+				return false;
+		}
+
+		return true;
 	}
 
 	/// <summary>True for the break that ends a trailing <c>//</c> comment. See <see cref="DocArena.LineCommentBreak"/>.</summary>
@@ -128,13 +159,6 @@ internal sealed class BreakPropagation
 			if (_hardPrefix.Length > 0)
 				ArrayPool<int>.Shared.Return(_hardPrefix);
 			_hardPrefix = ArrayPool<int>.Shared.Rent(count + 1);
-		}
-
-		if (_lastContent.Length < count + 1)
-		{
-			if (_lastContent.Length > 0)
-				ArrayPool<int>.Shared.Return(_lastContent);
-			_lastContent = ArrayPool<int>.Shared.Rent(count + 1);
 		}
 
 		var words = (count >> 6) + 1;

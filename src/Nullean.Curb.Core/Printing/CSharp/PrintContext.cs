@@ -1,3 +1,4 @@
+using System.Buffers;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
@@ -13,11 +14,15 @@ namespace Nullean.Curb.Printing.CSharp;
 /// copying it would be both wasteful and wrong. The options it holds are a struct and are read
 /// through helpers, never poked at directly by a printer.
 /// </remarks>
-internal sealed class PrintContext(DocArena arena, SourceText text, FormatOptions options)
+internal sealed class PrintContext(DocArena arena, SourceText text, string source, FormatOptions options)
 {
 	public DocArena Arena { get; } = arena;
 
 	public SourceText Text { get; } = text;
+
+	/// <summary>The string <see cref="Text"/> was made from, for reading a run of it as a span.</summary>
+	/// <remarks>Indexing <see cref="SourceText"/> is a virtual call per character.</remarks>
+	private readonly string _source = source;
 
 	public FormatOptions Options { get; } = options;
 
@@ -354,9 +359,37 @@ internal sealed class PrintContext(DocArena arena, SourceText text, FormatOption
 	/// this reachable made that a review rule; hiding it makes it a compile error. Anything genuinely
 	/// needing the raw answer — how far apart two comments are — reads <c>Text.Lines</c> itself, as
 	/// <c>TokenPrinter</c> does.
+	/// <para>
+	/// One line lookup rather than two: <c>end</c> is on <c>start</c>'s line exactly when it falls inside that
+	/// line's span, line break included — or sits at the very end of a last line that has no break.
+	/// <c>TextLine.LineNumber</c> is itself another binary search, so comparing line numbers cost four.
+	/// </para>
 	/// </remarks>
-	private bool OnSameLine(int start, int end) =>
-		Text.Lines.GetLineFromPosition(start).LineNumber == Text.Lines.GetLineFromPosition(end).LineNumber;
+	private bool OnSameLine(int start, int end)
+	{
+		// Most questions are about the few characters between two adjacent tokens — `, ` or ` (` —
+		// where looking for a line break is far cheaper than a binary search over the line starts.
+		if (start <= end && end - start <= ShortGap)
+		{
+			var gap = _source.AsSpan(start, end - start);
+			var at = gap.IndexOfAny(LineBreaks);
+			if (at < 0)
+				return true;
+
+			// A `\r\n` pair is one break, and the `\n` half still belongs to the line it ends.
+			return gap[at] == '\r' && at == gap.Length - 1 && end < _source.Length && _source[end] == '\n';
+		}
+
+		var line = Text.Lines.GetLineFromPosition(start);
+		return end >= line.Start
+			&& (end < line.EndIncludingLineBreak || (end == line.End && line.End == line.EndIncludingLineBreak));
+	}
+
+	/// <summary>The longest gap <see cref="OnSameLine"/> scans for a line break instead of looking its lines up.</summary>
+	private const int ShortGap = 256;
+
+	/// <summary>The characters <see cref="SourceText"/> ends a line on.</summary>
+	private static readonly SearchValues<char> LineBreaks = SearchValues.Create("\r\n\u0085\u2028\u2029");
 
 	/// <summary>The author put a break between these positions, and Curb honours it.</summary>
 	/// <remarks>
@@ -418,8 +451,8 @@ internal sealed class PrintContext(DocArena arena, SourceText text, FormatOption
 	{
 		if (endOfPrevious < 0 || startOfNext <= endOfPrevious)
 			return 0;
-		var previousLine = Text.Lines.GetLineFromPosition(endOfPrevious).LineNumber;
-		var nextLine = Text.Lines.GetLineFromPosition(startOfNext).LineNumber;
+		var previousLine = Text.Lines.IndexOf(endOfPrevious);
+		var nextLine = Text.Lines.IndexOf(startOfNext);
 		return Math.Max(0, nextLine - previousLine - 1);
 	}
 

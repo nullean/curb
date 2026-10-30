@@ -820,7 +820,10 @@ internal static partial class Printers
 			StatementSyntax? previousStatement = null;
 			foreach (var statement in node.Statements)
 			{
-				var start = EffectiveStart(statement);
+				// One walk down to the statement's first token serves both the blank-line measurement and
+				// the region and comment checks below; EffectiveStart would walk it again.
+				var statementFirstToken = statement.GetFirstToken(includeZeroWidth: true);
+				var start = EffectiveTriviaStart(statementFirstToken.Span.Length > 0 ? statementFirstToken : statement.GetFirstToken());
 
 				// `int y = 1; int z = 2;` — two statements the author put on one line stay there
 				// under csharp_preserve_single_line_statements.
@@ -849,7 +852,6 @@ internal static partial class Printers
 				// starts with a `//` comment and csharp_blank_lines_before_single_line_comment is
 				// set — this floor (up to keep_blank_lines_in_code) would otherwise run ahead of
 				// TokenPrinter's own floor for the same gap and the two would stack.
-				var statementFirstToken = statement.GetFirstToken(includeZeroWidth: true);
 				if (!NextStartsWithRegionBoundary(statementFirstToken)
 					&& !(context.Options.BlankLinesBeforeSingleLineComment > 0 && NextStartsWithSingleLineComment(statementFirstToken)))
 				{
@@ -958,9 +960,13 @@ internal static partial class Printers
 		// onto one line (issue #135). A break between two arguments is left to the hugging path, which
 		// keeps one a trailing comment forces at the column the author had; the ordinary path would
 		// move that argument to the list's level.
+		//
+		// Both gaps lie between the parentheses, so a list kept on one line answers without reading the
+		// arguments' spans.
 		var hugs = node.Arguments.Count > 0
-			&& !context.AuthorBroke(node.OpenParenToken.Span.End, node.Arguments[0].SpanStart)
-			&& !context.AuthorBroke(node.Arguments[^1].Span.End, node.CloseParenToken.SpanStart);
+			&& (!context.AuthorBroke(node.OpenParenToken.Span.End, node.CloseParenToken.SpanStart)
+				|| (!context.AuthorBroke(node.OpenParenToken.Span.End, node.Arguments[0].SpanStart)
+					&& !context.AuthorBroke(node.Arguments[^1].Span.End, node.CloseParenToken.SpanStart)));
 		var hugsOwnBlock = hugs && node.Arguments.Count == 1 && EndsWithOwnBlock(node.Arguments[0].Expression);
 
 		// Several arguments where the LAST is a genuinely block-bodied callback — `On("click", () =>
@@ -974,7 +980,7 @@ internal static partial class Printers
 
 		// Captured ahead of the `(`: a trailing `// note` on it ends the line, and an anchor after that
 		// would measure the next line, which nothing has been written to yet.
-		var lineShift = hugsOwnBlock || hugsCallback ? -1 : EnterArgumentLines(node.Arguments, node.OpenParenToken.Span.End, context);
+		var lineShift = hugsOwnBlock || hugsCallback ? -1 : EnterArgumentLines(node.Arguments, node.OpenParenToken.Span.End, node.CloseParenToken.SpanStart, context);
 		TokenPrinter.Print(node.OpenParenToken, context);
 
 		if (hugsOwnBlock)
@@ -2311,8 +2317,14 @@ internal static partial class Printers
 			return;
 		}
 
+		// Each element's span is read once and carried to the next element as its previous end: a node's
+		// span walks its green tree down to its first and last tokens every time it is asked for.
+		var previousEnd = anchorEnd;
 		for (var i = 0; i < list.Count; i++)
 		{
+			var element = list[i];
+			var span = element.Span;
+
 			// A construct bringing its own braces anchors to the indent of the line it starts on.
 			// Inline after `M(` that is the statement's line, so the list's own level has to come
 			// back off; on a line of its own it is already the right depth and must be left alone.
@@ -2331,8 +2343,7 @@ internal static partial class Printers
 			// starts on, not one level in from the list — issues #102 and #108. Only on the `(` line,
 			// though: one starting on a later line is already at the list's depth. An attribute's
 			// arguments anchor exactly as an invocation's do.
-			var previousEnd = i == 0 ? anchorEnd : list[i - 1].Span.End;
-			var value = list[i] switch
+			var value = element switch
 			{
 				ArgumentSyntax argument => argument.Expression,
 				AttributeArgumentSyntax argument => argument.Expression,
@@ -2341,8 +2352,8 @@ internal static partial class Printers
 			var endsWithOwnBlock = value is not null && EndsWithOwnBlock(value);
 			var indentsItself = value is not null && !endsWithOwnBlock && IndentsOwnContinuation(value);
 			var ownBlock = endsWithOwnBlock
-				? previousEnd >= 0 && context.AuthorJoined(previousEnd, list[i].SpanStart)
-				: indentsItself && anchorEnd >= 0 && context.AuthorJoined(anchorEnd, list[i].SpanStart);
+				? previousEnd >= 0 && context.AuthorJoined(previousEnd, span.Start)
+				: indentsItself && anchorEnd >= 0 && context.AuthorJoined(anchorEnd, span.Start);
 
 			// An element on a line the author broke to sits as far in from that line as it would from the
 			// list's level, as HugTrailingCallback's do, and so do the elements that follow it on that line.
@@ -2354,8 +2365,9 @@ internal static partial class Printers
 
 			using (offset == int.MinValue ? default : arena.AlignedIndent(lineShift, offset))
 			using (arena.IndentIf(ownBlock, -1))
-				PrintKeepingContinuation(list[i], indentsItself, context);
+				PrintKeepingContinuation(element, indentsItself, context);
 
+			previousEnd = span.End;
 			if (i >= list.SeparatorCount)
 				continue;
 
@@ -2368,12 +2380,13 @@ internal static partial class Printers
 				continue;
 			}
 
-			if (context.AuthorJoined(list[i].Span.End, list[i + 1].SpanStart))
+			var next = list[i + 1];
+			if (context.AuthorJoined(span.End, next.SpanStart))
 				Spacing.AfterComma(context);
 			else if (lineShift >= 0)
-				offset = MemberContinuationLine(list[i].Span.End, list[i + 1], lineShift, context);
+				offset = MemberContinuationLine(span.End, next, lineShift, context);
 			else
-				BreakBetweenMembers(list[i].Span.End, list[i + 1], context);
+				BreakBetweenMembers(span.End, next, context);
 		}
 	}
 
@@ -2388,19 +2401,25 @@ internal static partial class Printers
 	/// Breaking to the list's level pulled the deeper ones back — issue #143. A caller given a register
 	/// releases it with <see cref="PrintContext.ExitContinuation"/>.
 	/// </remarks>
-	private static int EnterArgumentLines(SeparatedSyntaxList<ArgumentSyntax> arguments, int openEnd, PrintContext context)
+	private static int EnterArgumentLines(SeparatedSyntaxList<ArgumentSyntax> arguments, int openEnd, int closeStart, PrintContext context)
 	{
+		// Every gap asked about below lies between the brackets, so a list the author kept on one line
+		// answers without reading a single argument's span — which is most lists.
+		if (!context.AuthorBroke(openEnd, closeStart))
+			return -1;
+
 		var previousEnd = openEnd;
 		for (var i = 0; i < arguments.Count; i++)
 		{
-			if (context.AuthorBroke(previousEnd, arguments[i].SpanStart))
+			var span = arguments[i].Span;
+			if (context.AuthorBroke(previousEnd, span.Start))
 			{
 				var register = context.EnterContinuation();
 				context.Arena.LineShiftAnchor(register);
 				return register;
 			}
 
-			previousEnd = arguments[i].Span.End;
+			previousEnd = span.End;
 		}
 
 		return -1;
@@ -2416,10 +2435,20 @@ internal static partial class Printers
 	/// as a space, and a blank line there would force the list open, so it is dropped with the rest of
 	/// the author's layout.
 	/// </remarks>
-	internal static void BreakBetweenMembers(int previousEnd, SyntaxNode next, PrintContext context)
+	internal static void BreakBetweenMembers(int previousEnd, SyntaxNode next, PrintContext context) =>
+		BreakBeforeFirstToken(previousEnd, next.GetFirstToken(), context);
+
+	/// <summary>
+	/// <see cref="BreakBetweenMembers"/> for a caller that already has the next member's first token,
+	/// which saves walking down to it twice.
+	/// </summary>
+	/// <param name="previousEnd">Where the previous member ends.</param>
+	/// <param name="nextFirst">The next member's first token, for a caller that already has it.</param>
+	/// <param name="context">Per-file printing state.</param>
+	private static void BreakBeforeFirstToken(int previousEnd, SyntaxToken nextFirst, PrintContext context)
 	{
 		context.Arena.HardLine();
-		context.BlankLines(context.CodeSeparation(previousEnd, EffectiveStart(next)));
+		context.BlankLines(context.CodeSeparation(previousEnd, EffectiveTriviaStart(nextFirst)));
 	}
 
 	/// <summary>
@@ -3023,8 +3052,11 @@ internal static partial class Printers
 	/// deterministic mode means at the list printers: each of them already has a width-driven branch
 	/// for a construct the author left on one line, and this makes that the only branch.
 	/// </remarks>
-	internal static bool SpansLines(SyntaxNode node, PrintContext context) =>
-		context.AuthorBroke(node.SpanStart, node.Span.End);
+	internal static bool SpansLines(SyntaxNode node, PrintContext context)
+	{
+		var span = node.Span;
+		return context.AuthorBroke(span.Start, span.End);
+	}
 
 	/// <summary>
 	/// True when the block an expression finishes with is one that positions its own contents.
