@@ -99,6 +99,11 @@ public sealed class CSharpSource
 	/// <remarks>
 	/// Curb refuses to format source with syntax errors. Roslyn's recovery would happily produce a
 	/// tree, but re-printing from a guessed tree is exactly how a formatter destroys code.
+	/// <para>
+	/// An active <c>#error</c> is the exception. Its CS1029 says the author asked the compiler to
+	/// stop, not that the parse went wrong: the directive is trivia and the tree around it is exact.
+	/// dotnet format formats such a file, and so does Curb (issue #26).
+	/// </para>
 	/// </remarks>
 	public static bool TryParse(string source, out CSharpSource parsed, out IReadOnlyList<Diagnostic> errors)
 	{
@@ -117,7 +122,7 @@ public sealed class CSharpSource
 		List<Diagnostic>? diagnostics = null;
 		foreach (var d in tree.GetDiagnostics())
 		{
-			if (d.Severity == DiagnosticSeverity.Error)
+			if (d.Severity == DiagnosticSeverity.Error && d.Id != "CS1029")
 				(diagnostics ??= []).Add(d);
 		}
 
