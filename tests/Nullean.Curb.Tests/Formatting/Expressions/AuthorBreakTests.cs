@@ -799,4 +799,90 @@ public class AuthorBreakTests : FormattingTest
 		}
 		""",
 		editorConfig: "max_line_length = 120");
+
+	// Issue #147: a switch or query the author put below `=>` is not joined onto the arrow's line.
+
+	[Test]
+	public Task A_switch_expression_body_below_the_arrow_stays_there() => Unchanged(
+		"""
+		public class C
+		{
+		    public int N(int y) =>
+		        y switch
+		        {
+		            1 => 3,
+		            _ => 2
+		        };
+
+		    public int Deeper(int y) =>
+		            y switch
+		            {
+		                _ => 2
+		            };
+
+		    public int Flush(int y) =>
+		    y switch
+		    {
+		        _ => 2
+		    };
+
+		    public IEnumerable<int> Q(int[] xs) =>
+		            from x in xs
+		            where x > 1
+		            select x;
+		}
+		""");
+
+	[Test]
+	public Task A_reindented_switch_expression_body_below_the_arrow_moves_with_its_member() => Formats(
+		"""
+		public class C
+		{
+		        public int N(int y) =>
+		                y switch
+		                {
+		                    _ => 2
+		                };
+		}
+		""",
+		"""
+		public class C
+		{
+		    public int N(int y) =>
+		            y switch
+		            {
+		                _ => 2
+		            };
+		}
+		""");
+
+	[Test]
+	public Task A_switch_expression_body_below_the_arrow_stays_there_with_tabs() => Unchanged(
+		"public class C\n{\n\tpublic int N(int y) =>\n\t\ty switch\n\t\t{\n\t\t\t1 => 3,\n\t\t\t_ => 2\n\t\t};\n}",
+		editorConfig: "indent_style = tab");
+
+	[Test]
+	public Task Deterministic_layout_still_hugs_a_switch_expression_body() => Formats(
+		"""
+		public class C
+		{
+		    public int N(int y) =>
+		        y switch
+		        {
+		            1 => 3,
+		            _ => 2
+		        };
+		}
+		""",
+		"""
+		public class C
+		{
+		    public int N(int y) => y switch
+		    {
+		        1 => 3,
+		        _ => 2
+		    };
+		}
+		""",
+		editorConfig: "max_line_length = 120");
 }

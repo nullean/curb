@@ -582,15 +582,15 @@ internal static partial class Printers
 		var hugs = node.Expression is SwitchExpressionSyntax or QueryExpressionSyntax;
 		var breakBeforeArrow = !hugs
 			&& context.AuthorBroke(node.ArrowToken.GetPreviousToken().Span.End, node.ArrowToken.SpanStart);
-		var breakAfterArrow = !hugs
-			&& context.AuthorBroke(node.ArrowToken.Span.End, node.Expression.SpanStart);
+		var breakAfterArrow = context.AuthorBroke(node.ArrowToken.Span.End, node.Expression.SpanStart);
 
 		var arrowLeadsTheBody = !hugs && (context.Options.WrapBeforeArrowWithExpressions || breakBeforeArrow);
 
 		// A body the author put below the arrow stays as far in from the member's line as they put it,
 		// as a value below `=` does. dotnet format leaves it one level in, two, or anywhere else, and
 		// moves it as far as that line moves; breaking to one level in pulled a deeper body back — issue
-		// #139.
+		// #139. That includes a switch or query, whose braces and clauses follow it down rather than
+		// hugging the arrow — issue #147.
 		if (breakAfterArrow && !arrowLeadsTheBody)
 		{
 			ValueBelowOperator(node.ArrowToken, node.Expression, context);
