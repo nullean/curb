@@ -52,7 +52,13 @@ internal static partial class Printers
 			for (var i = 0; i < node.Members.Count; i++)
 			{
 				arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
-				context.BlankLines(context.DeclarationSeparation(previousEnd, EffectiveStart(node.Members[i])));
+
+				// A member that starts with a region boundary leaves the gap to the region's own exact
+				// count, as PrintTypeBody's members do. Measuring it here as well stacked the blank line the
+				// first run forced above an `#endregion` on top of the force itself, so every run added one
+				// (issue #165).
+				if (i == 0 || !NextStartsWithRegionBoundary(node.Members[i].GetFirstToken(includeZeroWidth: true)))
+					context.BlankLines(context.DeclarationSeparation(previousEnd, EffectiveStart(node.Members[i])));
 
 				Node.Print(node.Members[i], context);
 				previousEnd = node.Members[i].Span.End;
@@ -66,12 +72,27 @@ internal static partial class Printers
 
 			if (rewritesComma)
 				PrintTrailingComma(context);
+
+			// What sits above the closing brace — an `#endregion`, a comment — belongs to the members, so
+			// it is printed at their level, the way PrintTypeBody prints it. Printed with the brace, it
+			// landed at the brace's column, and an `#endregion` there at column 0 (issue #165).
+			if (TokenPrinter.HasLeadingContent(node.CloseBraceToken))
+			{
+				if (!NextStartsWithRegionBoundary(node.CloseBraceToken))
+				{
+					arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
+					context.BlankLines(context.DeclarationSeparation(previousEnd, EffectiveTriviaStart(node.CloseBraceToken)));
+				}
+				TokenPrinter.PrintLeadingTrivia(node.CloseBraceToken, context, trailingBreak: false);
+			}
 		}
 
 		using (arena.IndentIf(context.Options.IndentBraces))
-			arena.HardLine();
+		{
+			arena.HardLine(DocFlags.Reindent);
+			TokenPrinter.PrintWithoutLeadingTrivia(node.CloseBraceToken, context);
+		}
 
-		TokenPrinter.Print(node.CloseBraceToken, context);
 		TokenPrinter.PrintIfPresent(node.SemicolonToken, context);
 	}
 

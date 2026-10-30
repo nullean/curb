@@ -2360,7 +2360,16 @@ internal static partial class Printers
 			// That line is not the statement's, so a block following an element on it anchors to the line
 			// without coming back off: `a, new C` / `{` put the brace a level left of the line it opens
 			// on, where dotnet format then moved it back.
-			if (offset != int.MinValue)
+			//
+			// A `//` comment between `name:` and the value puts the value on a line of its own as well, so
+			// it keeps that line's indent too: coming back off it walked `fallbackLoggerFactory:` /
+			// `// note` / `Create(x =>` / `{` a level left on every run (issue #16).
+			//
+			// So does every element of a list the author kept on one line, once anything breaks it: its
+			// breaks are the group's, and a break inside any element breaks the group, so an element whose
+			// block opens out always starts a line of its own. `M(a, n switch { … })` put the opened-out
+			// switch's braces a level left of `n switch`, and the next run moved them back (issue #16).
+			if (offset != int.MinValue || !asWritten || (ownBlock && ValueBelowComment(element, value!, context)))
 				ownBlock = false;
 
 			using (offset == int.MinValue ? default : arena.AlignedIndent(lineShift, offset))
@@ -3121,7 +3130,8 @@ internal static partial class Printers
 
 	/// <summary>
 	/// How many levels into <paramref name="element"/> its first continuation line sits: two for a lambda
-	/// whose expression body hangs a level off the arrow's line, one for everything else.
+	/// whose expression body hangs a level off the arrow's line, none for an argument whose value a
+	/// <c>//</c> comment holds below its <c>name:</c>, one for everything else.
 	/// </summary>
 	private static int ContinuationLevels(SyntaxNode element, PrintContext context)
 	{
@@ -3133,11 +3143,40 @@ internal static partial class Printers
 			_ => null,
 		};
 
+		// `expectedErrors:` / `// note` / `Diagnostic(…)`: the comment keeps the value on a line of its
+		// own, so that line is the first continuation, and it is written at the element's base rather
+		// than a level into it. Based a level to the left, the comment and the value walked a level left
+		// on every run (issue #16).
+		if (value is not null && value != element && ValueBelowComment(element, value, context))
+			return 0;
+
 		return value is LambdaExpressionSyntax { ExpressionBody: { } body } lambda
 			&& context.AuthorJoined(lambda.ArrowToken.Span.End, body.SpanStart)
 			&& HangsOnArrowLine(body)
 				? 2
 				: 1;
+	}
+
+	/// <summary>
+	/// True when an argument's value starts on a later line than the argument does and a <c>//</c>
+	/// comment between the two keeps it there. Without one, the value joins the line its <c>name:</c> is on.
+	/// </summary>
+	private static bool ValueBelowComment(SyntaxNode element, ExpressionSyntax value, PrintContext context)
+	{
+		var first = value.GetFirstToken();
+		if (!context.AuthorBroke(element.SpanStart, first.SpanStart))
+			return false;
+
+		if (EndsWithLineComment(first.GetPreviousToken()))
+			return true;
+
+		foreach (var trivia in first.LeadingTrivia)
+		{
+			if (trivia.IsKind(SyntaxKind.SingleLineCommentTrivia))
+				return true;
+		}
+
+		return false;
 	}
 
 	/// <summary>
@@ -3180,6 +3219,12 @@ internal static partial class Printers
 
 			var token = node.FindToken(first);
 			if (token.SpanStart != first)
+				continue;
+
+			// An argument list's `(` joins the line above, so the line it starts is no continuation of
+			// Curb's. Read as one, `new Options` / `(` / `a,` / `)` based the list on the `(`, and the
+			// `)` landed a level left of where the next run put it back (issue #16).
+			if (token.IsKind(SyntaxKind.OpenParenToken) && token.Parent is ArgumentListSyntax)
 				continue;
 
 			if (OpensBraceLineAbove(node, token, line.Start, context))

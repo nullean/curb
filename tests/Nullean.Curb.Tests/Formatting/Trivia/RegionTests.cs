@@ -244,4 +244,72 @@ public class RegionTests : FormattingTest
 		    }
 		}
 		""");
+
+	// Issue #165: an enum's regions take the same gaps as a class's, once. The gap the first run forced
+	// above an `#endregion` was measured again as the author's on the next run and stacked on the force,
+	// and the last `#endregion`, printed with the closing brace, went to column 0.
+	[Test]
+	public Task Regions_around_enum_members_settle_in_one_run() => Formats(
+		"""
+		internal enum E
+		{
+		    #region first
+		    A = 1,
+		    #endregion first
+		    #region second
+		    C = 3,
+		    #endregion second
+		}
+		""",
+		"""
+		internal enum E
+		{
+		    #region first
+
+		    A = 1,
+
+		    #endregion first
+
+		    #region second
+
+		    C = 3,
+
+		    #endregion second
+		}
+		""");
+
+	[Test]
+	public Task Regions_around_enum_members_without_gaps_are_left_alone() => Unchanged(
+		"""
+		internal enum E
+		{
+		    #region first
+		    A = 1,
+		    #endregion first
+		    #region second
+		    C = 3,
+		    #endregion second
+		}
+		""",
+		editorConfig: "csharp_blank_lines_around_region = 0\ncsharp_blank_lines_inside_region = 0");
+
+	// Issue #165: what sits above an enum's closing brace is printed at the members' level, as it is in
+	// a class, not at the brace's.
+	[Test]
+	public Task A_comment_above_an_enums_closing_brace_stays_at_the_members_column() => Unchanged(
+		"""
+		enum E
+		{
+		    A,
+		    // trailing note
+		}
+
+		enum F
+		{
+		    A,
+		    B
+
+		    // trailing note
+		}
+		""");
 }
