@@ -17,9 +17,35 @@ inputs:
     required: false
     default: ''
 runs:
-  using: 'docker'
-  image: 'docker://ghcr.io/nullean/curb:edge'
-  args:
-    - ${{ inputs.command }}
-    - ${{ inputs.path }}
-    - ${{ inputs.args }}
+  # A composite step rather than `using: docker`, because a docker action names one fixed image. This picks the
+  # image built from the ref the workflow pins, so `nullean/curb@0.9.0` formats like curb 0.9.0, not like main.
+  using: 'composite'
+  steps:
+    - name: Run curb
+      shell: bash
+      env:
+        CURB_ACTION_REF: ${{ github.action_ref }}
+        CURB_COMMAND: ${{ inputs.command }}
+        CURB_PATH: ${{ inputs.path }}
+        CURB_ARGS: ${{ inputs.args }}
+      run: |
+        set -euo pipefail
+        repository=ghcr.io/nullean/curb
+        # A release (0.9.0), its major tag (v0) or a full commit SHA has an image of the same name; a branch runs edge.
+        if [[ "$CURB_ACTION_REF" =~ ^([0-9]+\.[0-9]+\.[0-9]+|v[0-9]+|[0-9a-f]{40})$ ]]; then
+          tag="$CURB_ACTION_REF"
+        else
+          tag=edge
+        fi
+        # Refs from before images carried their SHA and v<major> have no image of their own; keep them running on edge.
+        if [[ "$tag" != edge ]] && ! docker manifest inspect "$repository:$tag" > /dev/null 2>&1; then
+          echo "::warning title=curb::No $repository:$tag image; running $repository:edge instead. Pin a curb release to format with a fixed version."
+          tag=edge
+        fi
+        echo "Running $repository:$tag"
+        # CURB_ARGS is split on spaces on purpose, so "--cache /tmp/curb.cache" reaches curb as two arguments.
+        # shellcheck disable=SC2086
+        docker run --rm \
+          --volume "$GITHUB_WORKSPACE:/github/workspace" \
+          --workdir /github/workspace \
+          "$repository:$tag" "$CURB_COMMAND" "$CURB_PATH" $CURB_ARGS

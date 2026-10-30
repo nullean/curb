@@ -56,24 +56,38 @@ Download the binary for your platform from the GitHub releases page and put it o
 ## GitHub Action
 
 ```yaml
-- uses: nullean/curb@main
+- uses: nullean/curb@0.9.0
   with:
     path: .            # default; a file or directory
     command: check      # default; or "format" to rewrite in place
 ```
 
 Runs curb from a pre-built, distroless container (`ghcr.io/nullean/curb`) — no .NET SDK install needed in
-the workflow. `command: check` fails the job if anything would be reformatted; switch to `format` to rewrite
-files instead. Extra flags pass through verbatim via `args`:
+the workflow. The action runs the image built from the ref you pin, so a release pin keeps the formatter
+fixed until you bump it:
+
+| `uses:` | Image |
+|---|---|
+| `nullean/curb@0.9.0` | `ghcr.io/nullean/curb:0.9.0`, that release |
+| `nullean/curb@v0` | `ghcr.io/nullean/curb:v0`, the latest `0.x` release |
+| `nullean/curb@<full commit SHA>` | the image built from that commit |
+| `nullean/curb@main` | `ghcr.io/nullean/curb:edge`, the latest commit on `main` |
+
+A ref with no image of its own, such as a commit from before images carried their SHA, runs `edge` and logs
+a warning.
+
+`command: check` fails the job if anything would be reformatted; switch to `format` to rewrite files instead.
+Extra flags pass through verbatim via `args`:
 
 ```yaml
-- uses: nullean/curb@main
+- uses: nullean/curb@0.9.0
   with:
     command: check
     args: --cache /tmp/curb.cache
 ```
 
-Linux runners only (`ubuntu-latest` and similar) — container actions can't run on Windows or macOS runners.
+Linux runners only (`ubuntu-latest` and similar) — the action runs a Linux container, which Windows and macOS
+runners can't host.
 
 ## Container image
 
@@ -85,8 +99,8 @@ docker run --rm -v "$(pwd)":/workspace ghcr.io/nullean/curb:edge check /workspac
 ```
 
 Distroless: native-AOT, chiseled `runtime-deps` base, no shell, ~53 MB, runs as a non-root user. Tags follow
-curb's own releases — `edge` tracks the latest commit on `main`, `latest` and a semver tag (e.g. `0.6.0`)
-follow tagged releases.
+curb's own releases — `edge` tracks the latest commit on `main`; `latest`, a semver tag (e.g. `0.6.0`) and a
+major tag (e.g. `v0`) follow tagged releases; and every build is also tagged with its full commit SHA.
 
 ## Verifying the install
 

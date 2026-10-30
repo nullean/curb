@@ -1913,10 +1913,17 @@ let private createReleaseOnGithub (arguments:ParseResults<Arguments>) =
 /// "edge" always (so `ghcr.io/nullean/curb:edge` is always the latest main build), plus "latest" and
 /// the plain semver when this is an exact release tag rather than a canary commit — MinVer's canary
 /// suffix always contains a hyphen, a clean tag never does.
+///
+/// Every build is also tagged with its full commit SHA, and a release with "v<major>", so action.yml
+/// can run the image built from the very ref a workflow pins: `nullean/curb@0.9.0`, `@v0` or `@<sha>`.
 let private containerImageTags =
     lazy(
         let version = currentVersion.Value
-        if version.Contains("-") then "edge" else sprintf "edge;latest;%s" version
+        let sha = Information.getCurrentSHA1(".")
+        if version.Contains("-") then
+            sprintf "edge;%s" sha
+        else
+            sprintf "edge;latest;%s;v%s;%s" version (version.Split('.').[0]) sha
     )
 
 /// Publishes the CLI's native-AOT build as a container image via the .NET SDK's own container

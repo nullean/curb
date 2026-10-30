@@ -441,9 +441,10 @@ jobs:
             --skip-duplicate \
             --no-symbols; do echo "Retrying"; sleep 1; done
 
-      # ghcr.io/nullean/curb, matching elastic/docs-builder's own tagging: "edge" on every push,
-      # plus "latest" and the semver when this push is an exact release tag — see
-      # publishContainers/containerImageTags in Targets.fs for how that split is decided.
+      # ghcr.io/nullean/curb, matching elastic/docs-builder's own tagging: "edge" and the commit SHA on
+      # every push, plus "latest", the semver and "v<major>" when this push is an exact release tag — see
+      # publishContainers/containerImageTags in Targets.fs for how that split is decided. action.yml
+      # picks among these tags by the ref a workflow pins.
       - name: Log in to ghcr.io
         if: github.event_name == 'push'
         uses: docker/login-action@v3
