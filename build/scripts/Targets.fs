@@ -731,6 +731,104 @@ let private cleanupConformance (arguments:ParseResults<Arguments>) =
     printfn "cleanup conformance verified: %d site(s) fixed across a solution that still builds, %d declined and said so"
         (sitesBefore.Count - sitesAfter.Count) sitesAfter.Count
 
+/// The properties and items `xmlsafety` asks MSBuild for: what a project builds, under what name, for
+/// which frameworks and with which inputs. Formatting a project file must change none of them.
+let private xmlSafetyProperties =
+    [ "TargetFramework"; "TargetFrameworks"; "AssemblyName"; "RootNamespace"; "OutputType"; "Nullable"
+      "LangVersion"; "PackageId"; "Version"; "DefineConstants" ]
+
+let private xmlSafetyItems = [ "Compile"; "PackageReference"; "ProjectReference"; "None"; "Content" ]
+
+/// Evaluates one project and returns MSBuild's JSON, or None when it does not evaluate.
+let private evaluateProject (project: string) =
+    let info = Diagnostics.ProcessStartInfo("dotnet")
+    info.ArgumentList.Add "msbuild"
+    info.ArgumentList.Add project
+    info.ArgumentList.Add "-nologo"
+    for property in xmlSafetyProperties do info.ArgumentList.Add(sprintf "-getProperty:%s" property)
+    for item in xmlSafetyItems do info.ArgumentList.Add(sprintf "-getItem:%s" item)
+    info.RedirectStandardOutput <- true
+    info.RedirectStandardError <- true
+    info.WorkingDirectory <- Path.GetDirectoryName project
+    // Evaluation only: no restore, no build, and no node reuse leaking state between the two passes.
+    info.Environment["MSBUILDDISABLENODEREUSE"] <- "1"
+    info.Environment["DOTNET_CLI_TELEMETRY_OPTOUT"] <- "1"
+    use proc = Diagnostics.Process.Start info
+    let output = proc.StandardOutput.ReadToEndAsync()
+    let error = proc.StandardError.ReadToEndAsync()
+    proc.WaitForExit()
+    let json = output.Result
+    // A file's timestamps are well-known metadata on every item, and formatting rewrites files, so they
+    // are the one part of the answer that is expected to move.
+    let timestamps = Text.RegularExpressions.Regex(@"^\s*""(ModifiedTime|CreatedTime|AccessedTime)"": .*$\n?", Text.RegularExpressions.RegexOptions.Multiline)
+    if proc.ExitCode = 0 && json.TrimStart().StartsWith "{" then Some(timestamps.Replace(json, "")) else (error.Result |> ignore; None)
+
+/// Proves formatting project files is safe the only way that counts: MSBuild reads them the same.
+///
+/// Copies the corpus, forces `curb_xml_format = true` in an appended section (whatever the corpus
+/// says), and evaluates every project before and after `curb format`, comparing the JSON MSBuild
+/// reports for a representative set of properties and items byte for byte. A project that does not
+/// evaluate before formatting (a missing SDK, a restore it needs) is reported and skipped; one that
+/// evaluated before and does not after is a failure. Then a second run must find nothing to change in
+/// the XML it just formatted.
+let private xmlSafety (arguments:ParseResults<Arguments>) =
+    let corpus = corpusFrom arguments "xmlsafety"
+    let work = Path.Combine(Paths.Output.FullName, "xmlsafety")
+    if Directory.Exists work then Directory.Delete(work, true)
+    printfn "copying corpus from %s" corpus.FullName
+    copyTree corpus.FullName work
+
+    let rootConfig = Path.Combine(work, ".editorconfig")
+    let existing = if File.Exists rootConfig then File.ReadAllText rootConfig else "root = true\n"
+    File.WriteAllText(rootConfig, existing + "\n\n[*.{csproj,fsproj,vbproj,proj,props,targets,slnx,config}]\ncurb_xml_format = true\n")
+
+    let projects =
+        [| for pattern in [ "*.csproj"; "*.fsproj"; "*.vbproj"; "*.proj" ] do
+               yield! Directory.GetFiles(work, pattern, SearchOption.AllDirectories) |]
+        |> Array.sort
+
+    printfn "evaluating %d project(s) before formatting" projects.Length
+    let before = projects |> Array.Parallel.map (fun p -> p, evaluateProject p)
+    let evaluated = before |> Array.choose (fun (p, json) -> json |> Option.map (fun j -> p, j))
+    let skipped = before |> Array.filter (fun (_, json) -> json.IsNone) |> Array.map fst
+
+    let run command =
+        let result = Proc.Start("dotnet", [| "run"; "--project"; "src/Nullean.Curb.Cli"; "-c"; "Release"; "--"; command; work |])
+        let output = result.ConsoleOut |> Seq.map (fun l -> l.Line) |> String.concat "\n"
+        printfn "%s" output
+        output
+
+    let xmlLine (output: string) =
+        let matched = Text.RegularExpressions.Regex.Match(output, @"xml: (\d+) file\(s\) — (\d+) (?:changed|would change), (?:\d+ skipped, )?(\d+) failed, (\d+) unparsable")
+        // The per-language line only appears once a second language ran; a corpus of project files
+        // alone gets the run's own summary line, which is then all XML.
+        let alone = Text.RegularExpressions.Regex.Match(output, @"(?:Formatted|Checked) (\d+) file\(s\).* — (\d+) (?:changed|would change), (?:\d+ skipped, )?(\d+) failed, (\d+) unparsable")
+        if matched.Success then [| for i in 1 .. 4 -> int matched.Groups[i].Value |]
+        elif alone.Success then [| for i in 1 .. 4 -> int alone.Groups[i].Value |]
+        else failwithf "could not read the run's summary from:\n%s" output
+
+    let formatted = run "format" |> xmlLine
+
+    printfn "evaluating %d project(s) after formatting" evaluated.Length
+    let differing =
+        evaluated
+        |> Array.Parallel.map (fun (p, json) -> p, json, evaluateProject p)
+        |> Array.filter (fun (_, json, after) -> after <> Some json)
+
+    let second = run "check" |> xmlLine
+
+    printfn ""
+    printfn "xml files: %d, changed by formatting: %d, failed: %d, unparsable: %d" formatted[0] formatted[1] formatted[2] formatted[3]
+    printfn "projects: %d, evaluated: %d, skipped (did not evaluate before formatting): %d" projects.Length evaluated.Length skipped.Length
+    printfn "evaluation identical after formatting: %d/%d" (evaluated.Length - differing.Length) evaluated.Length
+    printfn "second pass: %d xml file(s) would change" second[1]
+    skipped |> Array.truncate 10 |> Array.iter (fun p -> printfn "  skipped %s" (Path.GetRelativePath(work, p)))
+    differing |> Array.iter (fun (p, _, _) -> printfn "  EVALUATION CHANGED %s" (Path.GetRelativePath(work, p)))
+
+    if differing.Length > 0 then failwithf "%d project(s) evaluate differently after formatting" differing.Length
+    if formatted[2] > 0 then failwithf "%d xml file(s) failed to format" formatted[2]
+    if second[1] > 0 then failwithf "formatting is not idempotent: %d xml file(s) changed on the second pass" second[1]
+
 /// Feeds a corpus verdicts Curb has no business trusting, and requires that none of them damages a file.
 ///
 /// The counterpart to `conformance`, for the half of cleanup that conformance cannot reach. Every other
@@ -2228,6 +2326,7 @@ let Setup (parsed:ParseResults<Arguments>) (subCommand:Arguments) =
     cmd CleanupSmoketest.Name (Some [Build.Name]) None <| fun _ -> cleanupSmoketest parsed
     cmd CleanupSafety.Name (Some [Build.Name]) None <| fun _ -> cleanupSafety parsed
     cmd CleanupConformance.Name (Some [Build.Name]) None <| fun _ -> cleanupConformance parsed
+    cmd XmlSafety.Name (Some [Build.Name]) None <| fun _ -> xmlSafety parsed
 
     // No dependency on build: the documentation is markdown and one static HTML file, and waiting on
     // a Release compile to preview a paragraph would make nobody run it.
