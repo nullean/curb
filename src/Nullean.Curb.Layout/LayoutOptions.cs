@@ -26,6 +26,12 @@ public enum EndOfLine : byte
 	Auto = 0,
 	Lf = 1,
 	CrLf = 2,
+
+	/// <summary>
+	/// A lone <c>\r</c>. Never bound from <c>end_of_line</c>, which refuses <c>cr</c>; XML resolves to it
+	/// when the file it is keeping the line endings of uses them.
+	/// </summary>
+	Cr = 3,
 }
 
 
@@ -91,6 +97,7 @@ public readonly record struct LayoutOptions
 		{
 			EndOfLine.Lf => "\n",
 			EndOfLine.CrLf => "\r\n",
+			EndOfLine.Cr => "\r",
 			_ => Environment.NewLine,
 		};
 }

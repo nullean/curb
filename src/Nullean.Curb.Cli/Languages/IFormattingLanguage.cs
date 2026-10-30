@@ -1,4 +1,5 @@
 using EditorConfig.Core;
+using Nullean.Curb.EditorConfig;
 
 namespace Nullean.Curb.Cli.Languages;
 
@@ -31,7 +32,9 @@ internal interface IFormattingLanguage
 	/// resolver it follows is not thread-safe. Nothing it returns may be mutated afterwards: workers on
 	/// every thread read it.
 	/// </remarks>
-	LanguageOptions BindOptions(FileConfiguration configuration);
+	/// <param name="configuration">The file's resolved settings.</param>
+	/// <param name="editorConfig">The run's resolver, for a language that needs more than the merged settings.</param>
+	LanguageOptions BindOptions(FileConfiguration configuration, CurbEditorConfig editorConfig);
 
 	/// <summary>
 	/// True when the file says, in its own text, not to format it, such as C#'s <c>&lt;auto-generated&gt;</c>
@@ -52,6 +55,30 @@ internal abstract class LanguageOptions
 
 	/// <summary>The configuration asked for the file not to be formatted at all.</summary>
 	public abstract bool Excluded { get; }
+
+	/// <summary>
+	/// False when the language declines the file before the run begins: it is never read and never
+	/// counted, as though the walk had not found it.
+	/// </summary>
+	/// <remarks>
+	/// For a language a repository has to opt into, such as XML behind <c>curb_xml_format</c>. Counting
+	/// every project file as skipped in a repository that never asked for them would be noise, and
+	/// <see cref="Excluded"/> is for a file that did ask to be left alone.
+	/// </remarks>
+	public virtual bool Claimed => true;
+
+	/// <summary>
+	/// Settings the options were bound from beyond the file's merged ones, hashed into the cache key
+	/// with them; null when there are none.
+	/// </summary>
+	/// <remarks>
+	/// XML binds its core keys from explicit sections only, so moving <c>indent_size</c> from
+	/// <c>[*]</c> to <c>[*.csproj]</c> changes its options without changing the merged settings.
+	/// </remarks>
+	public virtual IReadOnlyDictionary<string, string>? AdditionalProperties => null;
+
+	/// <summary>False for a language whose results carry no printer coverage, so it stays out of that figure.</summary>
+	public virtual bool ReportsCoverage => true;
 }
 
 /// <summary>A language Curb formats itself, with one <see cref="ILanguageWorker"/> per thread.</summary>

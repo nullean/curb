@@ -112,7 +112,7 @@ internal static class FormattingRun
 		{
 			var root = fileSystem.Path.GetFullPath(target);
 			files = fileSystem.Directory.Exists(root)
-				? [.. fileSystem.Directory.EnumerateFiles(root, languages.SearchPattern, SearchOption.AllDirectories).Where(path => IsFormattable(languages, path))]
+				? [.. Walk(fileSystem, root, languages).Where(path => IsFormattable(languages, path))]
 				: [root];
 		}
 
@@ -129,7 +129,7 @@ internal static class FormattingRun
 		// The options fingerprint has to be taken here for the same reason, and it is only taken at all
 		// when there is a cache to key. The path is absolutised for the cache alone, so the messages and
 		// the writes below still say whatever the caller asked for.
-		var work = new (string Path, int Language, LanguageOptions Options, string CacheKey, UInt128 OptionsHash)[files.Length];
+		var claimed = new List<(string Path, int Language, LanguageOptions Options, string CacheKey, UInt128 OptionsHash)>(files.Length);
 		var fingerprinter = cache is null ? null : new OptionsFingerprinter();
 		for (var i = 0; i < files.Length; i++)
 		{
@@ -138,13 +138,24 @@ internal static class FormattingRun
 			// A file given as the target itself never went through the extension filter, and has always
 			// been formatted as C# regardless; the first language keeps it that way.
 			var language = Math.Max(0, languages.IndexOf(files[i]));
-			work[i] = (
+			var options = languages[language].BindOptions(configuration, editorConfig);
+
+			// A file its language declines (XML the repository has not opted into) leaves the run here,
+			// before it is read, hashed or counted.
+			if (!options.Claimed)
+				continue;
+
+			claimed.Add((
 				files[i],
 				language,
-				languages[language].BindOptions(configuration),
+				options,
 				cache is null ? "" : fileSystem.Path.GetFullPath(files[i]),
-				fingerprinter?.Of(configuration) ?? default);
+				fingerprinter is null ? default : OptionsHash(fingerprinter, configuration, options)));
 		}
+
+		var work = claimed.ToArray();
+		if (work.Length != files.Length)
+			files = [.. work.Select(item => item.Path)];
 
 		var changed = 0;
 		var cached = 0;
@@ -154,7 +165,14 @@ internal static class FormattingRun
 		long printedTokens = 0;
 		long totalTokens = 0;
 		var reparsed = 0;
+
+		// Files printed by a language with no printer coverage and no second parse (XML), kept out of
+		// both figures.
+		var uncovered = 0;
 		var unhandled = new Dictionary<(int Language, int Kind), int>();
+
+		// Per language, for the breakdown printed once more than one language ran.
+		var tallies = new LanguageTally[languages.Count];
 		var messages = new System.Collections.Concurrent.ConcurrentBag<string>();
 		var unformatted = write || unformattedListPath is null ? null : new System.Collections.Concurrent.ConcurrentBag<string>();
 
@@ -224,6 +242,9 @@ internal static class FormattingRun
 				// Parallel.ForEachAsync, which would abort every file still queued behind it on the
 				// strength of one the printer was never meant to survive. The file is reported and,
 				// because the catch sits before any write, left exactly as it was found.
+				if (!item.Options.ReportsCoverage)
+					Interlocked.Increment(ref uncovered);
+
 				try
 				{
 					var hadBom = item.Bytes.Length >= 3 && item.Bytes[0] == 0xEF && item.Bytes[1] == 0xBB && item.Bytes[2] == 0xBF;
@@ -235,6 +256,7 @@ internal static class FormattingRun
 					catch (DecoderFallbackException)
 					{
 						Interlocked.Increment(ref unparsable);
+						Interlocked.Increment(ref tallies[item.Language].Unparsable);
 						messages.Add($"{item.Path}: is not valid UTF-8 — left unchanged");
 						return ValueTask.CompletedTask;
 					}
@@ -247,6 +269,7 @@ internal static class FormattingRun
 					if (item.Options.Excluded || language.SkipSource(source))
 					{
 						Interlocked.Increment(ref skipped);
+						Interlocked.Increment(ref tallies[item.Language].Skipped);
 						return ValueTask.CompletedTask;
 					}
 
@@ -265,12 +288,14 @@ internal static class FormattingRun
 					{
 						case FormatStatus.SyntaxError:
 							Interlocked.Increment(ref unparsable);
+							Interlocked.Increment(ref tallies[item.Language].Unparsable);
 							messages.Add($"{item.Path}: does not parse — {result.Message}");
 							break;
 
 						case FormatStatus.VerificationFailed:
 						case FormatStatus.TooDeep:
 							Interlocked.Increment(ref failed);
+							Interlocked.Increment(ref tallies[item.Language].Failed);
 							messages.Add($"{item.Path}: {result.Message}");
 							break;
 
@@ -297,6 +322,7 @@ internal static class FormattingRun
 								else
 									unformatted?.Add(item.Path);
 								Interlocked.Increment(ref changed);
+								Interlocked.Increment(ref tallies[item.Language].Changed);
 							}
 							else
 							{
@@ -310,14 +336,19 @@ internal static class FormattingRun
 							break;
 					}
 
-					// Coverage is reported per run so that printer progress is visible as a number.
-					var tokens = result.Coverage;
-					Interlocked.Add(ref printedTokens, (long)(tokens * 1000));
-					Interlocked.Increment(ref totalTokens);
+					// Coverage is reported per run so that printer progress is visible as a number. Only a
+					// language that has printers to cover counts towards it.
+					if (item.Options.ReportsCoverage)
+					{
+						var tokens = result.Coverage;
+						Interlocked.Add(ref printedTokens, (long)(tokens * 1000));
+						Interlocked.Increment(ref totalTokens);
+					}
 				}
 				catch (Exception exception)
 				{
 					Interlocked.Increment(ref failed);
+					Interlocked.Increment(ref tallies[item.Language].Failed);
 					messages.Add($"{item.Path}: internal error — {exception.Message}");
 				}
 
@@ -370,10 +401,27 @@ internal static class FormattingRun
 
 		var coverage = totalTokens == 0 ? 1 : printedTokens / (double)totalTokens / 1000;
 
+		// Coverage is a C# figure. A run that printed only XML has none to report, rather than a
+		// vacuous 100 %; a run that printed nothing at all keeps the line it always had.
+		var coverageText = totalTokens == 0 && uncovered > 0 ? "" : string.Create(CultureInfo.InvariantCulture, $", printer coverage {coverage:P1}");
 		Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
 			$"{(write ? "Formatted" : "Checked")} {files.Length} file(s){CachedText(cached)} in {stopwatch.ElapsedMilliseconds}ms — "
-			+ $"{changed} {(write ? "changed" : "would change")}, {SkippedText(skipped)}{failed} failed, {unparsable} unparsable, "
-			+ $"printer coverage {coverage:P1}"));
+			+ $"{changed} {(write ? "changed" : "would change")}, {SkippedText(skipped)}{failed} failed, {unparsable} unparsable{coverageText}"));
+
+		// Only once a second language ran, so a C#-only run prints exactly what it always has.
+		foreach (var item in work)
+			tallies[item.Language].Files++;
+		if (tallies.Count(tally => tally.Files > 0) > 1)
+		{
+			for (var i = 0; i < tallies.Length; i++)
+			{
+				if (tallies[i].Files == 0)
+					continue;
+				Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
+					$"  {languages[i].Id}: {tallies[i].Files} file(s) — {tallies[i].Changed} {(write ? "changed" : "would change")}, "
+					+ $"{SkippedText(tallies[i].Skipped)}{tallies[i].Failed} failed, {tallies[i].Unparsable} unparsable"));
+			}
+		}
 
 		var costModel = expandUnhandled ? "  [full-coverage cost model]" : string.Empty;
 		Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
@@ -397,14 +445,73 @@ internal static class FormattingRun
 			// Out of the files that were printed, not out of every file named. A cache hit never reaches
 			// the printer, so counting it in the denominator would report a proportion of a population
 			// that was never at risk.
-			var printed = files.Length - cached;
-			Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
-				$"  round-trip verified {reparsed} of {printed} file(s) "
-				+ $"({reparsed / (double)Math.Max(1, printed):P1} needed a second parse)"));
+			//
+			// XML is left out too: every XML output is re-lexed and verified, which is not a second parse.
+			var printed = files.Length - cached - uncovered;
+			if (printed > 0 || uncovered == 0)
+			{
+				Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
+					$"  round-trip verified {reparsed} of {printed} file(s) "
+					+ $"({reparsed / (double)Math.Max(1, printed):P1} needed a second parse)"));
+			}
 		}
 
 		var exitCode = failed > 0 ? 3 : !write && changed > 0 ? 1 : 0;
 		return new FormattingRunSummary(files.Length, changed, cached, skipped, failed, unparsable, reparsed, coverage, exitCode);
+	}
+
+	/// <summary>
+	/// The cache key's options half: the file's merged settings, and whatever else its language bound
+	/// from.
+	/// </summary>
+	private static UInt128 OptionsHash(OptionsFingerprinter fingerprinter, global::EditorConfig.Core.FileConfiguration configuration, LanguageOptions options)
+	{
+		var hash = fingerprinter.Of(configuration);
+		if (options.AdditionalProperties is { } additional)
+			hash = (hash * 1_000_003) ^ Fingerprint.OfProperties(additional);
+		return hash;
+	}
+
+	/// <summary>
+	/// Every file under <paramref name="root"/> a registered language might own, without descending into
+	/// <c>.git</c>, <c>bin</c> or <c>obj</c>.
+	/// </summary>
+	/// <remarks>
+	/// With one language the file system is asked for its one extension across the whole tree, as it
+	/// always was. With more there is no single pattern to ask for, and enumerating everything only to
+	/// filter it would hand back a path string for every object in <c>.git</c> and every build output.
+	/// Those folders are pruned before they are entered instead. The bin/obj half of
+	/// <see cref="IsFormattable"/> still applies afterwards, so a root that is itself inside one behaves
+	/// as before.
+	/// </remarks>
+	private static IEnumerable<string> Walk(IFileSystem fileSystem, string root, LanguageRegistry languages)
+	{
+		if (languages.SearchPattern != "*")
+		{
+			foreach (var file in fileSystem.Directory.EnumerateFiles(root, languages.SearchPattern, SearchOption.AllDirectories))
+				yield return file;
+			yield break;
+		}
+
+		var pending = new Stack<string>();
+		pending.Push(root);
+		while (pending.Count > 0)
+		{
+			var directory = pending.Pop();
+			foreach (var file in fileSystem.Directory.EnumerateFiles(directory))
+			{
+				if (languages.IndexOf(file) >= 0)
+					yield return file;
+			}
+
+			foreach (var child in fileSystem.Directory.EnumerateDirectories(directory))
+			{
+				var name = fileSystem.Path.GetFileName(child.AsSpan());
+				if (name is ".git" or "bin" or "obj")
+					continue;
+				pending.Push(child);
+			}
+		}
 	}
 
 	/// <summary>
@@ -435,3 +542,13 @@ internal readonly record struct FormattingRunSummary(
 	int Reparsed,
 	double Coverage,
 	int ExitCode);
+
+/// <summary>One language's share of a run's outcomes.</summary>
+internal struct LanguageTally
+{
+	public int Files;
+	public int Changed;
+	public int Skipped;
+	public int Failed;
+	public int Unparsable;
+}

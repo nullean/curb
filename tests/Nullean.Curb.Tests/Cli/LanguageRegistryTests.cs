@@ -18,9 +18,9 @@ public class LanguageRegistryTests
 	private const string Root = "/repo";
 
 	[Test]
-	public async Task The_default_registry_is_csharp_alone_and_walks_only_cs_files()
+	public async Task The_csharp_registry_walks_only_cs_files()
 	{
-		var registry = LanguageRegistry.Default;
+		var registry = LanguageRegistry.CSharpOnly;
 
 		registry.Count.Should().Be(1);
 		registry[0].Should().BeSameAs(CSharpLanguage.Instance);
@@ -29,6 +29,22 @@ public class LanguageRegistryTests
 		registry.IndexOf("/repo/A.CS").Should().Be(0);
 		registry.IndexOf("/repo/A.fs").Should().Be(-1);
 		registry.IndexOf("/repo/A.csproj").Should().Be(-1);
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task The_default_registry_adds_xml_for_project_and_solution_files()
+	{
+		var registry = LanguageRegistry.Default;
+
+		registry.Count.Should().Be(2);
+		registry.SearchPattern.Should().Be("*");
+		registry.IndexOf("/repo/A.cs").Should().Be(0);
+		registry.IndexOf("/repo/A.csproj").Should().Be(1);
+		registry.IndexOf("/repo/Directory.Build.TARGETS").Should().Be(1);
+		registry.IndexOf("/repo/A.slnx").Should().Be(1);
+		registry.IndexOf("/repo/nuget.config").Should().Be(1);
+		registry.IndexOf("/repo/A.sln").Should().Be(-1);
 		await Task.CompletedTask;
 	}
 
@@ -83,7 +99,7 @@ public class LanguageRegistryTests
 
 		public string[] Extensions { get; } = [".shout"];
 
-		public LanguageOptions BindOptions(FileConfiguration configuration) =>
+		public LanguageOptions BindOptions(FileConfiguration configuration, CurbEditorConfig editorConfig) =>
 			new ShoutOptions(LayoutOptionsBinder.Bind(configuration.Properties, null, new LayoutOptions { IndentSize = 2 }));
 
 		public bool SkipSource(string source) => false;

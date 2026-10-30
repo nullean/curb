@@ -16,6 +16,7 @@ width-aware reflow. It ships as a native-AOT `dotnet tool`.
 ./build.sh msbuildsmoketest              # formatter runs before CoreCompile
 ./build.sh cleanupsmoketest              # cleanup fixes what a build reported
 ./build.sh cleanupsafety --corpus <path> # feed a corpus wrong verdicts; none may damage a file
+./build.sh xmlsafety --corpus <path>     # format project files; MSBuild must evaluate every project the same
 ./build.sh cleanupconformance            # clean a solution that builds; it must still build
 ./build.sh verifyexpectations            # expectations survive dotnet format
 ./build.sh verifycleanupexpectations     # cleanup-rule cases are a fixed point of dotnet format style
@@ -30,6 +31,7 @@ Microsoft.Testing.Platform, so they are launched with `dotnet run`, not `dotnet 
 | Path | What |
 |---|---|
 | `src/Nullean.Curb.Layout` | The language-neutral half: document IR, layout printer, `LayoutOptions`. **No package references, no parser.** A language plugs in through `ILayoutLanguage`. |
+| `src/Nullean.Curb.Xml` | The XML engine for project, props, targets, `.slnx` and `nuget.config` files: lossless lexer, well-formedness tree, printer, verifier. References Layout only. |
 | `src/Nullean.Curb.Core` | The C# engine: syntax printers, verifier, `FormatOptions`. **No IO, no config source.** |
 | `src/Nullean.Curb.Cleanup` | Applies code style fixes from diagnostics a build reported. **No IO, no compilation.** |
 | `src/Nullean.Curb.EditorConfig` | Binds `.editorconfig` to formatting options. Owns the `IFileSystem` dependency. |

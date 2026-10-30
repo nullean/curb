@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using Nullean.Curb;
 using Nullean.Curb.Options;
+using Nullean.Curb.Xml;
 
 namespace Nullean.Curb.OptionDocs;
 
@@ -40,6 +41,19 @@ internal static class Program
         [OptionGroup.ModifiersAndBraces] = "modifiers-and-braces",
         [OptionGroup.TrailingCommas] = "trailing-commas",
         [OptionGroup.Suppression] = "suppression",
+        [OptionGroup.XmlFiles] = "xml-files",
+        [OptionGroup.XmlLayout] = "xml-layout",
+    };
+
+    /// <summary>
+    /// The directory a group's pages go in under its language's root. The slug itself stays unique
+    /// across languages, since the docs listing groups by it.
+    /// </summary>
+    private static string GroupDirectory(OptionGroup group) => group switch
+    {
+        OptionGroup.XmlFiles => "files",
+        OptionGroup.XmlLayout => "layout",
+        _ => GroupSlugs[group],
     };
 
     private static readonly Dictionary<OptionGroup, string> GroupTitles = new()
@@ -55,6 +69,8 @@ internal static class Program
         [OptionGroup.ModifiersAndBraces] = "Modifiers and Braces",
         [OptionGroup.TrailingCommas] = "Trailing Commas",
         [OptionGroup.Suppression] = "Suppression",
+        [OptionGroup.XmlFiles] = "XML: Files",
+        [OptionGroup.XmlLayout] = "XML: Layout",
     };
 
     private static readonly Dictionary<OptionGroup, string> GroupDescriptions = new()
@@ -93,6 +109,18 @@ internal static class Program
         [OptionGroup.Suppression] =
             "Options for excluding files from formatting entirely, adjusting the severity of the IDE0055 diagnostic, " +
             "and inserting a file-header comment. IDE0073.",
+        [OptionGroup.XmlFiles] =
+            "Which XML files Curb formats. Project, props, targets, solution and `nuget.config` files are formatted by " +
+            "default; set `curb_xml_format = false` to leave them alone, and name other XML extensions in " +
+            "`curb_xml_extensions` to opt them in. The `curb` MSBuild package never formats XML, only `curb format` " +
+            "and `curb check` do. The core keys apply to XML only from sections that name its files, such as " +
+            "`[*.csproj]` or `[Directory.Packages.props]`; `[*]`, `[**]` and `[*.*]` are ignored for them. Without such a " +
+            "section XML indents by two, has no width, and keeps each file's own line endings, final newline and " +
+            "trailing whitespace. The `curb_xml_*` and `xml_*` keys apply from any section.",
+        [OptionGroup.XmlLayout] =
+            "How Curb lays XML out. It keeps the author's layout: it re-indents the lines that start a child element, caps " +
+            "blank lines, and tidies the whitespace inside start tags. Text, comments, CDATA, attribute values and anything " +
+            "MSBuild reads as a value are never changed.",
     };
 
     /// <summary>One documented case where an option's chosen shape is not a fixed point of a tool.</summary>
@@ -141,6 +169,7 @@ internal static class Program
         Console.WriteLine($"output:    {outputRoot}");
 
         var formatter = new CSharpFormatter();
+        using var xmlFormatter = new XmlFormatter();
         var defaultOptions = new FormatOptions();
         var divergences = LoadDivergences(root);
 
@@ -152,15 +181,17 @@ internal static class Program
         int generated = 0;
         foreach (var descriptor in OptionDescriptor.All)
         {
-            var slug = GroupSlugs[descriptor.Group];
-            var dir = Path.Combine(LanguageRoot(outputRoot, descriptor.Language), slug);
+            var dir = Path.Combine(LanguageRoot(outputRoot, descriptor.Language), GroupDirectory(descriptor.Group));
             Directory.CreateDirectory(dir);
 
-            var snippet = Snippets.All.TryGetValue(descriptor.SnippetKey, out var s)
+            var snippets = descriptor.Language == OptionLanguage.Xml ? Snippets.Xml : Snippets.All;
+            var snippet = snippets.TryGetValue(descriptor.SnippetKey, out var s)
                 ? s
                 : throw new InvalidOperationException($"Missing snippet '{descriptor.SnippetKey}' for key '{descriptor.Key}'");
 
-            var page = BuildPage(descriptor, snippet, formatter, defaultOptions, divergences[descriptor.Key]);
+            var page = descriptor.Language == OptionLanguage.Xml
+                ? BuildXmlPage(descriptor, snippet, xmlFormatter)
+                : BuildPage(descriptor, snippet, formatter, defaultOptions, divergences[descriptor.Key]);
             var path = Path.Combine(dir, descriptor.Key + ".md");
             File.WriteAllText(path, page, Encoding.UTF8);
             Console.WriteLine($"  {Path.GetRelativePath(root, path)}");
@@ -170,9 +201,13 @@ internal static class Program
         // Write group index pages.
         foreach (var (group, descriptors) in grouped)
         {
-            var slug = GroupSlugs[group];
+            // The reference listing only picks up a group index directly under docs/reference, so a
+            // language in a directory of its own is listed through its pages' front matter alone.
+            if (descriptors[0].Language is not (OptionLanguage.Shared or OptionLanguage.CSharp))
+                continue;
+
             var title = GroupTitles[group];
-            var dir = Path.Combine(LanguageRoot(outputRoot, descriptors[0].Language), slug);
+            var dir = Path.Combine(LanguageRoot(outputRoot, descriptors[0].Language), GroupDirectory(group));
             Directory.CreateDirectory(dir);
 
             var sb = new StringBuilder();
@@ -201,12 +236,18 @@ internal static class Program
             sb.AppendLine();
             foreach (var (group, descriptors) in grouped)
             {
-                var slug = GroupSlugs[group];
+                var link = Path.GetRelativePath(outputRoot, Path.Combine(LanguageRoot(outputRoot, descriptors[0].Language), GroupDirectory(group))).Replace('\\', '/');
                 var title = GroupTitles[group];
-                sb.AppendLine($"## [{title}]({slug}/index.md)");
+                var hasIndex = descriptors[0].Language is OptionLanguage.Shared or OptionLanguage.CSharp;
+                sb.AppendLine(hasIndex ? $"## [{title}]({link}/index.md)" : $"## {title}");
+                if (!hasIndex)
+                {
+                    sb.AppendLine();
+                    sb.AppendLine(GroupDescriptions[group]);
+                }
                 sb.AppendLine();
                 foreach (var d in descriptors)
-                    sb.AppendLine($"- [{d.Key}]({slug}/{d.Key}.md) — {d.Summary}");
+                    sb.AppendLine($"- [{d.Key}]({link}/{d.Key}.md) — {d.Summary}");
                 sb.AppendLine();
             }
             var path = Path.Combine(outputRoot, "index.md");
@@ -327,7 +368,93 @@ internal static class Program
         return sb.ToString();
     }
 
-    private static void EmitValueSection(StringBuilder sb, string key, string value, string before, string after)
+    /// <summary>
+    /// An XML key's page. XML has no reference formatter, so there is no conformance section; the
+    /// examples are Curb's own output for a project file under each value.
+    /// </summary>
+    private static string BuildXmlPage(OptionDescriptor descriptor, string snippet, XmlFormatter formatter)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("---");
+        sb.AppendLine($"listing: {GroupSlugs[descriptor.Group]}");
+        sb.AppendLine($"description: \"{descriptor.Summary} Defaults to `{descriptor.Default}`\"");
+        sb.AppendLine("---");
+        sb.AppendLine();
+        sb.AppendLine(GroupedHeader);
+        sb.AppendLine();
+        sb.AppendLine($"# `{descriptor.Key}`");
+        sb.AppendLine();
+        sb.AppendLine(descriptor.Summary);
+        sb.AppendLine();
+        sb.AppendLine("## Values");
+        sb.AppendLine();
+        sb.AppendLine("| Value | Notes |");
+        sb.AppendLine("|---|---|");
+        foreach (var v in descriptor.Values)
+            sb.AppendLine($"| `{v}` | {(v == "<integer>" ? "Any integer." : v == "<extensions>" ? "Comma-separated extensions." : "")} |");
+        sb.AppendLine();
+        sb.AppendLine($"**Default:** `{descriptor.Default}`");
+        sb.AppendLine();
+        if (Snippets.XmlNotes.TryGetValue(descriptor.Key, out var note))
+        {
+            sb.AppendLine(note);
+            sb.AppendLine();
+        }
+
+        var values = descriptor.Values.Where(v => !v.StartsWith('<')).ToList();
+        if (Snippets.DemoValues.TryGetValue(descriptor.Key, out var demo))
+            values.Insert(0, demo);
+
+        if (values.Count == 0)
+        {
+            sb.AppendLine("*This option accepts a freeform value. No canned example is generated.*");
+            sb.AppendLine();
+            sb.AppendLine("```ini");
+            sb.AppendLine($"{descriptor.Key} = <value>");
+            sb.AppendLine("```");
+            return sb.ToString();
+        }
+
+        foreach (var value in values)
+        {
+            var options = BuildXmlOptions(descriptor.Key, value);
+            var after = snippet;
+            if (options.Enabled)
+            {
+                var result = formatter.Format(snippet, options);
+                if (!result.Success)
+                    throw new InvalidOperationException($"the {descriptor.Key} = {value} example does not format: {result.Message}");
+                after = result.Text!;
+            }
+
+            EmitValueSection(sb, descriptor.Key, value, snippet, after, "xml");
+        }
+
+        return sb.ToString();
+    }
+
+    private static XmlOptions BuildXmlOptions(string key, string value)
+    {
+        var options = new XmlOptions { Profile = XmlProfile.MsBuild, Layout = XmlOptions.DefaultLayout with { EndOfLine = EndOfLine.Lf } };
+        return key switch
+        {
+            "curb_xml_format" => options with { Enabled = value == "true" },
+            "xml_max_blank_lines_between_tags" => options with { MaxBlankLines = int.Parse(value, System.Globalization.CultureInfo.InvariantCulture) },
+            "xml_space_before_self_closing" => options with { SpaceBeforeSelfClosingOption = value == "true" ? SelfClosingSpace.Always : SelfClosingSpace.Never },
+            "xml_attribute_indent" => options with
+            {
+                AttributeIndent = value switch
+                {
+                    "single_indent" => AttributeIndent.SingleIndent,
+                    "double_indent" => AttributeIndent.DoubleIndent,
+                    _ => AttributeIndent.AlignByFirstAttribute,
+                },
+            },
+            _ => options,
+        };
+    }
+
+    private static void EmitValueSection(StringBuilder sb, string key, string value, string before, string after, string language = "csharp")
     {
         sb.AppendLine($"### `{key} = {value}`");
         sb.AppendLine();
@@ -338,14 +465,14 @@ internal static class Program
         sb.AppendLine("::::{tab-set}");
         sb.AppendLine();
         sb.AppendLine(":::{tab-item} Before");
-        sb.AppendLine("```csharp");
+        sb.AppendLine($"```{language}");
         sb.Append(before.TrimEnd());
         sb.AppendLine();
         sb.AppendLine("```");
         sb.AppendLine(":::");
         sb.AppendLine();
         sb.AppendLine(":::{tab-item} After");
-        sb.AppendLine("```csharp");
+        sb.AppendLine($"```{language}");
         sb.Append(after.TrimEnd());
         sb.AppendLine();
         sb.AppendLine("```");

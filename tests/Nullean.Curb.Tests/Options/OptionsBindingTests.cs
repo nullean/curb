@@ -657,20 +657,43 @@ public class OptionsBindingTests
 	}
 
 	[Test]
-	public async Task Core_keys_are_shared_and_every_other_key_is_csharp()
+	public async Task Core_keys_are_shared_xml_keys_are_xml_and_every_other_key_is_csharp()
 	{
-		// The option reference and the coverage check split on this. Until a second language has keys
-		// of its own, getting it wrong would move a page or drop a key from a check without failing anything.
+		// The option reference and the coverage check split on this. Getting it wrong would move a page
+		// or drop a key from a check without failing anything.
 		var misclassified = OptionDescriptor.All
-			.Where(descriptor => descriptor.Language != (OptionCatalog.CoreKeys.Contains(descriptor.Key) ? OptionLanguage.Shared : OptionLanguage.CSharp))
+			.Where(descriptor => descriptor.Language != (
+				OptionCatalog.CoreKeys.Contains(descriptor.Key) ? OptionLanguage.Shared
+				: OptionCatalog.XmlKeys.Contains(descriptor.Key) ? OptionLanguage.Xml
+				: OptionLanguage.CSharp))
 			.Select(descriptor => descriptor.Key)
 			.ToArray();
 
 		misclassified.Should().BeEmpty();
 		OptionCatalog.ImplementedKeysFor(OptionLanguage.CSharp).Should().BeEquivalentTo(OptionCatalog.ImplementedKeys);
-		OptionCatalog.ImplementedKeysFor(OptionLanguage.Xml).Should().BeEquivalentTo(OptionCatalog.CoreKeys);
+		OptionCatalog.ImplementedKeysFor(OptionLanguage.Xml).Should().BeEquivalentTo(OptionCatalog.CoreKeys.Concat(OptionCatalog.XmlKeys));
+		OptionCatalog.ImplementedKeys.Overlaps(OptionCatalog.XmlKeys).Should().BeFalse("C#'s coverage check must not demand C# cases for XML keys");
 		await Task.CompletedTask;
 	}
+
+	/// <summary>
+	/// XML's half of the per-option coverage rule: every XML key appears in at least one XML test. Read
+	/// from the test sources, like the C# check reads dumped cases.
+	/// </summary>
+	[Test]
+	public async Task Every_xml_key_is_exercised_by_an_xml_test()
+	{
+		var tests = Path.Combine(Path.GetDirectoryName(ThisFile())!, "..");
+		var sources = string.Concat(
+			File.ReadAllText(Path.Combine(tests, "Formatting", "Xml", "XmlFormattingTests.cs")),
+			File.ReadAllText(Path.Combine(tests, "Cli", "XmlRunTests.cs")),
+			File.ReadAllText(Path.Combine(tests, "Formatting", "_Harness", "XmlFormattingTest.cs")));
+
+		OptionCatalog.XmlKeys.Where(key => !sources.Contains(key, StringComparison.Ordinal)).Should().BeEmpty();
+		await Task.CompletedTask;
+	}
+
+	private static string ThisFile([System.Runtime.CompilerServices.CallerFilePath] string path = "") => path;
 
 	[Test]
 	public async Task Layout_binder_keeps_the_defaults_it_is_given()

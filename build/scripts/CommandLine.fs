@@ -33,6 +33,7 @@ type Arguments =
     | [<CliPrefix(CliPrefix.None);SubCommand>] CleanupSmoketest
     | [<CliPrefix(CliPrefix.None);SubCommand>] CleanupSafety
     | [<CliPrefix(CliPrefix.None);SubCommand>] CleanupConformance
+    | [<CliPrefix(CliPrefix.None);SubCommand>] XmlSafety
     | [<CliPrefix(CliPrefix.None);SubCommand>] VerifyExpectations
     | [<CliPrefix(CliPrefix.None);SubCommand>] VerifyCleanupExpectations
     | [<CliPrefix(CliPrefix.None);SubCommand>] VerifyExpectationsJb
@@ -73,6 +74,7 @@ with
             | MsbuildSmoketest -> "prove the MSBuild integration runs before the compiler"
             | CleanupSmoketest -> "prove curb cleanup fixes what a build reported, and only that"
             | CleanupSafety -> "feed a corpus wrong verdicts and prove none of them damages a file (--corpus <path>)"
+            | XmlSafety -> "format a corpus's project files and prove MSBuild evaluates every project the same before and after (--corpus <path>)"
             | CleanupConformance -> "clean a corpus that builds, and prove it still builds and dotnet format style agrees"
             | VerifyExpectations -> "prove every expectation in the test suite survives dotnet format"
             | VerifyCleanupExpectations -> "prove every cleanup-rule case in the test suite is a fixed point of dotnet format style"

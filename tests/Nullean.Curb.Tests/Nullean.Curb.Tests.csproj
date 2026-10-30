@@ -19,6 +19,7 @@
     <ProjectReference Include="../../src/Nullean.Curb.Cleanup/Nullean.Curb.Cleanup.csproj" />
     <ProjectReference Include="../../src/Nullean.Curb.EditorConfig/Nullean.Curb.EditorConfig.csproj" />
     <ProjectReference Include="../../src/Nullean.Curb.Cli/Nullean.Curb.Cli.csproj" />
+    <ProjectReference Include="../../src/Nullean.Curb.Xml/Nullean.Curb.Xml.csproj" />
   </ItemGroup>
 
 </Project>

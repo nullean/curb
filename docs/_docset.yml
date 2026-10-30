@@ -35,6 +35,7 @@ toc:
     children:
       - file: integrations.md
       - file: msbuild.md
+      - file: xml.md
       - file: cleanup.md
       - file: agent-instructions.md
   - folder: why-not
@@ -46,7 +47,7 @@ toc:
       - file: editorconfig-analyzers.md
   - listing: reference
     glob: "**/*.md"
-    groups: [core, new-lines, indentation, spacing, wrapping, blank-lines, expression-bodies, usings, modifiers-and-braces, trailing-commas, suppression]
+    groups: [core, new-lines, indentation, spacing, wrapping, blank-lines, expression-bodies, usings, modifiers-and-braces, trailing-commas, suppression, xml-files, xml-layout]
     sort: asc
     visual: groups
     island: false

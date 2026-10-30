@@ -1526,5 +1526,61 @@ public static class Snippets
         ["csharp_blank_lines_around_namespace"] = "1",
         ["csharp_blank_lines_after_using_list"] = "1",
         ["file_header_template"] = "Copyright (c) Example Corp.\\nLicensed under the MIT license.",
+        ["xml_max_blank_lines_between_tags"] = "0",
+    };
+
+    /// <summary>Project-file fixtures for the XML keys' examples.</summary>
+    public static IReadOnlyDictionary<string, string> Xml { get; } = new Dictionary<string, string>
+    {
+        ["xml_project"] = """
+            <Project Sdk="Microsoft.NET.Sdk">
+                <PropertyGroup>
+                  <TargetFramework>net10.0</TargetFramework>
+                    <Description>
+                      Kept exactly as written: MSBuild reads this whitespace.
+                    </Description>
+                </PropertyGroup>
+
+
+
+              <ItemGroup>
+                <PackageReference Include="A"/>
+                <PackageReference   Include="B"   Version="1.0" />
+              </ItemGroup>
+            </Project>
+
+            """,
+
+        ["xml_attributes"] = """
+            <Project>
+                <Target Name="Pack"
+                        DependsOnTargets="Build"
+                        Condition="'$(IsPackable)' == 'true'">
+                </Target>
+            </Project>
+
+            """,
+    };
+
+    /// <summary>A paragraph for an XML key's page, where the values alone do not say enough.</summary>
+    public static IReadOnlyDictionary<string, string> XmlNotes { get; } = new Dictionary<string, string>
+    {
+        ["curb_xml_format"] =
+            "On by default. The first run changes some project files, all of them whitespace, so `curb check` fails " +
+            "until you run `curb format .` once. To turn XML formatting off for a whole repository, add a section for the files to the root " +
+            "`.editorconfig`:\n\n```ini\n[*.{csproj,fsproj,vbproj,proj,props,targets,slnx,config}]\ncurb_xml_format = false\n```",
+        ["curb_xml_extensions"] =
+            "Accepts `.xml`, `.config`, `.nuspec`, `.resx`, `.runsettings`, `.ruleset`, `.xsd`, `.xsl`, `.xslt`, " +
+            "`.manifest`, `.vsixmanifest`, `.xaml`, `.axaml`, `.wxs` and `.wxi`, with or without the dot. Files with " +
+            "these extensions are formatted as generic XML, so whitespace in element-only content may be re-indented.",
+        ["xml_max_blank_lines_between_tags"] =
+            "Applies from any section, `[*]` included, since its name says it is XML's. The core keys do not: XML reads " +
+            "them only from sections that name its files.",
+        ["xml_space_before_self_closing"] =
+            "Unset, each tag keeps whether it had a space, and several spaces become one. Solution files always get " +
+            "one, the shape Visual Studio writes.",
+        ["xml_attribute_indent"] =
+            "Unset, an attribute on a line of its own keeps its offset from its element, so attributes aligned under the " +
+            "first one stay aligned when the element is re-indented. A value's own continuation lines never move.",
     };
 }
