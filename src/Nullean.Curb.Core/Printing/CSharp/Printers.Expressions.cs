@@ -1021,28 +1021,23 @@ internal static partial class Printers
 		var arena = context.Arena;
 
 		arena.Synthetic(SyntheticText.Space);
+
+		// A body the author put on the next line stays there. Joining it here defeated reflow further
+		// out: the enclosing argument list saw nothing left to preserve, emitted no break
+		// opportunity, and the statement came back as one over-long line that only the next run
+		// broke — which is to say, formatting twice did not settle. It also keeps the offset the author
+		// gave it from the lambda's line, as an expression-bodied member's does — issue #139.
+		if (expression is not null && context.AuthorBroke(arrow.Span.End, expression.SpanStart))
+		{
+			ValueBelowOperator(arrow, expression, context);
+			return;
+		}
+
 		TokenPrinter.Print(arrow, context);
 
 		if (block is not null)
 		{
 			PrintAnonymousFunctionBody(block, BraceStyle.Lambdas, context);
-			return;
-		}
-
-		// A body the author put on the next line stays there. Joining it here defeated reflow further
-		// out: the enclosing argument list saw nothing left to preserve, emitted no break
-		// opportunity, and the statement came back as one over-long line that only the next run
-		// broke — which is to say, formatting twice did not settle.
-		// Reindent: a trailing `// note` after the arrow has already ended its line, and a second break
-		// made a blank one. The body still takes its indent on the line the comment left open.
-		if (expression is not null && context.AuthorBroke(arrow.Span.End, expression.SpanStart))
-		{
-			using (arena.Indent())
-			{
-				arena.HardLine(DocFlags.Reindent);
-				Node.Print(expression, context);
-			}
-
 			return;
 		}
 
@@ -1397,21 +1392,30 @@ internal static partial class Printers
 			else
 				arena.Synthetic(SyntheticText.Space);
 
-			TokenPrinter.Print(node.EqualsGreaterThanToken, context);
-			SwitchExpressionArmBody(node, context);
+			// A body the author put below the arrow stays below it, as a lambda's does, and as far in from
+			// the arrow's line as they put it. The group in SwitchExpressionArmBody never breaks with no
+			// width, so it joined `0 =>` / `[1]`; breaking to one level in pulled a deeper body back, as it
+			// did an expression body's (issue #139). A trailing `// note` after the arrow ends its line at
+			// the body's level rather than leaving the body stranded one column in from the arm.
+			if (context.AuthorBroke(node.EqualsGreaterThanToken.Span.End, node.Expression.SpanStart))
+				ValueBelowOperator(node.EqualsGreaterThanToken, node.Expression, context);
+			else
+			{
+				TokenPrinter.Print(node.EqualsGreaterThanToken, context);
+				SwitchExpressionArmBody(node, context);
+			}
 		}
 	}
 
-	/// <summary>The part of a switch expression arm after its <c>=&gt;</c>.</summary>
+	/// <summary>The part of a switch expression arm after its <c>=&gt;</c>, where the author did not break there.</summary>
 	private static void SwitchExpressionArmBody(SwitchExpressionArmSyntax node, PrintContext context)
 	{
 		var arena = context.Arena;
 
 		// A nested switch expression hugs the arrow, as it does an expression body's. It always breaks,
 		// so the group below would always push it onto a line of its own, which dotnet format never does.
-		// A break the author put there is still theirs.
-		if (node.Expression is SwitchExpressionSyntax
-			&& !context.AuthorBroke(node.EqualsGreaterThanToken.Span.End, node.Expression.SpanStart))
+		// A break the author put there is still theirs; SwitchExpressionArm keeps that one.
+		if (node.Expression is SwitchExpressionSyntax)
 		{
 			arena.Synthetic(SyntheticText.Space);
 			Node.Print(node.Expression, context);
@@ -1422,20 +1426,6 @@ internal static partial class Printers
 		if (context.AuthorJoined(node.EqualsGreaterThanToken.Span.End, node.Expression.SpanStart))
 		{
 			BodyOnArrowLine(node.Expression, context);
-			return;
-		}
-
-		// And one the author put below the arrow stays below it, as a lambda's does. The group below never
-		// breaks with no width, so it joined `0 =>` / `[1]`, and a trailing `// note` after the arrow
-		// left the body stranded one column in from the arm.
-		if (context.AuthorBroke(node.EqualsGreaterThanToken.Span.End, node.Expression.SpanStart))
-		{
-			using (arena.Indent())
-			{
-				arena.HardLine(DocFlags.Reindent);
-				Node.Print(node.Expression, context);
-			}
-
 			return;
 		}
 

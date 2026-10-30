@@ -587,6 +587,16 @@ internal static partial class Printers
 
 		var arrowLeadsTheBody = !hugs && (context.Options.WrapBeforeArrowWithExpressions || breakBeforeArrow);
 
+		// A body the author put below the arrow stays as far in from the member's line as they put it,
+		// as a value below `=` does. dotnet format leaves it one level in, two, or anywhere else, and
+		// moves it as far as that line moves; breaking to one level in pulled a deeper body back — issue
+		// #139.
+		if (breakAfterArrow && !arrowLeadsTheBody)
+		{
+			ValueBelowOperator(node.ArrowToken, node.Expression, context);
+			return;
+		}
+
 		if (!arrowLeadsTheBody)
 			TokenPrinter.Print(node.ArrowToken, context);
 
@@ -650,12 +660,6 @@ internal static partial class Printers
 
 				TokenPrinter.Print(node.ArrowToken, context);
 				arena.Synthetic(SyntheticText.Space);
-			}
-			else if (breakAfterArrow)
-			{
-				// Reindent: a trailing `// note` after the arrow has already ended its line, and a second
-				// break made a blank one. The body still takes its indent on the line the comment left open.
-				arena.HardLine(DocFlags.Reindent);
 			}
 			else
 			{

@@ -642,4 +642,118 @@ public class ContinuationIndentTests : FormattingTest
 		    }
 		}
 		""");
+
+	// Issue #139: a body below `=>` stays as far in from the line it belongs to as the author put it.
+
+	[Test]
+	public Task A_body_below_the_arrow_keeps_the_offset_the_author_gave_it() => Unchanged(
+		"""
+		public class C
+		{
+		    public int[] Values() =>
+		            [1, 2];
+
+		    public int Count() =>
+		            Compute(1);
+
+		    public int Aligned() =>
+		          Compute(3);
+
+		    public void M()
+		    {
+		        System.Func<int> f = () =>
+		                Compute(2);
+		        Foo(x =>
+		                x + 1);
+		        var s = 1 switch
+		        {
+		            1 =>
+		                    2,
+		            _ => 3
+		        };
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_body_below_the_arrow_after_a_trailing_comment_keeps_its_offset() => Unchanged(
+		"""
+		public class C
+		{
+		    public int Q => // note
+		            2;
+
+		    public void M()
+		    {
+		        var s = 1 switch
+		        {
+		            1 => // why
+		                    2,
+		            _ => 3
+		        };
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_reindented_member_takes_the_body_below_its_arrow_along() => Formats(
+		"""
+		public class C
+		{
+		  public int Shifted() =>
+		          4;
+
+		    public void M()
+		    {
+		            System.Func<int> f = () =>
+		                    Compute(2);
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public int Shifted() =>
+		            4;
+
+		    public void M()
+		    {
+		        System.Func<int> f = () =>
+		                Compute(2);
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_body_below_the_arrow_keeps_its_offset_with_tabs() => Unchanged(
+		"public class C\n{\n\tpublic int Count() =>\n\t\t\tCompute(1);\n\n\tpublic int Aligned() =>\n\t\t  Compute(3);\n\n\tpublic void M()\n\t{\n\t\tSystem.Func<int> f = () =>\n\t\t\t\tCompute(2);\n\t}\n}",
+		editorConfig: "indent_style = tab");
+
+	[Test]
+	public Task Deterministic_layout_still_decides_a_body_below_the_arrow() => Formats(
+		"""
+		public class C
+		{
+		    public int Count() =>
+		            Compute(1);
+
+		    public void M()
+		    {
+		        System.Func<int> f = () =>
+		                Compute(2);
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public int Count() => Compute(1);
+
+		    public void M()
+		    {
+		        System.Func<int> f = () => Compute(2);
+		    }
+		}
+		""",
+		editorConfig: "max_line_length = 120");
 }
