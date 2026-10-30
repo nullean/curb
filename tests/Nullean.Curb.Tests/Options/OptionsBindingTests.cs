@@ -657,7 +657,7 @@ public class OptionsBindingTests
 	}
 
 	[Test]
-	public async Task Core_keys_are_shared_xml_keys_are_xml_and_every_other_key_is_csharp()
+	public async Task Core_keys_are_shared_xml_and_razor_keys_are_their_own_and_every_other_key_is_csharp()
 	{
 		// The option reference and the coverage check split on this. Getting it wrong would move a page
 		// or drop a key from a check without failing anything.
@@ -665,6 +665,7 @@ public class OptionsBindingTests
 			.Where(descriptor => descriptor.Language != (
 				OptionCatalog.CoreKeys.Contains(descriptor.Key) ? OptionLanguage.Shared
 				: OptionCatalog.XmlKeys.Contains(descriptor.Key) ? OptionLanguage.Xml
+				: OptionCatalog.RazorKeys.Contains(descriptor.Key) ? OptionLanguage.Razor
 				: OptionLanguage.CSharp))
 			.Select(descriptor => descriptor.Key)
 			.ToArray();
@@ -673,6 +674,19 @@ public class OptionsBindingTests
 		OptionCatalog.ImplementedKeysFor(OptionLanguage.CSharp).Should().BeEquivalentTo(OptionCatalog.ImplementedKeys);
 		OptionCatalog.ImplementedKeysFor(OptionLanguage.Xml).Should().BeEquivalentTo(OptionCatalog.CoreKeys.Concat(OptionCatalog.XmlKeys));
 		OptionCatalog.ImplementedKeys.Overlaps(OptionCatalog.XmlKeys).Should().BeFalse("C#'s coverage check must not demand C# cases for XML keys");
+		OptionCatalog.ImplementedKeysFor(OptionLanguage.Razor).Should().BeEquivalentTo(OptionCatalog.CoreKeys.Concat(OptionCatalog.RazorKeys));
+		OptionCatalog.ImplementedKeys.Overlaps(OptionCatalog.RazorKeys).Should().BeFalse("nor for Razor keys");
+		await Task.CompletedTask;
+	}
+
+	/// <summary>Razor's half of the per-option coverage rule, read from the test sources like XML's.</summary>
+	[Test]
+	public async Task Every_razor_key_is_exercised_by_a_razor_test()
+	{
+		var tests = Path.Combine(Path.GetDirectoryName(ThisFile())!, "..");
+		var sources = File.ReadAllText(Path.Combine(tests, "Cli", "RazorRunTests.cs"));
+
+		OptionCatalog.RazorKeys.Where(key => !sources.Contains(key, StringComparison.Ordinal)).Should().BeEmpty();
 		await Task.CompletedTask;
 	}
 

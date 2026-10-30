@@ -37,6 +37,25 @@ internal interface IFormattingLanguage
 	LanguageOptions BindOptions(FileConfiguration configuration, CurbEditorConfig editorConfig);
 
 	/// <summary>
+	/// True when the language can tell, before the file's own settings are resolved, that it would
+	/// decline it (<see cref="LanguageOptions.Claimed"/> false). Such a file is passed over as though
+	/// the walk had not found it.
+	/// </summary>
+	/// <remarks>
+	/// For a language a repository has to opt into, so that the files of a repository that has not cost
+	/// nothing. The decline is silent, like a declined file whose <see cref="LanguageOptions.DeclinedReason"/>
+	/// is null: it suits Razor, which is off until someone asks, and not a language whose decline the run
+	/// reports, such as F# without Fantomas. Called on the run's one thread, like <see cref="BindOptions"/>.
+	/// </remarks>
+	bool DeclinesUnresolved(string path, CurbEditorConfig editorConfig) => false;
+
+	/// <summary>
+	/// What to say when a file named on the command line is declined without a
+	/// <see cref="LanguageOptions.DeclinedReason"/>; null to stay silent. Never said for a file a walk found.
+	/// </summary>
+	string? NamedDeclineReason => null;
+
+	/// <summary>
 	/// True when the file says, in its own text, not to format it, such as C#'s <c>&lt;auto-generated&gt;</c>
 	/// header. Counted as skipped, like a file the configuration excluded.
 	/// </summary>

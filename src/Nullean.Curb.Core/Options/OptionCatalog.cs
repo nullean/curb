@@ -226,20 +226,30 @@ public static class OptionCatalog
 		"xml_attribute_indent",
 	}.ToFrozenSet(StringComparer.Ordinal);
 
-	/// <summary>True for a key Curb knows about, whether or not it is implemented yet.</summary>
+	/// <summary>
+	/// The keys only Razor files read. Experimental. Kept apart from <see cref="ImplementedKeys"/> for the
+	/// same reason as <see cref="XmlKeys"/>.
+	/// </summary>
+	public static readonly FrozenSet<string> RazorKeys = new[]
+	{
+		"curb_razor_format_code_blocks",
+	}.ToFrozenSet(StringComparer.Ordinal);
+
 	/// <summary>
 	/// The implemented keys that apply to <paramref name="language"/>: its own, plus the shared core keys.
 	/// </summary>
 	/// <remarks>
 	/// For <see cref="OptionLanguage.CSharp"/> this is <see cref="ImplementedKeys"/> itself; for
-	/// <see cref="OptionLanguage.Xml"/> it is the core keys and <see cref="XmlKeys"/>.
+	/// <see cref="OptionLanguage.Xml"/> it is the core keys and <see cref="XmlKeys"/>, and for
+	/// <see cref="OptionLanguage.Razor"/> the core keys and <see cref="RazorKeys"/>.
 	/// </remarks>
 	public static IEnumerable<string> ImplementedKeysFor(OptionLanguage language) =>
 		OptionDescriptor.All
 			.Where(descriptor => descriptor.Language == OptionLanguage.Shared || descriptor.Language == language)
 			.Select(descriptor => descriptor.Key)
-			.Where(key => ImplementedKeys.Contains(key) || XmlKeys.Contains(key));
+			.Where(key => ImplementedKeys.Contains(key) || XmlKeys.Contains(key) || RazorKeys.Contains(key));
 
+	/// <summary>True for a key Curb knows about, whether or not it is implemented yet.</summary>
 	public static bool IsKnown(string key) => CoreKeys.Contains(key) || FormattingKeys.Contains(key);
 
 	public static bool IsImplemented(string key) => ImplementedKeys.Contains(key);

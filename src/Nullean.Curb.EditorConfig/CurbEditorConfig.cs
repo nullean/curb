@@ -73,6 +73,50 @@ public sealed class CurbEditorConfig(IFileSystem fileSystem)
 		return properties;
 	}
 
+	/// <summary>
+	/// False only when no <c>.editorconfig</c> in <paramref name="filePath"/>'s directory or any directory
+	/// above it so much as mentions <paramref name="key"/>.
+	/// </summary>
+	/// <remarks>
+	/// A false answer proves the file's resolved settings cannot hold the key, without resolving them or
+	/// parsing anything: each directory is probed for an <c>.editorconfig</c> once per run, and a file that
+	/// exists is searched as text. Any mention, in a comment or under <c>root = true</c>'s parent included,
+	/// answers true, which only sends the caller down the exact path.
+	/// </remarks>
+	public bool Mentions(string filePath, string key)
+	{
+		// A walk hands over a folder's files together, so the previous answer is usually this one: compared
+		// as a span, without cutting the folder out of the path or hashing it.
+		var directory = Path.GetDirectoryName(filePath.AsSpan());
+		if (_lastKey == key && _lastDirectory is not null && directory.SequenceEqual(_lastDirectory))
+			return _lastAnswer;
+
+		_lastKey = key;
+		_lastDirectory = directory.ToString();
+		_lastAnswer = MentionsFrom(_lastDirectory, key);
+		return _lastAnswer;
+	}
+
+	private string? _lastKey;
+	private string? _lastDirectory;
+	private bool _lastAnswer;
+
+	private bool MentionsFrom(string? directory, string key)
+	{
+		if (string.IsNullOrEmpty(directory))
+			return false;
+		if (_mentions.TryGetValue((directory, key), out var mentions))
+			return mentions;
+
+		var path = Path.Combine(directory, ".editorconfig");
+		mentions = (fileSystem.File.Exists(path) && fileSystem.File.ReadAllText(path).Contains(key, StringComparison.OrdinalIgnoreCase))
+			|| MentionsFrom(Path.GetDirectoryName(directory), key);
+		_mentions[(directory, key)] = mentions;
+		return mentions;
+	}
+
+	private readonly Dictionary<(string Directory, string Key), bool> _mentions = [];
+
 	private static readonly System.Buffers.SearchValues<char> Wildcards = System.Buffers.SearchValues.Create("*?.{},[]!");
 
 	/// <summary>True when a section's glob names an extension or a file name in its last path segment.</summary>

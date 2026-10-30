@@ -1,6 +1,7 @@
 using System.IO.Abstractions;
 using Nullean.Curb.Cli.Languages.CSharp;
 using Nullean.Curb.Cli.Languages.FSharp;
+using Nullean.Curb.Cli.Languages.Razor;
 using Nullean.Curb.Cli.Languages.Xml;
 
 namespace Nullean.Curb.Cli.Languages;
@@ -24,12 +25,16 @@ internal sealed class LanguageRegistry
 	/// saying why, everywhere else. A new registry per run, because F# keeps per-run state: the manifests
 	/// it found, and the warnings it collected.
 	/// </para>
+	/// <para>
+	/// Razor is off by default, and declines every file whose repository has not opted in through
+	/// <c>curb_razor_format_code_blocks</c>, before it is read.
+	/// </para>
 	/// </remarks>
 	/// <param name="fileSystem">What F# reads manifests and ignore files through.</param>
 	/// <param name="launcher">Starts Fantomas; the real one when absent.</param>
 	/// <param name="environment">Where the SDK keeps its caches; this process's when absent.</param>
 	public static LanguageRegistry Default(IFileSystem fileSystem, IToolLauncher? launcher = null, ToolEnvironment? environment = null) =>
-		new(CSharpLanguage.Instance, XmlLanguage.Instance, FSharp(fileSystem, launcher, environment));
+		new(CSharpLanguage.Instance, XmlLanguage.Instance, FSharp(fileSystem, launcher, environment), RazorLanguage.Instance);
 
 	/// <summary>F# alone, for the MSBuild integration's F# target.</summary>
 	public static LanguageRegistry FSharpOnly(IFileSystem fileSystem, IToolLauncher? launcher = null, ToolEnvironment? environment = null) =>
@@ -37,6 +42,9 @@ internal sealed class LanguageRegistry
 
 	private static FSharpLanguage FSharp(IFileSystem fileSystem, IToolLauncher? launcher, ToolEnvironment? environment) =>
 		new(fileSystem, launcher ?? ProcessLauncher.Instance, environment ?? ToolEnvironment.Current);
+
+	/// <summary>Razor alone, for <c>--language razor</c>. A file still has to opt in to be formatted.</summary>
+	public static LanguageRegistry RazorOnly { get; } = new(RazorLanguage.Instance);
 
 	/// <summary>
 	/// C# alone, for the MSBuild integration: a build formats the files it compiles, never the project

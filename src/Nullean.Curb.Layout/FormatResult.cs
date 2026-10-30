@@ -27,7 +27,7 @@ public enum FormatStatus
 /// <param name="Changed">True when the output differs from the input.</param>
 /// <param name="Text">The formatted text, or null when it was not requested or not produced.</param>
 /// <param name="Coverage">Share of tokens emitted by a real printer rather than verbatim.</param>
-/// <param name="Message">Detail for a non-successful status.</param>
+/// <param name="Message">Detail for a non-successful status, or for what <see cref="Declined"/> counts.</param>
 public readonly record struct FormatResult(
 	FormatStatus Status,
 	bool Changed,
@@ -36,4 +36,12 @@ public readonly record struct FormatResult(
 	string? Message)
 {
 	public bool Success => Status == FormatStatus.Formatted;
+
+	/// <summary>
+	/// Parts of a file the language declined to format and left as written while it formatted the rest,
+	/// such as Razor's <c>@code</c> blocks. <see cref="Message"/> then says which and why, even though the
+	/// status is <see cref="FormatStatus.Formatted"/>. Zero for a language that formats a file whole or
+	/// not at all.
+	/// </summary>
+	public int Declined { get; init; }
 }

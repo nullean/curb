@@ -33,7 +33,7 @@ public sealed class CSharpSource
 	/// an error, so Curb refused every such file outright while dotnet format formatted it. The flag
 	/// only makes previously-invalid syntax valid; a file without <c>#:</c> parses identically.
 	/// </remarks>
-	private static readonly CSharpParseOptions ParseOptions =
+	internal static readonly CSharpParseOptions ParseOptions =
 		new CSharpParseOptions(LanguageVersion.Preview)
 			.WithFeatures([new KeyValuePair<string, string>("FileBasedProgram", "true")]);
 
