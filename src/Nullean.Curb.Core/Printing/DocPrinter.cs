@@ -92,6 +92,15 @@ internal sealed class DocPrinter
 	private bool _pendingSpace;
 
 	/// <summary>
+	/// The source offset a <see cref="SyntheticText.Glue"/> holds the next text against, or -1.
+	/// </summary>
+	/// <remarks>
+	/// Until the next text, a space is held back as pending rather than written. If that text starts
+	/// at this offset the space is dropped, and otherwise it is written as usual.
+	/// </remarks>
+	private int _gluedTo = -1;
+
+	/// <summary>
 	/// True when this document could have changed the token stream, so the output is worth
 	/// re-parsing.
 	/// </summary>
@@ -121,6 +130,7 @@ internal sealed class DocPrinter
 		_insideLineComment = false;
 		_lineCommentBroke = false;
 		_pendingSpace = false;
+		_gluedTo = -1;
 		_lineOpen = false;
 		_pendingAnchorCount = 0;
 		_lineCount = 0;
@@ -186,6 +196,13 @@ internal sealed class DocPrinter
 				case DocKind.SrcText:
 					{
 						var text = _source.Span.Slice(doc.A, doc.B);
+						if (_gluedTo >= 0)
+						{
+							if (_gluedTo == doc.A)
+								_pendingSpace = false;
+							_gluedTo = -1;
+						}
+
 						if (!_lineOpen)
 							OpenLine(text, doc.A);
 						// Before the weld check, which reads the character this text lands after.
@@ -207,7 +224,12 @@ internal sealed class DocPrinter
 						break;
 					}
 
-					if (doc.A == SyntheticText.MergingSpace)
+					if (doc.A == SyntheticText.Glue)
+					{
+						_gluedTo = doc.B;
+						_pendingSpace = false;
+					}
+					else if (doc.A == SyntheticText.MergingSpace || (doc.A == SyntheticText.Space && _gluedTo >= 0))
 						_pendingSpace = true;
 					else
 					{
@@ -248,6 +270,7 @@ internal sealed class DocPrinter
 
 				case DocKind.Trim:
 					_pendingSpace = false;
+					_gluedTo = -1;
 					_column -= _output.TrimTrailingWhitespace();
 					i++;
 					break;
@@ -474,11 +497,17 @@ internal sealed class DocPrinter
 			_column = 0;
 			_insideLineComment = false;
 			_pendingSpace = false;
+			_gluedTo = -1;
 			_lineOpen = false;
 			return;
 		}
 
-		if (scope.Mode is PrintMode.Flat or PrintMode.ForceFlat)
+		// A trailing // comment still ends its line in a flat group. The group is flat only because the
+		// comment is the last thing in it (see BreakPropagation), so this is the group's last line and
+		// the next break after the group merges into it.
+		var endsLineComment = BreakPropagation.IsLineCommentBreak(doc);
+
+		if (scope.Mode is PrintMode.ForceFlat || (scope.Mode is PrintMode.Flat && !endsLineComment))
 		{
 			// The comment has already broken where this line would have put a space, so the line it
 			// opened is this line's. It takes this line's indent rather than the comment's, which is
@@ -494,6 +523,13 @@ internal sealed class DocPrinter
 
 			if (type is LineType.Normal or LineType.Hard)
 			{
+				// Held back until the glued text shows whether it is the one the source put there.
+				if (_gluedTo >= 0)
+				{
+					_pendingSpace = true;
+					return;
+				}
+
 				// The space this line writes is the one a pending space was waiting to merge with.
 				_pendingSpace = false;
 				_output.Append(' ');
@@ -504,6 +540,7 @@ internal sealed class DocPrinter
 		}
 
 		_pendingSpace = false;
+		_gluedTo = -1;
 
 		if (_trimTrailingWhitespace && !doc.Flags.HasFlag(DocFlags.NoTrim))
 			_output.TrimTrailingWhitespace();
@@ -545,7 +582,7 @@ internal sealed class DocPrinter
 		_output.Append(_endOfLine);
 		WriteIndent(scope);
 		_insideLineComment = false;
-		_lineCommentBroke = type == LineType.Hard && doc.B == Doc.EndsLineComment;
+		_lineCommentBroke = endsLineComment;
 		_lineOpen = false;
 	}
 
@@ -718,6 +755,7 @@ internal sealed class DocPrinter
 	private void Emit(ReadOnlySpan<char> text, DocFlags flags, bool suppressWidth)
 	{
 		WritePendingSpace(text, suppressWidth);
+		_gluedTo = -1;
 		_lineCommentBroke = false;
 		_output.Append(text);
 
@@ -840,6 +878,10 @@ internal sealed class DocPrinter
 								return true;
 							break;
 						}
+
+						// A trailing comment's break ends the line whether the group is flat or not.
+						if (BreakPropagation.IsLineCommentBreak(doc))
+							return remaining >= 0;
 
 						if (flat)
 						{

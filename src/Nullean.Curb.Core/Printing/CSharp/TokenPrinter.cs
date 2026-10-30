@@ -119,7 +119,7 @@ internal static class TokenPrinter
 
 		// The first token of a continuation line in a broken binary chain: its comments sit at its
 		// column, where dotnet format puts them, rather than at the ambient indent.
-		var aligned = context.TryTakeLeadingTriviaAlignment(token, out var alignRegister, out var alignOffset);
+		var aligned = context.TryTakeLeadingTriviaAlignment(token, out var alignRegister, out var alignOffset, out var alignElement);
 
 		// Blank lines are only preserved *between* things, never introduced at the start of a run,
 		// and never more than one however many the source had.
@@ -221,11 +221,14 @@ internal static class TokenPrinter
 					// writes nor stable: the ragged result read back differently on the next run.
 					//
 					// Only a // comment aligns, and only under a trailing //. A block or doc comment, or
-					// anything under a trailing /* */, goes to the statement indent as usual.
+					// anything under a trailing /* */, goes to the statement indent as usual. Nor
+					// between collection or initializer elements, where dotnet format leaves the
+					// comment on the element's line.
 					var isLineComment = trivia.IsKind(SyntaxKind.SingleLineCommentTrivia);
 					var startsAligned = isLineComment
 						&& !emittedAnything
 						&& priorNewLines == 0
+						&& !(aligned && alignElement)
 						&& AlignsUnderTrailingComment(token, trivia, context);
 
 					if (startsAligned || (alignedRun && isLineComment && priorNewLines <= 1))
@@ -489,8 +492,9 @@ internal static class TokenPrinter
 		// `Call(); // why` still keeps the one it did.
 		var separated = false;
 
-		foreach (var trivia in trailing)
+		for (var i = 0; i < trailing.Count; i++)
 		{
+			var trivia = trailing[i];
 			switch (trivia.Kind())
 			{
 				case SyntaxKind.WhitespaceTrivia:
@@ -513,11 +517,17 @@ internal static class TokenPrinter
 						// The break the enclosing printer emits next is merged into this one.
 						context.Arena.LineCommentBreak();
 					}
-					else
+					else if (i + 1 < trailing.Count
+						&& (trailing[i + 1].IsKind(SyntaxKind.WhitespaceTrivia) || trailing[i + 1].IsKind(SyntaxKind.EndOfLineTrivia)))
 					{
 						// A /* */ comment can have code after it on the same line; keep them apart,
 						// with the one space the printer may already be about to write.
 						context.Arena.Synthetic(SyntheticText.MergingSpace);
+					}
+					else
+					{
+						// Written against what follows, which dotnet format leaves alone: `{ /* c */}`.
+						context.Arena.GlueTo(trivia.Span.End);
 					}
 					break;
 

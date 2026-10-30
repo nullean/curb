@@ -714,6 +714,8 @@ public class CommentTests : FormattingTest
 		    }
 		}
 		""",
+		// The value below `=` stays at the author's column, as dotnet format leaves it: #130 keeps a
+		// value the author put below `=` where they put it, comment or not.
 		"""
 		public class C : Base, // base
 		    IFoo
@@ -721,10 +723,295 @@ public class CommentTests : FormattingTest
 		    public int M(int a)
 		    {
 		        var y = // eq
-		            a;
+		        a;
 		        return // r
 		            y;
 		    }
 		}
 		""");
+
+	// ---- a trailing comment at the end of a group ---------------------------------------------------
+
+	// Every expectation below was checked against dotnet format whitespace, which leaves each input
+	// unchanged.
+	//
+	// With no width, a plain arm keeps its line through AuthorJoined on the arrow anyway (#104), so the
+	// first two cases pass with or without the BreakPropagation exemption; they guard the shape, not
+	// the mechanism. The `_with_a_width` variants, and the ternary case with no width, fail without it.
+
+	[Test]
+	public Task A_trailing_comment_on_the_last_switch_arm_keeps_it_on_one_line() => Unchanged(
+		// With no comma, the comment trails the arm's value rather than the separator, so it sits
+		// inside the arm's group. Its line break used to force that group open after `=>` (issue #127).
+		"""
+		public class C
+		{
+		    public int M(int y)
+		    {
+		        return y switch
+		        {
+		            1 => 1, // one
+		            _ => 2 // two
+		        };
+		    }
+
+		    public int N(int y)
+		    {
+		        return y switch
+		        {
+		            1 => 1,
+		            > 1 when y < 10 => Compute(y, 1), // guarded
+		            _ => Compute(y, 2) // last
+		        };
+		    }
+
+		    private static int Compute(int a, int b) => a;
+		}
+		""");
+
+	[Test]
+	public Task A_trailing_comment_on_the_last_switch_arm_keeps_it_on_one_line_with_tabs() => Unchanged(
+		"""
+		public class C
+		{
+			public int M(int y)
+			{
+				return y switch
+				{
+					1 => 1, // one
+					_ => 2 // two
+				};
+			}
+		}
+		""",
+		editorConfig: "indent_style = tab");
+
+	[Test]
+	public Task A_trailing_comment_on_the_last_switch_arm_keeps_it_on_one_line_with_a_width() => Unchanged(
+		"""
+		public class C
+		{
+		    public int M(int y)
+		    {
+		        return y switch
+		        {
+		            1 => 1, // one
+		            _ => 2 // two
+		        };
+		    }
+
+		    public int N(int y)
+		    {
+		        return y switch
+		        {
+		            1 => 1,
+		            > 1 when y < 10 => Compute(y, 1), // guarded
+		            _ => Compute(y, 2) // last
+		        };
+		    }
+
+		    private static int Compute(int a, int b) => a;
+		}
+		""",
+		editorConfig: "max_line_length = 120");
+
+	[Test]
+	public Task A_trailing_comment_on_the_last_nested_initializer_leaves_it_on_one_line_with_a_width() => Unchanged(
+		// The same cause under a width: the comment trailed the last initializer's `}` inside its group
+		// and opened it out one element per line (issue #98).
+		"""
+		public class C
+		{
+		    private static readonly int[,] Patterns = {
+		        { 2, 1, 1, 2, 3, 2, 0, 0 }, // 1
+		        { 2, 3, 3, 1, 1, 1, 2, 0 } // 2
+		    };
+
+		    public void M()
+		    {
+		        Call(
+		            1, // one
+		            2 // two
+		        );
+		        var o = new Version
+		        {
+		            Major = 1, // one
+		            Minor = Compute(1, 2) // two
+		        };
+		    }
+
+		    private static void Call(int a, int b)
+		    { }
+
+		    private static int Compute(int a, int b) => a;
+		}
+		""",
+		editorConfig: "max_line_length = 120");
+
+	[Test]
+	public Task A_last_switch_arm_broken_after_the_arrow_stays_broken_with_a_trailing_comment() => Unchanged(
+		// The comment no longer holds the arm open, so the author's break has to.
+		"""
+		public class C
+		{
+		    public int M(int y)
+		    {
+		        return y switch
+		        {
+		            1 => 1,
+		            _ =>
+		                2 // two
+		        };
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_trailing_comment_after_a_last_ternary_leaves_it_on_one_line() => Unchanged(
+		// No author break is read here: the ternary's own group held the comment as its last content, so
+		// its line break opened the ternary at `?` and `:`.
+		"""
+		public class C
+		{
+		    public int M(int y)
+		    {
+		        var o = new O
+		        {
+		            A = 1,
+		            B = y > 1 ? 1 : 2 // b
+		        };
+		        return y switch
+		        {
+		            1 => 1,
+		            _ => y > 1 ? 1 : 2 // two
+		        };
+		    }
+		}
+
+		public class O { public int A; public int B; }
+		""");
+
+	[Test]
+	public Task A_switch_arm_broken_before_the_arrow_stays_broken() => Unchanged(
+		// The arrow used to join the pattern's line whether or not a comment followed the arm.
+		"""
+		public class C
+		{
+		    public int M(int y)
+		    {
+		        return y switch
+		        {
+		            1
+		                => 1,
+		            > 1 when y < 10 // guarded
+		                => 2,
+		            > 10 when y < 100
+		                => 3,
+		            _ when y > 1000
+		                => 4 // four
+		        };
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_switch_arm_broken_before_the_arrow_stays_broken_with_tabs() => Unchanged(
+		"""
+		public class C
+		{
+			public int M(int y)
+			{
+				return y switch
+				{
+					> 10 when y < 100
+						=> 3,
+					_ when y > 1000
+						=> 4 // four
+				};
+			}
+		}
+		""",
+		editorConfig: "indent_style = tab");
+
+	[Test]
+	public Task An_inline_block_comment_against_a_closing_brace_stays_against_it() => Unchanged(
+		// The comment always wrote a space after itself, so `{ /* ignore */}` gained one (issue #128).
+		// One the source has is still kept.
+		"""
+		public class C
+		{
+		    public C() { /* serialization */}
+
+		    public void M()
+		    {
+		        try { Run(); } catch { /* ignore */}
+		        try { Run(); } catch { /* spaced */ }
+		        var a = new[] { 1, 2 /* last */};
+		        var o = new O { X = 1 /* x */};
+		    }
+
+		    public void N() {/* tight */}
+
+		    private void Run() { }
+		}
+
+		public class O { public int X; }
+		""");
+
+	[Test]
+	public Task An_inline_block_comment_against_the_next_token_stays_against_it() => Unchanged(
+		"""
+		public class C
+		{
+		    private int _field = /* lead */1;
+
+		    public int M(int a)
+		    {
+		        var x = /* lead */a;
+		        Use(/* lead */a);
+		        Use(a /* tail */);
+		        Use(a, /* lead */a);
+		        Use(a /* one *//* two */, a);
+		        return a /* tail */;
+		    }
+
+		    private void Use(int a, int b = 0) { }
+		}
+		""");
+
+	[Test]
+	public Task An_inline_block_comment_against_the_next_token_stays_against_it_with_tabs() => Unchanged(
+		"""
+		public class C
+		{
+			public void M()
+			{
+				try { Run(); } catch { /* ignore */}
+				Use(/* lead */1);
+			}
+
+			private void Run() { }
+			private void Use(int a) { }
+		}
+		""",
+		editorConfig: "indent_style = tab");
+
+	[Test]
+	public Task An_inline_block_comment_against_the_next_token_stays_against_it_with_a_width() => Unchanged(
+		"""
+		public class C
+		{
+		    public C()
+		    { /* serialization */}
+
+		    public int M(int a)
+		    {
+		        var x = new[] { 1, 2 /* last */};
+		        Use(/* lead */a);
+		        Use(a /* tail */);
+		        return a /* tail */;
+		    }
+		}
+		""",
+		editorConfig: "max_line_length = 120");
 }

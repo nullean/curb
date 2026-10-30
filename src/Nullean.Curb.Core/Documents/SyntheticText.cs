@@ -29,6 +29,18 @@ internal static class SyntheticText
 	/// </remarks>
 	public const int MergingSpace = 7;
 
+	/// <summary>
+	/// Writes nothing, and holds back the next space unless the next text is not the source offset in
+	/// <c>B</c>.
+	/// </summary>
+	/// <remarks>
+	/// For an inline <c>/* */</c> comment the source wrote directly against the next token, as in
+	/// <c>{ /* ignore */}</c>. dotnet format keeps that, but the printer puts its own space in front
+	/// of a closing brace, an operand and so on, and the comment cannot stop it. Checking the offset
+	/// keeps the space whenever something else lands there, such as a brace Curb inserts.
+	/// </remarks>
+	public const int Glue = 8;
+
 	public static readonly string[] Table =
 	[
 		"",
@@ -39,6 +51,7 @@ internal static class SyntheticText
 		";",
 		"=>",
 		" ",
+		"",
 	];
 
 	public static string Get(int id) => Table[id];

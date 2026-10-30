@@ -184,13 +184,27 @@ internal static partial class Printers
 	/// rather than at the ambient indent with the operand stranded to its right (issue #115). A
 	/// conditional-compilation directive still goes to column 0.
 	/// </remarks>
-	private static int ContinuationLine(SyntaxToken next, int anchor, PrintContext context)
+	private static int ContinuationLine(SyntaxToken next, int anchor, PrintContext context, bool element = false)
 	{
 		var offset = context.SourceIndent(next.SpanStart);
 		context.Arena.AlignedLine(anchor, offset);
 		if (TokenPrinter.HasLeadingContent(next))
-			context.AlignLeadingTrivia(next, anchor, offset);
+			context.AlignLeadingTrivia(next, anchor, offset, element);
 		return offset;
+	}
+
+	/// <summary>
+	/// <see cref="ContinuationLine"/> between two collection or initializer members the author put on
+	/// separate lines, with the blank line they left there, as <see cref="BreakBetweenMembers"/> keeps one.
+	/// </summary>
+	/// <remarks>
+	/// The break and the blank lines go first, and the aligned line then reuses the line they end on,
+	/// since an aligned break reuses a line nothing has been written to.
+	/// </remarks>
+	private static int MemberContinuationLine(int previousEnd, SyntaxNode next, int anchor, PrintContext context)
+	{
+		BreakBetweenMembers(previousEnd, next, context);
+		return ContinuationLine(next.GetFirstToken(), anchor, context, element: true);
 	}
 
 	public static void AssignmentExpression(AssignmentExpressionSyntax node, PrintContext context)
@@ -207,15 +221,10 @@ internal static partial class Printers
 		Spacing.BeforeOperator(context);
 
 		// A right side the author put below the operator stays there, as EqualsValueClause keeps one
-		// below an initializer's `=` — issue #102.
-		if (!BringsOwnBlock(node.Right) && context.AuthorBroke(node.OperatorToken.Span.End, node.Right.SpanStart))
+		// below an initializer's `=` — issue #102. A value with brackets of its own included (#107).
+		if (context.AuthorBroke(node.OperatorToken.Span.End, node.Right.SpanStart))
 		{
-			using (context.Arena.Indent())
-			{
-				TokenPrinter.Print(node.OperatorToken, context);
-				context.Arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
-				Node.Print(node.Right, context);
-			}
+			ValueBelowOperator(node.OperatorToken, node.Right, context);
 			return;
 		}
 
@@ -531,6 +540,13 @@ internal static partial class Printers
 		// and produced things like a `new[]` at one indent with its brace at another.
 		var openItOut = oneMemberPerLine && spansLines;
 
+		// An array or collection initializer the author broke keeps exactly their breaks, as a
+		// collection expression does. dotnet format leaves both as written, where it opens out an
+		// object initializer that spans lines. The breakable lines below broke as soon as any member
+		// did, so `new[] { a ||` / `b }` came back with its braces on lines of their own — issue #113.
+		var exactly = asWritten
+			&& node.Kind() is SyntaxKind.ArrayInitializerExpression or SyntaxKind.CollectionInitializerExpression;
+
 		// A dictionary initializer — one whose elements are themselves brace-wrapped — is the one
 		// shape Roslyn declines to re-indent: hand `dotnet format` a `{ { "k", "v" } }` block
 		// indented four tabs too far and it leaves every line of it exactly where it is, in a way it
@@ -546,21 +562,48 @@ internal static partial class Printers
 
 		var trailingTrivia = false;
 
+		// Each line the author broke keeps the offset they gave it from the line the initializer starts
+		// on, as a collection expression's does — see there.
+		var anchor = -1;
+		if (exactly)
+		{
+			anchor = context.EnterContinuation();
+			arena.LineShiftAnchor(anchor);
+		}
+
+		// The creation is an element of a collection kept as the author broke it, and they put this brace
+		// on a line of its own: the brace keeps that line's offset and the lines inside follow it. The
+		// indent here put them a level in from the collection's line — see BrokenCollectionElement. One
+		// that keeps exactly its breaks already places every line it has against an anchor of its own.
+		var elementBrace = -1;
+		if (leadingLine
+			&& context.TryTakeElementBraceAlignment(node.OpenBraceToken, out var elementRegister)
+			&& !exactly)
+			elementBrace = elementRegister;
+
 		// Outside the group below, because it has to resolve against the owner's break rather than this
 		// initializer's — see BeforeOpenBraceWhenOwnerBroke. This is the deterministic half of the
 		// `ownerSpansLines` question further down: that one reads where the author put the brace, which
 		// is right in preservation mode and unavailable in deterministic mode, and this one reads the
 		// decision the argument list took on this run, which is available in both.
-		if (leadingLine && !oneMemberPerLine)
+		if (leadingLine && !oneMemberPerLine && elementBrace < 0)
 			BeforeOpenBraceWhenOwnerBroke(BraceStyle.ObjectCollectionArrayInitializers, ownerGroup, context);
 
 		// Named and published so an enclosing construct can aim at it — see PrintContext.OwnBlockGroup.
 		var group = arena.NextGroupId();
 		context.OwnBlockGroup = group;
 
+		// Its line breaks outside the group, so that an initializer the author kept on that one line,
+		// `{ Name = "a" }`, is not opened out by it.
+		var aligned = default(DocScope);
+		if (elementBrace >= 0)
+			aligned = arena.AlignedIndent(elementBrace, ContinuationLine(node.OpenBraceToken, elementBrace, context));
+
+		using (aligned)
 		using (arena.Group(group))
 		{
-			if (leadingLine)
+			// An element's brace is already on its line, above.
+			if (leadingLine && elementBrace < 0)
 			{
 				// `new HttpClient(new Handler { … }) { Timeout = t }` — once the creation it belongs to
 				// has been opened out, the initializer takes a line of its own rather than trailing
@@ -574,10 +617,14 @@ internal static partial class Printers
 				var ownerSpansLines = node.Parent is not null
 					&& context.AuthorBroke(node.Parent.SpanStart, node.SpanStart);
 
-				if (openItOut
+				if (exactly && ownerSpansLines)
+					ContinuationLine(node.OpenBraceToken, anchor, context);
+				else if (openItOut
 					|| ownerSpansLines
 					|| (asWritten && context.AuthorBroke(node.SpanStart, node.Parent!.SpanStart)))
 					BeforeOpenBrace(BraceStyle.ObjectCollectionArrayInitializers, context);
+				else if (exactly)
+					arena.Synthetic(SyntheticText.Space);
 				else
 					BeforeOpenBraceWhenBroken(
 						BraceStyle.ObjectCollectionArrayInitializers, context, DocFlags.OnlyIfNotAtLineStart);
@@ -611,10 +658,15 @@ internal static partial class Printers
 
 				using (arena.Indent())
 				{
-					InsideBrace(node.OpenBraceToken.Span.End, node.Expressions[0].SpanStart);
+					var offset = InsideBrace(node.OpenBraceToken.Span.End, node.Expressions[0].GetFirstToken());
 					for (var i = 0; i < node.Expressions.Count; i++)
 					{
-						Node.Print(node.Expressions[i], context);
+						if (anchor < 0)
+							Node.Print(node.Expressions[i], context);
+						else
+							BrokenCollectionElement(node.Expressions[i], anchor, offset, context);
+
+						offset = int.MinValue;
 						if (i >= node.Expressions.SeparatorCount)
 							continue;
 
@@ -628,7 +680,7 @@ internal static partial class Printers
 
 						// A trailing separator is followed by the closing line, not by another one.
 						if (i < node.Expressions.Count - 1)
-							Separator(node.Expressions[i].Span.End, node.Expressions[i + 1]);
+							offset = Separator(node.Expressions[i].Span.End, node.Expressions[i + 1]);
 					}
 
 					if (rewritesComma)
@@ -658,7 +710,7 @@ internal static partial class Printers
 					if (trailingTrivia)
 						arena.HardLine(DocFlags.Reindent);
 					else
-						InsideBrace(node.Expressions[^1].Span.End, node.CloseBraceToken.SpanStart);
+						InsideBrace(node.Expressions[^1].Span.End, node.CloseBraceToken);
 				}
 			}
 			else if (TokenPrinter.HasLeadingContent(node.CloseBraceToken))
@@ -684,25 +736,119 @@ internal static partial class Printers
 			TokenPrinter.PrintWithoutLeadingTrivia(node.CloseBraceToken, context);
 		}
 
-		// Between two members: a hard line, or the ordinary comma separator.
-		void Separator(int from, ExpressionSyntax next)
+		if (anchor >= 0)
+			context.ExitContinuation();
+
+		// Between two members: a hard line, or the ordinary comma separator. Returns the offset of a
+		// line it kept where the author broke it, for the member after it to follow.
+		int Separator(int from, ExpressionSyntax next)
 		{
+			if (exactly && context.AuthorBroke(from, next.SpanStart))
+				return MemberContinuationLine(from, next, anchor, context);
+
 			if (openItOut || (asWritten && context.AuthorBroke(from, next.SpanStart)))
 				BreakBetweenMembers(from, next, context);
 			else if (asWritten)
 				Spacing.AfterComma(context);
 			else
 				Spacing.AfterCommaBreakable(context);
+
+			return int.MinValue;
 		}
 
 		// Just inside the braces, where no comma sits and the comma options do not reach.
-		void InsideBrace(int from, int to)
+		int InsideBrace(int from, SyntaxToken next)
 		{
-			if (openItOut || (asWritten && context.AuthorBroke(from, to)))
+			if (exactly && context.AuthorBroke(from, next.SpanStart))
+				return ContinuationLine(next, anchor, context, element: true);
+
+			if (openItOut || (asWritten && context.AuthorBroke(from, next.SpanStart)))
 				arena.HardLine();
+			else if (exactly)
+				arena.Synthetic(SyntheticText.Space);
 			else
 				arena.Line();
+
+			return int.MinValue;
 		}
+	}
+
+	/// <summary>
+	/// Prints one element of a collection expression or initializer that keeps the author's breaks, whose
+	/// lines read <paramref name="anchor"/>.
+	/// </summary>
+	/// <param name="element">The element to print.</param>
+	/// <param name="anchor">The register the collection's broken lines read.</param>
+	/// <param name="offset">
+	/// The offset of the line of its own the author put the element on, or <see cref="int.MinValue"/> when it
+	/// shares a line with the bracket or with the element before it.
+	/// </param>
+	/// <param name="context">Per-file printing state.</param>
+	/// <remarks>
+	/// A creation whose initializer brace the author put on a line of its own keeps that line where they put
+	/// it too, as dotnet format does: `{ new Person` / `{ Name = "a" } }` left the brace a level in from
+	/// the line the collection opens on, where the source has it at the line's own level.
+	/// </remarks>
+	private static void BrokenCollectionElement(SyntaxNode element, int anchor, int offset, PrintContext context)
+	{
+		var expression = element switch
+		{
+			ExpressionElementSyntax item => item.Expression,
+			ExpressionSyntax value => value,
+			_ => null,
+		};
+
+		if (expression is BaseObjectCreationExpressionSyntax { Initializer: { } initializer }
+			&& context.AuthorBroke(initializer.OpenBraceToken.GetPreviousToken().Span.End, initializer.OpenBraceToken.SpanStart))
+			context.AlignElementBrace(initializer.OpenBraceToken, anchor);
+
+		var indent = ElementIndent(expression, offset, context);
+		if (indent == int.MinValue)
+		{
+			Node.Print(element, context);
+			return;
+		}
+
+		using (context.Arena.AlignedIndent(anchor, indent))
+			Node.Print(element, context);
+	}
+
+	/// <summary>
+	/// The offset an element's own lines are based on, for an element the author put on a line of its own
+	/// at <paramref name="offset"/>, or that shares a line when <paramref name="offset"/> is
+	/// <see cref="int.MinValue"/>.
+	/// </summary>
+	/// <remarks>
+	/// <para>
+	/// dotnet format leaves an element's own lines where the author put them. It does not move them with
+	/// the element: `Create(` one, two or three columns off the grid keeps its arguments where they were
+	/// (issue #138). Basing them on the element's column moved them off the grid with it.
+	/// </para>
+	/// <para>
+	/// So a call or creation whose own arguments the author opened out after its `(` is based on where
+	/// they put the first argument, a level to its left, the way an argument's continuation is read on the
+	/// argument-list side. That holds for an element sharing the bracket's line as well: `[Make(` / `1),`
+	/// moved `1` to a level in from the statement wherever the author aligned it. Only its own list: a
+	/// nested call's arguments are a level further in than the outer list says, and reading them as the
+	/// outer list's moved them a level right on every run. Any other element's lines follow the element,
+	/// which is <see cref="int.MinValue"/> for one that shares a line: it follows that line.
+	/// </para>
+	/// </remarks>
+	private static int ElementIndent(ExpressionSyntax? expression, int offset, PrintContext context)
+	{
+		var arguments = expression switch
+		{
+			InvocationExpressionSyntax invocation => invocation.ArgumentList,
+			BaseObjectCreationExpressionSyntax creation => creation.ArgumentList,
+			_ => null,
+		};
+
+		if (arguments is not { Arguments.Count: > 0 }
+			|| !context.AuthorJoined(expression!.SpanStart, arguments.OpenParenToken.SpanStart)
+			|| !context.AuthorBroke(arguments.OpenParenToken.Span.End, arguments.Arguments[0].SpanStart))
+			return offset;
+
+		return context.SourceIndent(arguments.Arguments[0].SpanStart) - context.LevelColumns;
 	}
 
 	/// <summary>True for an initializer whose elements are brace-wrapped, as a dictionary's are.</summary>
@@ -735,6 +881,7 @@ internal static partial class Printers
 		// group to break, so the trailing initializer aims at this one instead.
 		var group = arena.NextGroupId();
 		context.OwnBlockGroup = group;
+		var anchor = -1;
 
 		using (arena.Group(group))
 		{
@@ -752,29 +899,44 @@ internal static partial class Printers
 			// Soft, not the brace helpers' Normal line: EqualsValueClause and OperandOnRight already
 			// print the space that belongs here when this stays flat, so only the broken case needs
 			// anything from this line at all — a Normal line would double that space.
-			if (node.Parent is EqualsValueClauseSyntax or AssignmentExpressionSyntax
-				&& context.Options.NewLineBeforeOpenBrace.HasFlag(BraceStyle.ObjectCollectionArrayInitializers))
+			var equals = node.Parent switch
+			{
+				EqualsValueClauseSyntax clause => clause.EqualsToken,
+				AssignmentExpressionSyntax assignment => assignment.OperatorToken,
+				_ => default,
+			};
+
+			// Deterministic mode only. In preservation mode the author decided: a bracket they put below
+			// the `=` is EqualsValueClause's to place, and one they started on the `=` line stays on it
+			// however its contents break — the line would break with them and open out `= [1,` / `2]`
+			// (issue #113).
+			if (equals.RawKind != 0
+				&& BraceOnOwnLine(BraceStyle.ObjectCollectionArrayInitializers, context)
+				&& !context.AuthorBroke(equals.Span.End, node.SpanStart)
+				&& !context.AuthorJoined(equals.Span.End, node.SpanStart))
 			{
 				using (arena.IndentIf(context.Options.IndentBraces))
-				{
-					// The author already broke before this bracket — keep it, the same as
-					// InitializerExpression's own asWritten-broke branch, so preservation mode does
-					// not silently join what the author split across lines.
-					if (asWritten && context.AuthorBroke(node.Parent.SpanStart, node.SpanStart))
-						arena.HardLine();
-					else
-						arena.SoftLine(DocFlags.OnlyIfNotAtLineStart);
-				}
+					arena.SoftLine(DocFlags.OnlyIfNotAtLineStart);
+			}
+
+			// Each line the author broke keeps the offset they gave it from the line the bracket opens
+			// on, as dotnet format leaves it: `2` aligned under `1`, or one level in, or wherever they
+			// put it. Breaking to the indent instead moved an aligned element to one level.
+			if (asWritten)
+			{
+				anchor = context.EnterContinuation();
+				arena.LineShiftAnchor(anchor);
 			}
 
 			TokenPrinter.Print(node.OpenBracketToken, context);
 
 			using (arena.Indent())
 			{
-				Edge(node.SpanStart, node.Elements[0].SpanStart);
+				var offset = Edge(node.SpanStart, node.Elements[0].GetFirstToken());
 				for (var i = 0; i < node.Elements.Count; i++)
 				{
-					Node.Print(node.Elements[i], context);
+					PrintElement(node.Elements[i], offset);
+					offset = int.MinValue;
 					if (i >= node.Elements.SeparatorCount)
 						continue;
 
@@ -793,26 +955,44 @@ internal static partial class Printers
 					else if (context.AuthorJoined(node.Elements[i].Span.End, node.Elements[i + 1].SpanStart))
 						Spacing.AfterComma(context);
 					else
-						BreakBetweenMembers(node.Elements[i].Span.End, node.Elements[i + 1], context);
+						offset = MemberContinuationLine(node.Elements[i].Span.End, node.Elements[i + 1], anchor, context);
 				}
 
 				if (rewritesComma)
 					PrintTrailingComma(context);
 			}
 
-			Edge(node.Elements[^1].Span.End, node.Span.End);
+			Edge(node.Elements[^1].Span.End, node.CloseBracketToken);
 		}
 
 		TokenPrinter.Print(node.CloseBracketToken, context);
 
-		void Edge(int from, int to)
+		if (anchor >= 0)
+			context.ExitContinuation();
+
+		void PrintElement(CollectionElementSyntax element, int offset)
 		{
-			if (asWritten && context.AuthorBroke(from, to))
-				arena.HardLine();
+			if (anchor < 0)
+				Node.Print(element, context);
 			else
+				BrokenCollectionElement(element, anchor, offset, context);
+		}
+
+		// An edge the author left joined stays joined. A breakable line there broke as soon as any element
+		// did, which opened out `[1,` / `2]` in full — issue #113. Returns the offset of a line it broke.
+		int Edge(int from, SyntaxToken next)
+		{
+			if (!asWritten)
 				Spacing.InsideBracketsBreakable(context);
+			else if (context.AuthorBroke(from, next.SpanStart))
+				return ContinuationLine(next, anchor, context, element: true);
+			else
+				Spacing.InsideBrackets(context);
+
+			return int.MinValue;
 		}
 	}
+
 
 	public static void SimpleLambdaExpression(SimpleLambdaExpressionSyntax node, PrintContext context)
 	{
@@ -853,11 +1033,13 @@ internal static partial class Printers
 		// out: the enclosing argument list saw nothing left to preserve, emitted no break
 		// opportunity, and the statement came back as one over-long line that only the next run
 		// broke — which is to say, formatting twice did not settle.
+		// Reindent: a trailing `// note` after the arrow has already ended its line, and a second break
+		// made a blank one. The body still takes its indent on the line the comment left open.
 		if (expression is not null && context.AuthorBroke(arrow.Span.End, expression.SpanStart))
 		{
 			using (arena.Indent())
 			{
-				arena.HardLine();
+				arena.HardLine(DocFlags.Reindent);
 				Node.Print(expression, context);
 			}
 
@@ -1195,8 +1377,28 @@ internal static partial class Printers
 			Node.Print(node.WhenClause.Condition, context);
 		}
 
-		arena.Synthetic(SyntheticText.Space);
-		TokenPrinter.Print(node.EqualsGreaterThanToken, context);
+		// An arrow the author put below the pattern stays below it, one level in, as dotnet format leaves
+		// it. Joined, `_ when a > 3` / `=> 2` lost a break the author chose. The body then lays out from
+		// the arrow's line.
+		var arrowBroken = context.AuthorBroke(
+			node.WhenClause?.Condition.Span.End ?? node.Pattern.Span.End, node.EqualsGreaterThanToken.SpanStart);
+
+		using (arena.IndentIf(arrowBroken))
+		{
+			if (arrowBroken)
+				arena.HardLine(DocFlags.Reindent);
+			else
+				arena.Synthetic(SyntheticText.Space);
+
+			TokenPrinter.Print(node.EqualsGreaterThanToken, context);
+			SwitchExpressionArmBody(node, context);
+		}
+	}
+
+	/// <summary>The part of a switch expression arm after its <c>=&gt;</c>.</summary>
+	private static void SwitchExpressionArmBody(SwitchExpressionArmSyntax node, PrintContext context)
+	{
+		var arena = context.Arena;
 
 		// A nested switch expression hugs the arrow, as it does an expression body's. It always breaks,
 		// so the group below would always push it onto a line of its own, which dotnet format never does.
@@ -1213,6 +1415,20 @@ internal static partial class Printers
 		if (context.AuthorJoined(node.EqualsGreaterThanToken.Span.End, node.Expression.SpanStart))
 		{
 			BodyOnArrowLine(node.Expression, context);
+			return;
+		}
+
+		// And one the author put below the arrow stays below it, as a lambda's does. The group below never
+		// breaks with no width, so it joined `0 =>` / `[1]`, and a trailing `// note` after the arrow
+		// left the body stranded one column in from the arm.
+		if (context.AuthorBroke(node.EqualsGreaterThanToken.Span.End, node.Expression.SpanStart))
+		{
+			using (arena.Indent())
+			{
+				arena.HardLine(DocFlags.Reindent);
+				Node.Print(node.Expression, context);
+			}
+
 			return;
 		}
 
