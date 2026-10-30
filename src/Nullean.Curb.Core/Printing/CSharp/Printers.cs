@@ -799,6 +799,12 @@ internal static partial class Printers
 	public static void Block(BlockSyntax node, PrintContext context)
 	{
 		var arena = context.Arena;
+
+		// A block inside a case label, a lambda's in a `when` clause, holds statements, and dotnet format
+		// measures their continuation lines from their own lines rather than from the switch.
+		var outerLabelAnchor = context.CaseLabelContinuation;
+		context.CaseLabelContinuation = -1;
+
 		TokenPrinter.Print(node.OpenBraceToken, context);
 
 		using (arena.Indent(context.Options.IndentBlockContents ? 1 : 0))
@@ -887,6 +893,8 @@ internal static partial class Printers
 			arena.HardLine(DocFlags.Reindent);
 			TokenPrinter.PrintWithoutLeadingTrivia(node.CloseBraceToken, context);
 		}
+
+		context.CaseLabelContinuation = outerLabelAnchor;
 	}
 
 	public static void ExpressionStatement(ExpressionStatementSyntax node, PrintContext context)

@@ -243,7 +243,7 @@ internal sealed class PrintContext(DocArena arena, SourceText text, FormatOption
 	public void ExitContinuation() => _continuationDepth--;
 
 	/// <summary>
-	/// The register a case label's broken chains read their continuation lines against, instead of
+	/// The register a case label's broken patterns and chains read their continuation lines against, instead of
 	/// claiming their own, or -1 outside a case label.
 	/// </summary>
 	/// <remarks>
