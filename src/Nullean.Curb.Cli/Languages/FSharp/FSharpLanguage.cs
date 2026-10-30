@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.IO.Abstractions;
 using EditorConfig.Core;
 using Nullean.Curb.EditorConfig;
@@ -25,6 +26,8 @@ internal sealed class FSharpLanguage(IFileSystem fileSystem, IToolLauncher launc
 		"no local tool manifest declares Fantomas; run `dotnet new tool-manifest` and `dotnet tool install fantomas` to format F#";
 
 	private readonly ToolManifestLocator _manifests = new(fileSystem);
+	private readonly Dictionary<string, string> _ignoreByDirectory = new(StringComparer.Ordinal);
+	private readonly Dictionary<(FantomasManifest, string Extension, string Ignore), IReadOnlyDictionary<string, string>> _keys = [];
 	private readonly HashSet<string> _warnings = new(StringComparer.Ordinal);
 
 	public FSharpLanguage(IFileSystem fileSystem) : this(fileSystem, ProcessLauncher.Instance, ToolEnvironment.Current) { }
@@ -52,7 +55,24 @@ internal sealed class FSharpLanguage(IFileSystem fileSystem, IToolLauncher launc
 		if (manifest is null)
 			return new FSharpOptions(layout, excluded, null, null);
 
-		return new FSharpOptions(layout, excluded, manifest, null);
+		var extension = fileSystem.Path.GetExtension(path).ToLowerInvariant();
+		var ignore = IgnoreFingerprint(directory);
+		if (!_keys.TryGetValue((manifest, extension, ignore), out var key))
+		{
+			// Folded into the cache key with the file's settings. A different Fantomas formats differently,
+			// a signature file is parsed differently, and a file the ignore file covered is recorded as
+			// left alone, which stops being true the moment the ignore file changes.
+			key = new Dictionary<string, string>(StringComparer.Ordinal)
+			{
+				["curb_fsharp_formatter"] = manifest.ToolId,
+				["curb_fsharp_formatter_version"] = manifest.Version,
+				["curb_fsharp_extension"] = extension,
+				["curb_fsharp_ignore"] = ignore,
+			};
+			_keys[(manifest, extension, ignore)] = key;
+		}
+
+		return new FSharpOptions(layout, excluded, manifest, key);
 	}
 
 	/// <summary>A file whose leading comments say it is generated, as a project's <c>AssemblyInfo.fs</c> often does.</summary>
@@ -77,6 +97,48 @@ internal sealed class FSharpLanguage(IFileSystem fileSystem, IToolLauncher launc
 	{
 		lock (_warnings)
 			_warnings.Add(warning);
+	}
+
+	/// <summary>
+	/// The nearest <c>.fantomasignore</c> at or above <paramref name="directory"/>, as its path and a hash of
+	/// its content; empty when there is none. Fantomas reads only the nearest one, matching paths relative to
+	/// its folder, so both halves decide what it ignores.
+	/// </summary>
+	private string IgnoreFingerprint(string directory)
+	{
+		if (_ignoreByDirectory.TryGetValue(directory, out var known))
+			return known;
+
+		var visited = new List<string>();
+		var answer = "";
+		for (var current = directory; !string.IsNullOrEmpty(current); current = fileSystem.Path.GetDirectoryName(current))
+		{
+			if (_ignoreByDirectory.TryGetValue(current, out var cached))
+			{
+				answer = cached;
+				break;
+			}
+
+			visited.Add(current);
+			var candidate = fileSystem.Path.Combine(current, ".fantomasignore");
+			if (fileSystem.File.Exists(candidate))
+			{
+				try
+				{
+					answer = candidate + "\n" + Fingerprint.OfContent(fileSystem.File.ReadAllBytes(candidate)).ToString("x32", CultureInfo.InvariantCulture);
+				}
+				catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+				{
+					// Unreadable: key it so it never matches a recorded entry, and let Fantomas decide.
+					answer = candidate + "\nunreadable";
+				}
+				break;
+			}
+		}
+
+		foreach (var folder in visited)
+			_ignoreByDirectory[folder] = answer;
+		return answer;
 	}
 
 	/// <summary>

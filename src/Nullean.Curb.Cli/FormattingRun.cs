@@ -385,10 +385,11 @@ internal static class FormattingRun
 					break;
 
 				case FormatStatus.Ignored:
-					// The tool's own ignore rules, such as .fantomasignore. Not recorded: the options hash does
-					// not cover those rules, so a remembered answer would outlive a change to them.
+					// The tool's own ignore rules, such as .fantomasignore. Recorded, because the language keys
+					// the rules into the options hash: the entry stops matching the moment they change.
 					Interlocked.Increment(ref skipped);
 					Interlocked.Increment(ref tallies[item.Language].Skipped);
+					cache?.Record(item.CacheKey, item.ContentHash, item.OptionsHash);
 					break;
 
 				default:

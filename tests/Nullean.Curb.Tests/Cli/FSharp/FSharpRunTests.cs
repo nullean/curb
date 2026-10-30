@@ -16,6 +16,7 @@ public class FSharpRunTests
 	private const string Root = "/repo";
 	private const string Home = "/home";
 	private const string Dll = "/home/.nuget/packages/fantomas/8.1.0/tools/net10.0/any/fantomas.dll";
+	private const string CachePath = "/repo/obj/curb.cache";
 
 	private sealed class Repo
 	{
@@ -147,17 +148,63 @@ public class FSharpRunTests
 	}
 
 	[Test]
-	public async Task An_ignored_file_is_skipped()
+	public async Task An_ignored_file_is_skipped_and_cached_until_the_ignore_file_changes()
 	{
 		var repo = new Repo();
 		repo.Add(".fantomasignore", "A.fs\n");
 		repo.Add("A.fs", "let  x = 1\n");
 
-		var summary = repo.Run(write: true);
-
-		summary.Skipped.Should().Be(1);
-		summary.Changed.Should().Be(0);
+		var first = repo.Run(write: true, cache: CachePath);
+		first.Skipped.Should().Be(1);
+		first.Changed.Should().Be(0);
 		repo.Read("A.fs").Should().Be("let  x = 1\n");
+
+		var second = repo.Run(write: true, cache: CachePath);
+		second.Cached.Should().Be(1, "the ignore file's content is in the key, so the answer can be remembered");
+		repo.Fantomas.DaemonsStarted.Should().Be(1, "a cached ignore costs no daemon");
+
+		repo.Fs.File.WriteAllText($"{Root}/.fantomasignore", "Other.fs\n");
+		var third = repo.Run(write: true, cache: CachePath);
+		third.Cached.Should().Be(0, "a changed ignore file invalidates what it decided");
+		third.Changed.Should().Be(1);
+		repo.Read("A.fs").Should().Be("let x = 1\n");
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task A_fully_cached_run_starts_no_process()
+	{
+		var repo = new Repo();
+		repo.Add("A.fs", "let x = 1\n");
+		repo.Add("B.fsi", "val y: int\n");
+		repo.Add("C.cs", "class C { }\n");
+
+		repo.Run(write: false, cache: CachePath).Cached.Should().Be(0);
+		repo.Fantomas.Started.Clear();
+
+		var cached = repo.Run(write: false, cache: CachePath);
+
+		cached.Cached.Should().Be(3);
+		repo.Fantomas.Started.Should().BeEmpty();
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task A_manifest_version_bump_invalidates_only_fsharp()
+	{
+		var repo = new Repo();
+		repo.Add("A.fs", "let x = 1\n");
+		repo.Add("C.cs", "class C { }\n");
+		repo.Run(write: false, cache: CachePath);
+
+		repo.Fs.File.WriteAllText($"{Root}/.config/dotnet-tools.json", FantomasToolTests.Manifest("8.2.0", isRoot: true));
+		repo.Fs.File.WriteAllText($"{Home}/.dotnet/toolResolverCache/1/fantomas", FantomasToolTests.ResolverCache("8.2.0", Dll));
+		repo.Fantomas.Version = "8.2.0";
+
+		var summary = repo.Run(write: false, cache: CachePath);
+
+		summary.Cached.Should().Be(1, "the C# entry survives a Fantomas upgrade");
+		repo.Fantomas.DaemonsStarted.Should().Be(2);
 		await Task.CompletedTask;
 	}
 
