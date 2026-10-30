@@ -1030,6 +1030,101 @@ public class ContinuationIndentTests : FormattingTest
 		""",
 		editorConfig: "csharp_new_line_before_members_in_object_initializers = true");
 
+	// Issue #16: a `//` comment between `name:` and the value holds the value on a line of its own, and
+	// that line, not a line a level into the value, is the argument's first continuation. Read as the
+	// latter, the comment and the value walked a level left on every run.
+	[Test]
+	public Task A_comment_run_between_a_name_and_its_value_keeps_its_column() => Unchanged(
+		"""
+		public class C
+		{
+		    void M()
+		    {
+		        verify(View(compilation, source, expectedDiagnostics:
+		            // (4,26): error CS0462
+		            //     public override void M(int z) => throw null;
+		            Diagnostic(ErrorCode.ERR_AmbigOverride, "M").WithLocation(4, 26)));
+		        UsingDeclaration("C operator unchecked", expectedErrors:
+		            // (1,12): error CS9027: Unexpected keyword 'unchecked'
+		            Diagnostic(ErrorCode.ERR_MisplacedUnchecked, "unchecked").WithLocation(1, 12));
+		        UsingDeclaration("C operator unchecked", expectedErrors: // note
+		            Diagnostic(ErrorCode.ERR_MisplacedUnchecked, "unchecked")
+		                .WithLocation(1, 12));
+		        builder.AddProvider(new LoggerProvider(fallbackLoggerFactory:
+		            // A console logger for when no server is available.
+		            LoggerFactory.Create(builder =>
+		            {
+		                builder.SetMinimumLevel(LogLevel.Trace);
+		            }), connectionManager, new(configuration.InitialLogLevel)
+		        ));
+		    }
+		}
+		""");
+
+	// Issue #16: a list the author kept on one line breaks at every argument once a switch expression in
+	// it opens out, so the switch starts a line of its own and its braces sit at that line's column. They
+	// came back off it to the statement's, and the next run, reading an argument line, moved them back.
+	[Test]
+	public Task A_switch_expression_opened_out_in_an_argument_list_settles_in_one_run() => Formats(
+		"""
+		public class C
+		{
+		    void M()
+		    {
+		        AssertUsed(comp2, ordinal switch { 1 => references, 2 => expected, _ => new Reference[] { } }, references);
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    void M()
+		    {
+		        AssertUsed(
+		            comp2,
+		            ordinal switch
+		            {
+		                1 => references,
+		                2 => expected,
+		                _ => new Reference[] { }
+		            },
+		            references
+		        );
+		    }
+		}
+		""");
+
+	// Issue #16: Curb joins an argument list's `(` onto the line above, so a `(` the author put on a line
+	// of its own does not start the argument's first continuation line. Read as if it did, the lone `)`
+	// landed a level left of the argument lines, and the next run moved it back.
+	[Test]
+	public Task A_lone_close_paren_after_an_opening_paren_on_its_own_line_settles_in_one_run() => Formats(
+		"""
+		public class C
+		{
+		    public Task M()
+		        => Test(
+		            "a",
+		            new(options: new Options
+		            (
+		                Kind.Dll,
+		                nullable: Nullable.Enable
+		            )));
+		}
+		""",
+		"""
+		public class C
+		{
+		    public Task M()
+		        => Test(
+		            "a",
+		            new(options: new Options(
+		                Kind.Dll,
+		                nullable: Nullable.Enable
+		            )));
+		}
+		""");
+
 	[Test]
 	public Task Deterministic_layout_still_decides_an_argument_line() => Formats(
 		"""
