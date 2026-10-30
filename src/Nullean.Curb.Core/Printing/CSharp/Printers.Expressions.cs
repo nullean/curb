@@ -1259,22 +1259,31 @@ internal static partial class Printers
 	public static void BracketedArgumentList(BracketedArgumentListSyntax node, PrintContext context)
 	{
 		Spacing.BeforeOpenBracket(context);
+
+		// Each argument line keeps the offset the author gave it, as an invocation's does — issue #143.
+		// Captured ahead of the `[`, as ArgumentList captures it ahead of the `(`.
+		var arguments = node.Arguments;
+		var lineShift = EnterArgumentLines(arguments, node.OpenBracketToken.Span.End, context);
 		TokenPrinter.Print(node.OpenBracketToken, context);
 
 		// A bracketed list the author broke keeps their breaks, as an invocation's or an attribute's
 		// does. Printed flat it was joined onto one line however it was written — issue #124.
-		var arguments = node.Arguments;
 		if (arguments.Count > 0 && SpansLines(node, context))
 		{
 			using (context.Arena.Indent())
 			{
+				var offset = int.MinValue;
 				if (context.AuthorBroke(node.OpenBracketToken.Span.End, arguments[0].SpanStart))
-					context.Arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
+					offset = ContinuationLine(arguments[0].GetFirstToken(), lineShift, context);
 				else
 					Spacing.InsideBrackets(context);
 
-				PrintSeparated(arguments, context, asWritten: true, node.OpenBracketToken.Span.End);
+				PrintSeparated(arguments, context, asWritten: true, node.OpenBracketToken.Span.End,
+					lineShift: lineShift, offset: offset);
 			}
+
+			if (lineShift >= 0)
+				context.ExitContinuation();
 
 			if (context.AuthorBroke(arguments[^1].Span.End, node.CloseBracketToken.SpanStart))
 				context.Arena.HardLine(DocFlags.OnlyIfNotAtLineStart);

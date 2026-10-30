@@ -756,4 +756,155 @@ public class ContinuationIndentTests : FormattingTest
 		}
 		""",
 		editorConfig: "max_line_length = 120");
+
+	// Issue #143: an argument the author broke to keeps its offset from the line the list starts on.
+
+	[Test]
+	public Task An_argument_line_keeps_the_offset_the_author_gave_it() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M(int[] arr)
+		    {
+		        Foo(
+		                first,
+		                second);
+		        Foo(first,
+		                second);
+		        Foo(
+		              aligned);
+		        var x = arr[
+		                0];
+		        var y = new C(
+		                    1,
+		                      2);
+		    }
+		}
+		""");
+
+	[Test]
+	public Task An_argument_line_after_a_comment_or_a_blank_line_keeps_its_offset() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        Foo( // why
+		                first,
+		                second);
+		        Foo(
+		                // lead
+		                first,
+
+		                second);
+		    }
+		}
+		""");
+
+	[Test]
+	public Task An_argument_line_s_own_continuation_and_block_follow_it() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        Foo(first,
+		                Bar(1,
+		                    2),
+		                  third);
+		        Foo(
+		                new C
+		                {
+		                    X = 1
+		                },
+		                second);
+		        Foo(
+		                a, new C
+		                {
+		                    X = 1
+		                });
+		        Foo(
+		            a, new C
+		            {
+		                X = 1
+		            });
+		        Foo(
+		                a,
+		                x =>
+		                {
+		                    return x;
+		                });
+		    }
+		}
+		""");
+
+	[Test]
+	public Task An_argument_line_s_lambda_body_keeps_its_own_continuation_where_it_is() => Unchanged(
+		"""
+		public class C
+		{
+		    public string M(string[] constants)
+		    {
+		        return constants.FirstOrDefault(
+		            name => constants.All(c => c.Has(name)) && constants
+		                    .Select(c => c[name])
+		                    .Count() == 2
+		        );
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_reindented_statement_takes_its_argument_lines_along() => Formats(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		  Shift(
+		          a,
+		              b);
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        Shift(
+		                a,
+		                    b);
+		    }
+		}
+		""");
+
+	[Test]
+	public Task An_argument_line_keeps_its_offset_with_tabs() => Unchanged(
+		"public class C\n{\n\tpublic void M(int[] arr)\n\t{\n\t\tFoo(\n\t\t\t\tfirst,\n\t\t\t\tsecond);\n\t\tFoo(\n\t\t\t  aligned);\n\t\tvar x = arr[\n\t\t\t\t0];\n\t}\n}",
+		editorConfig: "indent_style = tab");
+
+	[Test]
+	public Task Deterministic_layout_still_decides_an_argument_line() => Formats(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        Foo(
+		                first,
+		                second);
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        Foo(first, second);
+		    }
+		}
+		""",
+		editorConfig: "max_line_length = 120");
 }

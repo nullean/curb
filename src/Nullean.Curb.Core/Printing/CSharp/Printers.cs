@@ -940,7 +940,6 @@ internal static partial class Printers
 	public static void ArgumentList(ArgumentListSyntax node, PrintContext context)
 	{
 		var arena = context.Arena;
-		TokenPrinter.Print(node.OpenParenToken, context);
 
 		// A sole argument that brings its own braces positions its own contents — `Returns(new C
 		// { … })`, `Select(x => { … })` — so the list has nothing to lay out and adding its indent
@@ -959,8 +958,23 @@ internal static partial class Printers
 		var hugs = node.Arguments.Count > 0
 			&& !context.AuthorBroke(node.OpenParenToken.Span.End, node.Arguments[0].SpanStart)
 			&& !context.AuthorBroke(node.Arguments[^1].Span.End, node.CloseParenToken.SpanStart);
+		var hugsOwnBlock = hugs && node.Arguments.Count == 1 && EndsWithOwnBlock(node.Arguments[0].Expression);
 
-		if (hugs && node.Arguments.Count == 1 && EndsWithOwnBlock(node.Arguments[0].Expression))
+		// Several arguments where the LAST is a genuinely block-bodied callback — `On("click", () =>
+		// { … })` — hug it the same way a sole argument would: the leading arguments print flat and
+		// comma-separated, then the callback's own block supplies the break, with no list group or
+		// indent wrapping the whole thing. EndsWithBlockBodiedCallback rather than the broader
+		// EndsWithOwnBlock above: with several arguments already inline, only a genuine block
+		// guarantees a break exists to hug against — a `with` or object initializer tail could still
+		// print flat and would leave the list with no break opportunity of its own.
+		var hugsCallback = hugs && node.Arguments.Count > 1 && EndsWithBlockBodiedCallback(node.Arguments[^1].Expression);
+
+		// Captured ahead of the `(`: a trailing `// note` on it ends the line, and an anchor after that
+		// would measure the next line, which nothing has been written to yet.
+		var lineShift = hugsOwnBlock || hugsCallback ? -1 : EnterArgumentLines(node.Arguments, node.OpenParenToken.Span.End, context);
+		TokenPrinter.Print(node.OpenParenToken, context);
+
+		if (hugsOwnBlock)
 		{
 			Spacing.InsideCallParens(context);
 			context.OwnBlockGroup = 0;
@@ -975,14 +989,7 @@ internal static partial class Printers
 			return;
 		}
 
-		// Several arguments where the LAST is a genuinely block-bodied callback — `On("click", () =>
-		// { … })` — hug it the same way a sole argument would: the leading arguments print flat and
-		// comma-separated, then the callback's own block supplies the break, with no list group or
-		// indent wrapping the whole thing. EndsWithBlockBodiedCallback rather than the broader
-		// EndsWithOwnBlock above: with several arguments already inline, only a genuine block
-		// guarantees a break exists to hug against — a `with` or object initializer tail could still
-		// print flat and would leave the list with no break opportunity of its own.
-		if (hugs && node.Arguments.Count > 1 && EndsWithBlockBodiedCallback(node.Arguments[^1].Expression))
+		if (hugsCallback)
 		{
 			HugTrailingCallback(node, context);
 			return;
@@ -1007,15 +1014,16 @@ internal static partial class Printers
 
 				using (arena.Indent())
 				{
+					var offset = int.MinValue;
 					if (!asWritten)
 						Spacing.InsideCallParensBreakable(context);
 					else if (context.AuthorBroke(node.SpanStart, node.Arguments[0].SpanStart))
-						arena.HardLine();
+						offset = ContinuationLine(node.Arguments[0].GetFirstToken(), lineShift, context);
 					else
 						Spacing.InsideCallParens(context);
 
 					PrintSeparated(node.Arguments, context, asWritten, node.OpenParenToken.Span.End,
-						fill: context.Options.WrapArgumentsStyle == WrapStyle.WrapIfLong);
+						fill: context.Options.WrapArgumentsStyle == WrapStyle.WrapIfLong, lineShift, offset);
 				}
 
 				var rpar = context.Options.WrapBeforeInvocationRpar;
@@ -1028,6 +1036,9 @@ internal static partial class Printers
 				else
 					Spacing.InsideCallParens(context);
 			}
+
+			if (lineShift >= 0)
+				context.ExitContinuation();
 		}
 		else
 			Spacing.InsideEmptyCallParens(context);
@@ -2234,12 +2245,23 @@ internal static partial class Printers
 	/// for the author's own arrangement — so the ordinary per-element indent-and-break-position logic
 	/// below is not needed here and is skipped rather than reused.
 	/// </param>
+	/// <param name="lineShift">
+	/// A register holding how far the line the list starts on moved, from <see cref="EnterArgumentLines"/>,
+	/// or -1. Given one, an element the author broke to keeps the column they gave it, moved as far as
+	/// that line moved, rather than going to the list's level.
+	/// </param>
+	/// <param name="offset">
+	/// The offset the break before the first element was aligned to, or <see cref="int.MinValue"/> when
+	/// the first element follows the opening bracket on its line.
+	/// </param>
 	private static void PrintSeparated<T>(
 		SeparatedSyntaxList<T> list,
 		PrintContext context,
 		bool asWritten = false,
 		int anchorEnd = -1,
-		bool fill = false)
+		bool fill = false,
+		int lineShift = -1,
+		int offset = int.MinValue)
 		where T : SyntaxNode
 	{
 		var arena = context.Arena;
@@ -2300,6 +2322,15 @@ internal static partial class Printers
 				? previousEnd >= 0 && context.AuthorJoined(previousEnd, list[i].SpanStart)
 				: indentsItself && anchorEnd >= 0 && context.AuthorJoined(anchorEnd, list[i].SpanStart);
 
+			// An element on a line the author broke to sits as far in from that line as it would from the
+			// list's level, as HugTrailingCallback's do, and so do the elements that follow it on that line.
+			// That line is not the statement's, so a block following an element on it anchors to the line
+			// without coming back off: `a, new C` / `{` put the brace a level left of the line it opens
+			// on, where dotnet format then moved it back.
+			if (offset != int.MinValue)
+				ownBlock = false;
+
+			using (offset == int.MinValue ? default : arena.AlignedIndent(lineShift, offset))
 			using (arena.IndentIf(ownBlock, -1))
 				PrintKeepingContinuation(list[i], indentsItself, context);
 
@@ -2317,9 +2348,40 @@ internal static partial class Printers
 
 			if (context.AuthorJoined(list[i].Span.End, list[i + 1].SpanStart))
 				Spacing.AfterComma(context);
+			else if (lineShift >= 0)
+				offset = MemberContinuationLine(list[i].Span.End, list[i + 1], lineShift, context);
 			else
 				BreakBetweenMembers(list[i].Span.End, list[i + 1], context);
 		}
+	}
+
+	/// <summary>
+	/// Claims a register for <see cref="PrintSeparated{T}"/>'s <c>lineShift</c> and captures how far the
+	/// line an argument list starts on moved, when the author broke before one of its arguments;
+	/// otherwise -1.
+	/// </summary>
+	/// <remarks>
+	/// dotnet format leaves each argument line at the offset the author gave it from the line the list
+	/// starts on, one level in, two or a hand-aligned column, and moves it as far as that line moves.
+	/// Breaking to the list's level pulled the deeper ones back — issue #143. A caller given a register
+	/// releases it with <see cref="PrintContext.ExitContinuation"/>.
+	/// </remarks>
+	private static int EnterArgumentLines(SeparatedSyntaxList<ArgumentSyntax> arguments, int openEnd, PrintContext context)
+	{
+		var previousEnd = openEnd;
+		for (var i = 0; i < arguments.Count; i++)
+		{
+			if (context.AuthorBroke(previousEnd, arguments[i].SpanStart))
+			{
+				var register = context.EnterContinuation();
+				context.Arena.LineShiftAnchor(register);
+				return register;
+			}
+
+			previousEnd = arguments[i].Span.End;
+		}
+
+		return -1;
 	}
 
 	/// <summary>
