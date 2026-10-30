@@ -1,5 +1,6 @@
 using AwesomeAssertions;
 using Nullean.Curb.Documents;
+using Nullean.Curb.Printing;
 
 namespace Nullean.Curb.Tests.Documents;
 
@@ -26,10 +27,10 @@ public class DocDumperTests
 			using (ifBreak.Branch())
 				arena.Synthetic(SyntheticText.Empty);
 			using (ifBreak.Branch())
-				arena.Synthetic(SyntheticText.Comma);
+				arena.Synthetic(CSharpSyntheticText.Comma);
 		}
 
-		var dump = DocDumper.Dump(arena, Source);
+		var dump = DocDumper.Dump<CSharpLayout>(arena, Source);
 
 		await Assert.That(dump).IsEqualTo(
 			"""
@@ -57,7 +58,7 @@ public class DocDumperTests
 		var arena = new DocArena();
 		arena.SourceText(0, source.Length);
 
-		DocDumper.Dump(arena, source).Should().Contain(@"text ""a\n\tb""");
+		DocDumper.Dump<CSharpLayout>(arena, source).Should().Contain(@"text ""a\n\tb""");
 		await Task.CompletedTask;
 	}
 
@@ -67,7 +68,7 @@ public class DocDumperTests
 		var arena = new DocArena();
 		arena.HardLine(DocFlags.NoTrim);
 
-		DocDumper.Dump(arena, Source).Should().Contain("hardline [NoTrim]");
+		DocDumper.Dump<CSharpLayout>(arena, Source).Should().Contain("hardline [NoTrim]");
 		await Task.CompletedTask;
 	}
 }

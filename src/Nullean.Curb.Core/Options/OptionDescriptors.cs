@@ -16,6 +16,20 @@ public enum OptionGroup
 	Suppression,
 }
 
+/// <summary>Which files an option applies to.</summary>
+/// <remarks>
+/// The option reference and the coverage check both split on this. <see cref="Shared"/> keys are the
+/// EditorConfig core keys every language binds through the same layout binder, with its own defaults.
+/// </remarks>
+public enum OptionLanguage
+{
+	Shared,
+	CSharp,
+	Xml,
+	Razor,
+	FSharp,
+}
+
 /// <summary>
 /// Metadata for one implemented .editorconfig key.
 /// </summary>
@@ -36,6 +50,13 @@ public sealed record OptionDescriptor(
 	string Summary,
 	string SnippetKey)
 {
+	/// <summary>Which files the key applies to.</summary>
+	/// <remarks>
+	/// Derived rather than spelled out on every entry below: the core keys are the only shared ones and
+	/// every other key so far is C#'s. A key for another language sets it explicitly.
+	/// </remarks>
+	public OptionLanguage Language { get; init; } = Group == OptionGroup.Core ? OptionLanguage.Shared : OptionLanguage.CSharp;
+
 	/// <summary>All implemented option descriptors, one per key.</summary>
 	public static IReadOnlyList<OptionDescriptor> All { get; } = Build();
 

@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.IO.Abstractions;
 using Nullean.Argh;
+using Nullean.Curb.Cli.Languages.CSharp;
 using Nullean.Curb.EditorConfig;
 using Nullean.Curb.Options;
 
@@ -186,7 +187,7 @@ internal sealed class CurbCommands
 
 	/// <summary>Dump the document IR for a file.</summary>
 	/// <param name="path">The C# file to dump.</param>
-	public int DocTree([Argument][Existing][FileExtensions(Extensions = "cs")] FileInfo path)
+	public int DocTree([Argument][Existing][FileExtensions(Extensions = CSharpLanguage.ExtensionList)] FileInfo path)
 	{
 		var full = _fileSystem.Path.GetFullPath(path.FullName);
 		var options = EditorConfigOptionsBinder.Bind(new CurbEditorConfig(_fileSystem).For(full));
@@ -197,7 +198,7 @@ internal sealed class CurbCommands
 
 	/// <summary>Show the resolved options and any diagnostics for a file.</summary>
 	/// <param name="path">The C# file to resolve options for.</param>
-	public int PrintConfig([Argument][Existing][FileExtensions(Extensions = "cs")] FileInfo path)
+	public int PrintConfig([Argument][Existing][FileExtensions(Extensions = CSharpLanguage.ExtensionList)] FileInfo path)
 	{
 		var full = _fileSystem.Path.GetFullPath(path.FullName);
 		var config = new CurbEditorConfig(_fileSystem).For(full);

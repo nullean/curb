@@ -118,6 +118,20 @@ internal static class Program
             .ToLookup(d => d.Key);
     }
 
+    /// <summary>
+    /// Where a language's group directories go. C# and the shared core keys stay at the top of
+    /// docs/reference, where every page has always been, so no existing URL moves; each other language
+    /// gets a directory of its own beneath it.
+    /// </summary>
+    private static string LanguageRoot(string outputRoot, OptionLanguage language) => language switch
+    {
+        OptionLanguage.Shared or OptionLanguage.CSharp => outputRoot,
+        OptionLanguage.Xml => Path.Combine(outputRoot, "xml"),
+        OptionLanguage.Razor => Path.Combine(outputRoot, "razor"),
+        OptionLanguage.FSharp => Path.Combine(outputRoot, "fsharp"),
+        _ => throw new ArgumentOutOfRangeException(nameof(language), language, null),
+    };
+
     internal static int Main(string[] args)
     {
         var root = RepoRoot();
@@ -139,7 +153,7 @@ internal static class Program
         foreach (var descriptor in OptionDescriptor.All)
         {
             var slug = GroupSlugs[descriptor.Group];
-            var dir = Path.Combine(outputRoot, slug);
+            var dir = Path.Combine(LanguageRoot(outputRoot, descriptor.Language), slug);
             Directory.CreateDirectory(dir);
 
             var snippet = Snippets.All.TryGetValue(descriptor.SnippetKey, out var s)
@@ -158,7 +172,7 @@ internal static class Program
         {
             var slug = GroupSlugs[group];
             var title = GroupTitles[group];
-            var dir = Path.Combine(outputRoot, slug);
+            var dir = Path.Combine(LanguageRoot(outputRoot, descriptors[0].Language), slug);
             Directory.CreateDirectory(dir);
 
             var sb = new StringBuilder();

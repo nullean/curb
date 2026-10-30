@@ -1,5 +1,4 @@
 using System.Buffers;
-using Microsoft.CodeAnalysis.Text;
 
 namespace Nullean.Curb.Documents;
 
@@ -50,9 +49,6 @@ internal sealed class DocArena
 	public ushort NextGroupId() => _nextGroupId++;
 
 	// ---- leaves ---------------------------------------------------------------------------------
-
-	/// <summary>Emits a span of the original source verbatim.</summary>
-	public void SourceText(TextSpan span) => Add(new Doc(DocKind.SrcText, a: span.Start, b: span.Length));
 
 	/// <summary>Emits a span of the original source verbatim.</summary>
 	public void SourceText(int offset, int length, DocFlags flags = DocFlags.None) =>

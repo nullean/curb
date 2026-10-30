@@ -14,7 +14,7 @@ public class DocPrinterTests
 	/// <summary>Source the tests slice text leaves out of. Offsets below index into this.</summary>
 	private const string Source = "0123456789abcdefghijklmnopqrstuvwxyz";
 
-	private static FormatOptions Options(int width = FormatOptions.Off) => new()
+	private static LayoutOptions Options(int width = LayoutOptions.Off) => new()
 	{
 		MaxLineLength = width,
 		IndentSize = 2,
@@ -22,10 +22,10 @@ public class DocPrinterTests
 		InsertFinalNewLine = false,
 	};
 
-	private static string Render(DocArena arena, int width = FormatOptions.Off)
+	private static string Render(DocArena arena, int width = LayoutOptions.Off)
 	{
-		DocValidator.Validate(arena, Source.Length);
-		return DocLayout.Render(arena, Source, Options(width));
+		DocValidator.Validate<CSharpLayout>(arena, Source.Length);
+		return DocLayout.Render<CSharpLayout>(arena, Source, Options(width));
 	}
 
 	/// <summary>Appends the literal <paramref name="text"/> by finding it in <see cref="Source"/>.</summary>
@@ -196,7 +196,7 @@ public class DocPrinterTests
 					using (ifBreak.Branch())
 						arena.Synthetic(SyntheticText.Empty);
 					using (ifBreak.Branch())
-						arena.Synthetic(SyntheticText.Comma);
+						arena.Synthetic(CSharpSyntheticText.Comma);
 				}
 				arena.SoftLine();
 				Text(arena, "abc");
@@ -403,7 +403,7 @@ public class DocPrinterTests
 		Text(arena, "012");
 
 		var options = Options() with { InsertFinalNewLine = true };
-		DocLayout.Render(arena, Source, options).Should().Be("012\n");
+		DocLayout.Render<CSharpLayout>(arena, Source, options).Should().Be("012\n");
 		await Task.CompletedTask;
 	}
 
@@ -416,7 +416,7 @@ public class DocPrinterTests
 		Text(arena, "abc");
 
 		var options = Options() with { EndOfLine = EndOfLine.CrLf };
-		DocLayout.Render(arena, Source, options).Should().Be("012\r\nabc");
+		DocLayout.Render<CSharpLayout>(arena, Source, options).Should().Be("012\r\nabc");
 		await Task.CompletedTask;
 	}
 
@@ -436,8 +436,8 @@ public class DocPrinterTests
 			arena.SourceText(5, 3); // "678"
 		}
 
-		DocValidator.Validate(arena, source.Length);
-		var options = new FormatOptions
+		DocValidator.Validate<CSharpLayout>(arena, source.Length);
+		var options = new LayoutOptions
 		{
 			MaxLineLength = 8, // "0123" (4) + line-as-space (1) + "678" (3) = 8 columns, ignoring '\r'
 			IndentSize = 2,
@@ -445,7 +445,7 @@ public class DocPrinterTests
 			InsertFinalNewLine = false,
 		};
 
-		DocLayout.Render(arena, source, options).Should().Be("0123\r 678",
+		DocLayout.Render<CSharpLayout>(arena, source, options).Should().Be("0123\r 678",
 			"the '\\r' must not count toward the 8-column budget, so the group still fits flat");
 		await Task.CompletedTask;
 	}
@@ -484,8 +484,8 @@ public class DocPrinterTests
 				Text(arena, "abc");
 			}
 
-			DocValidator.Validate(arena, Source.Length);
-			return DocLayout.Render(arena, Source, new FormatOptions
+			DocValidator.Validate<CSharpLayout>(arena, Source.Length);
+			return DocLayout.Render<CSharpLayout>(arena, Source, new LayoutOptions
 			{
 				MaxLineLength = width,
 				IndentSize = 2,
@@ -525,8 +525,8 @@ public class DocPrinterTests
 					Text(arena, "abcdefghij");
 			}
 
-			DocValidator.Validate(arena, Source.Length);
-			return DocLayout.Render(arena, Source, new FormatOptions
+			DocValidator.Validate<CSharpLayout>(arena, Source.Length);
+			return DocLayout.Render<CSharpLayout>(arena, Source, new LayoutOptions
 			{
 				MaxLineLength = width,
 				IndentSize = 2,
@@ -561,8 +561,8 @@ public class DocPrinterTests
 			arena.LineIfBroken(group);
 			Text(arena, "abc");
 
-			DocValidator.Validate(arena, Source.Length);
-			return DocLayout.Render(arena, Source, new FormatOptions
+			DocValidator.Validate<CSharpLayout>(arena, Source.Length);
+			return DocLayout.Render<CSharpLayout>(arena, Source, new LayoutOptions
 			{
 				MaxLineLength = width,
 				IndentSize = 2,
@@ -593,8 +593,8 @@ public class DocPrinterTests
 			Text(arena, "345");
 		}
 
-		DocValidator.Validate(arena, Source.Length);
-		var rendered = DocLayout.Render(arena, Source, new FormatOptions
+		DocValidator.Validate<CSharpLayout>(arena, Source.Length);
+		var rendered = DocLayout.Render<CSharpLayout>(arena, Source, new LayoutOptions
 		{
 			MaxLineLength = 80,
 			IndentSize = 2,
@@ -610,7 +610,7 @@ public class DocPrinterTests
 
 	private static void CommaSeparator(DocArena arena)
 	{
-		arena.Synthetic(SyntheticText.Comma);
+		arena.Synthetic(CSharpSyntheticText.Comma);
 		arena.Line();
 	}
 
@@ -731,7 +731,7 @@ public class DocPrinterTests
 				Text(arena, "0");
 			using (fill.Separator())
 			{
-				arena.Synthetic(SyntheticText.Comma);
+				arena.Synthetic(CSharpSyntheticText.Comma);
 				arena.HardLine();
 			}
 			using (fill.Item())
@@ -754,7 +754,7 @@ public class DocPrinterTests
 				Text(arena, "0");
 			using (fill.Separator())
 			{
-				arena.Synthetic(SyntheticText.Comma);
+				arena.Synthetic(CSharpSyntheticText.Comma);
 				arena.HardLine();
 			}
 			using (fill.Item())

@@ -5,38 +5,6 @@ using Nullean.Curb.Verification;
 
 namespace Nullean.Curb;
 
-/// <summary>Why a file was not formatted.</summary>
-public enum FormatStatus
-{
-	/// <summary>Formatted successfully.</summary>
-	Formatted,
-
-	/// <summary>The source does not parse. Curb never re-prints from a recovered tree.</summary>
-	SyntaxError,
-
-	/// <summary>Formatting produced output that lost or altered content, so it was discarded.</summary>
-	VerificationFailed,
-
-	/// <summary>The syntax nests deeper than Curb will follow.</summary>
-	TooDeep,
-}
-
-/// <summary>The outcome of formatting one file.</summary>
-/// <param name="Status">Whether it worked, and if not, why.</param>
-/// <param name="Changed">True when the output differs from the input.</param>
-/// <param name="Text">The formatted text, or null when it was not requested or not produced.</param>
-/// <param name="Coverage">Share of tokens emitted by a real printer rather than verbatim.</param>
-/// <param name="Message">Detail for a non-successful status.</param>
-public readonly record struct FormatResult(
-	FormatStatus Status,
-	bool Changed,
-	string? Text,
-	double Coverage,
-	string? Message)
-{
-	public bool Success => Status == FormatStatus.Formatted;
-}
-
 /// <summary>
 /// Formats C# source.
 /// </summary>
@@ -54,7 +22,7 @@ public readonly record struct FormatResult(
 public sealed class CSharpFormatter : IDisposable
 {
 	private readonly DocArena _arena = new();
-	private readonly DocPrinter _printer = new();
+	private readonly DocPrinter<CSharpLayout> _printer = new();
 	private readonly OutputBuffer _output = new();
 
 	/// <summary>How many files this formatter actually re-parsed, for reporting how often it was needed.</summary>
@@ -123,10 +91,10 @@ public sealed class CSharpFormatter : IDisposable
 		}
 
 #if DEBUG
-		DocValidator.Validate(_arena, source.Length);
+		DocValidator.Validate<CSharpLayout>(_arena, source.Length);
 #endif
 
-		_printer.Print(_arena, source.AsMemory(), options, _output);
+		_printer.Print(_arena, source.AsMemory(), options.Layout, _output);
 
 		var written = _output.Written;
 
@@ -198,6 +166,6 @@ public sealed class CSharpFormatter : IDisposable
 
 		_arena.Reset(source.Length);
 		Node.Print(parsed.Root, new PrintContext(_arena, parsed.Text, source, options));
-		return DocDumper.Dump(_arena, source);
+		return DocDumper.Dump<CSharpLayout>(_arena, source);
 	}
 }

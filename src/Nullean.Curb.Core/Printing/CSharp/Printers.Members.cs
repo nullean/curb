@@ -297,7 +297,7 @@ internal static partial class Printers
 	{
 		var arena = context.Arena;
 
-		arena.Synthetic(SyntheticText.Semicolon);
+		arena.Synthetic(CSharpSyntheticText.Semicolon);
 		context.NamespaceUnwrapped = true;
 
 		// A blank line under the declaration whatever the author had under the brace, which is what

@@ -20,58 +20,9 @@ public static class EditorConfigOptionsBinder
 		var options = new FormatOptions();
 		var properties = configuration.Properties;
 
-		if (properties.TryGetValue("indent_style", out var indentStyle))
-		{
-			switch (indentStyle)
-			{
-				case "tab":
-					options = options with { UseTabs = true };
-					break;
-				case "space":
-					options = options with { UseTabs = false };
-					break;
-				default:
-					diagnostics?.Add(CurbDiagnostic.UnrecognisedValue("indent_style", indentStyle, "tab or space"));
-					break;
-			}
-		}
-
-		if (TryIndentWidth(properties, "indent_size", diagnostics, out var indentSize))
-			options = options with { IndentSize = indentSize };
-
-		if (TryIndentWidth(properties, "tab_width", diagnostics, out var tabWidth))
-			options = options with { TabWidth = tabWidth };
-		else if (properties.ContainsKey("indent_size"))
-			options = options with { TabWidth = options.IndentSize };
-
-		if (properties.TryGetValue("max_line_length", out var maxLineLength))
-		{
-			if (string.Equals(maxLineLength, "off", StringComparison.OrdinalIgnoreCase))
-				options = options with { MaxLineLength = FormatOptions.Off };
-			else if (int.TryParse(maxLineLength, NumberStyles.Integer, CultureInfo.InvariantCulture, out var width) && width > 0)
-				options = options with { MaxLineLength = width };
-			else
-				diagnostics?.Add(CurbDiagnostic.UnrecognisedValue("max_line_length", maxLineLength, "a positive integer or 'off'"));
-		}
-
-		if (properties.TryGetValue("charset", out var charset))
-		{
-			switch (charset.Trim().ToLowerInvariant())
-			{
-				case "utf-8":
-					options = options with { Charset = Charset.Utf8 };
-					break;
-				case "utf-8-bom":
-					options = options with { Charset = Charset.Utf8Bom };
-					break;
-				default:
-					// latin1, utf-16le and utf-16be are documented by EditorConfig and not supported
-					// here: Curb reads and writes UTF-8, and re-encoding a file is not a formatting
-					// change. Said out loud rather than silently ignored.
-					diagnostics?.Add(CurbDiagnostic.UnrecognisedValue("charset", charset, "utf-8 or utf-8-bom"));
-					break;
-			}
-		}
+		// The core keys, bound with C#'s defaults, which are Roslyn's. In two halves because
+		// csharp_keep_existing_linebreaks has to sit between them: see the comment on it below.
+		options = options with { Layout = LayoutOptionsBinder.BindIndentationAndWidth(properties, diagnostics, options.Layout) };
 
 		// After max_line_length and before anything that asks which mode it is in, and that order is
 		// load-bearing rather than tidy: FormatOptions.KeepExistingLinebreaks resolves from the width when
@@ -93,36 +44,7 @@ public static class EditorConfigOptionsBinder
 			}
 		}
 
-		if (properties.TryGetValue("end_of_line", out var endOfLine))
-		{
-			switch (endOfLine.ToLowerInvariant())
-			{
-				case "lf":
-					options = options with { EndOfLine = EndOfLine.Lf };
-					break;
-				case "crlf":
-					options = options with { EndOfLine = EndOfLine.CrLf };
-					break;
-				case "auto":
-					// The struct default. Named explicitly here so writing it out is not an error —
-					// it is what print-config and the catalog already advertise as a legal value.
-					break;
-				case "cr":
-					// EditorConfig allows it; nothing has emitted lone CR line endings for decades and
-					// supporting it would mean a third code path through every break.
-					diagnostics?.Add(CurbDiagnostic.UnrecognisedValue("end_of_line", endOfLine, "lf or crlf; cr is not supported"));
-					break;
-				default:
-					diagnostics?.Add(CurbDiagnostic.UnrecognisedValue("end_of_line", endOfLine, "lf or crlf"));
-					break;
-			}
-		}
-
-		if (TryBool(properties, "insert_final_newline", diagnostics, out var insertFinalNewLine))
-			options = options with { InsertFinalNewLine = insertFinalNewLine };
-
-		if (TryBool(properties, "trim_trailing_whitespace", diagnostics, out var trimTrailing))
-			options = options with { TrimTrailingWhitespace = trimTrailing };
+		options = options with { Layout = LayoutOptionsBinder.BindLineEndings(properties, diagnostics, options.Layout) };
 
 		if (TryBool(properties, "csharp_new_line_before_else", diagnostics, out var newLineBeforeElse))
 			options = options with { NewLineBeforeElse = newLineBeforeElse };
@@ -765,27 +687,6 @@ public static class EditorConfigOptionsBinder
 		}
 	}
 
-	private static bool TryIndentWidth(
-		IReadOnlyDictionary<string, string> properties,
-		string key,
-		ICollection<CurbDiagnostic>? diagnostics,
-		out int value)
-	{
-		value = 0;
-		if (!properties.TryGetValue(key, out var raw))
-			return false;
-
-		// `indent_size = tab` defers to tab_width; the caller's default already covers it.
-		if (string.Equals(raw, "tab", StringComparison.OrdinalIgnoreCase))
-			return false;
-
-		if (int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out value) && value is > 0 and <= 64)
-			return true;
-
-		diagnostics?.Add(CurbDiagnostic.UnrecognisedValue(key, raw, "an integer between 1 and 64"));
-		return false;
-	}
-
 	/// <summary>Reads one <c>csharp_style_expression_bodied_*</c> key.</summary>
 	/// <remarks>
 	/// <c>false</c> binds to <see cref="ExpressionBodyStyle.AsWritten"/> rather than to a mode of its
@@ -1009,23 +910,6 @@ public static class EditorConfigOptionsBinder
 		IReadOnlyDictionary<string, string> properties,
 		string key,
 		ICollection<CurbDiagnostic>? diagnostics,
-		out bool value)
-	{
-		value = false;
-		if (!properties.TryGetValue(key, out var raw))
-			return false;
-
-		switch (raw.ToLowerInvariant())
-		{
-			case "true":
-				value = true;
-				return true;
-			case "false":
-				value = false;
-				return true;
-			default:
-				diagnostics?.Add(CurbDiagnostic.UnrecognisedValue(key, raw, "true or false"));
-				return false;
-		}
-	}
+		out bool value) =>
+		LayoutOptionsBinder.TryBool(properties, key, diagnostics, out value);
 }

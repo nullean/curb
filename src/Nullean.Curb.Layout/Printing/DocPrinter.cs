@@ -18,7 +18,8 @@ namespace Nullean.Curb.Printing;
 /// branches they did not take.
 /// </para>
 /// </remarks>
-internal sealed class DocPrinter
+internal sealed class DocPrinter<TLanguage>
+	where TLanguage : struct, ILayoutLanguage
 {
 	private readonly struct Scope(int end, int indent, PrintMode mode, int resume, bool suppressWidth, int align)
 	{
@@ -116,7 +117,7 @@ internal sealed class DocPrinter
 	/// </remarks>
 	public bool RoundTripAtRisk { get; private set; }
 
-	public void Print(DocArena arena, ReadOnlyMemory<char> source, in FormatOptions options, OutputBuffer output)
+	public void Print(DocArena arena, ReadOnlyMemory<char> source, in LayoutOptions options, OutputBuffer output)
 	{
 		_arena = arena;
 		_source = source;
@@ -237,8 +238,8 @@ internal sealed class DocPrinter
 					else
 					{
 						if (!_lineOpen)
-							OpenLine(SyntheticText.Get(doc.A), -1);
-						Emit(SyntheticText.Get(doc.A), doc.Flags, scope.SuppressWidth);
+							OpenLine(TLanguage.SyntheticTable[doc.A], -1);
+						Emit(TLanguage.SyntheticTable[doc.A], doc.Flags, scope.SuppressWidth);
 					}
 					i++;
 					break;
@@ -427,7 +428,7 @@ internal sealed class DocPrinter
 				return;
 			}
 
-			if (_width == FormatOptions.Off)
+			if (_width == LayoutOptions.Off)
 			{
 				RunSegment(index + 1, end, scope.Indent, scope.Align, PrintMode.Flat, scope.SuppressWidth);
 				return;
@@ -774,7 +775,7 @@ internal sealed class DocPrinter
 		if (previous is '\0' or ' ' or '\t' or '\n' or '\r')
 			return;
 
-		if (WeldDetector.CanWeld(previous, text[0]))
+		if (TLanguage.CanWeld(previous, text[0]))
 			RoundTripAtRisk = true;
 	}
 
@@ -821,7 +822,7 @@ internal sealed class DocPrinter
 			return scope.Mode;
 
 		// With reflow off there is no width to exceed, so every unbroken group is flat.
-		if (_width == FormatOptions.Off)
+		if (_width == LayoutOptions.Off)
 			return PrintMode.Flat;
 
 		return Fits(index, index + doc.Length, scope) ? PrintMode.Flat : PrintMode.Break;
@@ -836,7 +837,7 @@ internal sealed class DocPrinter
 		for (var option = index + 1; option < end; option += _arena[option].Length)
 		{
 			last = option;
-			if (_width == FormatOptions.Off || Fits(option, option + _arena[option].Length, scope))
+			if (_width == LayoutOptions.Off || Fits(option, option + _arena[option].Length, scope))
 				return option;
 		}
 
@@ -882,7 +883,7 @@ internal sealed class DocPrinter
 					break;
 
 				case DocKind.SynText:
-					remaining -= TextWidth(SyntheticText.Get(doc.A));
+					remaining -= TextWidth(TLanguage.SyntheticTable[doc.A]);
 					break;
 
 				case DocKind.ExternalText:

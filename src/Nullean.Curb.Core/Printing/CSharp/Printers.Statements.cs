@@ -164,7 +164,7 @@ internal static partial class Printers
 		var arena = context.Arena;
 
 		BeforeOpenBrace(BraceStyle.ControlBlocks, context, statement);
-		arena.Synthetic(SyntheticText.OpenBrace);
+		arena.Synthetic(CSharpSyntheticText.OpenBrace);
 
 		using (arena.Indent(context.Options.IndentBlockContents ? 1 : 0))
 		{
@@ -175,7 +175,7 @@ internal static partial class Printers
 		using (arena.IndentIf(context.Options.IndentBraces))
 			arena.HardLine(DocFlags.Reindent);
 
-		arena.Synthetic(SyntheticText.CloseBrace);
+		arena.Synthetic(CSharpSyntheticText.CloseBrace);
 		context.BracesAdded = true;
 	}
 

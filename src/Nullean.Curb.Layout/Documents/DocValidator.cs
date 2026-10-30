@@ -1,3 +1,5 @@
+using Nullean.Curb.Printing;
+
 namespace Nullean.Curb.Documents;
 
 /// <summary>Raised when the document arena is structurally inconsistent. Always a Curb bug.</summary>
@@ -13,15 +15,17 @@ internal sealed class DocArenaCorruptException(string message) : Exception(messa
 /// </remarks>
 internal static class DocValidator
 {
-	public static void Validate(DocArena arena, int sourceLength)
+	/// <typeparam name="TLanguage">Whose <see cref="ILayoutLanguage.SyntheticTable"/> the synthetic ids must index.</typeparam>
+	public static void Validate<TLanguage>(DocArena arena, int sourceLength)
+		where TLanguage : struct, ILayoutLanguage
 	{
 		if (arena.Count == 0)
 			return;
 
-		ValidateRange(arena, 0, arena.Count, sourceLength);
+		ValidateRange(arena, 0, arena.Count, sourceLength, TLanguage.SyntheticTable.Length);
 	}
 
-	private static void ValidateRange(DocArena arena, int start, int end, int sourceLength)
+	private static void ValidateRange(DocArena arena, int start, int end, int sourceLength, int syntheticCount)
 	{
 		var i = start;
 		while (i < end)
@@ -44,7 +48,7 @@ internal static class DocValidator
 					break;
 
 				case DocKind.SynText:
-					if (doc.A < 0 || doc.A >= SyntheticText.Table.Length)
+					if (doc.A < 0 || doc.A >= syntheticCount)
 						throw new DocArenaCorruptException($"doc {i} references synthetic text {doc.A}, which is not in the table");
 					break;
 
@@ -63,7 +67,7 @@ internal static class DocValidator
 						if (doc.B != 0 && (doc.B & 1) == 0)
 							throw new DocArenaCorruptException($"doc {i} is a fill with an even number of children ({doc.B}); a fill must end on an item");
 
-						ValidateRange(arena, i + 1, i + doc.Length, sourceLength);
+						ValidateRange(arena, i + 1, i + doc.Length, sourceLength, syntheticCount);
 						break;
 					}
 
@@ -84,12 +88,12 @@ internal static class DocValidator
 						if (arena[breakStart].Length != doc.Length - 1 - doc.A)
 							throw new DocArenaCorruptException($"doc {i} ifbreak branches do not fill its subtree");
 
-						ValidateRange(arena, i + 1, i + doc.Length, sourceLength);
+						ValidateRange(arena, i + 1, i + doc.Length, sourceLength, syntheticCount);
 						break;
 					}
 
 				default:
-					ValidateRange(arena, i + 1, i + doc.Length, sourceLength);
+					ValidateRange(arena, i + 1, i + doc.Length, sourceLength, syntheticCount);
 					break;
 			}
 
