@@ -244,8 +244,7 @@ public class DirectiveTests : FormattingTest
 		""");
 
 	[Test]
-	[Skip("Curb refuses a file containing #error; CSharpier filters that diagnostic instead")]
-	public Task Error_directive_is_formatted_rather_than_refused() => Unchanged(
+	public Task Error_directive_in_a_false_branch() => Unchanged(
 		"""
 		public class C
 		{
@@ -253,6 +252,27 @@ public class DirectiveTests : FormattingTest
 		#error not supported
 		#endif
 		    public int Value;
+		}
+		""");
+
+	// An active #error reports CS1029, which says the author asked the compiler to stop, not that the
+	// parse went wrong. dotnet format formats the file around it, and so does Curb (issue #26).
+	[Test]
+	public Task Active_error_directive_is_formatted_rather_than_refused() => Formats(
+		"""
+		public class C
+		{
+		#error not supported
+		      public int Value;
+		  public   void M( ) { }
+		}
+		""",
+		"""
+		public class C
+		{
+		#error not supported
+		    public int Value;
+		    public void M() { }
 		}
 		""");
 
