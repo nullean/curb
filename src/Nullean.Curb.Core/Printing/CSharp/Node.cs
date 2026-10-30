@@ -92,6 +92,11 @@ internal static class Node
 				Printers.UnsafeStatement((UnsafeStatementSyntax)node, context);
 				break;
 
+			case SyntaxKind.CheckedStatement:
+			case SyntaxKind.UncheckedStatement:
+				Printers.CheckedStatement((CheckedStatementSyntax)node, context);
+				break;
+
 			case SyntaxKind.EventDeclaration:
 				Printers.EventDeclaration((EventDeclarationSyntax)node, context);
 				break;
@@ -167,6 +172,10 @@ internal static class Node
 
 			case SyntaxKind.Parameter:
 				Printers.Parameter((ParameterSyntax)node, context);
+				break;
+
+			case SyntaxKind.Block when node.Parent is BlockSyntax:
+				Printers.BareBlock((BlockSyntax)node, context);
 				break;
 
 			case SyntaxKind.Block:
