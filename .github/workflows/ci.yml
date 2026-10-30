@@ -157,7 +157,10 @@ jobs:
   corpus:
     runs-on: ubuntu-latest
     name: Corpus and conformance
-    timeout-minutes: ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')) && 45 || 20 }}
+    # The full gates build real projects twice over (cleanupconformance, then one project per expectation),
+    # and a hosted runner's speed varies: one run took 11.5 minutes for the cleanup step, the next 19.
+    # 45 minutes stopped fitting once the expectation count grew past ~1,200.
+    timeout-minutes: ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')) && 75 || 20 }}
 
     steps:
       - uses: actions/checkout@v6
