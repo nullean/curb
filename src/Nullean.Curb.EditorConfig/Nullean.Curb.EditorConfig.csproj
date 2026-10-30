@@ -10,6 +10,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../Nullean.Curb.Core/Nullean.Curb.Core.csproj" />
+    <ProjectReference Include="../Nullean.Curb.Xml/Nullean.Curb.Xml.csproj" />
   </ItemGroup>
 
   <ItemGroup>

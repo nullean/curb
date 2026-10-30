@@ -3,6 +3,7 @@ using System.Text;
 using System.Xml;
 using System.Xml.Linq;
 using AwesomeAssertions;
+using Nullean.Curb.Tests.Formatting;
 using Nullean.Curb.Xml;
 
 namespace Nullean.Curb.Tests.Xml;
@@ -51,7 +52,7 @@ public class XmlLexerTests
 	}
 
 	[Test]
-	public async Task Every_xml_file_in_this_repository_lexes_losslessly_and_builds_a_tree()
+	public async Task Every_xml_file_in_this_repository_lexes_losslessly_and_formats_safely()
 	{
 		var root = RepositoryRoot();
 		var files = Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories)
@@ -62,31 +63,38 @@ public class XmlLexerTests
 
 		files.Should().NotBeEmpty();
 		using var tokens = new XmlTokenBuffer();
-		using var tree = new XmlTree();
+		using var formatter = new XmlFormatter();
 		foreach (var file in files)
 		{
 			var source = File.ReadAllText(file);
 			XmlLexer.Lex(source, tokens, out var error).Should().BeTrue($"{file} {error.Describe(source)}");
 			XmlLexer.Covers(source, tokens.Tokens).Should().BeTrue(file);
-			tree.Build(source, tokens, XmlOptions.ProfileFor(file), out error).Should().BeTrue($"{file} {error.Describe(source)}");
+
+			var options = new XmlOptions { Profile = XmlOptions.ProfileFor(file) };
+			var result = formatter.Format(source, options);
+			result.Status.Should().Be(FormatStatus.Formatted, $"{file}: {result.Message}");
+			XmlFormattingTest.AssertSameInfoset(source, result.Text!, options.Profile);
+			formatter.Format(result.Text!, options).Changed.Should().BeFalse($"{file} is not idempotent");
 		}
 
 		await Task.CompletedTask;
 	}
 
 	/// <summary>
-	/// Random documents built from XML's punctuation. Whatever the lexer accepts it must cover exactly,
-	/// and whatever the tree accepts as well, <see cref="XDocument"/> must accept too.
+	/// Random documents built from XML's punctuation. Whatever the lexer accepts it must cover exactly;
+	/// whatever Curb accepts as a whole, <see cref="XDocument"/> must accept too, and formatting it must
+	/// pass the verifier, keep the infoset and be idempotent.
 	/// </summary>
 	[Test]
 	public async Task Generated_documents_never_break_the_lexers_promise()
 	{
+		using var tokens = new XmlTokenBuffer();
+		using var formatter = new XmlFormatter();
+		var accepted = 0;
+
 		// CURB_XML_FUZZ raises the count for a long run by hand; the suite keeps it quick.
 		var iterations = int.TryParse(Environment.GetEnvironmentVariable("CURB_XML_FUZZ"), out var n) ? n : 20_000;
 		var random = new Random(int.TryParse(Environment.GetEnvironmentVariable("CURB_XML_FUZZ_SEED"), out var seed) ? seed : 20261030);
-		using var tokens = new XmlTokenBuffer();
-		using var tree = new XmlTree();
-		var accepted = 0;
 		for (var i = 0; i < iterations; i++)
 		{
 			var source = Generate(random);
@@ -94,12 +102,27 @@ public class XmlLexerTests
 				continue;
 
 			XmlLexer.Covers(source, tokens.Tokens).Should().BeTrue(source);
-			if (!tree.Build(source, tokens, XmlProfile.Generic, out _))
+
+			var options = new XmlOptions
+			{
+				Profile = XmlProfile.Generic,
+				MaxBlankLines = random.Next(3),
+				AttributeIndent = (AttributeIndent)random.Next(4),
+				SpaceBeforeSelfClosingOption = (SelfClosingSpace)random.Next(3),
+				Layout = XmlOptions.DefaultLayout with { MaxLineLength = random.Next(2) == 0 ? LayoutOptions.Off : random.Next(8, 60), UseTabs = random.Next(4) == 0 },
+			};
+			var result = formatter.Format(source, options);
+			if (result.Status == FormatStatus.SyntaxError)
 				continue;
 
 			accepted++;
+			result.Status.Should().Be(FormatStatus.Formatted, $"{source}\n{result.Message}");
+
 			var parse = () => XDocument.Parse(source, LoadOptions.PreserveWhitespace);
 			parse.Should().NotThrow<XmlException>($"Curb accepted a document XDocument refuses:\n{source}");
+
+			XmlFormattingTest.AssertSameInfoset(source, result.Text!, XmlProfile.Generic);
+			formatter.Format(result.Text!, options).Changed.Should().BeFalse(source);
 		}
 
 		accepted.Should().BeGreaterThan(1000, "the generator has to produce enough well-formed documents to mean anything");
