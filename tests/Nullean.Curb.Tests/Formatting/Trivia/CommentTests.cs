@@ -1014,4 +1014,58 @@ public class CommentTests : FormattingTest
 		}
 		""",
 		editorConfig: "max_line_length = 120");
+
+	/// <summary>
+	/// The spaces the author put on either side of an inline <c>/* */</c> comment stay as written, as
+	/// <c>dotnet format</c> leaves them. See <see href="https://github.com/nullean/curb/issues/148">issue #148</see>.
+	/// </summary>
+	[Test]
+	public Task Several_spaces_beside_an_inline_block_comment_are_kept() => Unchanged(
+		"""
+		public class C
+		{
+		    public int M(int a)
+		    {
+		        var x =   /* c */   1;
+		        Use(a  /* c */  , a);
+		        Use(/* c */   a,   /* d */a);
+		        Use(a /* c */  /* d */  , a);
+		        if (a > 0) { Use(a, a); /* after */   }
+		        return x   /* r */;
+		    }
+
+		    private void Use(int a, int b) { }
+		}
+		""");
+
+	[Test]
+	public Task Deterministic_layout_puts_one_space_beside_an_inline_block_comment() => Formats(
+		"""
+		public class C
+		{
+		    public int M(int a)
+		    {
+		        var x =   /* c */   1;
+		        Use(a  /* c */  , a);
+		        return x   /* r */;
+		    }
+
+		    private void Use(int a, int b) { }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public int M(int a)
+		    {
+		        var x = /* c */ 1;
+		        Use(a /* c */ , a);
+		        return x /* r */;
+		    }
+
+		    private void Use(int a, int b)
+		    { }
+		}
+		""",
+		editorConfig: "max_line_length = 120");
 }
