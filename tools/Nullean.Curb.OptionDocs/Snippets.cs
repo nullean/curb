@@ -1492,11 +1492,7 @@ public static class Snippets
 
             public class Widget
             {
-                public int X
-                {
-                    get;
-                    set;
-                }
+                public int X { get; set; }
 
                 public string Name
                 {

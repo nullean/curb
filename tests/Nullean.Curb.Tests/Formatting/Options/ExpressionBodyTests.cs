@@ -207,10 +207,16 @@ public class ExpressionBodyTests : FormattingTest
 		    }
 		}
 		""",
+		// The accessor list stays opened out, as the author wrote it: with no width Curb never joins
+		// lines (issue #24), and converting the bodies is no reason to start.
 		"""
 		public class C
 		{
-		    public int Value { get => _x; set => _x = value; }
+		    public int Value
+		    {
+		        get => _x;
+		        set => _x = value;
+		    }
 		}
 		""",
 		editorConfig: "csharp_style_expression_bodied_accessors = true");

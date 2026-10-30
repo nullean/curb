@@ -131,7 +131,6 @@ public class MemberTests : FormattingTest
 		""");
 
 	[Test]
-	[Skip("reflow off collapses a multi-line accessor list onto one line; dotnet format never joins lines")]
 	public Task Property_with_expression_bodied_accessors() => Unchanged(
 		"""
 		public class C
@@ -145,6 +144,104 @@ public class MemberTests : FormattingTest
 		    }
 		}
 		""");
+
+	// Issue #24: with no width an accessor list the author opened out stays opened out. dotnet format
+	// puts its braces on lines of their own and keeps the accessors' own breaks.
+	[Test]
+	public Task Accessor_list_opened_out_keeps_accessors_the_author_joined() => Unchanged(
+		"""
+		public class C
+		{
+		    private int _value;
+
+		    public int Value
+		    {
+		        get => _value; set => _value = value;
+		    }
+
+		    public event System.Action Changed
+		    {
+		        add { }
+		        remove { }
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Accessor_list_spanning_lines_gets_its_braces_on_lines_of_their_own() => Formats(
+		"""
+		public class C
+		{
+		    private int _value;
+
+		    public int First {
+		        get => _value;
+		        set => _value = value;
+		    }
+
+		    public int Second { get => _value;
+		        set => _value = value; }
+
+		    public int Third { get; set;
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    private int _value;
+
+		    public int First
+		    {
+		        get => _value;
+		        set => _value = value;
+		    }
+
+		    public int Second
+		    {
+		        get => _value;
+		        set => _value = value;
+		    }
+
+		    public int Third
+		    {
+		        get; set;
+		    }
+		}
+		""");
+
+	[Test]
+	public Task One_line_accessor_list_on_a_line_of_its_own_stays_there() => Unchanged(
+		"""
+		public class C
+		{
+		    public int Value
+		    { get; set; }
+		}
+		""");
+
+	[Test]
+	public Task One_line_accessor_list_below_its_declaration_joins_it_with_braces_on_the_same_line() => Formats(
+		"""
+		public class C
+		{
+		    public int Value
+		    { get; set; }
+
+		    public int Other {
+		        get; set; }
+		}
+		""",
+		"""
+		public class C {
+		    public int Value { get; set; }
+
+		    public int Other {
+		        get; set;
+		    }
+		}
+		""",
+		"csharp_new_line_before_open_brace = none");
 
 	[Test]
 	public Task Property_with_a_private_setter() => Unchanged(

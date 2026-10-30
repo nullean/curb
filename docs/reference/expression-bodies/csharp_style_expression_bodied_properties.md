@@ -60,9 +60,15 @@ public class Widget
 {
     private int _value;
 
-    public int Value { get { return _value; } }
+    public int Value
+    {
+        get { return _value; }
+    }
 
-    public string Name { get { return "widget"; } }
+    public string Name
+    {
+        get { return "widget"; }
+    }
 }
 ```
 :::
@@ -85,9 +91,15 @@ public class Widget
 {
     private int _value;
 
-    public int Value { get { return _value; } }
+    public int Value
+    {
+        get { return _value; }
+    }
 
-    public string Name { get { return "widget"; } }
+    public string Name
+    {
+        get { return "widget"; }
+    }
 }
 ```
 :::
@@ -125,9 +137,15 @@ public class Widget
 {
     private int _value;
 
-    public int Value { get { return _value; } }
+    public int Value
+    {
+        get { return _value; }
+    }
 
-    public string Name { get { return "widget"; } }
+    public string Name
+    {
+        get { return "widget"; }
+    }
 }
 ```
 :::
@@ -140,9 +158,15 @@ public class Widget
 {
     private int _value;
 
-    public int Value { get { return _value; } }
+    public int Value
+    {
+        get { return _value; }
+    }
 
-    public string Name { get { return "widget"; } }
+    public string Name
+    {
+        get { return "widget"; }
+    }
 }
 ```
 :::
