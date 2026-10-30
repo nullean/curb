@@ -1533,8 +1533,19 @@ internal static partial class Printers
 			Node.Print(node.Types[i], context);
 			if (i >= node.Types.SeparatorCount)
 				continue;
-			TokenPrinter.Print(node.Types.GetSeparator(i), context);
-			arena.Synthetic(SyntheticText.Space);
+			var separator = node.Types.GetSeparator(i);
+			TokenPrinter.Print(separator, context);
+
+			// A trailing `// comment` ends the line, and the next type continues the declaration one
+			// level in, where dotnet format leaves it. The comment's own break would have put it at
+			// the declaration's column. The break merges into the comment's.
+			if (EndsWithLineComment(separator))
+			{
+				using (arena.Indent())
+					arena.HardLine();
+			}
+			else
+				arena.Synthetic(SyntheticText.Space);
 		}
 	}
 

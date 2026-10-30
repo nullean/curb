@@ -509,10 +509,14 @@ internal sealed class DocPrinter
 
 		if (scope.Mode is PrintMode.ForceFlat || (scope.Mode is PrintMode.Flat && !endsLineComment))
 		{
-			// The same stray space as a synthetic one at the start of the comment's fresh line, and
-			// still the first thing after it, so a break that follows merges as it would have.
+			// The comment has already broken where this line would have put a space, so the line it
+			// opened is this line's. It takes this line's indent rather than the comment's, which is
+			// the statement's: `var y = // eq` / `a;` lost its continuation indent under a width.
+			// Nothing has been written to it yet, so a break that follows still merges into it.
 			if (mergesIntoCommentBreak)
 			{
+				_output.TrimTrailingWhitespace();
+				WriteIndent(scope);
 				_lineCommentBroke = true;
 				return;
 			}
