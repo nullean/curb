@@ -168,7 +168,7 @@ jobs:
           global-json-file: global.json
 
       - name: Check out the corpus
-        run: git clone --depth 1 https://github.com/elastic/docs-builder.git /tmp/corpus
+        run: ./build.sh clonecorpus -s true --corpus /tmp/corpus
 
       - name: Build
         run: ./build.sh build -s true
@@ -399,7 +399,7 @@ jobs:
           global-json-file: global.json
 
       - name: Check out the corpus
-        run: git clone --depth 1 https://github.com/elastic/docs-builder.git /tmp/corpus
+        run: ./build.sh clonecorpus -s true --corpus /tmp/corpus
 
       - name: Cleaning a real solution leaves it building
         run: ./build.sh cleanupconformance -s true --corpus /tmp/corpus

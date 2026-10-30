@@ -14,6 +14,7 @@ type Arguments =
     | [<CliPrefix(CliPrefix.None);SubCommand>] Compare
     | [<CliPrefix(CliPrefix.None);SubCommand>] Options
     | [<CliPrefix(CliPrefix.None);SubCommand>] Docs
+    | [<CliPrefix(CliPrefix.None);SubCommand>] CloneCorpus
 
     | [<CliPrefix(CliPrefix.None);Hidden;SubCommand>] PristineCheck
     | [<CliPrefix(CliPrefix.None);Hidden;SubCommand>] GeneratePackages
@@ -66,6 +67,7 @@ with
             | Perf -> "times the AOT binary over a corpus (--corpus <path>); never measure the JIT build"
             | Compare -> "times curb, csharpier and dotnet format over a directory of repos (--corpus <dir>)"
             | Options -> "generates docs/reference/**/*.md by running Curb against each option's snippet"
+            | CloneCorpus -> "clones the corpus the corpus gates run against into --corpus <path>; the one place CI gets it from"
             | Docs -> "builds the public docs, applies the landing page override, and serves them"
             | Port _ -> "port to serve the documentation on (default 8080)"
             | NoServe -> "build the documentation without serving it"

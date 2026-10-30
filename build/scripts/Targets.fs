@@ -550,6 +550,19 @@ let private fsharpSmoketest (_: ParseResults<Arguments>) =
     printfn ""
     printfn "F# MSBuild integration verified: formatted through Fantomas, skipped when unchanged, cached, checked, and untouched when bypassed"
 
+/// Where the corpus comes from, in one place: every CI job that needs it calls `./build.sh clonecorpus`, and
+/// cleanupconformance clones through here when no --corpus is given. Today that is elastic/docs-builder at
+/// HEAD; replacing it is a change to this function alone.
+let private cloneCorpus (destination: string) =
+    printfn "cloning elastic/docs-builder into %s" destination
+    exec "git" ["clone"; "--depth"; "1"; "https://github.com/elastic/docs-builder.git"; destination] |> ignore
+
+let private cloneCorpusTarget (arguments:ParseResults<Arguments>) =
+    match arguments.TryGetResult Corpus with
+    | Some destination when Directory.Exists destination -> failwithf "%s already exists; clonecorpus needs a fresh path" destination
+    | Some destination -> cloneCorpus destination
+    | None -> failwith "clonecorpus needs --corpus <path> to clone into"
+
 /// Cleans a corpus that really builds, then requires that it still builds and that dotnet format style has
 /// nothing left to say about the rules Curb owns.
 ///
@@ -570,9 +583,8 @@ let private cleanupConformance (arguments:ParseResults<Arguments>) =
         | None ->
             let cached = DirectoryInfo(Path.Combine(Paths.Output.FullName, "corpus", "docs-builder"))
             if not cached.Exists then
-                printfn "cloning elastic/docs-builder into %s" cached.FullName
                 Directory.CreateDirectory(cached.Parent.FullName) |> ignore
-                exec "git" ["clone"; "--depth"; "1"; "https://github.com/elastic/docs-builder.git"; cached.FullName] |> ignore
+                cloneCorpus cached.FullName
             cached
 
     let work = DirectoryInfo(Path.Combine(Paths.Output.FullName, "cleanup-conformance"))
@@ -2618,6 +2630,8 @@ let Setup (parsed:ParseResults<Arguments>) (subCommand:Arguments) =
     // No dependency on build: the documentation is markdown and one static HTML file, and waiting on
     // a Release compile to preview a paragraph would make nobody run it.
     step Docs.Name docs
+    // No dependency on build either: it is a git clone.
+    step CloneCorpus.Name cloneCorpusTarget
     cmd VerifyExpectations.Name (Some [Build.Name]) None <| fun _ -> verifyExpectations parsed
     cmd VerifyCleanupExpectations.Name (Some [Build.Name]) None <| fun _ -> verifyCleanupExpectations parsed
     cmd VerifyExpectationsJb.Name (Some [Build.Name]) None <| fun _ -> verifyExpectationsJb parsed
