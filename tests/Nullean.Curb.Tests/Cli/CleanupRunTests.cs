@@ -69,6 +69,34 @@ public class CleanupRunTests
 	}
 
 	[Test]
+	public async Task A_file_that_is_not_utf8_is_reported_rather_than_rewritten()
+	{
+		var fs = Repo("root = true\n\n[*.cs]\nindent_style = space\n");
+
+		// Latin-1 é in a string literal: decoded leniently it became U+FFFD and was written back that way.
+		byte[] latin1 =
+		[
+			.. Encoding.ASCII.GetBytes("namespace N;\n\npublic sealed class Widget\n{\n\tprivate string _name;\n\n\tpublic Widget() => _name = \"caf"),
+			0xE9,
+			.. Encoding.ASCII.GetBytes("\";\n}\n"),
+		];
+		var diagnosticLine = $"{Root}/Widget.cs(5,17): warning IDE0044: " +
+			$"Make field readonly (https://example/ide0044) [{Root}/e1.csproj::TargetFramework=net10.0]\n";
+
+		fs.AddFile($"{Root}/Widget.cs", new MockFileData(latin1));
+		fs.AddFile($"{Root}/curb.sarif", new MockFileData(diagnosticLine));
+		fs.File.SetLastWriteTimeUtc($"{Root}/Widget.cs", DateTime.UtcNow);
+		fs.File.SetLastWriteTimeUtc($"{Root}/curb.sarif", DateTime.UtcNow.AddMinutes(1));
+
+		var exitCode = CleanupRun.Execute(fs, Root, write: true);
+
+		exitCode.Should().NotBe(0, "a file that cannot be read is a failure, not a clean run");
+		fs.File.ReadAllBytes($"{Root}/Widget.cs").Should().Equal(latin1, "a file Curb cannot decode is left exactly as it was");
+
+		await Task.CompletedTask;
+	}
+
+	[Test]
 	public async Task A_byte_order_mark_is_stripped_when_charset_asks_for_plain_utf8()
 	{
 		var fs = Repo("root = true\n\n[*.cs]\nindent_style = space\ncharset = utf-8\n");

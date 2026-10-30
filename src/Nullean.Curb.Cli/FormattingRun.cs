@@ -22,6 +22,15 @@ internal static class FormattingRun
 	/// <summary>UTF-8 without a byte-order mark, and without the exception-throwing default.</summary>
 	private static readonly UTF8Encoding Utf8 = new(encoderShouldEmitUTF8Identifier: false);
 
+	/// <summary>
+	/// The decoder for what is read: invalid bytes throw rather than become U+FFFD.
+	/// </summary>
+	/// <remarks>
+	/// The lenient default turned a Latin-1 <c>"café"</c> into <c>"caf�"</c>, and the verifier, which
+	/// compares decoded text, could not see it. A file that is not UTF-8 is reported and left as it was.
+	/// </remarks>
+	internal static readonly UTF8Encoding StrictUtf8 = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
+
 	/// <summary>UTF-8 with a byte-order mark, for <c>charset = utf-8-bom</c>.</summary>
 	private static readonly UTF8Encoding Utf8WithBom = new(encoderShouldEmitUTF8Identifier: true);
 
@@ -218,7 +227,17 @@ internal static class FormattingRun
 				try
 				{
 					var hadBom = item.Bytes.Length >= 3 && item.Bytes[0] == 0xEF && item.Bytes[1] == 0xBB && item.Bytes[2] == 0xBF;
-					var source = Utf8.GetString(hadBom ? item.Bytes.AsSpan(3) : item.Bytes);
+					string source;
+					try
+					{
+						source = StrictUtf8.GetString(hadBom ? item.Bytes.AsSpan(3) : item.Bytes);
+					}
+					catch (DecoderFallbackException)
+					{
+						Interlocked.Increment(ref unparsable);
+						messages.Add($"{item.Path}: is not valid UTF-8 — left unchanged");
+						return ValueTask.CompletedTask;
+					}
 
 					var language = languages[item.Language];
 
