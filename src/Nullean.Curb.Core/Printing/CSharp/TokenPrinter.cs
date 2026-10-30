@@ -503,7 +503,9 @@ internal static class TokenPrinter
 
 				case SyntaxKind.SingleLineCommentTrivia:
 				case SyntaxKind.MultiLineCommentTrivia:
-					if (separated)
+					if (separated && trivia.IsKind(SyntaxKind.MultiLineCommentTrivia) && KeepsSpacing(trailing[i - 1], context))
+						context.Arena.SourceText(trailing[i - 1].Span);
+					else if (separated)
 						context.Arena.Synthetic(SyntheticText.Space);
 					separated = false;
 
@@ -516,6 +518,16 @@ internal static class TokenPrinter
 						// A // comment runs to end of line, so whatever follows must start a new one.
 						// The break the enclosing printer emits next is merged into this one.
 						context.Arena.LineCommentBreak();
+					}
+					else if (i + 2 == trailing.Count
+						&& KeepsSpacing(trailing[i + 1], context)
+						&& trailing[i + 1].Span.End < context.Text.Length)
+					{
+						// The author's own gap to the code after it, which dotnet format leaves as written
+						// (issue #148). The printer's space in front of that code is held back by the glue.
+						context.Arena.SourceText(trailing[i + 1].Span);
+						context.Arena.GlueTo(trailing[i + 1].Span.End);
+						break;
 					}
 					else if (i + 1 < trailing.Count
 						&& (trailing[i + 1].IsKind(SyntaxKind.WhitespaceTrivia) || trailing[i + 1].IsKind(SyntaxKind.EndOfLineTrivia)))
@@ -535,6 +547,33 @@ internal static class TokenPrinter
 					break;
 			}
 		}
+	}
+
+	/// <summary>
+	/// True when the whitespace beside an inline <c>/* */</c> comment is wider than the one space the
+	/// printer would write, and is written as it stands.
+	/// </summary>
+	/// <remarks>
+	/// dotnet format leaves `x =   /* c */   1` as written, and cutting each gap to one space was churn it
+	/// never asked for (issue #148). Spaces only: it rewrites a tab there into spaces of its own choosing.
+	/// Preservation mode only, where the author owns the layout; deterministic layout keeps one space.
+	/// </remarks>
+	private static bool KeepsSpacing(SyntaxTrivia whitespace, PrintContext context)
+	{
+		if (!context.Options.KeepExistingLinebreaks || !whitespace.IsKind(SyntaxKind.WhitespaceTrivia))
+			return false;
+
+		var span = whitespace.Span;
+		if (span.Length < 2)
+			return false;
+
+		for (var i = span.Start; i < span.End; i++)
+		{
+			if (context.Text[i] != ' ')
+				return false;
+		}
+
+		return true;
 	}
 
 	/// <summary>
