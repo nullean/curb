@@ -679,10 +679,11 @@ public class BracketAndLambdaBlockTests : FormattingTest
 		"public class C\n{\n\tpublic void M()\n\t{\n\t\tOn(\"a\", Make(1,\n\t\t\t\t\t 2),\n\t\t\t() =>\n\t\t\t{\n\t\t\t\tRun();\n\t\t\t});\n\t\tOn(\"a\",\n\t\t\tMake(1,\n\t\t\t\t\t 2),\n\t\t\t() =>\n\t\t\t{\n\t\t\t\tRun();\n\t\t\t});\n\t\tOn(\"a\", Make(1,\n\t\t\t\t\t 2),\n\t\t\t() =>\n\t\t\t{\n\t\t\t\tRun();\n\t\t\t});\n\t}\n}",
 		editorConfig: "indent_style = tab");
 
-	// A statement Curb moves off an `if` line takes a lambda block that was flush with that line
-	// nowhere: the block keeps its column, a level left of the call. dotnet format leaves the
-	// statement on the `if` line (issue #145) and, after `case 1:`, which it does break, the block
-	// at its column in just this way. Pinned so the shape is a decision rather than an accident.
+	// A statement moved off its label's line takes a lambda block that was flush with that line
+	// nowhere: the block keeps its column, a level left of the call. dotnet format breaks after
+	// `case 1:` and leaves the block at its column in just this way. Pinned so the shape is a decision
+	// rather than an accident. The statement on the `if` line stays there, as dotnet format leaves it
+	// (issue #145), and so does its block.
 
 	[Test]
 	public Task A_lambda_block_keeps_its_column_when_its_statement_leaves_the_line() => Formats(
@@ -711,8 +712,7 @@ public class BracketAndLambdaBlockTests : FormattingTest
 		{
 		    public void M(bool c, int x)
 		    {
-		        if (c)
-		            Register(() =>
+		        if (c) Register(() =>
 		        {
 		            Run();
 		        });

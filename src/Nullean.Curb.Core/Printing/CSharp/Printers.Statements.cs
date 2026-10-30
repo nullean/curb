@@ -55,6 +55,17 @@ internal static partial class Printers
 			return;
 		}
 
+		// One that starts on the header's line and continues below it stays there too, as dotnet format
+		// leaves `if (a) Register(` then `value);`; it was moved onto a line of its own with its
+		// continuation lines after it (issue #145). Not forced flat: its own breaks are laid out as they
+		// would be from a line of its own, which is the line it shares.
+		if (context.Options.PreserveSingleLineStatements && context.AuthorJoined(headerEnd, statement.SpanStart))
+		{
+			SpaceBeforeBody(statement, context);
+			Node.Print(statement, context);
+			return;
+		}
+
 		using (arena.Indent())
 		{
 			arena.HardLine();
@@ -74,6 +85,23 @@ internal static partial class Printers
 		else
 			context.Arena.Synthetic(SyntheticText.Space);
 	}
+
+	/// <summary>
+	/// True when a block below <c>for (;;)</c> stays below it although the brace option would join it.
+	/// </summary>
+	/// <remarks>
+	/// Roslyn's empty-header rule for <c>for (;;)</c> also owns the gap after its <c>)</c>, and it only
+	/// adjusts spaces, so the brace option never gets to remove a line break there: with
+	/// <c>csharp_new_line_before_open_brace = none</c>, dotnet format leaves <c>{</c> on the line below
+	/// <c>for (; ; )</c> as well as on its line, while it joins the one below <c>while (a)</c> or
+	/// <c>for (; a;)</c>. Joining it was not a fixed point (issue #153). A brace the option already puts on
+	/// its own line never asks; braces Curb adds are left to the option.
+	/// </remarks>
+	private static bool KeepsBraceBelowEmptyForHeader(SyntaxNode? body, PrintContext context) =>
+		body is BlockSyntax { Parent: ForStatementSyntax header } block
+		&& header.Statement == block
+		&& IsEmptyForHeader(header)
+		&& context.AuthorBroke(header.CloseParenToken.Span.End, block.OpenBraceToken.SpanStart);
 
 	/// <summary>
 	/// Whether this body should be given braces it was not written with.
@@ -279,7 +307,10 @@ internal static partial class Printers
 		var afterBlock = node.Statement is BlockSyntax
 			|| WantsBraces(node.Statement, context);
 
-		BeforeContinuation(context.Options.NewLineBeforeElse, afterBlock, context);
+		if (ElseStaysOnLine(node, context))
+			context.Arena.Synthetic(SyntheticText.Space);
+		else
+			BeforeContinuation(context.Options.NewLineBeforeElse, afterBlock, context);
 		TokenPrinter.Print(node.Else.ElseKeyword, context);
 
 		// `else if` stays on one line rather than nesting a whole new indent level.
@@ -291,6 +322,41 @@ internal static partial class Printers
 		}
 
 		EmbeddedStatement(node.Else.Statement, node.Else.ElseKeyword.Span.End, context);
+	}
+
+	/// <summary>True when <c>else</c> stays on the line of the body before it (issue #152).</summary>
+	/// <remarks>
+	/// <para>
+	/// <c>if (a) { } else { }</c> written on one line stays there under
+	/// <c>csharp_preserve_single_line_statements</c>, the same as a whole <c>try</c>; both bodies already
+	/// do, as embedded statements that share their header's line. It is a question about each <c>if</c>
+	/// statement, not the chain: Roslyn keeps whole any statement that sits on one line, so in
+	/// <c>if (a) { } else if (b)</c> then <c>{ }</c>, dotnet format moves the <c>else</c> down, and an
+	/// <c>else if (b) { } else { }</c> on one line keeps its own <c>else</c> where it is.
+	/// </para>
+	/// <para>
+	/// Not when Curb is adding braces to any body in the rest of the chain: those open it out over several
+	/// lines, so there is no single line left to keep. The <c>if</c> of an <c>else if</c> is never braced.
+	/// </para>
+	/// </remarks>
+	private static bool ElseStaysOnLine(IfStatementSyntax node, PrintContext context)
+	{
+		if (node.Else is null
+			|| !context.Options.PreserveSingleLineStatements
+			|| !context.AuthorJoined(node.SpanStart, node.Span.End))
+			return false;
+
+		for (var current = node; ;)
+		{
+			if (WantsBraces(current.Statement, context))
+				return false;
+
+			var next = current.Else?.Statement;
+			if (next is not IfStatementSyntax nested)
+				return next is null || !WantsBraces(next, context);
+
+			current = nested;
+		}
 	}
 
 	public static void WhileStatement(WhileStatementSyntax node, PrintContext context)
@@ -388,9 +454,18 @@ internal static partial class Printers
 	{
 		Spacing.InsideControlFlowParens(context);
 
+		// The separators are printed here, as the incrementors' are below: an initializer list is a bare
+		// separated list with no node of its own to print them, so `for (i = 0, j = 10; …)` lost its
+		// comma and verification refused the file (issue #150). A declaration's declarators print theirs.
 		Node.Print(node.Declaration, context);
-		foreach (var initializer in node.Initializers)
-			Node.Print(initializer, context);
+		for (var i = 0; i < node.Initializers.Count; i++)
+		{
+			Node.Print(node.Initializers[i], context);
+			if (i >= node.Initializers.SeparatorCount)
+				continue;
+			TokenPrinter.Print(node.Initializers.GetSeparator(i), context);
+			context.Arena.Synthetic(SyntheticText.Space);
+		}
 
 		if (node.Declaration is not null || node.Initializers.Count > 0)
 			Spacing.BeforeForSemicolon(context);
@@ -624,10 +699,39 @@ internal static partial class Printers
 		EmbeddedStatement(node.Statement, node.CloseParenToken.Span.End, context);
 	}
 
+	/// <summary>A block that is a statement of its own rather than the body of one.</summary>
+	/// <remarks>
+	/// <c>{ }</c> or <c>{ a++; }</c> written on one line stays there under
+	/// <c>csharp_preserve_single_line_blocks</c>, as dotnet format leaves it; Curb opened it out (issue
+	/// #152). A body never comes here: its owner decides, through <see cref="PrintStatementBody"/>.
+	/// </remarks>
+	public static void BareBlock(BlockSyntax node, PrintContext context)
+	{
+		using (context.Arena.ForceFlatIf(KeepsOneLine(node, context)))
+			Block(node, context);
+	}
+
+	/// <summary><c>unsafe { … }</c>.</summary>
+	/// <remarks>
+	/// The block is an embedded statement as far as dotnet format is concerned: <c>unsafe { }</c> written on
+	/// one line stays there under <c>csharp_preserve_single_line_statements</c>, and moves below the keyword
+	/// without it (issue #152).
+	/// </remarks>
 	public static void UnsafeStatement(UnsafeStatementSyntax node, PrintContext context)
 	{
 		TokenPrinter.Print(node.UnsafeKeyword, context);
-		PrintStatementBody(node.Block, BraceStyle.ControlBlocks, context);
+		EmbeddedStatement(node.Block, node.UnsafeKeyword.Span.End, context);
+	}
+
+	/// <summary><c>checked { … }</c> and <c>unchecked { … }</c>, laid out as <see cref="UnsafeStatement"/> is.</summary>
+	/// <remarks>
+	/// Printed verbatim until issue #151, which matched dotnet format by accident with the defaults and
+	/// kept the block on the keyword's line with <c>csharp_preserve_single_line_statements = false</c>.
+	/// </remarks>
+	public static void CheckedStatement(CheckedStatementSyntax node, PrintContext context)
+	{
+		TokenPrinter.Print(node.Keyword, context);
+		EmbeddedStatement(node.Block, node.Keyword.Span.End, context);
 	}
 
 	public static void LockStatement(LockStatementSyntax node, PrintContext context)

@@ -300,6 +300,56 @@ public class NewLineBeforeOpenBraceTests : FormattingTest
 		""",
 		editorConfig: "csharp_new_line_before_open_brace = types,methods");
 
+	/// <summary>
+	/// A brace below <c>for (;;)</c> stays below it: Roslyn's empty-header rule owns that gap and never
+	/// removes a line break there. One on the header's line stays there too. See
+	/// <see href="https://github.com/nullean/curb/issues/153">issue #153</see>.
+	/// </summary>
+	[Test]
+	public Task Control_blocks_excluded_leaves_a_brace_below_an_empty_for_header() => Formats(
+		"""
+		public class C {
+		    public void M(bool a) {
+		        for (; ; )
+		        { }
+
+		        for (;;)
+		        {
+		            M(a);
+		        }
+
+		        for (; ; ) { }
+
+		        for (; a;)
+		        { }
+
+		        while (a)
+		        { }
+		    }
+		}
+		""",
+		// Checked against dotnet format, which writes exactly this.
+		"""
+		public class C {
+		    public void M(bool a) {
+		        for (; ; )
+		        { }
+
+		        for (; ; )
+		        {
+		            M(a);
+		        }
+
+		        for (; ; ) { }
+
+		        for (; a;) { }
+
+		        while (a) { }
+		    }
+		}
+		""",
+		editorConfig: "csharp_new_line_before_open_brace = none");
+
 	[Test]
 	public Task Control_blocks_excluded_pulls_try_catch_finally_braces_up() => Formats(
 		// A statement in each body, not left empty — an empty try/catch/finally always collapses to

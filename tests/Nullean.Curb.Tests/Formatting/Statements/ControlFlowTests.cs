@@ -66,6 +66,65 @@ public class ControlFlowTests : FormattingTest
 		""",
 		editorConfig: "csharp_preserve_single_line_statements = false");
 
+	/// <summary>
+	/// A statement that starts on its header's line and continues below it stays on that line. See
+	/// <see href="https://github.com/nullean/curb/issues/145">issue #145</see>.
+	/// </summary>
+	[Test]
+	public Task A_multi_line_statement_on_its_header_line_stays_there() => Unchanged(
+		"""
+		public class C
+		{
+		    public int M(bool enabled, bool ready, int[] items)
+		    {
+		        if (enabled) Register(
+		            1);
+		        if (enabled) Run();
+		        while (enabled) Register(
+		            2);
+		        if (enabled) Run();
+		        else Register(
+		            3);
+		        foreach (var item in items) Register(
+		            item);
+		        if (enabled) if (ready)
+		            Run();
+		        if (enabled) return Compute(
+		            4);
+		        return 0;
+		    }
+		}
+		""");
+
+	/// <summary>
+	/// The <c>else</c> after one still takes its own line: the <c>if</c> is no longer a single-line
+	/// statement, so there is nothing to keep it on.
+	/// </summary>
+	[Test]
+	public Task An_else_after_a_multi_line_statement_on_its_header_line_takes_its_own_line() => Formats(
+		"""
+		public class C
+		{
+		    public void M(bool enabled)
+		    {
+		        if (enabled) Register(
+		            1); else Run();
+		    }
+		}
+		""",
+		// Checked against dotnet format, which writes exactly this.
+		"""
+		public class C
+		{
+		    public void M(bool enabled)
+		    {
+		        if (enabled) Register(
+		            1);
+		        else Run();
+		    }
+		}
+		""");
+
 	[Test]
 	public Task Space_after_the_if_keyword() => Formats(
 		"""
@@ -306,6 +365,45 @@ public class ControlFlowTests : FormattingTest
 		        for (var j = 0; ;) { }
 		        for (; ; );
 		        for (; a;) ;
+		    }
+		}
+		""");
+
+	/// <summary>
+	/// The commas between initializers that are not a declaration are printed, so the file formats
+	/// rather than failing verification. See
+	/// <see href="https://github.com/nullean/curb/issues/150">issue #150</see>.
+	/// </summary>
+	[Test]
+	public Task For_loop_with_two_initializers() => Formats(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        int i, j;
+		        for (i = 0, j = 10; i < j; i++, j--)
+		        {
+		        }
+		        for (i = 0,j = 10; i < j; i++,j--)
+		        {
+		        }
+		    }
+		}
+		""",
+		// dotnet format leaves the first header alone and gives the second's commas a space each.
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        int i, j;
+		        for (i = 0, j = 10; i < j; i++, j--)
+		        {
+		        }
+		        for (i = 0, j = 10; i < j; i++, j--)
+		        {
+		        }
 		    }
 		}
 		""");

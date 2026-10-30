@@ -98,6 +98,77 @@ public class PreserveSingleLineTests : FormattingTest
 		}
 		""");
 
+	/// <summary>
+	/// A one-line body on the line below its signature stays below it rather than joining it. See
+	/// <see href="https://github.com/nullean/curb/issues/146">issue #146</see>.
+	/// </summary>
+	[Test]
+	public Task A_one_line_body_below_its_signature_stays_there() => Unchanged(
+		"""
+		public class C
+		{
+		    public C()
+		    { /* serialization */}
+
+		    ~C()
+		    { }
+
+		    public void P()
+		    { }
+
+		    public int Q
+		    {
+		        get
+		        { return 1; }
+		    }
+
+		    public void M()
+		    {
+		        Action a = () =>
+		        { };
+		    }
+
+		    public void N()
+		    {
+		        void Inner()
+		        { }
+		    }
+		}
+		""");
+
+	/// <summary>Without a line of its own from the brace option, dotnet format joins it, and so does Curb.</summary>
+	[Test]
+	public Task A_one_line_body_below_its_signature_joins_it_when_the_brace_option_says_so() => Formats(
+		"""
+		public class C {
+		    public void P()
+		    { }
+
+		    public void M() {
+		        void Inner()
+		        { M(); }
+		    }
+
+		    public void R(
+		        int a)
+		    { }
+		}
+		""",
+		// Checked against dotnet format, which writes exactly this.
+		"""
+		public class C {
+		    public void P() { }
+
+		    public void M() {
+		        void Inner() { M(); }
+		    }
+
+		    public void R(
+		        int a) { }
+		}
+		""",
+		editorConfig: "csharp_new_line_before_open_brace = none");
+
 	// ---- what preserving does not reach -----------------------------------------------------------
 
 	[Test]
@@ -294,6 +365,145 @@ public class PreserveSingleLineTests : FormattingTest
 		}
 		""");
 
+	/// <summary>
+	/// An <c>if</c>/<c>else</c> chain on one line stays there, as a whole <c>try</c> does. See
+	/// <see href="https://github.com/nullean/curb/issues/152">issue #152</see>.
+	/// </summary>
+	[Test]
+	public Task A_whole_if_else_chain_written_on_one_line_stays_there() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M(bool a, bool b)
+		    {
+		        if (a) { } else if (b) { } else { }
+		        if (a) { Call(); } else { Other(); }
+		        if (a) Call(); else Other();
+		    }
+		}
+		""");
+
+	/// <summary>
+	/// Each <c>if</c> answers for itself: an <c>else if</c> on one line keeps its own <c>else</c> there
+	/// even when the <c>if</c> before it was broken, and the <c>else</c> of an <c>if</c> that spans lines
+	/// takes its own line.
+	/// </summary>
+	[Test]
+	public Task An_else_stays_on_the_line_only_when_its_own_if_does() => Formats(
+		"""
+		public class C
+		{
+		    public void M(bool a, bool b)
+		    {
+		        if (a)
+		        { }
+		        else if (b) { } else { }
+		        if (a) { } else if (b)
+		        { }
+		    }
+		}
+		""",
+		// Checked against dotnet format, which writes exactly this.
+		"""
+		public class C
+		{
+		    public void M(bool a, bool b)
+		    {
+		        if (a)
+		        { }
+		        else if (b) { } else { }
+		        if (a) { }
+		        else if (b)
+		        { }
+		    }
+		}
+		""");
+
+	/// <summary>
+	/// Braces Curb adds open the chain out, so its <c>else</c> takes its own line again — including for
+	/// a body further down an <c>else if</c>.
+	/// </summary>
+	[Test]
+	public Task An_else_takes_its_own_line_when_a_body_in_the_chain_gains_braces() => Formats(
+		"""
+		public class C
+		{
+		    public void M(bool a, bool b)
+		    {
+		        if (a) { Call(); } else if (b) Other(); else { }
+		    }
+		}
+		""",
+		// dotnet format whitespace leaves this unchanged.
+		"""
+		public class C
+		{
+		    public void M(bool a, bool b)
+		    {
+		        if (a) { Call(); }
+		        else if (b)
+		        {
+		            Other();
+		        }
+		        else { }
+		    }
+		}
+		""",
+		editorConfig: "csharp_prefer_braces = true");
+
+	/// <summary>
+	/// <c>unsafe</c>, <c>checked</c> and <c>unchecked</c> blocks and a bare block on one line stay there.
+	/// See <see href="https://github.com/nullean/curb/issues/151">issue #151</see> and
+	/// <see href="https://github.com/nullean/curb/issues/152">issue #152</see>.
+	/// </summary>
+	[Test]
+	public Task Unsafe_checked_and_bare_blocks_written_on_one_line_stay_there() => Unchanged(
+		"""
+		public class C
+		{
+		    public unsafe void M(int a)
+		    {
+		        unsafe { }
+		        checked { a++; }
+		        unchecked { }
+		        { }
+		        { a++; }
+		    }
+		}
+		""");
+
+	/// <summary>
+	/// With blocks off a bare block opens out, but the keyword blocks are statements and stay whole.
+	/// </summary>
+	[Test]
+	public Task Disabling_blocks_opens_a_bare_block_but_not_an_unsafe_or_checked_one() => Formats(
+		"""
+		public class C
+		{
+		    public unsafe void M(int a)
+		    {
+		        unsafe { a++; }
+		        checked { a++; }
+		        { a++; }
+		    }
+		}
+		""",
+		// Checked against dotnet format, which writes exactly this.
+		"""
+		public class C
+		{
+		    public unsafe void M(int a)
+		    {
+		        unsafe { a++; }
+		        checked { a++; }
+		        {
+		            a++;
+		        }
+		    }
+		}
+		""",
+		editorConfig: "csharp_preserve_single_line_blocks = false");
+
 	[Test]
 	public Task A_catch_after_a_broken_try_still_takes_its_own_line() => Formats(
 		"""
@@ -429,6 +639,49 @@ public class PreserveSingleLineTests : FormattingTest
 		        do
 		            Spin();
 		        while (!ready);
+		    }
+		}
+		""",
+		editorConfig: "csharp_preserve_single_line_statements = false");
+
+	/// <summary>
+	/// <c>checked</c> and <c>unchecked</c> blocks move off their keyword like an <c>unsafe</c> one, and a
+	/// bare block, which has no keyword, stays put. See
+	/// <see href="https://github.com/nullean/curb/issues/151">issue #151</see>.
+	/// </summary>
+	[Test]
+	public Task Disabling_it_moves_checked_and_unsafe_blocks_off_their_keyword() => Formats(
+		"""
+		public class C
+		{
+		    public unsafe void M(int a)
+		    {
+		        checked { }
+
+		        unchecked { a++; }
+
+		        unsafe { }
+
+		        { a++; }
+		    }
+		}
+		""",
+		// Checked against dotnet format, which writes exactly this.
+		"""
+		public class C
+		{
+		    public unsafe void M(int a)
+		    {
+		        checked
+		        { }
+
+		        unchecked
+		        { a++; }
+
+		        unsafe
+		        { }
+
+		        { a++; }
 		    }
 		}
 		""",
