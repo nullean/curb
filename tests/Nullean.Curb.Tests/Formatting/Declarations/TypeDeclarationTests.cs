@@ -251,6 +251,90 @@ public class TypeDeclarationTests : FormattingTest
 		}
 		""");
 
+	// ---- unions (C# preview) -----------------------------------------------------------------------
+	//
+	// Issue #90. A union is a type declaration whose primary constructor lists case types, so it prints
+	// as a record does. It used to print verbatim, which left a mis-indented one for dotnet format to
+	// move. Every expectation here was checked against dotnet format whitespace (SDK 10.0.403, whose
+	// Roslyn parses `union`) under LangVersion=preview.
+
+	[Test]
+	public Task Union_without_a_body() => Unchanged(
+		"""
+		public union Outcome(Started, Orphaned);
+		""");
+
+	[Test]
+	public Task Union_with_a_body_and_a_switch_expression_property() => Unchanged(
+		"""
+		public union RaftMessage(VoteRequest, VoteResponse, AppendRequest, AppendResponse)
+		{
+		    public readonly int Term => this switch
+		    {
+		        VoteRequest r => r.Term,
+		        VoteResponse r => r.Term,
+		        AppendRequest r => r.Term,
+		        AppendResponse r => r.Term,
+		        _ => 0,
+		    };
+		}
+		""");
+
+	[Test]
+	public Task Union_with_type_parameters_and_a_constraint() => Unchanged(
+		"""
+		public union Result<T>(T, Error) where T : class;
+		""");
+
+	[Test]
+	public Task Union_is_formatted_like_a_record() => Formats(
+		"""
+		public   union  Messy( VoteRequest ,VoteResponse ){
+		public int Term => 1;
+		}
+		""",
+		"""
+		public union Messy(VoteRequest, VoteResponse)
+		{
+		    public int Term => 1;
+		}
+		""");
+
+	[Test]
+	public Task Union_keeps_its_case_types_where_the_author_broke_them() => Unchanged(
+		"""
+		public union Command(
+		    ParseCommand,
+		    CheckCommand,
+		    VerifyCommand);
+		""");
+
+	[Test]
+	public Task Union_with_tabs_and_allman_braces() => Unchanged(
+		"public union RaftMessage(VoteRequest, VoteResponse)\n{\n\tpublic readonly int Term => this switch\n\t{\n\t\tVoteRequest r => r.Term,\n\t\t_ => 0,\n\t};\n}",
+		editorConfig: "indent_style = tab\ncsharp_new_line_before_open_brace = all");
+
+	[Test]
+	public Task Union_that_does_not_fit_wraps_its_case_types_like_a_record() => Formats(
+		"""
+		public union RaftMessage(VoteRequest, VoteResponse, AppendRequest, AppendResponse)
+		{
+		    public int Term => 1;
+		}
+		""",
+		"""
+		public union RaftMessage(
+		    VoteRequest,
+		    VoteResponse,
+		    AppendRequest,
+		    AppendResponse
+		)
+		{
+		    public int Term => 1;
+		}
+		""",
+		editorConfig: "max_line_length = 60");
+
 	[Test]
 	public Task Enum_is_not_a_type_declaration_but_indents_the_same() => Unchanged(
 		"""

@@ -191,9 +191,9 @@ public class PlaceSimpleDeclarationBlocksTests : FormattingTest
 
 	[Test]
 	public Task An_accessor_body_collapses() => Formats(
-		// The property line joins too: once each accessor's own body collapses to one line,
-		// csharp_place_simple_accessorholder_on_single_line's own default (true, unrelated to this
-		// key) joins the now-short accessor list back onto the property's line as well.
+		// Each accessor's own body collapses, but the accessor list the author opened out stays
+		// opened out: csharp_place_simple_accessorholder_on_single_line only lets a list the author
+		// kept on one line stay there, and with no width Curb never joins lines (issue #24).
 		"""
 		public class C
 		{
@@ -215,7 +215,11 @@ public class PlaceSimpleDeclarationBlocksTests : FormattingTest
 		"""
 		public class C
 		{
-		    public int P { get { return _p; } set { _p = value; } }
+		    public int P
+		    {
+		        get { return _p; }
+		        set { _p = value; }
+		    }
 
 		    private int _p;
 		}

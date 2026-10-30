@@ -256,8 +256,9 @@ internal static partial class Printers
 	/// Accessors collapse onto one line when they fit — <c>{ get; set; }</c> — and break otherwise.
 	/// </summary>
 	/// <remarks>
-	/// With reflow off, which is the default, a group is always flat, so accessor lists stay on one
-	/// line. That matches csharp_preserve_single_line_blocks, whose default is also true.
+	/// With reflow off, which is the default, a group is always flat, so an accessor list the author
+	/// kept on one line stays there, which matches csharp_preserve_single_line_blocks, whose default is
+	/// also true. One they opened out stays opened out.
 	/// </remarks>
 	public static void AccessorList(AccessorListSyntax node, PrintContext context)
 	{
@@ -272,8 +273,23 @@ internal static partial class Printers
 		// measured on the corpus at 455 non-idempotent files and 43 that dotnet format then moved.
 		// Dropping the guard takes those to 2 and 41, so it is an improvement on both axes rather than
 		// a trade; the remaining two are a separate shape and left standing.
+		//
+		// Guarding the other way is safe, and with no width it is the only thing standing between an
+		// accessor list the author opened out and a group that is always flat: `{` / `get => _value;` /
+		// `set => …;` / `}` came back as one line, where dotnet format never joins lines (issue #24).
+		// It opens such a list out itself, braces on lines of their own, and keeps the accessors' own
+		// breaks — which is what expanding prints, and expanding leaves the list spanning lines.
 		var expand = !context.Options.PlaceSimpleAccessorholderOnSingleLine
-			|| !context.Options.PreserveSingleLineBlocks;
+			|| !context.Options.PreserveSingleLineBlocks
+			|| context.AuthorBroke(node.OpenBraceToken.SpanStart, node.CloseBraceToken.SpanStart);
+
+		// `Value` / `{ get; set; }` keeps its one-line list on a line of its own, as dotnet format does.
+		// Outside the group, so the break the author made before the brace does not open out the list.
+		var braceLineOnly = !expand
+			&& BraceOnOwnLine(BraceStyle.Properties, context)
+			&& context.AuthorBroke(node.OpenBraceToken.GetPreviousToken().Span.End, node.OpenBraceToken.SpanStart);
+		if (braceLineOnly)
+			BeforeOpenBrace(BraceStyle.Properties, context);
 
 		using (arena.Group())
 		{
@@ -289,7 +305,7 @@ internal static partial class Printers
 			const BraceStyle construct = BraceStyle.Properties;
 			if (expand)
 				BeforeOpenBrace(construct, context);
-			else
+			else if (!braceLineOnly)
 				BeforeOpenBraceWhenBroken(construct, context);
 
 			TokenPrinter.Print(node.OpenBraceToken, context);

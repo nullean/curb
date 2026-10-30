@@ -188,6 +188,48 @@ public class ExpressionBodyTests : FormattingTest
 
 	// ---- accessors and whole properties -------------------------------------------------------------
 
+	// Issue #16: after a trailing comment the converted arrow starts the next line one level in. The
+	// comment's break left it at the member's column, and the next run moved it a level in.
+	[Test]
+	public Task A_converted_property_after_a_trailing_comment_puts_its_arrow_one_level_in() => Formats(
+		"""
+		public class C
+		{
+		    internal object Compilation // not for correctness
+		    {
+		        get { return null; }
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    internal object Compilation // not for correctness
+		        => null;
+		}
+		""",
+		editorConfig: "csharp_style_expression_bodied_properties = true");
+
+	[Test]
+	public Task A_converted_method_after_a_trailing_comment_puts_its_arrow_one_level_in() => Formats(
+		"""
+		public class C
+		{
+		    int M() // note
+		    {
+		        return 1;
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    int M() // note
+		        => 1;
+		}
+		""",
+		editorConfig: "csharp_style_expression_bodied_methods = true");
+
 	[Test]
 	public Task Accessors_convert_without_the_property_collapsing() => Formats(
 		// Two accessors, so there is a setter to keep and the accessor list has to stay.
@@ -207,10 +249,16 @@ public class ExpressionBodyTests : FormattingTest
 		    }
 		}
 		""",
+		// The accessor list stays opened out, as the author wrote it: with no width Curb never joins
+		// lines (issue #24), and converting the bodies is no reason to start.
 		"""
 		public class C
 		{
-		    public int Value { get => _x; set => _x = value; }
+		    public int Value
+		    {
+		        get => _x;
+		        set => _x = value;
+		    }
 		}
 		""",
 		editorConfig: "csharp_style_expression_bodied_accessors = true");

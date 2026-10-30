@@ -482,7 +482,21 @@ internal sealed class DocPrinter
 		_lineCommentBroke = false;
 
 		if (doc.Flags.HasFlag(DocFlags.OnlyIfNotAtLineStart) && _output.AtLineStart())
+		{
+			// A trailing comment opened this line at its own indent, and this break would have opened it
+			// at this one's. The line is this break's, so it takes this break's indent, as a break without
+			// the flag does below. A switch section's statement comes after its label's comment: kept at
+			// the label's column, a comment above the statement read back on the next run as out of
+			// shape and moved under the label's comment instead (issue #16).
+			if (mergesIntoCommentBreak && scope.Mode is not (PrintMode.Flat or PrintMode.ForceFlat)
+				&& !doc.Flags.HasFlag(DocFlags.AlignToAnchor))
+			{
+				_output.TrimTrailingWhitespace();
+				WriteIndent(scope);
+			}
+
 			return;
+		}
 
 		// A literal line is content, not layout: it breaks even inside a ForceFlat, and carries no
 		// indent because whatever it sits inside (a raw string) owns its own leading whitespace.

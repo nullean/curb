@@ -55,7 +55,10 @@ public class Widget
 {
     private int[] _data = new int[10];
 
-    public int this[int index] { get { return _data[index]; } }
+    public int this[int index]
+    {
+        get { return _data[index]; }
+    }
 }
 ```
 :::
@@ -78,7 +81,10 @@ public class Widget
 {
     private int[] _data = new int[10];
 
-    public int this[int index] { get { return _data[index]; } }
+    public int this[int index]
+    {
+        get { return _data[index]; }
+    }
 }
 ```
 :::
@@ -91,7 +97,10 @@ public class Widget
 {
     private int[] _data = new int[10];
 
-    public int this[int index] { get { return _data[index]; } }
+    public int this[int index]
+    {
+        get { return _data[index]; }
+    }
 }
 ```
 :::
@@ -114,7 +123,10 @@ public class Widget
 {
     private int[] _data = new int[10];
 
-    public int this[int index] { get { return _data[index]; } }
+    public int this[int index]
+    {
+        get { return _data[index]; }
+    }
 }
 ```
 :::
@@ -127,7 +139,10 @@ public class Widget
 {
     private int[] _data = new int[10];
 
-    public int this[int index] { get { return _data[index]; } }
+    public int this[int index]
+    {
+        get { return _data[index]; }
+    }
 }
 ```
 :::

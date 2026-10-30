@@ -36,11 +36,7 @@ namespace N;
 
 public class Widget
 {
-    public int X
-    {
-        get;
-        set;
-    }
+    public int X { get; set; }
 
     public string Name
     {
@@ -59,7 +55,11 @@ public class Widget
 {
     public int X { get; set; }
 
-    public string Name { get; set; }
+    public string Name
+    {
+        get;
+        set;
+    }
 }
 ```
 :::
@@ -82,7 +82,11 @@ public class Widget
 {
     public int X { get; set; }
 
-    public string Name { get; set; }
+    public string Name
+    {
+        get;
+        set;
+    }
 }
 ```
 :::
@@ -95,8 +99,7 @@ public class Widget
 {
     public int X
     {
-        get;
-        set;
+        get; set;
     }
 
     public string Name

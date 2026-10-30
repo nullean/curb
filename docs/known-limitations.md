@@ -23,7 +23,38 @@ in one pass currently do not.
 
 ## Anchor columns feed back into the next run
 
-In certain initializer patterns, {{product}}'s output indentation can change between consecutive
-passes. An initializer anchors to the indentation of the line it starts on; when {{product}}'s own
-output moves that line, the next run anchors somewhere else. The same applies to comment alignment in
-some cases. It is the anchor mechanism being unstable under its own output on real code.
+A few continuation lines inside an argument list can still move between the first and second pass.
+{{product}} keeps a continuation line at the offset the author gave it from the line it continues. When
+{{product}}'s first pass changes which line that is, the second pass measures from a different line and
+moves the continuation again.
+
+The two docs-builder corpora the conformance gate runs (1,702 and 1,688 files) settle in one pass,
+with widths off, with their own widths, and at width 120. roslyn at `dcfa99c3` (18,283 files, its own `.editorconfig`, no width)
+is the hardest case found. Five of its files still change on a second pass, in two shapes:
+
+- a switch expression, or a run of `//` comment lines, that starts a later argument line of a call
+- a lone `)` or `));` line closing a call whose arguments the author broke
+
+The shapes that used to account for most unsettled files settle in one pass now: a comment under a
+`case` label's trailing comment, a chain line in a lambda argument whose body has an operator, a tuple
+broken after its `(`, an initializer opened out inside a lambda argument, and an expression body
+converted after a trailing comment. The run is `curb format` twice over a copy, then a diff.
+
+## Blank lines grow around a region in an enum
+
+An enum whose members are wrapped in `#region` blocks gains blank lines inside each region on the first
+pass and another before an `#endregion` on the second. Its last `#endregion` also moves to column 0:
+
+```csharp
+internal enum E
+{
+    #region first
+    A = 1,
+    #endregion first
+    #region second
+    C = 3,
+    #endregion second
+}
+```
+
+Two of roslyn's files change on a second pass for this reason.

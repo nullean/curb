@@ -451,6 +451,84 @@ public class CommentTests : FormattingTest
 		}
 		""");
 
+	// Issue #16: the comment above a section's first statement sits where that statement does. The
+	// label's comment broke the line at the label's column, the comment stayed there, and the next
+	// run read it as out of shape and moved it under the label's comment.
+	[Test]
+	public Task A_comment_under_a_case_labels_trailing_comment_stays_at_the_statement_column() => Formats(
+		"""
+		public class C
+		{
+		    int M(int k)
+		    {
+		        switch (k)
+		        {
+		            case 1: // one
+		            case 2:     // two
+		                // shared
+		                return 1;
+		            case 3: // three
+		                    // under three
+		                return 3;
+		        }
+		        return 0;
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    int M(int k)
+		    {
+		        switch (k)
+		        {
+		            case 1: // one
+		            case 2: // two
+		                // shared
+		                return 1;
+		            case 3: // three
+		                    // under three
+		                return 3;
+		        }
+		        return 0;
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_comment_under_a_case_labels_trailing_comment_that_has_to_move_aligns_under_it() => Formats(
+		// Out of shape, at the label's column, so dotnet format moves it under the label's comment.
+		"""
+		public class C
+		{
+		    int M(int k)
+		    {
+		        switch (k)
+		        {
+		            case 2: // two
+		            // shared
+		                return 1;
+		        }
+		        return 0;
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    int M(int k)
+		    {
+		        switch (k)
+		        {
+		            case 2: // two
+		                    // shared
+		                return 1;
+		        }
+		        return 0;
+		    }
+		}
+		""");
+
 	[Test]
 	public Task Only_a_line_comment_aligns_under_a_trailing_line_comment() => Formats(
 		// A block or doc comment under a trailing `//`, or a `//` under a trailing `/* */`, goes to the

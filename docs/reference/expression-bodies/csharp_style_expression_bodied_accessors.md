@@ -56,7 +56,11 @@ public class Widget
 {
     private int _value;
 
-    public int Value { get { return _value; } set { _value = value; } }
+    public int Value
+    {
+        get { return _value; }
+        set { _value = value; }
+    }
 }
 ```
 :::
@@ -79,7 +83,11 @@ public class Widget
 {
     private int _value;
 
-    public int Value { get { return _value; } set { _value = value; } }
+    public int Value
+    {
+        get { return _value; }
+        set { _value = value; }
+    }
 }
 ```
 :::
@@ -92,7 +100,11 @@ public class Widget
 {
     private int _value;
 
-    public int Value { get => _value; set => _value = value; }
+    public int Value
+    {
+        get => _value;
+        set => _value = value;
+    }
 }
 ```
 :::
@@ -115,7 +127,11 @@ public class Widget
 {
     private int _value;
 
-    public int Value { get { return _value; } set { _value = value; } }
+    public int Value
+    {
+        get { return _value; }
+        set { _value = value; }
+    }
 }
 ```
 :::
@@ -128,7 +144,11 @@ public class Widget
 {
     private int _value;
 
-    public int Value { get => _value; set => _value = value; }
+    public int Value
+    {
+        get => _value;
+        set => _value = value;
+    }
 }
 ```
 :::
