@@ -203,8 +203,9 @@ internal static partial class Printers
 	/// </remarks>
 	private static int MemberContinuationLine(int previousEnd, SyntaxNode next, int anchor, PrintContext context)
 	{
-		BreakBetweenMembers(previousEnd, next, context);
-		return ContinuationLine(next.GetFirstToken(), anchor, context, element: true);
+		var first = next.GetFirstToken();
+		BreakBeforeFirstToken(previousEnd, first, context);
+		return ContinuationLine(first, anchor, context, element: true);
 	}
 
 	public static void AssignmentExpression(AssignmentExpressionSyntax node, PrintContext context)
