@@ -478,10 +478,11 @@ let private cleanupConformance (arguments:ParseResults<Arguments>) =
     // Frontend builds need npm, which a CI runner for a C# repository has no reason to have. Both npm
     // targets in docs-builder are Inputs/Outputs-gated, so writing their outputs makes MSBuild skip them.
     // If a future corpus needs something else the build fails loudly, which is the right way to find out.
+    // That happened once: Vite's manifest joined NpmRunBuild's outputs, and the target ran npm again.
     for project in Directory.GetFiles(work.FullName, "package.json", SearchOption.AllDirectories) do
         let dir = Path.GetDirectoryName(project)
         if Directory.GetFiles(dir, "*.csproj") |> Array.isEmpty |> not then
-            for relative in [ "node_modules/.install-stamp"; "_static/.build-stamp"; "_static/main.js"; "_static/styles.css" ] do
+            for relative in [ "node_modules/.install-stamp"; "_static/.build-stamp"; "_static/.vite/manifest.json"; "_static/main.js"; "_static/styles.css" ] do
                 let file = Path.Combine(dir, relative.Replace('/', Path.DirectorySeparatorChar))
                 Directory.CreateDirectory(Path.GetDirectoryName(file)) |> ignore
                 File.WriteAllText(file, "")
