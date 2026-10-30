@@ -1,3 +1,4 @@
+using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Nullean.Curb.Documents;
 using Nullean.Curb.Options;
@@ -90,16 +91,12 @@ internal static partial class Printers
 		arena.Synthetic(SyntheticText.Space);
 
 		// A value the author put below the `=` stays there. The group further down cannot keep it: with
-		// no width it never breaks, so `_comparers =` / `new(…)` was joined — issue #102. The `=` prints
-		// inside the indent so that a trailing `// note` on it ends its line at the value's level.
-		if (!BringsOwnBlock(node.Value) && context.AuthorBroke(node.EqualsToken.Span.End, node.Value.SpanStart))
+		// no width it never breaks, so `_comparers =` / `new(…)` was joined — issue #102. That includes a
+		// value with brackets of its own, such as `[1, 2, 3]`, `new Options { … }` or a block lambda,
+		// which BringsOwnBlock below would hug to the `=` — issue #107.
+		if (context.AuthorBroke(node.EqualsToken.Span.End, node.Value.SpanStart))
 		{
-			using (arena.Indent())
-			{
-				TokenPrinter.Print(node.EqualsToken, context);
-				arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
-				Node.Print(node.Value, context);
-			}
+			ValueBelowOperator(node.EqualsToken, node.Value, context);
 			return;
 		}
 
@@ -175,6 +172,35 @@ internal static partial class Printers
 
 			_ => false,
 		};
+
+	/// <summary>
+	/// Prints <paramref name="operatorToken"/> and a <paramref name="value"/> the author put on a line below
+	/// it, as far in from the operator's line as they put it.
+	/// </summary>
+	/// <remarks>
+	/// <c>dotnet format</c> leaves that line at whatever indent it has, so the offset is read from the
+	/// source: a bracket at the declaration's own level, one level in, or deeper all stay put, and a
+	/// statement Curb re-indents takes the value along with it. The value's own lines follow it. Where
+	/// the operator's line has no source line to measure from, the value sits one level in. The operator
+	/// prints inside that indent so that a trailing <c>// note</c> on it ends its line at the value's
+	/// level.
+	/// </remarks>
+	private static void ValueBelowOperator(SyntaxToken operatorToken, ExpressionSyntax value, PrintContext context)
+	{
+		var arena = context.Arena;
+		var anchor = context.EnterContinuation();
+		arena.LineShiftAnchor(anchor);
+
+		using (arena.Indent())
+		{
+			TokenPrinter.Print(operatorToken, context);
+			var offset = ContinuationLine(value.GetFirstToken(), anchor, context);
+			using (arena.AlignedIndent(anchor, offset))
+				Node.Print(value, context);
+		}
+
+		context.ExitContinuation();
+	}
 
 	/// <summary>True for values whose own layout supplies the indentation of their contents.</summary>
 	internal static bool BringsOwnBlock(ExpressionSyntax? value) =>

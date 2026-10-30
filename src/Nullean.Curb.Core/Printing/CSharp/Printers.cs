@@ -653,7 +653,9 @@ internal static partial class Printers
 			}
 			else if (breakAfterArrow)
 			{
-				arena.HardLine();
+				// Reindent: a trailing `// note` after the arrow has already ended its line, and a second
+				// break made a blank one. The body still takes its indent on the line the comment left open.
+				arena.HardLine(DocFlags.Reindent);
 			}
 			else
 			{
@@ -1351,6 +1353,10 @@ internal static partial class Printers
 		using (context.Arena.IndentIf(context.Options.IndentBraces))
 			context.Arena.HardLine();
 	}
+
+	/// <summary>True when <c>csharp_new_line_before_open_brace</c> puts this construct's brace on a line of its own.</summary>
+	internal static bool BraceOnOwnLine(BraceStyle construct, PrintContext context) =>
+		context.Options.NewLineBeforeOpenBrace.HasFlag(construct);
 
 	/// <summary>
 	/// The source column of a block's opening brace when the author put it on a line of its own and
