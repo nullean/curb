@@ -655,4 +655,33 @@ public class OptionsBindingTests
 		OptionCatalog.CoreKeys.Should().HaveCount(8);
 		await Task.CompletedTask;
 	}
+
+	[Test]
+	public async Task Layout_binder_keeps_the_defaults_it_is_given()
+	{
+		// XML's defaults are not C#'s. An absent key has to leave the caller's default in place, and
+		// indent_size without tab_width has to carry the new size into the tab width as it does for C#.
+		var xml = new LayoutOptions { IndentSize = 2, TabWidth = 2 };
+
+		LayoutOptionsBinder.Bind(new Dictionary<string, string>(), null, xml).Should().Be(xml);
+		LayoutOptionsBinder.Bind(new Dictionary<string, string> { ["indent_size"] = "3" }, null, xml)
+			.Should().Be(xml with { IndentSize = 3, TabWidth = 3 });
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task Csharp_keeps_its_mode_key_between_the_width_and_the_line_endings()
+	{
+		// The C# binder binds csharp_keep_existing_linebreaks between the two halves of the core keys,
+		// as it always has. Diagnostics are reported in binding order, so this pins it.
+		Bind(
+			"root = true\n\n[*.cs]\nindent_style = tabs\ncsharp_keep_existing_linebreaks = false\nend_of_line = cr\n",
+			out var diagnostics);
+
+		diagnostics.Should().Equal(
+			CurbDiagnostic.UnrecognisedValue("indent_style", "tabs", "tab or space"),
+			CurbDiagnostic.DeterministicLayoutNeedsAWidth(),
+			CurbDiagnostic.UnrecognisedValue("end_of_line", "cr", "lf or crlf; cr is not supported"));
+		await Task.CompletedTask;
+	}
 }
