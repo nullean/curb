@@ -642,4 +642,303 @@ public class ContinuationIndentTests : FormattingTest
 		    }
 		}
 		""");
+
+	// Issue #139: a body below `=>` stays as far in from the line it belongs to as the author put it.
+
+	[Test]
+	public Task A_body_below_the_arrow_keeps_the_offset_the_author_gave_it() => Unchanged(
+		"""
+		public class C
+		{
+		    public int[] Values() =>
+		            [1, 2];
+
+		    public int Count() =>
+		            Compute(1);
+
+		    public int Aligned() =>
+		          Compute(3);
+
+		    public void M()
+		    {
+		        System.Func<int> f = () =>
+		                Compute(2);
+		        Foo(x =>
+		                x + 1);
+		        var s = 1 switch
+		        {
+		            1 =>
+		                    2,
+		            _ => 3
+		        };
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_body_below_the_arrow_after_a_trailing_comment_keeps_its_offset() => Unchanged(
+		"""
+		public class C
+		{
+		    public int Q => // note
+		            2;
+
+		    public void M()
+		    {
+		        var s = 1 switch
+		        {
+		            1 => // why
+		                    2,
+		            _ => 3
+		        };
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_reindented_member_takes_the_body_below_its_arrow_along() => Formats(
+		"""
+		public class C
+		{
+		  public int Shifted() =>
+		          4;
+
+		    public void M()
+		    {
+		            System.Func<int> f = () =>
+		                    Compute(2);
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public int Shifted() =>
+		            4;
+
+		    public void M()
+		    {
+		        System.Func<int> f = () =>
+		                Compute(2);
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_body_below_the_arrow_keeps_its_offset_with_tabs() => Unchanged(
+		"public class C\n{\n\tpublic int Count() =>\n\t\t\tCompute(1);\n\n\tpublic int Aligned() =>\n\t\t  Compute(3);\n\n\tpublic void M()\n\t{\n\t\tSystem.Func<int> f = () =>\n\t\t\t\tCompute(2);\n\t}\n}",
+		editorConfig: "indent_style = tab");
+
+	[Test]
+	public Task Deterministic_layout_still_decides_a_body_below_the_arrow() => Formats(
+		"""
+		public class C
+		{
+		    public int Count() =>
+		            Compute(1);
+
+		    public void M()
+		    {
+		        System.Func<int> f = () =>
+		                Compute(2);
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public int Count() => Compute(1);
+
+		    public void M()
+		    {
+		        System.Func<int> f = () => Compute(2);
+		    }
+		}
+		""",
+		editorConfig: "max_line_length = 120");
+
+	// Issue #143: an argument the author broke to keeps its offset from the line the list starts on.
+
+	[Test]
+	public Task An_argument_line_keeps_the_offset_the_author_gave_it() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M(int[] arr)
+		    {
+		        Foo(
+		                first,
+		                second);
+		        Foo(first,
+		                second);
+		        Foo(
+		              aligned);
+		        var x = arr[
+		                0];
+		        var y = new C(
+		                    1,
+		                      2);
+		    }
+		}
+		""");
+
+	[Test]
+	public Task An_argument_line_after_a_comment_or_a_blank_line_keeps_its_offset() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        Foo( // why
+		                first,
+		                second);
+		        Foo(
+		                // lead
+		                first,
+
+		                second);
+		    }
+		}
+		""");
+
+	[Test]
+	public Task An_argument_line_s_own_continuation_and_block_follow_it() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        Foo(first,
+		                Bar(1,
+		                    2),
+		                  third);
+		        Foo(
+		                new C
+		                {
+		                    X = 1
+		                },
+		                second);
+		        Foo(
+		                a, new C
+		                {
+		                    X = 1
+		                });
+		        Foo(
+		            a, new C
+		            {
+		                X = 1
+		            });
+		        Foo(
+		                a,
+		                x =>
+		                {
+		                    return x;
+		                });
+		    }
+		}
+		""");
+
+	[Test]
+	public Task An_argument_line_s_lambda_body_keeps_its_own_continuation_where_it_is() => Unchanged(
+		"""
+		public class C
+		{
+		    public string M(string[] constants)
+		    {
+		        return constants.FirstOrDefault(
+		            name => constants.All(c => c.Has(name)) && constants
+		                    .Select(c => c[name])
+		                    .Count() == 2
+		        );
+		    }
+		}
+		""");
+
+	// The line a list or an arrow ends up on can be the closing line of a raw string, which is the
+	// string's own text and so has not moved; reading its indent as a shift drifted a level per run.
+
+	[Test]
+	public Task An_argument_or_body_below_the_end_of_a_raw_string_keeps_its_offset() => Unchanged(
+		""""
+		public class C : B
+		{
+		    public void M()
+		    {
+		        var s = """
+		            text
+		            """.Replace(
+		            "a",
+		            b);
+		        var t = """
+		            text
+		            """.Replace(
+		                "a",
+		                b);
+		    }
+
+		    public C() : base("""
+		        text
+		        """) =>
+		        Run();
+		}
+		"""");
+
+	[Test]
+	public Task An_argument_below_the_end_of_a_raw_string_keeps_its_offset_with_tabs() => Unchanged(
+		"public class C\n{\n\tpublic void M()\n\t{\n\t\tvar t = \"\"\"\n\t\t\ttext\n\t\t\t\"\"\".Replace(\n\t\t\t\t\"a\",\n\t\t\t\tb);\n\t\tvar u = \"\"\"\n\t\t\ttext\n\t\t\t\"\"\".Replace(\n\t\t\t\"a\",\n\t\t\tb);\n\t}\n}",
+		editorConfig: "indent_style = tab");
+
+	[Test]
+	public Task A_reindented_statement_takes_its_argument_lines_along() => Formats(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		  Shift(
+		          a,
+		              b);
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        Shift(
+		                a,
+		                    b);
+		    }
+		}
+		""");
+
+	[Test]
+	public Task An_argument_line_keeps_its_offset_with_tabs() => Unchanged(
+		"public class C\n{\n\tpublic void M(int[] arr)\n\t{\n\t\tFoo(\n\t\t\t\tfirst,\n\t\t\t\tsecond);\n\t\tFoo(\n\t\t\t  aligned);\n\t\tvar x = arr[\n\t\t\t\t0];\n\t}\n}",
+		editorConfig: "indent_style = tab");
+
+	[Test]
+	public Task Deterministic_layout_still_decides_an_argument_line() => Formats(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        Foo(
+		                first,
+		                second);
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        Foo(first, second);
+		    }
+		}
+		""",
+		editorConfig: "max_line_length = 120");
 }
