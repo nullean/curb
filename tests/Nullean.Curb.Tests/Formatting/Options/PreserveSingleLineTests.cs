@@ -98,6 +98,77 @@ public class PreserveSingleLineTests : FormattingTest
 		}
 		""");
 
+	/// <summary>
+	/// A one-line body on the line below its signature stays below it rather than joining it. See
+	/// <see href="https://github.com/nullean/curb/issues/146">issue #146</see>.
+	/// </summary>
+	[Test]
+	public Task A_one_line_body_below_its_signature_stays_there() => Unchanged(
+		"""
+		public class C
+		{
+		    public C()
+		    { /* serialization */}
+
+		    ~C()
+		    { }
+
+		    public void P()
+		    { }
+
+		    public int Q
+		    {
+		        get
+		        { return 1; }
+		    }
+
+		    public void M()
+		    {
+		        Action a = () =>
+		        { };
+		    }
+
+		    public void N()
+		    {
+		        void Inner()
+		        { }
+		    }
+		}
+		""");
+
+	/// <summary>Without a line of its own from the brace option, dotnet format joins it, and so does Curb.</summary>
+	[Test]
+	public Task A_one_line_body_below_its_signature_joins_it_when_the_brace_option_says_so() => Formats(
+		"""
+		public class C {
+		    public void P()
+		    { }
+
+		    public void M() {
+		        void Inner()
+		        { M(); }
+		    }
+
+		    public void R(
+		        int a)
+		    { }
+		}
+		""",
+		// Checked against dotnet format, which writes exactly this.
+		"""
+		public class C {
+		    public void P() { }
+
+		    public void M() {
+		        void Inner() { M(); }
+		    }
+
+		    public void R(
+		        int a) { }
+		}
+		""",
+		editorConfig: "csharp_new_line_before_open_brace = none");
+
 	// ---- what preserving does not reach -----------------------------------------------------------
 
 	[Test]

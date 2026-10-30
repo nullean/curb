@@ -1796,6 +1796,8 @@ internal static partial class Printers
 	/// csharp_preserve_single_line_blocks still takes a line of its own when the *header* wrapped —
 	/// `)` and `{ }` do not share a line — and whether the header wrapped is this run's decision when
 	/// a count or a width forced it, so it is asked of the list's group rather than of the source.
+	/// Only where csharp_new_line_before_open_brace gives the brace a line at all: without one, dotnet
+	/// format writes `int a) { }` after a wrapped list too.
 	/// </param>
 	internal static void PrintBody(
 		SyntaxNode body,
@@ -1803,11 +1805,27 @@ internal static partial class Printers
 		PrintContext context,
 		ushort ownerGroup = 0)
 	{
-		if (KeepsOneLine(body, context) || JoinsEmptyBracesToHeader(body, context))
+		// A one-line body the author put on the line below its header stays there, as dotnet format leaves
+		// `void P()` then `{ }`; it was joined onto the signature (issue #146). The brace option still has
+		// the last word: without a line of its own for this brace, dotnet format joins it, after a wrapped
+		// parameter list too, and BeforeOpenBrace does the same.
+		var keepsOneLine = KeepsOneLine(body, context);
+		if (keepsOneLine
+			&& !JoinsEmptyBracesToHeader(body, context)
+			&& body is BlockSyntax block
+			&& context.AuthorBroke(block.OpenBraceToken.GetPreviousToken().Span.End, block.OpenBraceToken.SpanStart))
+		{
+			BeforeOpenBrace(construct, context);
+			using (context.Arena.ForceFlat())
+				Node.Print(body, context);
+			return;
+		}
+
+		if (keepsOneLine || JoinsEmptyBracesToHeader(body, context))
 		{
 			var arena = context.Arena;
 
-			if (ownerGroup != 0)
+			if (ownerGroup != 0 && BraceOnOwnLine(construct, context))
 			{
 				arena.LineIfBroken(ownerGroup);
 
