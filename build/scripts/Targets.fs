@@ -1306,6 +1306,25 @@ let private caseSettings (d: string) =
         let t = l.Trim()
         t.Length > 0 && not (t.StartsWith("[")) && t <> "root = true")
 
+/// Gives a per-case project its own obj and bin, for the gates that build or analyse cases one project each.
+///
+/// Every case's project is called Case, and the repository's Directory.Build.props sends every project's obj
+/// and bin to one .artifacts/<project name>, so cases share .artifacts/obj/Case. Built concurrently, one case's
+/// build can leave a Case.dll newer than the next case's freshly written source, which makes MSBuild skip that
+/// case's CoreCompile and with it every analyser: its IDE0055 then silently goes unreported. This file imports
+/// the repository's props unchanged and only turns UseArtifactsOutput off, so obj and bin land in the case's
+/// own directory.
+let private isolateCaseOutput (caseDir: string) =
+    File.WriteAllText(
+        Path.Combine(caseDir, "Directory.Build.props"),
+        [ "<Project>"
+          "  <Import Project=\"$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))\" />"
+          "  <PropertyGroup>"
+          "    <UseArtifactsOutput>false</UseArtifactsOutput>"
+          "  </PropertyGroup>"
+          "</Project>" ]
+        |> String.concat "\n")
+
 /// Slow, and it needs the SDK, so it is its own target rather than part of `test`.
 let rec private verifyExpectations (arguments:ParseResults<Arguments>) =
     let dump = Path.Combine(Paths.Output.FullName, "expectations")
@@ -1468,6 +1487,9 @@ and private verifyCleanupExpectations (arguments:ParseResults<Arguments>) =
                   "  </ItemGroup>"
                   "</Project>" ]
                 |> String.concat "\n")
+
+            // Checked one at a time, so the shared obj never raced here; isolated anyway, so no case can see another's.
+            isolateCaseOutput d
 
             File.WriteAllText(
                 Path.Combine(d, "Case.csproj"),
@@ -1934,6 +1956,11 @@ and private verifyExpectationsJb (arguments:ParseResults<Arguments>) =
 /// noise the same way an undefined local already is, confirmed directly earlier — they do not stop that
 /// SAME case's own IDE0055 sites from reporting when nothing else is in the compilation to poison.
 ///
+/// Each case also gets its own obj and bin (isolateCaseOutput). Sharing the repository's .artifacts/obj/Case made
+/// a case's IDE0055 go unreported now and then — measured on CoreOptionTests.Tab_width_counts_toward_the_line_length,
+/// missed 4 times in 90 interleaved builds with a shared obj and 0 in 90 with its own — which is how the 0.10.0
+/// tag run came to call that registry entry stale.
+///
 /// `-p:UseSharedCompilation=false` earns its own line in every one of these builds — not a speed tweak,
 /// a correctness fix found the hard way. With the shared VBCSCompiler server (the default), which cases
 /// reported IDE0055 genuinely varied between otherwise-identical runs against the same, already-
@@ -1970,6 +1997,8 @@ and private verifyExpectationsIde0055 (arguments:ParseResults<Arguments>) =
         Directory.CreateDirectory caseDir |> ignore
 
         File.WriteAllText(Path.Combine(caseDir, "Case.cs"), read "Expected.cs" d + "\n")
+        // Concurrent cases would otherwise share one obj; see isolateCaseOutput.
+        isolateCaseOutput caseDir
 
         // Same shape ExpectationDump already writes ("root = true\n[*.cs]\n<settings>"), with the gate
         // itself added ahead of the case's own settings.
