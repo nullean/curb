@@ -21,6 +21,12 @@ namespace Nullean.Curb.Printing;
 internal sealed class BreakPropagation
 {
 	private int[] _hardPrefix = [];
+
+	/// <summary>
+	/// For each boundary <c>i</c>, the index of the last doc before it that prints anything, or -1.
+	/// </summary>
+	private int[] _lastContent = [];
+
 	private ulong[] _broken = [];
 	private int[] _forceFlatEnds = [];
 	private readonly List<int> _groupIndices = [];
@@ -55,7 +61,9 @@ internal sealed class BreakPropagation
 		// line does, even there: its newline is content, not layout.
 		var forceFlatDepth = 0;
 		var running = 0;
+		var lastContent = -1;
 		_hardPrefix[0] = 0;
+		_lastContent[0] = -1;
 
 		for (var i = 0; i < count; i++)
 		{
@@ -81,6 +89,10 @@ internal sealed class BreakPropagation
 				running++;
 
 			_hardPrefix[i + 1] = running;
+
+			if (doc.Kind is DocKind.SrcText or DocKind.SynText or DocKind.ExternalText or DocKind.Line or DocKind.BreakParent)
+				lastContent = i;
+			_lastContent[i + 1] = lastContent;
 		}
 
 		// ---- pass 2: a group breaks if its subtree contains any --------------------------------
@@ -89,10 +101,25 @@ internal sealed class BreakPropagation
 		foreach (var i in _groupIndices)
 		{
 			var doc = docs[i];
-			if (_hardPrefix[i + doc.Length] - _hardPrefix[i] > 0)
+			var end = i + doc.Length;
+			var hard = _hardPrefix[end] - _hardPrefix[i];
+
+			// A trailing // comment that is the last thing in the group ends the group's line, not a line
+			// inside it: nothing of the group follows it. Counting it forced the group open, so a comment
+			// after the last switch arm broke the arm after `=>` (issue #127). The printer still breaks
+			// it in a flat group, and the next break outside merges into it.
+			var last = _lastContent[end];
+			if (hard > 0 && last >= i && IsLineCommentBreak(docs[last]) && _hardPrefix[last + 1] > _hardPrefix[last])
+				hard--;
+
+			if (hard > 0)
 				_broken[i >> 6] |= 1UL << (i & 63);
 		}
 	}
+
+	/// <summary>True for the break that ends a trailing <c>//</c> comment. See <see cref="DocArena.LineCommentBreak"/>.</summary>
+	internal static bool IsLineCommentBreak(in Doc doc) =>
+		doc.Kind == DocKind.Line && doc.LineType == LineType.Hard && doc.B == Doc.EndsLineComment;
 
 	private void EnsureCapacity(int count)
 	{
@@ -101,6 +128,13 @@ internal sealed class BreakPropagation
 			if (_hardPrefix.Length > 0)
 				ArrayPool<int>.Shared.Return(_hardPrefix);
 			_hardPrefix = ArrayPool<int>.Shared.Rent(count + 1);
+		}
+
+		if (_lastContent.Length < count + 1)
+		{
+			if (_lastContent.Length > 0)
+				ArrayPool<int>.Shared.Return(_lastContent);
+			_lastContent = ArrayPool<int>.Shared.Rent(count + 1);
 		}
 
 		var words = (count >> 6) + 1;

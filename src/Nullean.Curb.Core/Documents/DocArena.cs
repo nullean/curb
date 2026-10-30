@@ -98,6 +98,13 @@ internal sealed class DocArena
 	public void LineCommentBreak() =>
 		Add(new Doc(DocKind.Line, a: (int)LineType.Hard, b: Doc.EndsLineComment));
 
+	/// <summary>
+	/// Keeps the text at <paramref name="sourceOffset"/> against what was just written, as the source
+	/// has it. See <see cref="SyntheticText.Glue"/>.
+	/// </summary>
+	public void GlueTo(int sourceOffset) =>
+		Add(new Doc(DocKind.SynText, a: SyntheticText.Glue, b: sourceOffset));
+
 	/// <summary>Always a newline emitted at column 0, for content that must not be re-indented.</summary>
 	public void LiteralLine(DocFlags flags = DocFlags.None) => AddLine(LineType.Literal, flags);
 
