@@ -704,19 +704,11 @@ let private cleanupConformance (arguments:ParseResults<Arguments>) =
         let output = result.ConsoleOut |> Seq.map (fun l -> l.Line) |> String.concat "\n"
         if result.ExitCode <> 0 then
             printfn "%s" output
-            failwithf "the corpus must build %s, but it did not" stage
+            // There is no build of the untouched corpus to compare against, so say whether the seed is to blame.
+            let inSeed = Text.RegularExpressions.Regex.IsMatch(output, @"CurbConformanceSeed\.cs\(\d+,\d+\): error")
+            failwithf "the corpus must build %s, but it did not%s" stage
+                (if inSeed then " (the seed file has errors)" else " (the seed file has none, so the corpus itself does not build)")
         output
-
-    printfn "building the corpus"
-    let pristine = build "before anything"
-
-    // What a repository that is already style-clean reports: nothing. docs-builder sets
-    // `dotnet_analyzer_diagnostic.category-Style.severity = warning` and builds warning-free, so every one of
-    // these rules is already satisfied across its 1,200 files. That is the zero-churn promise as a
-    // measurement rather than a claim — and it is why the fixing half has to be exercised by a seeded file,
-    // because there is nothing here to fix.
-    let pristineReports = ownedIds |> Array.filter (fun id -> pristine.Contains(id, StringComparison.Ordinal))
-    printfn "the pristine corpus reports: %s" (if pristineReports.Length = 0 then "(none, as it should)" else String.concat " " pristineReports)
 
     // One site per rule, in a file of its own, so the fixing half runs against a solution that really
     // compiles. The 1,200 files around it are what the rebuild and the dotnet-format check are for: cleanup
@@ -765,6 +757,11 @@ let private cleanupConformance (arguments:ParseResults<Arguments>) =
     let seedFile = Path.Combine(seedProject, "CurbConformanceSeed.cs")
     File.WriteAllText(seedFile, seed)
 
+    // One build, with the seed already in place. There used to be a build of the untouched corpus first,
+    // and it asserted nothing a seeded build does not: the corpus has to build (this one fails if it does
+    // not), and what the corpus reports by itself is every owned site outside the seed file, read off this
+    // same output below. Dropping it took one of three analyser-enabled builds of a 1,200-file solution,
+    // about five minutes on a hosted runner, out of the gate.
     printfn "building with one violation seeded per rule"
     let before = build "with the seed in place"
 
@@ -796,6 +793,17 @@ let private cleanupConformance (arguments:ParseResults<Arguments>) =
     let sitesBefore = sites before
     printfn "reported: all %d rules, %d distinct site(s)" ownedIds.Length sitesBefore.Count
     printfn "  before: %s" (tally before)
+
+    // What the corpus reports by itself: every owned rule with a site outside the seed file. Reported, not
+    // gated. Most of it is IDE0005, which docs-builder turns off and this gate turns back on above.
+    let corpusReports =
+        Text.RegularExpressions.Regex.Matches(before, ownedPattern)
+        |> Seq.filter (fun m -> Path.GetFileName m.Groups[1].Value <> "CurbConformanceSeed.cs")
+        |> Seq.map (fun m -> m.Groups[4].Value)
+        |> Seq.distinct
+        |> Seq.sort
+        |> Seq.toArray
+    printfn "outside the seed, the corpus reports: %s" (if corpusReports.Length = 0 then "(none)" else String.concat " " corpusReports)
 
     printfn "cleaning"
     let cleanupCode, cleanupLines = startCurb ["cleanup"; work.FullName]
