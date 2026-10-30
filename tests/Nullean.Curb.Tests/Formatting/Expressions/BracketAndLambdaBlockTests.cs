@@ -562,6 +562,173 @@ public class BracketAndLambdaBlockTests : FormattingTest
 		"public class C\n{\n\tpublic void M()\n\t{\n\t\tOn(\"click\",\n\t\t\t() =>\n\t\t\t{\n\t\t\t\tRun();\n\t\t\t});\n\t}\n}",
 		editorConfig: "indent_style = tab");
 
+	// A middle argument's own continuation keeps the offset the author gave it from the argument's
+	// line, as it does in a list without a callback. It had gone a level in from the argument, which
+	// also moved the line a callback's block keeps its offset from.
+
+	[Test]
+	public Task A_middle_argument_keeps_its_continuation_before_a_callback() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        On("a", Make(1,
+		                     2),
+		            () =>
+		            {
+		                Run();
+		            });
+		        On("a", Make(1,
+		                2),
+		            () =>
+		            {
+		                Run();
+		            });
+		        On("a",
+		            Make(1,
+		                     2),
+		            () =>
+		            {
+		                Run();
+		            });
+		        On("a", x.Where(y => y > 0)
+		                 .Select(y => y),
+		            () =>
+		            {
+		                Run();
+		            });
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_callback_on_a_continued_argument_s_line_keeps_its_block() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        On(Make(1,
+		                2), () =>
+		        {
+		            Run();
+		        });
+		        On("a", Make(1,
+		                     2), () =>
+		        {
+		            Run();
+		        });
+		        On("a", Make(1, 2), Make(3,
+		            4), () =>
+		        {
+		            Run();
+		        });
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_reindented_statement_takes_a_middle_argument_s_continuation_with_it() => Formats(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		      On("a", Make(1,
+		                   2),
+		          () =>
+		          {
+		              Run();
+		          });
+		            On("a",
+		                Make(1,
+		                         2),
+		                () =>
+		                {
+		                    Run();
+		                });
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        On("a", Make(1,
+		                     2),
+		            () =>
+		            {
+		                Run();
+		            });
+		        On("a",
+		            Make(1,
+		                     2),
+		            () =>
+		            {
+		                Run();
+		            });
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_middle_argument_keeps_its_continuation_before_a_callback_with_tabs() => Formats(
+		"public class C\n{\n\tpublic void M()\n\t{\n\t\tOn(\"a\", Make(1,\n\t\t             2),\n\t\t\t() =>\n\t\t\t{\n\t\t\t\tRun();\n\t\t\t});\n\t\tOn(\"a\",\n\t\t\tMake(1,\n\t\t\t\t\t 2),\n\t\t\t() =>\n\t\t\t{\n\t\t\t\tRun();\n\t\t\t});\n\t\t\tOn(\"a\", Make(1,\n\t\t\t             2),\n\t\t\t\t() =>\n\t\t\t\t{\n\t\t\t\t\tRun();\n\t\t\t\t});\n\t}\n}",
+		"public class C\n{\n\tpublic void M()\n\t{\n\t\tOn(\"a\", Make(1,\n\t\t\t\t\t 2),\n\t\t\t() =>\n\t\t\t{\n\t\t\t\tRun();\n\t\t\t});\n\t\tOn(\"a\",\n\t\t\tMake(1,\n\t\t\t\t\t 2),\n\t\t\t() =>\n\t\t\t{\n\t\t\t\tRun();\n\t\t\t});\n\t\tOn(\"a\", Make(1,\n\t\t\t\t\t 2),\n\t\t\t() =>\n\t\t\t{\n\t\t\t\tRun();\n\t\t\t});\n\t}\n}",
+		editorConfig: "indent_style = tab");
+
+	// A statement Curb moves off an `if` line takes a lambda block that was flush with that line
+	// nowhere: the block keeps its column, a level left of the call. dotnet format leaves the
+	// statement on the `if` line (issue #145) and, after `case 1:`, which it does break, the block
+	// at its column in just this way. Pinned so the shape is a decision rather than an accident.
+
+	[Test]
+	public Task A_lambda_block_keeps_its_column_when_its_statement_leaves_the_line() => Formats(
+		"""
+		public class C
+		{
+		    public void M(bool c, int x)
+		    {
+		        if (c) Register(() =>
+		        {
+		            Run();
+		        });
+		        switch (x)
+		        {
+		            case 1: Register(() =>
+		            {
+		                Run();
+		            });
+		                break;
+		        }
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M(bool c, int x)
+		    {
+		        if (c)
+		            Register(() =>
+		        {
+		            Run();
+		        });
+		        switch (x)
+		        {
+		            case 1:
+		                Register(() =>
+		            {
+		                Run();
+		            });
+		                break;
+		        }
+		    }
+		}
+		""");
+
 	[Test]
 	public Task A_reindented_statement_takes_its_lambda_block_with_it() => Formats(
 		"""

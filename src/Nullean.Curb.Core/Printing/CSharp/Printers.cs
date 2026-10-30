@@ -1062,9 +1062,14 @@ internal static partial class Printers
 				context.OwnBlockGroup = 0;
 
 			// An argument on a line the author broke to sits as far in from that line as it would from
-			// the indent, as a chain operand does after its continuation line.
+			// the indent, as a chain operand does after its continuation line. Its own continuation
+			// lines keep their offset from it, as they would in an ordinary list: `Make(1,` / `2)`
+			// put the `2` a level in from the argument however far right the author had aligned it.
+			// Every argument line moved as far as the list's line did, so the list's register holds
+			// the shift for each of them.
+			var value = arguments[i].Expression;
 			using (offset == int.MinValue ? default : arena.AlignedIndent(register, offset))
-				Node.Print(arguments[i], context);
+				PrintKeepingContinuation(arguments[i], !EndsWithOwnBlock(value) && IndentsOwnContinuation(value), context, register);
 
 			if (i == arguments.Count - 1)
 				break;
@@ -2283,27 +2288,8 @@ internal static partial class Printers
 				? previousEnd >= 0 && context.AuthorJoined(previousEnd, list[i].SpanStart)
 				: indentsItself && anchorEnd >= 0 && context.AuthorJoined(anchorEnd, list[i].SpanStart);
 
-			// The level only says where a continuation goes when there is nothing better. dotnet format
-			// leaves each one at the offset the author gave it from the line its argument starts on,
-			// moved as far as that line moved, whether that is one level, two or a hand-aligned column.
-			// Reading the level alone moved a continuation written two levels in to one.
-			var continuation = indentsItself ? ContinuationIndent(list[i], context) : -1;
-
 			using (arena.IndentIf(ownBlock, -1))
-			{
-				if (continuation < 0)
-					Node.Print(list[i], context);
-				else
-				{
-					// The argument's first continuation line sits one level into the subtree, so the
-					// subtree is based a level to the left of where that line belongs.
-					var register = context.EnterContinuation();
-					arena.LineShiftAnchor(register);
-					using (arena.AlignedIndent(register, continuation - context.LevelColumns))
-						Node.Print(list[i], context);
-					context.ExitContinuation();
-				}
-			}
+				PrintKeepingContinuation(list[i], indentsItself, context);
 
 			if (i >= list.SeparatorCount)
 				continue;
@@ -2338,6 +2324,49 @@ internal static partial class Printers
 	{
 		context.Arena.HardLine();
 		context.BlankLines(context.CodeSeparation(previousEnd, EffectiveStart(next)));
+	}
+
+	/// <summary>
+	/// Prints a list element, keeping the continuation lines of one that <paramref name="indentsItself"/>
+	/// at the offset the author gave them from the line it starts on.
+	/// </summary>
+	/// <remarks>
+	/// The level only says where a continuation goes when there is nothing better. dotnet format leaves
+	/// each one at the offset the author gave it from the line its argument starts on, moved as far as
+	/// that line moved, whether that is one level, two or a hand-aligned column. Reading the level alone
+	/// moved a continuation written two levels in to one.
+	/// </remarks>
+	/// <param name="element">The element to print.</param>
+	/// <param name="indentsItself">The element's own layout indents its continuation lines.</param>
+	/// <param name="context">Per-file printing state.</param>
+	/// <param name="lineShift">
+	/// A line-shift register that already holds how far the element's line moved, or -1 to capture one
+	/// here. A register captured here on a line nothing has been written to yet is not filled until
+	/// the element's first token, too late for the indent that reads it.
+	/// </param>
+	private static void PrintKeepingContinuation(SyntaxNode element, bool indentsItself, PrintContext context, int lineShift = -1)
+	{
+		var continuation = indentsItself ? ContinuationIndent(element, context) : -1;
+		if (continuation < 0)
+		{
+			Node.Print(element, context);
+			return;
+		}
+
+		var register = lineShift;
+		if (register < 0)
+		{
+			register = context.EnterContinuation();
+			context.Arena.LineShiftAnchor(register);
+		}
+
+		// The element's first continuation line sits one level into the subtree, so the subtree is
+		// based a level to the left of where that line belongs.
+		using (context.Arena.AlignedIndent(register, continuation - context.LevelColumns))
+			Node.Print(element, context);
+
+		if (lineShift < 0)
+			context.ExitContinuation();
 	}
 
 	/// <summary>
