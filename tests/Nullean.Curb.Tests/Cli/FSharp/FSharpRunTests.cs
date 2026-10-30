@@ -389,20 +389,23 @@ public class FSharpRunTests
 	{
 		var repo = new Repo();
 		repo.Fantomas.DaemonStalls = true;
-		repo.Variables[FantomasRunner.TimeoutVariable] = "0.2";
+
+		// Long enough that the handshake, which shares the base timeout, cannot run out on a loaded machine;
+		// the request still stalls for ever, so it is the one that times out.
+		repo.Variables[FantomasRunner.TimeoutVariable] = "2";
 		repo.Add("A.fs", "let  x = 1\n");
 		repo.Add("B.fs", "let y = 1\n");
 
-		var started = DateTime.UtcNow;
 		var (summary, errors) = repo.RunReporting(write: true);
 
-		// Killed at once, not after the five seconds a polite shutdown is given: a daemon that stopped answering
-		// is not asked to stop.
-		(DateTime.UtcNow - started).Should().BeLessThan(TimeSpan.FromSeconds(3));
 		summary.Failed.Should().Be(2, "the whole group fails, including any file answered before the daemon stopped");
 		summary.ExitCode.Should().Be(3);
 		repo.Read("A.fs").Should().Be("let  x = 1\n");
-		repo.Fantomas.Kills.Should().BeGreaterThan(0);
+		repo.Fantomas.DaemonsStarted.Should().Be(1);
+		repo.Fantomas.CliRuns.Should().Be(0, "a daemon that stopped answering is not a reason to try the command line");
+
+		// Killed outright, with its input still open: a daemon that stopped answering is not asked to stop.
+		repo.Fantomas.Aborts.Should().Be(1);
 		errors.Should().ContainSingle().Which.Should().Contain("did not answer").And.Contain(FantomasRunner.TimeoutVariable);
 		await Task.CompletedTask;
 	}
@@ -413,17 +416,37 @@ public class FSharpRunTests
 		var repo = new Repo();
 		repo.Fantomas.DaemonStalls = true;
 		repo.Add("A.fs", "let  x = 1\n");
-		using var cancellation = new CancellationTokenSource(TimeSpan.FromMilliseconds(300));
+		using var cancellation = new CancellationTokenSource();
 
-		var started = DateTime.UtcNow;
-		var summary = repo.Run(write: true, cancellationToken: cancellation.Token);
+		// Cancelled only once the daemon holds the request, so there is a running process to stop.
+		_ = repo.Fantomas.FirstRequest.ContinueWith(_ => cancellation.Cancel(), TaskScheduler.Default);
+		var languages = repo.Languages();
+		var summary = FormattingRun.Execute(repo.Fs, Root, write: true, languages: languages, cancellationToken: cancellation.Token);
 
-		// Well inside the 60 s request timeout, so it was the cancellation that stopped it.
-		(DateTime.UtcNow - started).Should().BeLessThan(TimeSpan.FromSeconds(5));
 		summary.Failed.Should().Be(1);
 		summary.ExitCode.Should().Be(3);
 		repo.Read("A.fs").Should().Be("let  x = 1\n");
-		repo.Fantomas.Kills.Should().BeGreaterThan(0);
+		repo.Fantomas.Aborts.Should().Be(1);
+
+		// Said as a cancellation, not as the request timeout running out.
+		((IExternalLanguage)languages[2]).Errors.Should().ContainSingle().Which.Should().Contain("cancelled");
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task A_run_cancelled_before_fantomas_starts_starts_nothing()
+	{
+		var repo = new Repo();
+		repo.Add("A.fs", "let  x = 1\n");
+		using var cancellation = new CancellationTokenSource();
+		cancellation.Cancel();
+
+		var summary = repo.Run(write: true, cancellationToken: cancellation.Token);
+
+		summary.Failed.Should().Be(1);
+		summary.ExitCode.Should().Be(3);
+		repo.Read("A.fs").Should().Be("let  x = 1\n");
+		repo.Fantomas.Started.Should().BeEmpty();
 		await Task.CompletedTask;
 	}
 

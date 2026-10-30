@@ -51,9 +51,25 @@ internal sealed class FakeFantomas(MockFileSystem fileSystem) : IToolLauncher
 	/// <summary>How many processes were killed.</summary>
 	public int Kills => _kills;
 
-	private int _kills;
+	/// <summary>
+	/// How many were killed while Curb still held their input open: an abort, as opposed to the kill a polite
+	/// shutdown falls back to after closing the input and waiting.
+	/// </summary>
+	public int Aborts => _aborts;
 
-	internal void Killed() => Interlocked.Increment(ref _kills);
+	/// <summary>Completes when the daemon receives its first document request.</summary>
+	public Task FirstRequest => _firstRequest.Task;
+
+	private readonly TaskCompletionSource _firstRequest = new(TaskCreationOptions.RunContinuationsAsynchronously);
+	private int _kills;
+	private int _aborts;
+
+	internal void Killed(bool inputOpen)
+	{
+		Interlocked.Increment(ref _kills);
+		if (inputOpen)
+			Interlocked.Increment(ref _aborts);
+	}
 
 	/// <summary>Settings to report as unknown in a configuration warning, after every request.</summary>
 	public string[] UnknownSettings { get; set; } = [];
@@ -207,6 +223,7 @@ internal sealed class FakeFantomas(MockFileSystem fileSystem) : IToolLauncher
 				var path = parameters.GetProperty("FilePath").GetString()!;
 				var source = parameters.GetProperty("SourceCode").GetString()!;
 				_owner.Requests.Enqueue((path, source));
+				_owner._firstRequest.TrySetResult();
 				pending.Add(Task.Run(async () =>
 				{
 					if (_owner.DaemonStalls)
@@ -364,7 +381,7 @@ internal class FakeProcess(FakeFantomas owner) : IToolProcess
 
 	public void Kill()
 	{
-		owner.Killed();
+		owner.Killed(inputOpen: !FromClient.Completed);
 		_killed.Cancel();
 		ToClient.Complete();
 		Exit(-1);
@@ -388,7 +405,14 @@ internal sealed class ChannelStream : Stream
 		Complete();
 	}
 
-	public void Complete() => _chunks.Writer.TryComplete();
+	public void Complete()
+	{
+		Completed = true;
+		_chunks.Writer.TryComplete();
+	}
+
+	/// <summary>The writer closed this pipe.</summary>
+	public bool Completed { get; private set; }
 
 	public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
 	{
