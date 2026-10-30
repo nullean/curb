@@ -67,6 +67,9 @@ internal sealed class DocPrinter
 	/// <summary>Where in the source the current line's first text came from, or -1 if it was synthetic.</summary>
 	private int _lineSource;
 
+	/// <summary>Where in the output the current line's first text was written.</summary>
+	private int _lineOutputStart;
+
 	/// <summary>
 	/// For each line written so far whose first text came from the source: where in the source that
 	/// text starts, and the line's indent in columns. Read back by a source-line anchor.
@@ -635,6 +638,7 @@ internal sealed class DocPrinter
 
 		_lineOpen = true;
 		_lineSource = sourceStart < 0 ? -1 : sourceStart + leading;
+		_lineOutputStart = _output.Length;
 
 		for (var i = 0; i < _pendingAnchorCount; i++)
 			_anchors[_pendingAnchors[i]] = LineShift(anchoredAtLineStart: true);
@@ -689,6 +693,14 @@ internal sealed class DocPrinter
 	{
 		if (_lineSource < 0)
 			return Doc.AnchorUnset;
+
+		// A line that begins inside a multi-line token — the closing line of a raw or verbatim string,
+		// `""".Replace(` — is that token's own text, written as it was, so it has not moved however far
+		// the line the token opened on did. Measured against that line, the token's indent read as a
+		// shift, and the lines anchored to it drifted a level on every run.
+		var written = _output.Written;
+		if (written[Math.Min(_lineOutputStart, written.Length)..].Contains('\n'))
+			return 0;
 
 		var source = _source.Span;
 		var lineStart = _lineSource;

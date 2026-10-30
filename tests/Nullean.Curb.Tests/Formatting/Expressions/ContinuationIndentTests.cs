@@ -854,6 +854,40 @@ public class ContinuationIndentTests : FormattingTest
 		}
 		""");
 
+	// The line a list or an arrow ends up on can be the closing line of a raw string, which is the
+	// string's own text and so has not moved; reading its indent as a shift drifted a level per run.
+
+	[Test]
+	public Task An_argument_or_body_below_the_end_of_a_raw_string_keeps_its_offset() => Unchanged(
+		""""
+		public class C : B
+		{
+		    public void M()
+		    {
+		        var s = """
+		            text
+		            """.Replace(
+		            "a",
+		            b);
+		        var t = """
+		            text
+		            """.Replace(
+		                "a",
+		                b);
+		    }
+
+		    public C() : base("""
+		        text
+		        """) =>
+		        Run();
+		}
+		"""");
+
+	[Test]
+	public Task An_argument_below_the_end_of_a_raw_string_keeps_its_offset_with_tabs() => Unchanged(
+		"public class C\n{\n\tpublic void M()\n\t{\n\t\tvar t = \"\"\"\n\t\t\ttext\n\t\t\t\"\"\".Replace(\n\t\t\t\t\"a\",\n\t\t\t\tb);\n\t\tvar u = \"\"\"\n\t\t\ttext\n\t\t\t\"\"\".Replace(\n\t\t\t\"a\",\n\t\t\tb);\n\t}\n}",
+		editorConfig: "indent_style = tab");
+
 	[Test]
 	public Task A_reindented_statement_takes_its_argument_lines_along() => Formats(
 		"""
