@@ -553,7 +553,22 @@ internal static partial class Printers
 		// does for no other initializer. Reproducing the source verbatim is what parity means here.
 		if (asWritten && HasBracedElements(node))
 		{
-			if (leadingLine)
+			// That includes the brace's own line: `new Dictionary<string, int>` / `{` keeps the brace where
+			// the author put it, column and all, as dotnet format does. The space alone joined it onto the
+			// `new` line whatever the source had (issue #137). Not past a comment, which places the line
+			// itself, nor from an indent dotnet format would rewrite into the configured style.
+			var open = node.OpenBraceToken;
+			var lineStart = context.Text.Lines.GetLineFromPosition(open.SpanStart).Start;
+			if (leadingLine
+				&& !TokenPrinter.HasLeadingContent(open)
+				&& !EndsWithLineComment(open.GetPreviousToken())
+				&& context.AuthorBroke(open.GetPreviousToken().Span.End, open.SpanStart)
+				&& IndentInStyle(lineStart, open.SpanStart, context))
+			{
+				arena.LiteralLine();
+				arena.SourceText(lineStart, open.SpanStart - lineStart);
+			}
+			else if (leadingLine)
 				arena.Synthetic(SyntheticText.Space);
 
 			PrintVerbatim(node, context);
@@ -849,6 +864,29 @@ internal static partial class Printers
 			return offset;
 
 		return context.SourceIndent(arguments.Arguments[0].SpanStart) - context.LevelColumns;
+	}
+
+	/// <summary>
+	/// True when the source between <paramref name="start"/> and <paramref name="end"/>, a line's indent, is
+	/// already written the way <c>indent_style</c> asks: spaces only, or tabs followed by less than a tab's
+	/// width of spaces.
+	/// </summary>
+	/// <remarks>
+	/// dotnet format keeps the column of a line it otherwise leaves alone, but rewrites its whitespace into
+	/// the configured style, so only an indent already in that style can be reproduced as written.
+	/// </remarks>
+	private static bool IndentInStyle(int start, int end, PrintContext context)
+	{
+		var spaces = 0;
+		for (var i = start; i < end; i++)
+		{
+			if (context.Text[i] == ' ')
+				spaces++;
+			else if (!context.Options.UseTabs || spaces > 0)
+				return false;
+		}
+
+		return !context.Options.UseTabs || spaces < Math.Max(1, context.Options.TabWidth);
 	}
 
 	/// <summary>True for an initializer whose elements are brace-wrapped, as a dictionary's are.</summary>

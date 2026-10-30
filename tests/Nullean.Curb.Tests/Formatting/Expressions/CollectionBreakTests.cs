@@ -797,4 +797,66 @@ public class CollectionBreakTests : FormattingTest
 		    };
 		}
 		""");
+
+	/// <summary>
+	/// A dictionary initializer's brace stays on the line of its own the author gave it, at the column they gave it,
+	/// as <c>dotnet format</c> leaves it. See <see href="https://github.com/nullean/curb/issues/137">issue #137</see>.
+	/// </summary>
+	[Test]
+	public Task A_dictionary_initializer_keeps_its_brace_below_new() => Unchanged(
+		"""
+		public class C
+		{
+		    private readonly Dictionary<string, int> _lookup =
+		        new Dictionary<string, int>
+		        {
+		            { "a", 1 },
+		            { "b", 2 },
+		        };
+
+		    public void M()
+		    {
+		        var lookup = new Dictionary<string, int>
+		        {
+		            { "a", 1 },
+		        };
+		        Use(new Dictionary<string, int>()
+		        {
+		            { "a", 1 },
+		        });
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_reindented_statement_leaves_its_dictionary_brace_where_it_is() => Formats(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		          var lookup = new Dictionary<string, int>
+		      {
+		            { "a", 1 },
+		        };
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        var lookup = new Dictionary<string, int>
+		      {
+		            { "a", 1 },
+		        };
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_dictionary_initializer_keeps_its_brace_below_new_with_tabs() => Unchanged(
+		"public class C\n{\n\tpublic void M()\n\t{\n\t\tvar lookup = new Dictionary<string, int>\n\t\t{\n\t\t\t{ \"a\", 1 },\n\t\t};\n\t}\n}",
+		editorConfig: "indent_style = tab");
 }
