@@ -1596,7 +1596,7 @@ internal static partial class Printers
 		// unit tests, which all started from a body that already had its arrow.
 		var arrowLeadsTheBody = context.Options.WrapBeforeArrowWithExpressions;
 
-		arena.Synthetic(SyntheticText.Space);
+		BeforeSynthesisedArrow(body.OpenBraceToken.GetPreviousToken(), context);
 		if (!arrowLeadsTheBody)
 			arena.Synthetic(SyntheticText.Arrow);
 
@@ -1700,7 +1700,7 @@ internal static partial class Printers
 		// The third place an arrow is emitted, and it takes the same placement as the other two.
 		var arrowLeadsTheBody = context.Options.WrapBeforeArrowWithExpressions;
 
-		arena.Synthetic(SyntheticText.Space);
+		BeforeSynthesisedArrow(accessors.OpenBraceToken.GetPreviousToken(), context);
 		if (!arrowLeadsTheBody)
 			arena.Synthetic(SyntheticText.Arrow);
 
@@ -2454,8 +2454,11 @@ internal static partial class Printers
 		}
 
 		// The element's first continuation line sits one level into the subtree, so the subtree is
-		// based a level to the left of where that line belongs.
-		using (context.Arena.AlignedIndent(register, continuation - context.LevelColumns))
+		// based a level to the left of where that line belongs. Two for a lambda whose body hangs off
+		// its arrow, which indents the body a level before the body indents its own lines: based one
+		// level to the left, `Where(x => x.A()` / `.B() == 1)` put `.B()` a level right of where the
+		// author had it, and a level further on every run (issue #16).
+		using (context.Arena.AlignedIndent(register, continuation - (ContinuationLevels(element, context) * context.LevelColumns)))
 			Node.Print(element, context);
 
 		if (lineShift < 0)
@@ -2877,6 +2880,29 @@ internal static partial class Printers
 			or ContinueStatementSyntax or GotoStatementSyntax or YieldStatementSyntax;
 
 	/// <summary>
+	/// The space before an arrow a conversion synthesises, or the break onto a line one level in when a
+	/// trailing <c>// comment</c> already ends <paramref name="previous"/>'s line.
+	/// </summary>
+	/// <remarks>
+	/// The comment's own break left the arrow at the member's column, and the next run, reading an
+	/// arrow the author put below the declaration, moved it a level in (issue #16). It goes there on
+	/// the run that converts it. Only where the next run reads that break: under deterministic layout
+	/// <see cref="ArrowExpressionClause"/> leaves an arrow after a comment at the member's column, and
+	/// so does this.
+	/// </remarks>
+	private static void BeforeSynthesisedArrow(SyntaxToken previous, PrintContext context)
+	{
+		if (!context.Options.KeepExistingLinebreaks || !EndsWithLineComment(previous))
+		{
+			context.Arena.Synthetic(SyntheticText.Space);
+			return;
+		}
+
+		using (context.Arena.Indent())
+			context.Arena.HardLine();
+	}
+
+	/// <summary>
 	/// True when a token is followed by a line comment, which has already ended the line.
 	/// </summary>
 	/// <remarks>
@@ -3059,6 +3085,27 @@ internal static partial class Printers
 		};
 
 	/// <summary>
+	/// How many levels into <paramref name="element"/> its first continuation line sits: two for a lambda
+	/// whose expression body hangs a level off the arrow's line, one for everything else.
+	/// </summary>
+	private static int ContinuationLevels(SyntaxNode element, PrintContext context)
+	{
+		var value = element switch
+		{
+			ArgumentSyntax argument => argument.Expression,
+			AttributeArgumentSyntax argument => argument.Expression,
+			ExpressionSyntax expression => expression,
+			_ => null,
+		};
+
+		return value is LambdaExpressionSyntax { ExpressionBody: { } body } lambda
+			&& context.AuthorJoined(lambda.ArrowToken.Span.End, body.SpanStart)
+			&& HangsOnArrowLine(body)
+				? 2
+				: 1;
+	}
+
+	/// <summary>
 	/// The source indent, in columns, of the first line inside <paramref name="node"/> after the one it
 	/// starts on, or -1 when the author kept it on one line or that line says nothing about its offset.
 	/// </summary>
@@ -3100,6 +3147,9 @@ internal static partial class Printers
 			if (token.SpanStart != first)
 				continue;
 
+			if (OpensBraceLineAbove(node, token, line.Start, context))
+				return -1;
+
 			return token.Kind() is SyntaxKind.OpenBraceToken
 				or SyntaxKind.CloseBraceToken
 				or SyntaxKind.CloseParenToken
@@ -3109,6 +3159,46 @@ internal static partial class Printers
 		}
 
 		return -1;
+	}
+
+	/// <summary>
+	/// True when Curb opens out an initializer or anonymous type that starts above
+	/// <paramref name="lineStart"/>, inside <paramref name="node"/>, and so puts its brace on a line of
+	/// its own ahead of <paramref name="token"/>'s.
+	/// </summary>
+	/// <remarks>
+	/// That brace, not the token, starts the first continuation line Curb writes, and a brace line reads
+	/// as -1 on the next run. Reading the token's column instead based `Create(new[] { a,` / `b })` on
+	/// the elements' column on the first run and on the indent on the second, so the opened-out braces
+	/// moved by tens of columns between the two (issue #16).
+	/// </remarks>
+	private static bool OpensBraceLineAbove(SyntaxNode node, SyntaxToken token, int lineStart, PrintContext context)
+	{
+		var options = context.Options;
+		for (var current = token.Parent; current is not null && current != node; current = current.Parent)
+		{
+			switch (current)
+			{
+				case InitializerExpressionSyntax initializer
+					when initializer.OpenBraceToken.SpanStart < lineStart
+						&& initializer.Parent is BaseObjectCreationExpressionSyntax
+							or ArrayCreationExpressionSyntax
+							or ImplicitArrayCreationExpressionSyntax
+						&& options.NewLineBeforeMembersInObjectInitializers
+						&& BraceOnOwnLine(BraceStyle.ObjectCollectionArrayInitializers, context)
+						&& SpansLines(initializer, context):
+					return true;
+
+				case AnonymousObjectCreationExpressionSyntax anonymous
+					when anonymous.OpenBraceToken.SpanStart < lineStart
+						&& (options.NewLineBeforeMembersInAnonymousTypes || options.NewLineBeforeMembersInObjectInitializers)
+						&& BraceOnOwnLine(BraceStyle.AnonymousTypes, context)
+						&& SpansLines(anonymous, context):
+					return true;
+			}
+		}
+
+		return false;
 	}
 
 	private static bool LastArgumentEndsWithOwnBlock(BaseArgumentListSyntax? arguments) =>

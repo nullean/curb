@@ -918,6 +918,118 @@ public class ContinuationIndentTests : FormattingTest
 		"public class C\n{\n\tpublic void M(int[] arr)\n\t{\n\t\tFoo(\n\t\t\t\tfirst,\n\t\t\t\tsecond);\n\t\tFoo(\n\t\t\t  aligned);\n\t\tvar x = arr[\n\t\t\t\t0];\n\t}\n}",
 		editorConfig: "indent_style = tab");
 
+	// Issue #16: a lambda whose body hangs off its arrow indents that body a level before the body
+	// indents its own lines, so an argument line inside it is two levels into the lambda, not one.
+	// Read as one, `.Kind()` moved a level right on every run.
+	[Test]
+	public Task A_chain_line_in_a_lambda_argument_with_an_operator_keeps_its_offset() => Unchanged(
+		"""
+		public class C
+		{
+		    object M()
+		    {
+		        return all
+		            .Where(label => label.First().Get(x)
+		                .Kind() is 1 or 2);
+		    }
+
+		    void N()
+		    {
+		        Where(label => label.First()
+		            .Kind() == 1);
+		        Where(label => label
+		                .Kind() is 1);
+		        Where((a, b) => a.First()
+		            .Kind() != b);
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_chain_line_in_a_lambda_argument_with_an_operator_keeps_its_offset_with_tabs() => Unchanged(
+		"public class C\n{\n\tvoid N()\n\t{\n\t\tWhere(label => label.First()\n\t\t\t.Kind() == 1);\n\t}\n}",
+		editorConfig: "indent_style = tab");
+
+	// Issue #16: a tuple keeps the lines the author broke it onto, the one after `(` and the `)`'s
+	// included, at their offset from the line it starts on. It joined `(` / `Name: m,` and put the rest
+	// at the statement's column, which the next run moved again.
+	[Test]
+	public Task A_tuple_keeps_its_lines_at_their_offset() => Formats(
+		"""
+		public class C
+		{
+		    object M(int[] xs)
+		    {
+		          return xs.Select(m => (
+		              Name: m,
+		              Path: m
+		          ));
+		    }
+
+		    object N()
+		    {
+		        var t = (1,
+		                 2);
+		        return (
+		            t,
+		            2);
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    object M(int[] xs)
+		    {
+		        return xs.Select(m => (
+		            Name: m,
+		            Path: m
+		        ));
+		    }
+
+		    object N()
+		    {
+		        var t = (1,
+		                 2);
+		        return (
+		            t,
+		            2);
+		    }
+		}
+		""");
+
+	// Issue #16: an initializer Curb opens out puts its brace on a line of its own, and that brace, not
+	// the element below it, is the argument's first continuation line. Read from the element, the
+	// braces landed under it on the first run and back at the indent on the second.
+	[Test]
+	public Task An_initializer_opened_out_in_a_lambda_argument_settles_in_one_run() => Formats(
+		"""
+		public class C
+		{
+		    void M()
+		    {
+		        Assert(() => Create(new[] { Parse(a),
+		                                    Parse(b) },
+		                            options: x));
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    void M()
+		    {
+		        Assert(() => Create(new[]
+		        {
+		            Parse(a),
+		            Parse(b)
+		        },
+		                            options: x));
+		    }
+		}
+		""",
+		editorConfig: "csharp_new_line_before_members_in_object_initializers = true");
+
 	[Test]
 	public Task Deterministic_layout_still_decides_an_argument_line() => Formats(
 		"""

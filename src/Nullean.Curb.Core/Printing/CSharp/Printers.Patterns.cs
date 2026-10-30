@@ -512,26 +512,50 @@ internal static partial class Printers
 		// Every list that can hold a line break has to keep the author's, or it joins and the
 		// enclosing construct — which preserved its own layout and so emitted no break opportunity —
 		// has no way to break the result. A tuple was the last one still joining unconditionally.
-		var asWritten = SpansLines(node, context);
+		//
+		// And each line keeps the offset the author gave it from the line the tuple starts on, as an
+		// argument list's do, the line after the `(` and the `)`'s included. Breaking to the ambient
+		// indent joined `(` / `Name: a,` onto the paren's line and left the rest at the statement's
+		// column, which the next run read back and moved again (issue #16).
+		var arguments = node.Arguments;
+		var anchor = -1;
+		if (SpansLines(node, context))
+		{
+			anchor = context.EnterContinuation();
+			context.Arena.LineShiftAnchor(anchor);
+		}
 
 		TokenPrinter.Print(node.OpenParenToken, context);
 
-		for (var i = 0; i < node.Arguments.Count; i++)
+		// The offset of the line the current element sits on, once the author broke onto one.
+		var offset = int.MinValue;
+		if (anchor >= 0 && arguments.Count > 0 && context.AuthorBroke(node.OpenParenToken.Span.End, arguments[0].SpanStart))
+			offset = ContinuationLine(arguments[0].GetFirstToken(), anchor, context, element: true);
+
+		for (var i = 0; i < arguments.Count; i++)
 		{
-			Node.Print(node.Arguments[i], context);
-			if (i >= node.Arguments.SeparatorCount)
+			using (offset == int.MinValue ? default : context.Arena.AlignedIndent(anchor, offset))
+				Node.Print(arguments[i], context);
+
+			if (i >= arguments.SeparatorCount)
 				continue;
 
 			Spacing.BeforeComma(context);
-			TokenPrinter.Print(node.Arguments.GetSeparator(i), context);
+			TokenPrinter.Print(arguments.GetSeparator(i), context);
 
-			if (asWritten && context.AuthorBroke(node.Arguments[i].Span.End, node.Arguments[i + 1].SpanStart))
-				context.Arena.HardLine();
+			if (anchor >= 0 && context.AuthorBroke(arguments[i].Span.End, arguments[i + 1].SpanStart))
+				offset = MemberContinuationLine(arguments[i].Span.End, arguments[i + 1], anchor, context);
 			else
 				Spacing.AfterComma(context);
 		}
 
+		if (anchor >= 0 && arguments.Count > 0 && context.AuthorBroke(arguments[^1].Span.End, node.CloseParenToken.SpanStart))
+			ContinuationLine(node.CloseParenToken, anchor, context);
+
 		TokenPrinter.Print(node.CloseParenToken, context);
+
+		if (anchor >= 0)
+			context.ExitContinuation();
 	}
 
 	public static void TupleType(TupleTypeSyntax node, PrintContext context)

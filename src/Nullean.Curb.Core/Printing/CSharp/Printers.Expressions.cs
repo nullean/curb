@@ -1137,12 +1137,14 @@ internal static partial class Printers
 	/// </remarks>
 	private static void BodyOnArrowLine(ExpressionSyntax body, PrintContext context)
 	{
-		var hangs = body is BinaryExpressionSyntax || !(BringsOwnBlock(body) || BreaksWithoutHelp(body));
-
 		context.Arena.Synthetic(SyntheticText.Space);
-		using (context.Arena.IndentIf(hangs))
+		using (context.Arena.IndentIf(HangsOnArrowLine(body)))
 			Node.Print(body, context);
 	}
+
+	/// <summary>True when <see cref="BodyOnArrowLine"/> indents <paramref name="body"/> a level of its own.</summary>
+	private static bool HangsOnArrowLine(ExpressionSyntax body) =>
+		body is BinaryExpressionSyntax || !(BringsOwnBlock(body) || BreaksWithoutHelp(body));
 
 	/// <summary>The <c>delegate (T x) { }</c> form that predates lambdas.</summary>
 	public static void AnonymousMethodExpression(AnonymousMethodExpressionSyntax node, PrintContext context)
