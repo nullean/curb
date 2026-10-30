@@ -214,6 +214,20 @@ public static class OptionCatalog
 		]).ToFrozenSet(StringComparer.Ordinal);
 
 	/// <summary>True for a key Curb knows about, whether or not it is implemented yet.</summary>
+	/// <summary>
+	/// The implemented keys that apply to <paramref name="language"/>: its own, plus the shared core keys.
+	/// </summary>
+	/// <remarks>
+	/// Every implemented key so far is C#'s or shared, so for <see cref="OptionLanguage.CSharp"/> this is
+	/// <see cref="ImplementedKeys"/> itself. It is the list a language's coverage check and option
+	/// reference work from once a second language has keys of its own.
+	/// </remarks>
+	public static IEnumerable<string> ImplementedKeysFor(OptionLanguage language) =>
+		OptionDescriptor.All
+			.Where(descriptor => descriptor.Language == OptionLanguage.Shared || descriptor.Language == language)
+			.Select(descriptor => descriptor.Key)
+			.Where(ImplementedKeys.Contains);
+
 	public static bool IsKnown(string key) => CoreKeys.Contains(key) || FormattingKeys.Contains(key);
 
 	public static bool IsImplemented(string key) => ImplementedKeys.Contains(key);

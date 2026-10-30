@@ -657,6 +657,22 @@ public class OptionsBindingTests
 	}
 
 	[Test]
+	public async Task Core_keys_are_shared_and_every_other_key_is_csharp()
+	{
+		// The option reference and the coverage check split on this. Until a second language has keys
+		// of its own, getting it wrong would move a page or drop a key from a check without failing anything.
+		var misclassified = OptionDescriptor.All
+			.Where(descriptor => descriptor.Language != (OptionCatalog.CoreKeys.Contains(descriptor.Key) ? OptionLanguage.Shared : OptionLanguage.CSharp))
+			.Select(descriptor => descriptor.Key)
+			.ToArray();
+
+		misclassified.Should().BeEmpty();
+		OptionCatalog.ImplementedKeysFor(OptionLanguage.CSharp).Should().BeEquivalentTo(OptionCatalog.ImplementedKeys);
+		OptionCatalog.ImplementedKeysFor(OptionLanguage.Xml).Should().BeEquivalentTo(OptionCatalog.CoreKeys);
+		await Task.CompletedTask;
+	}
+
+	[Test]
 	public async Task Layout_binder_keeps_the_defaults_it_is_given()
 	{
 		// XML's defaults are not C#'s. An absent key has to leave the caller's default in place, and
