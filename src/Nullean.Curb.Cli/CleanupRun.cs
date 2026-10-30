@@ -157,7 +157,18 @@ internal static class CleanupRun
 					// the same bug FormattingRun.cs fixes for `curb format`.
 					var bytes = fileSystem.File.ReadAllBytes(path);
 					var hadBom = bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF;
-					var source = Utf8.GetString(hadBom ? bytes.AsSpan(3) : bytes);
+					string source;
+					try
+					{
+						// Strict for the same reason as FormattingRun: invalid bytes become U+FFFD otherwise.
+						source = FormattingRun.StrictUtf8.GetString(hadBom ? bytes.AsSpan(3) : bytes);
+					}
+					catch (DecoderFallbackException)
+					{
+						Interlocked.Increment(ref failed);
+						messages.Add($"{path}: is not valid UTF-8 — left unchanged");
+						return worker;
+					}
 
 					// The file's own opt-outs, honoured exactly as the formatter honours them.
 					if (options[index].Excluded || CSharpSource.HasGeneratedHeader(source))

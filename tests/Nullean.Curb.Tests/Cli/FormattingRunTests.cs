@@ -120,6 +120,23 @@ public class FormattingRunTests
 	}
 
 	[Test]
+	public async Task A_file_that_is_not_utf8_is_reported_rather_than_rewritten()
+	{
+		// Latin-1: © and é are single bytes that are not valid UTF-8. Decoded leniently they became
+		// U+FFFD, the verifier compared the already-damaged text, and "café" was written back as "caf�".
+		var fs = Repo();
+		byte[] latin1 = [.. Encoding.ASCII.GetBytes("class A {  // "), 0xA9, .. Encoding.ASCII.GetBytes("\n  string S = \"caf"), 0xE9, .. Encoding.ASCII.GetBytes("\"; }")];
+		fs.AddFile($"{Root}/A.cs", new MockFileData(latin1));
+
+		var summary = FormattingRun.Execute(fs, Root, write: true);
+
+		summary.Unparsable.Should().Be(1);
+		summary.Changed.Should().Be(0);
+		fs.File.ReadAllBytes($"{Root}/A.cs").Should().Equal(latin1, "a file Curb cannot decode is left exactly as it was");
+		await Task.CompletedTask;
+	}
+
+	[Test]
 	public async Task A_write_failure_in_one_file_is_reported_rather_than_aborting_the_run()
 	{
 		// A read-only file's write throws inside the worker — standing in for any per-file fault,
