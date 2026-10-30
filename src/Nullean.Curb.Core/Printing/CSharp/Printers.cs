@@ -791,10 +791,13 @@ internal static partial class Printers
 		if (node.Type is not null)
 		{
 			Node.Print(node.Type, context);
-			context.Arena.Synthetic(SyntheticText.Space);
+
+			// A union's case types are parameters with a type and no name: `union U(A, B)`.
+			if (node.Identifier.RawKind != 0)
+				context.Arena.Synthetic(SyntheticText.Space);
 		}
 
-		TokenPrinter.Print(node.Identifier, context);
+		TokenPrinter.PrintIfPresent(node.Identifier, context);
 
 		// EqualsValueClause supplies its own leading space.
 		Node.Print(node.Default, context);

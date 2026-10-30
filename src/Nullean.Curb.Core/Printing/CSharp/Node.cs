@@ -69,6 +69,14 @@ internal static class Node
 			case SyntaxKind.InterfaceDeclaration:
 			case SyntaxKind.RecordDeclaration:
 			case SyntaxKind.RecordStructDeclaration:
+			// C# preview's `union Name(A, B) { … }`: a type declaration with a primary constructor's
+			// parameter list of case types, so it prints as a record does. It fell through to
+			// UnhandledNode, which kept it verbatim — safe, but neither re-indented nor wrapped (#90).
+			// Roslyn marks the kind experimental; the parser is exact-pinned, so a bump that renames
+			// it fails to compile here rather than quietly sending unions back to verbatim.
+#pragma warning disable RSEXPERIMENTAL006
+			case SyntaxKind.UnionDeclaration:
+#pragma warning restore RSEXPERIMENTAL006
 				Printers.TypeDeclaration((TypeDeclarationSyntax)node, context);
 				break;
 
