@@ -1,5 +1,6 @@
 using AwesomeAssertions;
 using Nullean.Curb.Documents;
+using Nullean.Curb.Printing;
 
 namespace Nullean.Curb.Tests.Documents;
 
@@ -97,7 +98,7 @@ public class DocArenaTests
 				arena.Synthetic(SyntheticText.Empty);
 			using (ifBreak.Branch())
 			{
-				arena.Synthetic(SyntheticText.Comma);
+				arena.Synthetic(CSharpSyntheticText.Comma);
 				arena.HardLine();
 			}
 		}
@@ -135,7 +136,7 @@ public class DocArenaTests
 			}
 		}
 
-		var validate = () => DocValidator.Validate(arena, Source.Length);
+		var validate = () => DocValidator.Validate<CSharpLayout>(arena, Source.Length);
 		validate.Should().NotThrow();
 		await Task.CompletedTask;
 	}
@@ -146,7 +147,7 @@ public class DocArenaTests
 		var arena = new DocArena();
 		arena.SourceText(5, 99);
 
-		var validate = () => DocValidator.Validate(arena, Source.Length);
+		var validate = () => DocValidator.Validate<CSharpLayout>(arena, Source.Length);
 		validate.Should().Throw<DocArenaCorruptException>().WithMessage("*outside the 10-char source*");
 		await Task.CompletedTask;
 	}

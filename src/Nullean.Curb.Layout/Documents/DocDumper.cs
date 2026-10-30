@@ -1,4 +1,5 @@
 using System.Text;
+using Nullean.Curb.Printing;
 
 namespace Nullean.Curb.Documents;
 
@@ -12,14 +13,16 @@ namespace Nullean.Curb.Documents;
 /// </remarks>
 internal static class DocDumper
 {
-	public static string Dump(DocArena arena, ReadOnlySpan<char> source)
+	/// <typeparam name="TLanguage">Whose <see cref="ILayoutLanguage.SyntheticTable"/> the <c>syn</c> ids index.</typeparam>
+	public static string Dump<TLanguage>(DocArena arena, ReadOnlySpan<char> source)
+		where TLanguage : struct, ILayoutLanguage
 	{
 		var builder = new StringBuilder();
-		Write(arena, source, builder, 0, arena.Count, 0);
+		Write(arena, source, TLanguage.SyntheticTable, builder, 0, arena.Count, 0);
 		return builder.ToString();
 	}
 
-	private static void Write(DocArena arena, ReadOnlySpan<char> source, StringBuilder output, int start, int end, int depth)
+	private static void Write(DocArena arena, ReadOnlySpan<char> source, string[] synthetic, StringBuilder output, int start, int end, int depth)
 	{
 		var i = start;
 		while (i < end)
@@ -37,7 +40,7 @@ internal static class DocDumper
 					break;
 
 				case DocKind.SynText:
-					output.Append("syn ").Append(Quote(SyntheticText.Get(doc.A))).AppendLine();
+					output.Append("syn ").Append(Quote(synthetic[doc.A])).AppendLine();
 					break;
 
 				case DocKind.ExternalText:
@@ -80,7 +83,7 @@ internal static class DocDumper
 							: doc.B == Doc.IndentToRoot ? "to-root"
 							: doc.B.ToString(System.Globalization.CultureInfo.InvariantCulture))
 						.AppendLine();
-					Write(arena, source, output, i + 1, i + doc.Length, depth + 1);
+					Write(arena, source, synthetic, output, i + 1, i + doc.Length, depth + 1);
 					break;
 
 				case DocKind.Group:
@@ -88,7 +91,7 @@ internal static class DocDumper
 					if (doc.GroupId != 0)
 						output.Append(" #").Append(doc.GroupId);
 					output.AppendLine();
-					Write(arena, source, output, i + 1, i + doc.Length, depth + 1);
+					Write(arena, source, synthetic, output, i + 1, i + doc.Length, depth + 1);
 					break;
 
 				case DocKind.IfBreak:
@@ -101,15 +104,15 @@ internal static class DocDumper
 						var flatStart = i + 1;
 						var breakStart = flatStart + doc.A;
 						output.Append('\t', depth + 1).AppendLine("flat:");
-						Write(arena, source, output, flatStart, breakStart, depth + 2);
+						Write(arena, source, synthetic, output, flatStart, breakStart, depth + 2);
 						output.Append('\t', depth + 1).AppendLine("break:");
-						Write(arena, source, output, breakStart, i + doc.Length, depth + 2);
+						Write(arena, source, synthetic, output, breakStart, i + doc.Length, depth + 2);
 						break;
 					}
 
 				default:
 					output.Append(doc.Kind.ToString().ToLowerInvariant()).AppendLine();
-					Write(arena, source, output, i + 1, i + doc.Length, depth + 1);
+					Write(arena, source, synthetic, output, i + 1, i + doc.Length, depth + 1);
 					break;
 			}
 

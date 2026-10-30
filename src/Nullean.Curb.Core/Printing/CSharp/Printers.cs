@@ -1607,7 +1607,7 @@ internal static partial class Printers
 
 		BeforeSynthesisedArrow(body.OpenBraceToken.GetPreviousToken(), context);
 		if (!arrowLeadsTheBody)
-			arena.Synthetic(SyntheticText.Arrow);
+			arena.Synthetic(CSharpSyntheticText.Arrow);
 
 		using (arena.Group())
 		using (arena.Indent())
@@ -1615,7 +1615,7 @@ internal static partial class Printers
 			if (arrowLeadsTheBody)
 			{
 				arena.SoftLine();
-				arena.Synthetic(SyntheticText.Arrow);
+				arena.Synthetic(CSharpSyntheticText.Arrow);
 				arena.Synthetic(SyntheticText.Space);
 			}
 			else
@@ -1711,7 +1711,7 @@ internal static partial class Printers
 
 		BeforeSynthesisedArrow(accessors.OpenBraceToken.GetPreviousToken(), context);
 		if (!arrowLeadsTheBody)
-			arena.Synthetic(SyntheticText.Arrow);
+			arena.Synthetic(CSharpSyntheticText.Arrow);
 
 		using (arena.Group())
 		using (arena.Indent())
@@ -1719,7 +1719,7 @@ internal static partial class Printers
 			if (arrowLeadsTheBody)
 			{
 				arena.SoftLine();
-				arena.Synthetic(SyntheticText.Arrow);
+				arena.Synthetic(CSharpSyntheticText.Arrow);
 				arena.Synthetic(SyntheticText.Space);
 			}
 			else
@@ -3029,7 +3029,7 @@ internal static partial class Printers
 		if (options.TrailingCommaInMultilineLists && options.TrailingCommaInSinglelineLists)
 		{
 			// Wanted either way, so there is nothing for the printer to decide.
-			arena.Synthetic(SyntheticText.Comma);
+			arena.Synthetic(CSharpSyntheticText.Comma);
 			return;
 		}
 
@@ -3038,13 +3038,13 @@ internal static partial class Printers
 		using (ifBreak.Branch())
 		{
 			if (options.TrailingCommaInSinglelineLists)
-				arena.Synthetic(SyntheticText.Comma);
+				arena.Synthetic(CSharpSyntheticText.Comma);
 		}
 
 		using (ifBreak.Branch())
 		{
 			if (options.TrailingCommaInMultilineLists)
-				arena.Synthetic(SyntheticText.Comma);
+				arena.Synthetic(CSharpSyntheticText.Comma);
 		}
 	}
 

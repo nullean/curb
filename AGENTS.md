@@ -29,7 +29,8 @@ Microsoft.Testing.Platform, so they are launched with `dotnet run`, not `dotnet 
 
 | Path | What |
 |---|---|
-| `src/Nullean.Curb.Core` | The engine: document IR, layout printer, syntax printers, verifier. **No IO, no config source.** |
+| `src/Nullean.Curb.Layout` | The language-neutral half: document IR, layout printer, `LayoutOptions`. **No package references, no parser.** A language plugs in through `ILayoutLanguage`. |
+| `src/Nullean.Curb.Core` | The C# engine: syntax printers, verifier, `FormatOptions`. **No IO, no config source.** |
 | `src/Nullean.Curb.Cleanup` | Applies code style fixes from diagnostics a build reported. **No IO, no compilation.** |
 | `src/Nullean.Curb.EditorConfig` | Binds `.editorconfig` to formatting options. Owns the `IFileSystem` dependency. |
 | `src/Nullean.Curb.Cli` | The `curb` tool. Native-AOT, packed per RID. |

@@ -82,22 +82,6 @@ public enum EmptyBlockStyle
 	TogetherSameLine,
 }
 
-/// <summary>What <c>charset</c> asks for, to the extent Curb writes it.</summary>
-public enum Charset : byte
-{
-	/// <summary>
-	/// No <c>charset</c> key. The file keeps whatever byte-order mark it arrived with, which is what
-	/// dotnet format does when nothing asks otherwise and is the least churn.
-	/// </summary>
-	Preserve = 0,
-
-	/// <summary>UTF-8 with no byte-order mark.</summary>
-	Utf8 = 1,
-
-	/// <summary>UTF-8 with a byte-order mark.</summary>
-	Utf8Bom = 2,
-}
-
 /// <summary>Where a member's attribute section goes, for the <c>csharp_place_*_attribute_on_same_line</c> family.</summary>
 public enum AttributePlacement
 {
@@ -126,18 +110,6 @@ public enum AttributePlacement
 	IfOwnerIsSingleLine,
 }
 
-/// <summary>Line ending to emit.</summary>
-public enum EndOfLine : byte
-{
-	/// <summary>
-	/// The platform's own line ending (<see cref="System.Environment.NewLine"/>) — Roslyn's own default
-	/// when <c>end_of_line</c> is unset, so this is what keeps Curb agreeing with the IDE out of the box.
-	/// </summary>
-	Auto = 0,
-	Lf = 1,
-	CrLf = 2,
-}
-
 /// <summary>
 /// Every setting that influences layout, resolved from <c>.editorconfig</c>.
 /// </summary>
@@ -161,7 +133,7 @@ public enum EndOfLine : byte
 public readonly record struct FormatOptions
 {
 	/// <summary>Value of <see cref="MaxLineLength"/> meaning "never reflow".</summary>
-	public const int Off = int.MaxValue;
+	public const int Off = LayoutOptions.Off;
 
 	// There is no implied width. Deterministic layout used to supply 160 when the configuration named
 	// none, which was the weakest part of that design — a magic number nobody typed, reflowing a
@@ -170,36 +142,41 @@ public readonly record struct FormatOptions
 
 	public FormatOptions() { }
 
-	/// <summary>Columns per indent level. <c>indent_size</c>.</summary>
-	public int IndentSize { get; init; } = 4;
-
-	/// <summary>Columns a tab occupies when measuring width. <c>tab_width</c>.</summary>
-	public int TabWidth { get; init; } = 4;
-
-	/// <summary>Indent with tabs rather than spaces. <c>indent_style</c>.</summary>
-	public bool UseTabs { get; init; }
-
-	/// <summary>Reflow target. <c>max_line_length</c>. <see cref="Off"/> disables reflow entirely.</summary>
-	public int MaxLineLength { get; init; } = Off;
-
 	/// <summary>
-	/// <c>charset</c>. Governs the byte-order mark only; Curb reads and writes UTF-8 either way.
+	/// The EditorConfig core keys, which are all the layout printer reads. Every property from
+	/// <see cref="IndentSize"/> to <see cref="TrimTrailingWhitespace"/> below reads and writes through it.
 	/// </summary>
 	/// <remarks>
-	/// Defaults to <see cref="Charset.Preserve"/>, so a file keeps the mark it had. Curb used to write
-	/// every file without one, which silently stripped the mark from any repository asking for
-	/// <c>utf-8-bom</c> — 17,000 files on roslyn, which sets it on every source file.
+	/// Kept as one value so the printer, which other languages share, never sees a C# option. The
+	/// forwarding properties keep every existing caller and <c>with</c> expression compiling unchanged.
 	/// </remarks>
-	public Charset Charset { get; init; } = Charset.Preserve;
+	public LayoutOptions Layout { get; init; } = new();
+
+	/// <summary>Columns per indent level. <c>indent_size</c>.</summary>
+	public int IndentSize { get => Layout.IndentSize; init => Layout = Layout with { IndentSize = value }; }
+
+	/// <summary>Columns a tab occupies when measuring width. <c>tab_width</c>.</summary>
+	public int TabWidth { get => Layout.TabWidth; init => Layout = Layout with { TabWidth = value }; }
+
+	/// <summary>Indent with tabs rather than spaces. <c>indent_style</c>.</summary>
+	public bool UseTabs { get => Layout.UseTabs; init => Layout = Layout with { UseTabs = value }; }
+
+	/// <summary>Reflow target. <c>max_line_length</c>. <see cref="Off"/> disables reflow entirely.</summary>
+	public int MaxLineLength { get => Layout.MaxLineLength; init => Layout = Layout with { MaxLineLength = value }; }
+
+	/// <summary>
+	/// <c>charset</c>. Governs the byte-order mark only; see <see cref="LayoutOptions.Charset"/>.
+	/// </summary>
+	public Charset Charset { get => Layout.Charset; init => Layout = Layout with { Charset = value }; }
 
 	/// <summary><c>end_of_line</c>.</summary>
-	public EndOfLine EndOfLine { get; init; } = EndOfLine.Auto;
+	public EndOfLine EndOfLine { get => Layout.EndOfLine; init => Layout = Layout with { EndOfLine = value }; }
 
 	/// <summary><c>insert_final_newline</c>.</summary>
-	public bool InsertFinalNewLine { get; init; } = true;
+	public bool InsertFinalNewLine { get => Layout.InsertFinalNewLine; init => Layout = Layout with { InsertFinalNewLine = value }; }
 
 	/// <summary><c>trim_trailing_whitespace</c>.</summary>
-	public bool TrimTrailingWhitespace { get; init; } = true;
+	public bool TrimTrailingWhitespace { get => Layout.TrimTrailingWhitespace; init => Layout = Layout with { TrimTrailingWhitespace = value }; }
 
 	/// <summary>
 	/// Which constructs put their opening brace on a new line.
@@ -1387,15 +1364,6 @@ public readonly record struct FormatOptions
 	/// </remarks>
 	public bool ReflowDisabled => MaxLineLength == Off;
 
-	/// <summary>
-	/// Resolves <see cref="EndOfLine.Auto"/> to <see cref="System.Environment.NewLine"/> — the same
-	/// fallback Roslyn's own <c>FormattingOptions2.NewLine</c> uses when <c>end_of_line</c> is unset.
-	/// </summary>
-	internal string ResolveEndOfLine() =>
-		EndOfLine switch
-		{
-			EndOfLine.Lf => "\n",
-			EndOfLine.CrLf => "\r\n",
-			_ => Environment.NewLine,
-		};
+	/// <summary>Resolves <see cref="EndOfLine.Auto"/>; see <see cref="LayoutOptions.ResolveEndOfLine"/>.</summary>
+	internal string ResolveEndOfLine() => Layout.ResolveEndOfLine();
 }

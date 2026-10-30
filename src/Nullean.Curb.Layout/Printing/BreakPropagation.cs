@@ -40,9 +40,9 @@ internal sealed class BreakPropagation
 
 	/// <summary>
 	/// True if <c>[start, end)</c> contains an unconditional break, for a caller measuring a range
-	/// that is not itself a group — <see cref="Printing.DocPrinter.PrintFill"/>, which decides an
+	/// that is not itself a group — <see cref="DocPrinter{TLanguage}.PrintFill"/>, which decides an
 	/// item's or a pair's flatness by calling <c>Fits</c> directly rather than through
-	/// <see cref="Printing.DocPrinter.ResolveGroupMode"/>&#8203;'s <see cref="IsBroken"/> guard, and
+	/// <see cref="DocPrinter{TLanguage}.ResolveGroupMode"/>&#8203;'s <see cref="IsBroken"/> guard, and
 	/// so needs the same check <see cref="Run"/> already has the numbers for.
 	/// </summary>
 	/// <remarks>

@@ -15,7 +15,7 @@ public class RoundTripRiskTests
 	//                                     0123456789
 	private const string Source = "out var a.b // c";
 
-	private static FormatOptions Options => new() { EndOfLine = EndOfLine.Lf, InsertFinalNewLine = false };
+	private static LayoutOptions Options => new() { EndOfLine = EndOfLine.Lf, InsertFinalNewLine = false };
 
 	private static bool RiskOf(Action<DocArena> build)
 	{
@@ -23,7 +23,7 @@ public class RoundTripRiskTests
 		build(arena);
 
 		using var output = new OutputBuffer();
-		var printer = new DocPrinter();
+		var printer = new DocPrinter<CSharpLayout>();
 		printer.Print(arena, Source.AsMemory(), Options, output);
 		return printer.RoundTripAtRisk;
 	}
@@ -110,8 +110,8 @@ public class RoundTripRiskTests
 		arena.SourceText(0, 3);
 
 		using var output = new OutputBuffer();
-		var printer = new DocPrinter();
-		printer.Print(arena, "@\"a\r\nb\"".AsMemory(), new FormatOptions { EndOfLine = EndOfLine.Lf }, output);
+		var printer = new DocPrinter<CSharpLayout>();
+		printer.Print(arena, "@\"a\r\nb\"".AsMemory(), new LayoutOptions { EndOfLine = EndOfLine.Lf }, output);
 
 		printer.RoundTripAtRisk.Should().BeFalse();
 		await Task.CompletedTask;
@@ -128,7 +128,7 @@ public class RoundTripRiskTests
 		arena.SourceText(8, 1);
 
 		using var output = new OutputBuffer();
-		var printer = new DocPrinter();
+		var printer = new DocPrinter<CSharpLayout>();
 		printer.Print(arena, Source.AsMemory(), Options, output);
 
 		// Options say LF; both endings come from the document, not from the configuration.
