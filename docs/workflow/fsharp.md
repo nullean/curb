@@ -31,9 +31,18 @@ Fantomas.
 
 | Situation | What happens |
 |---|---|
-| No manifest declares Fantomas | The F# files are not read and not counted. One line says how many there were and how to turn it on. Exit code unaffected. |
+| No manifest declares Fantomas | The F# files are not read and not counted. One line, `fsharp: N file(s) skipped — no Fantomas in a tool manifest`, says so. Exit code unaffected. |
+| A manifest the SDK would refuse (not valid JSON, or Fantomas without a version) | The files it governs fail with the parse error and the manifest's path: exit 3, nothing written. A check does not pass by checking nothing. |
 | Declared, but not restored | Exit 3, with a message to run `dotnet tool restore`. Detected without starting anything. A failure in `check` too: a check that could not check has passed nothing. |
 | The Fantomas that starts is not the version the manifest pins | Exit 3, with the same message. Build metadata (`+9b5cde1`) is ignored. |
+
+Each manifest's files succeed or fail on their own: one broken or unrestored manifest does not stop the
+files under another from being formatted.
+
+| Fantomas version | What works |
+|---|---|
+| 8.0.0-alpha-016 and later | The daemon, and the command line fallback (`fantomas check --json`). Tested with 8.1.0. |
+| Earlier | The daemon only (started with `--daemon`). If it cannot be used, the files fail with a message naming the version the fallback needs. |
 
 ## What Curb guarantees on top of Fantomas
 
@@ -97,9 +106,15 @@ process `dotnet tool run` would cost.
 
 If the daemon cannot be started or does not answer, {{product}} falls back to the Fantomas command line:
 one `fantomas check --json` per few thousand files, never one per file. To format, the command line has to
-write in place, so {{product}} lets it, checks the result a second time, and puts the original bytes back
-before writing the stable results itself. Set `CURB_FANTOMAS_DAEMON=false` to use the command line from
-the start.
+write in place, so {{product}} lets it, checks the result a second time, and puts every file it handed over
+back to its original bytes, whatever happened in between, before writing the stable results itself. A file
+that cannot be put back is failed and reported. Set `CURB_FANTOMAS_DAEMON=false` to use the command line
+from the start.
+
+Nothing waits on Fantomas for ever. Each request to the daemon gets 60 seconds per 256 KB of source, and
+each command line run 60 seconds per MB; set `CURB_FANTOMAS_TIMEOUT` to a number of seconds to change the
+base. When time runs out, or the run is cancelled with Ctrl+C, Fantomas is stopped, none of that
+manifest's files are written, and the run exits 3.
 
 `curb format --language fsharp` formats only F#.
 
@@ -138,6 +153,6 @@ A project with no manifest declaring Fantomas builds as before; the target says 
 ## Upgrading
 
 Nothing changes for a repository whose manifests do not declare Fantomas, except one line in the
-summary when the run finds F# files, saying they were not formatted and why. Once Fantomas is declared,
+summary when the run finds F# files, saying they were skipped and why. Once Fantomas is declared,
 `curb check` fails on F# files Fantomas would change, so run `curb format .` once and commit the result,
 or set `Curb_FSharp=false` in the build until you are ready.

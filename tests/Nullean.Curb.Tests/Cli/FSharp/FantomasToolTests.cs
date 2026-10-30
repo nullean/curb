@@ -117,15 +117,17 @@ public class FantomasToolTests
 	}
 
 	[Test]
-	public async Task An_unreadable_manifest_is_reported_and_stops_the_walk()
+	public async Task An_unreadable_manifest_is_an_answer_carrying_its_problem()
 	{
 		var fs = new MockFileSystem();
 		fs.AddFile("/repo/dotnet-tools.json", new MockFileData(Manifest()));
 		fs.AddFile("/repo/sub/dotnet-tools.json", new MockFileData("{ not json"));
+		fs.AddFile("/repo/other/dotnet-tools.json", new MockFileData("""{ "tools": { "fantomas": { "commands": ["fantomas"] } } }"""));
 		var locator = new ToolManifestLocator(fs);
 
-		locator.Find("/repo/sub").Should().BeNull();
-		locator.Warnings.Should().ContainSingle().Which.Should().Contain("/repo/sub/dotnet-tools.json");
+		locator.Find("/repo/sub")!.Problem.Should().Contain("/repo/sub/dotnet-tools.json").And.Contain("could not be read");
+		locator.Find("/repo/other")!.Problem.Should().Contain("without a version");
+		locator.Find("/repo")!.Problem.Should().BeNull();
 		await Task.CompletedTask;
 	}
 
@@ -270,6 +272,33 @@ public class FantomasToolTests
 	public async Task The_daemon_version_is_compared_without_build_metadata(string reported, string pinned, bool matches)
 	{
 		FantomasRunner.VersionMatches(reported, pinned).Should().Be(matches);
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	[Arguments("8.1.0", "8.0.0-alpha-016", 1)]
+	[Arguments("8.0.0", "8.0.0-alpha-016", 1)]
+	[Arguments("8.0.0-alpha-016", "8.0.0-alpha-016", 0)]
+	[Arguments("8.0.0-alpha-015", "8.0.0-alpha-016", -1)]
+	[Arguments("8.0.0-alpha-100", "8.0.0-alpha-016", 1)]
+	[Arguments("8.0.0-beta-001", "8.0.0-alpha-016", 1)]
+	[Arguments("7.0.3", "8.0.0-alpha-016", -1)]
+	[Arguments("8.1.0+abc", "8.1.0", 0)]
+	[Arguments("10.0.0", "9.0.0", 1)]
+	public async Task Versions_order_by_release_then_prerelease(string left, string right, int expected)
+	{
+		Math.Sign(FantomasVersion.Compare(left, right)).Should().Be(expected);
+		Math.Sign(FantomasVersion.Compare(right, left)).Should().Be(-expected);
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task Timeouts_scale_with_the_size_of_the_input()
+	{
+		var minute = TimeSpan.FromSeconds(60);
+		FantomasRunner.Scaled(minute, 0, 1000).Should().Be(minute);
+		FantomasRunner.Scaled(minute, 1000, 1000).Should().Be(minute);
+		FantomasRunner.Scaled(minute, 1001, 1000).Should().Be(minute * 2);
 		await Task.CompletedTask;
 	}
 

@@ -8,7 +8,11 @@ namespace Nullean.Curb.Cli.Languages.FSharp;
 /// <param name="ToolId">The package id as the manifest spells it: <c>fantomas</c>, or the legacy <c>fantomas-tool</c>.</param>
 /// <param name="Version">The exact version the manifest pins.</param>
 /// <param name="RollForward">The manifest's <c>rollForward</c>, which asks for <c>--roll-forward Major</c>.</param>
-internal sealed record FantomasManifest(string ManifestPath, string ToolId, string Version, bool RollForward)
+/// <param name="Problem">
+/// Set when the manifest is one the SDK would refuse (not JSON, or Fantomas without a version): the files it
+/// governs fail with this, rather than quietly going unformatted.
+/// </param>
+internal sealed record FantomasManifest(string ManifestPath, string ToolId, string Version, bool RollForward, string? Problem = null)
 {
 	/// <summary>The folder the manifest governs, which is where <c>dotnet tool run</c> has to start from.</summary>
 	public string Directory
@@ -46,9 +50,6 @@ internal sealed class ToolManifestLocator(IFileSystem fileSystem)
 	private static readonly string[] ToolIds = ["fantomas", "fantomas-tool"];
 
 	private readonly Dictionary<string, FantomasManifest?> _byDirectory = new(StringComparer.Ordinal);
-
-	/// <summary>Problems met reading a manifest, for the run to report once each.</summary>
-	public List<string> Warnings { get; } = [];
 
 	/// <summary>The manifest that declares Fantomas for files in <paramref name="directory"/>, or null when none does.</summary>
 	public FantomasManifest? Find(string directory)
@@ -130,8 +131,7 @@ internal sealed class ToolManifestLocator(IFileSystem fileSystem)
 					if (!tool.Value.TryGetProperty("version", out var version) || version.ValueKind != JsonValueKind.String
 						|| version.GetString() is not { Length: > 0 } pinned)
 					{
-						Warnings.Add($"{path}: '{tool.Name}' has no version, so it cannot be run");
-						continue;
+						return new FantomasManifest(path, id, "", false, $"{path} declares '{tool.Name}' without a version, so it cannot be run");
 					}
 
 					var rollForward = tool.Value.TryGetProperty("rollForward", out var roll) && roll.ValueKind == JsonValueKind.True;
@@ -143,11 +143,10 @@ internal sealed class ToolManifestLocator(IFileSystem fileSystem)
 		}
 		catch (Exception exception) when (exception is JsonException or IOException or UnauthorizedAccessException)
 		{
-			// The SDK refuses a manifest it cannot read, and so does Curb, out loud: silently skipping it
-			// would quietly fall through to a parent's Fantomas.
-			Warnings.Add($"{path}: could not be read as a tool manifest — {exception.Message}");
-			isRoot = true;
-			return null;
+			// The SDK refuses a manifest it cannot read, and so does Curb, out loud. Skipping it would either
+			// fall through to a parent's Fantomas or decline the files, and a check would pass having checked
+			// nothing. So it is an answer: the files it governs fail with the reason.
+			return new FantomasManifest(path, "fantomas", "", false, $"{path} could not be read as a tool manifest — {exception.Message}");
 		}
 	}
 }

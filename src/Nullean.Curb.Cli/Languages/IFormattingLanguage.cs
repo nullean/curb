@@ -140,8 +140,10 @@ internal interface ILanguageWorker : IDisposable
 /// mark, and only a file the tool handed back unchanged is recorded in the cache.
 /// </para>
 /// <para>
-/// A result of <see cref="FormatStatus.Ignored"/> counts as skipped. An <see cref="Exception"/> means the
-/// tool could not run at all; every file handed over is failed with its message, said once.
+/// A result of <see cref="FormatStatus.Ignored"/> counts as skipped. A failed result with no message is one
+/// whose reason the language reports once, through <see cref="Errors"/>, for a whole group of files. An
+/// <see cref="Exception"/> means the tool could not run at all; every file handed over is failed with its
+/// message, said once.
 /// </para>
 /// </remarks>
 internal interface IExternalLanguage : IFormattingLanguage
@@ -149,11 +151,14 @@ internal interface IExternalLanguage : IFormattingLanguage
 	/// <summary>Formats or checks <paramref name="files"/>, returning one result per file, in the same order.</summary>
 	/// <param name="files">The files that missed the cache and were not skipped. Never empty: a run with none never calls this.</param>
 	/// <param name="produceText">False for <c>check</c>.</param>
-	/// <param name="cancellationToken">Stops the tool.</param>
+	/// <param name="cancellationToken">Stops the tool: it is killed, and the files still waiting fail.</param>
 	Task<FormatResult[]> FormatBatchAsync(IReadOnlyList<ExternalFile> files, bool produceText, CancellationToken cancellationToken);
 
 	/// <summary>What the language or its tool wants said once at the end of the run, such as a setting the tool did not recognise.</summary>
 	IReadOnlyCollection<string> Warnings { get; }
+
+	/// <summary>Failures that cover several files, such as a tool that is not installed, said once each after the batch.</summary>
+	IReadOnlyCollection<string> Errors { get; }
 }
 
 /// <summary>One file handed to an <see cref="IExternalLanguage"/>.</summary>

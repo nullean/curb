@@ -40,8 +40,16 @@ public class FSharpRunTests
 		public LanguageRegistry Languages() =>
 			LanguageRegistry.Default(Fs, Fantomas, new ToolEnvironment(name => Variables.GetValueOrDefault(name), Home));
 
-		public FormattingRunSummary Run(bool write, string? cache = null, string? unformattedList = null) =>
-			FormattingRun.Execute(Fs, Root, write, cachePath: cache, unformattedListPath: unformattedList, languages: Languages());
+		public FormattingRunSummary Run(bool write, string? cache = null, string? unformattedList = null, CancellationToken cancellationToken = default) =>
+			FormattingRun.Execute(Fs, Root, write, cachePath: cache, unformattedListPath: unformattedList, languages: Languages(), cancellationToken: cancellationToken);
+
+		/// <summary>Runs, and hands back what the F# language said once for the run.</summary>
+		public (FormattingRunSummary Summary, IReadOnlyCollection<string> Errors) RunReporting(bool write)
+		{
+			var languages = Languages();
+			var summary = FormattingRun.Execute(Fs, Root, write, languages: languages);
+			return (summary, ((IExternalLanguage)languages[2]).Errors);
+		}
 
 		public void Add(string relative, string content) => Fs.AddFile($"{Root}/{relative}", new MockFileData(content));
 
@@ -374,5 +382,213 @@ public class FSharpRunTests
 		repo.Read("A.fs").Should().Be("let x = 1\n");
 		repo.Read("C.cs").Should().Be("class  C { }\n");
 		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task A_daemon_that_stops_answering_is_killed_and_nothing_is_written()
+	{
+		var repo = new Repo();
+		repo.Fantomas.DaemonStalls = true;
+		repo.Variables[FantomasRunner.TimeoutVariable] = "0.2";
+		repo.Add("A.fs", "let  x = 1\n");
+		repo.Add("B.fs", "let y = 1\n");
+
+		var started = DateTime.UtcNow;
+		var (summary, errors) = repo.RunReporting(write: true);
+
+		// Killed at once, not after the five seconds a polite shutdown is given: a daemon that stopped answering
+		// is not asked to stop.
+		(DateTime.UtcNow - started).Should().BeLessThan(TimeSpan.FromSeconds(3));
+		summary.Failed.Should().Be(2, "the whole group fails, including any file answered before the daemon stopped");
+		summary.ExitCode.Should().Be(3);
+		repo.Read("A.fs").Should().Be("let  x = 1\n");
+		repo.Fantomas.Kills.Should().BeGreaterThan(0);
+		errors.Should().ContainSingle().Which.Should().Contain("did not answer").And.Contain(FantomasRunner.TimeoutVariable);
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task Cancelling_the_run_kills_the_daemon_and_fails_its_files()
+	{
+		var repo = new Repo();
+		repo.Fantomas.DaemonStalls = true;
+		repo.Add("A.fs", "let  x = 1\n");
+		using var cancellation = new CancellationTokenSource(TimeSpan.FromMilliseconds(300));
+
+		var started = DateTime.UtcNow;
+		var summary = repo.Run(write: true, cancellationToken: cancellation.Token);
+
+		// Well inside the 60 s request timeout, so it was the cancellation that stopped it.
+		(DateTime.UtcNow - started).Should().BeLessThan(TimeSpan.FromSeconds(5));
+		summary.Failed.Should().Be(1);
+		summary.ExitCode.Should().Be(3);
+		repo.Read("A.fs").Should().Be("let  x = 1\n");
+		repo.Fantomas.Kills.Should().BeGreaterThan(0);
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task A_command_line_that_never_finishes_is_killed_and_every_file_is_put_back()
+	{
+		var repo = new Repo();
+		repo.Variables[FantomasRunner.DaemonVariable] = "false";
+		repo.Variables[FantomasRunner.TimeoutVariable] = "0.2";
+		repo.Fantomas.CliStalls = true;
+		repo.Add("A.fs", "let  x = 1\n");
+
+		var summary = repo.Run(write: true);
+
+		summary.Failed.Should().Be(1);
+		summary.ExitCode.Should().Be(3);
+		repo.Read("A.fs").Should().Be("let  x = 1\n", "the in-place write the command line made before it hung is undone");
+		repo.Fantomas.Kills.Should().Be(1);
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task A_report_that_cannot_be_read_still_puts_every_file_back()
+	{
+		var repo = new Repo();
+		repo.Variables[FantomasRunner.DaemonVariable] = "false";
+		repo.Fantomas.CliPrintsGarbage = true;
+		repo.Add(".editorconfig", "root = true\n\n[*.fs]\ncharset = utf-8-bom\n");
+		repo.Add("A.fs", "let  x = 1\n");
+		repo.Fs.AddFile($"{Root}/B.fs", new MockFileData([0xEF, 0xBB, 0xBF, .. Encoding.UTF8.GetBytes("let  y = 1\n")]));
+
+		var (summary, errors) = repo.RunReporting(write: true);
+
+		summary.Failed.Should().Be(2);
+		summary.Changed.Should().Be(0);
+		repo.Fs.File.ReadAllBytes($"{Root}/A.fs").Should().Equal(Encoding.UTF8.GetBytes("let  x = 1\n"));
+		repo.Fs.File.ReadAllBytes($"{Root}/B.fs").Should().Equal([0xEF, 0xBB, 0xBF, .. Encoding.UTF8.GetBytes("let  y = 1\n")]);
+		errors.Should().ContainSingle().Which.Should().Contain("did not report what it did");
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task A_file_that_cannot_be_put_back_is_failed_and_reported()
+	{
+		var repo = new Repo();
+		repo.Variables[FantomasRunner.DaemonVariable] = "false";
+		repo.Fantomas.CliLeavesReadOnly = true;
+		repo.Add("A.fs", "let  x = 1\n");
+
+		var (summary, errors) = repo.RunReporting(write: true);
+
+		summary.Changed.Should().Be(0, "a file Curb could not restore is not one Curb wrote");
+		summary.Failed.Should().Be(1);
+		errors.Should().ContainSingle().Which.Should().Contain("could not be put back");
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task The_fallback_refuses_a_fantomas_without_check_json()
+	{
+		var repo = new Repo();
+		repo.Fs.File.WriteAllText($"{Root}/.config/dotnet-tools.json", FantomasToolTests.Manifest("7.0.3", isRoot: true));
+		repo.Fs.File.WriteAllText($"{Home}/.dotnet/toolResolverCache/1/fantomas", FantomasToolTests.ResolverCache("7.0.3", Dll));
+		repo.Fantomas.DaemonFailsToStart = true;
+		repo.Add("A.fs", "let  x = 1\n");
+
+		var (summary, errors) = repo.RunReporting(write: true);
+
+		summary.ExitCode.Should().Be(3);
+		repo.Fantomas.CliRuns.Should().Be(0);
+		repo.Fantomas.Started.Single().Arguments.Should().Contain("--daemon", "7.0.3 predates the daemon command");
+		errors.Should().ContainSingle().Which.Should().Contain(FantomasRunner.MinimumCliVersion).And.Contain("7.0.3");
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task A_malformed_manifest_fails_check_instead_of_passing_it()
+	{
+		var repo = new Repo();
+		repo.Fs.File.WriteAllText($"{Root}/.config/dotnet-tools.json", "{ \"tools\": ");
+		repo.Add("A.fs", "let  x = 1\n");
+		repo.Add("C.cs", "class C { }\n");
+
+		var (summary, errors) = repo.RunReporting(write: false);
+
+		summary.ExitCode.Should().Be(3);
+		summary.Failed.Should().Be(1);
+		repo.Fantomas.Started.Should().BeEmpty();
+		errors.Should().ContainSingle().Which.Should().Contain($"{Root}/.config/dotnet-tools.json").And.Contain("could not be read");
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task One_broken_manifest_fails_only_its_own_files()
+	{
+		var repo = new Repo();
+		repo.Add("good/A.fs", "let  x = 1\n");
+		repo.Fs.AddFile($"{Root}/other/dotnet-tools.json", new MockFileData(FantomasToolTests.Manifest("9.9.9", isRoot: true)));
+		repo.Add("other/B.fs", "let  y = 1\n");
+
+		var (summary, errors) = repo.RunReporting(write: true);
+
+		summary.Changed.Should().Be(1);
+		summary.Failed.Should().Be(1);
+		repo.Read("good/A.fs").Should().Be("let x = 1\n");
+		repo.Read("other/B.fs").Should().Be("let  y = 1\n");
+		errors.Should().ContainSingle().Which.Should().Contain("9.9.9").And.Contain("dotnet tool restore");
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task An_answer_for_another_file_is_never_written()
+	{
+		var repo = new Repo();
+		repo.Fantomas.DaemonAnswersFor = $"{Root}/Other.fs";
+		repo.Add("A.fs", "let  x = 1\n");
+
+		var summary = repo.Run(write: true);
+
+		summary.Failed.Should().Be(1);
+		repo.Read("A.fs").Should().Be("let  x = 1\n");
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task An_external_language_that_throws_fails_every_file_it_was_handed()
+	{
+		var fs = new MockFileSystem();
+		fs.AddFile($"{Root}/.editorconfig", new MockFileData("root = true\n"));
+		fs.AddFile($"{Root}/A.boom", new MockFileData("a\n"));
+		fs.AddFile($"{Root}/B.boom", new MockFileData("b\n"));
+		fs.AddFile($"{Root}/C.cs", new MockFileData("class C { }\n"));
+
+		var summary = FormattingRun.Execute(fs, Root, write: true, languages: new LanguageRegistry(
+			Nullean.Curb.Cli.Languages.CSharp.CSharpLanguage.Instance, new Boom()));
+
+		summary.Failed.Should().Be(2);
+		summary.ExitCode.Should().Be(3);
+		fs.File.ReadAllText($"{Root}/A.boom").Should().Be("a\n");
+		await Task.CompletedTask;
+	}
+
+	/// <summary>An external language whose tool cannot run at all.</summary>
+	private sealed class Boom : IExternalLanguage
+	{
+		public string Id => "boom";
+
+		public string[] Extensions { get; } = [".boom"];
+
+		public LanguageOptions BindOptions(global::EditorConfig.Core.FileConfiguration configuration, global::Nullean.Curb.EditorConfig.CurbEditorConfig editorConfig) => new Options();
+
+		public bool SkipSource(string source) => false;
+
+		public Task<FormatResult[]> FormatBatchAsync(IReadOnlyList<ExternalFile> files, bool produceText, CancellationToken cancellationToken) =>
+			throw new InvalidOperationException("no tool");
+
+		public IReadOnlyCollection<string> Warnings => [];
+
+		public IReadOnlyCollection<string> Errors => [];
+
+		private sealed class Options : LanguageOptions
+		{
+			public override LayoutOptions Layout => new();
+
+			public override bool Excluded => false;
+		}
 	}
 }

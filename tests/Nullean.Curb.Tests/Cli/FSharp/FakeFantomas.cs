@@ -33,6 +33,28 @@ internal sealed class FakeFantomas(MockFileSystem fileSystem) : IToolLauncher
 	/// <summary>The daemon starts, then exits without answering its handshake.</summary>
 	public bool DaemonExitsBeforeHandshake { get; set; }
 
+	/// <summary>The daemon answers its handshake and then never answers a document.</summary>
+	public bool DaemonStalls { get; set; }
+
+	/// <summary>The daemon answers each document as though it had been asked about this path instead.</summary>
+	public string? DaemonAnswersFor { get; set; }
+
+	/// <summary>The command line never finishes.</summary>
+	public bool CliStalls { get; set; }
+
+	/// <summary>The command line does its work, then prints something that is not its report.</summary>
+	public bool CliPrintsGarbage { get; set; }
+
+	/// <summary>The command line leaves each file it rewrote read-only, so it cannot be put back.</summary>
+	public bool CliLeavesReadOnly { get; set; }
+
+	/// <summary>How many processes were killed.</summary>
+	public int Kills => _kills;
+
+	private int _kills;
+
+	internal void Killed() => Interlocked.Increment(ref _kills);
+
 	/// <summary>Settings to report as unknown in a configuration warning, after every request.</summary>
 	public string[] UnknownSettings { get; set; } = [];
 
@@ -55,6 +77,14 @@ internal sealed class FakeFantomas(MockFileSystem fileSystem) : IToolLauncher
 			if (DaemonFailsToStart)
 				throw new ToolStartException("no such file");
 			return new Daemon(this);
+		}
+
+		if (CliStalls)
+		{
+			// Formats in place first, as a real run would have started to, then never reports.
+			if (!command.Arguments.Contains("check"))
+				RunCli(command);
+			return new FakeProcess(this);
 		}
 
 		return RunCli(command);
@@ -126,7 +156,11 @@ internal sealed class FakeFantomas(MockFileSystem fileSystem) : IToolLauncher
 				{
 					json.WriteString("status", check ? "needs-formatting" : "formatted");
 					if (!check)
+					{
 						fileSystem.File.WriteAllText(path, formatted);
+						if (CliLeavesReadOnly)
+							fileSystem.File.SetAttributes(path, FileAttributes.ReadOnly);
+					}
 				}
 				json.WriteEndObject();
 			}
@@ -134,8 +168,8 @@ internal sealed class FakeFantomas(MockFileSystem fileSystem) : IToolLauncher
 			json.WriteEndObject();
 		}
 
-		var process = new FakeProcess();
-		process.ToClient.WriteAndComplete(output.ToArray());
+		var process = new FakeProcess(this);
+		process.ToClient.WriteAndComplete(CliPrintsGarbage ? "Unhandled exception. not a report"u8.ToArray() : output.ToArray());
 		process.Exit(0);
 		return process;
 	}
@@ -146,7 +180,7 @@ internal sealed class FakeFantomas(MockFileSystem fileSystem) : IToolLauncher
 		private readonly FakeFantomas _owner;
 		private readonly SemaphoreSlim _writeLock = new(1, 1);
 
-		public Daemon(FakeFantomas owner)
+		public Daemon(FakeFantomas owner) : base(owner)
 		{
 			_owner = owner;
 			_ = Task.Run(ServeAsync);
@@ -175,9 +209,15 @@ internal sealed class FakeFantomas(MockFileSystem fileSystem) : IToolLauncher
 				_owner.Requests.Enqueue((path, source));
 				pending.Add(Task.Run(async () =>
 				{
+					if (_owner.DaemonStalls)
+					{
+						await Task.Delay(Timeout.Infinite, KilledToken).ContinueWith(_ => { }, TaskScheduler.Default);
+						return;
+					}
+
 					await Task.Delay(Random.Shared.Next(0, 3));
 					await SendWarningAsync(path);
-					await SendAsync(writer => WriteResult(writer, path, source), id);
+					await SendAsync(writer => WriteResult(writer, _owner.DaemonAnswersFor ?? path, source), id);
 				}));
 			}
 
@@ -300,9 +340,13 @@ internal sealed class FakeFantomas(MockFileSystem fileSystem) : IToolLauncher
 }
 
 /// <summary>A process made of two in-memory pipes.</summary>
-internal class FakeProcess : IToolProcess
+internal class FakeProcess(FakeFantomas owner) : IToolProcess
 {
 	private readonly TaskCompletionSource<int> _exited = new(TaskCreationOptions.RunContinuationsAsynchronously);
+	private readonly CancellationTokenSource _killed = new();
+
+	/// <summary>Cancelled when the process is killed, so a stalled fake can stop.</summary>
+	protected CancellationToken KilledToken => _killed.Token;
 
 	public ChannelStream FromClient { get; } = new();
 
@@ -320,6 +364,8 @@ internal class FakeProcess : IToolProcess
 
 	public void Kill()
 	{
+		owner.Killed();
+		_killed.Cancel();
 		ToClient.Complete();
 		Exit(-1);
 	}

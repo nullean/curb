@@ -46,7 +46,7 @@ internal sealed class CurbCommands
 		LanguagesFor(msbuildListFile, language) is { } languages
 			? FormattingRun.Execute(
 				_fileSystem, path, write: true, verify: !noVerify, explicitFiles: ResolveExplicitFiles(files, msbuildListFile), cachePath: cache,
-				languages: languages).ExitCode
+				languages: languages, cancellationToken: Interrupted()).ExitCode
 			: 2;
 
 	/// <summary>Exit non-zero if anything would change.</summary>
@@ -90,7 +90,8 @@ internal sealed class CurbCommands
 				explicitFiles: ResolveExplicitFiles(files, msbuildListFile),
 				cachePath: cache,
 				unformattedListPath: unformattedListFile?.FullName,
-				languages: languages
+				languages: languages,
+				cancellationToken: Interrupted()
 			).ExitCode
 			: 2;
 
@@ -271,6 +272,23 @@ internal sealed class CurbCommands
 		}
 
 		return 0;
+	}
+
+	/// <summary>
+	/// Cancelled by the first Ctrl+C, which stops Fantomas and lets the run report and exit rather than leave a
+	/// daemon behind; a second one ends the process as usual.
+	/// </summary>
+	private static CancellationToken Interrupted()
+	{
+		var source = new CancellationTokenSource();
+		Console.CancelKeyPress += (_, args) =>
+		{
+			if (source.IsCancellationRequested)
+				return;
+			args.Cancel = true;
+			source.Cancel();
+		};
+		return source.Token;
 	}
 
 	/// <summary>

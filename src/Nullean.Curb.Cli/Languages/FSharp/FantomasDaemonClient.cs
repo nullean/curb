@@ -17,9 +17,10 @@ internal enum FantomasOutcome
 
 /// <summary>One answer from the daemon.</summary>
 /// <param name="Outcome">Its case.</param>
+/// <param name="Path">The path the daemon says it answered for; null for the version.</param>
 /// <param name="Content">The formatted text, for <see cref="FantomasOutcome.Formatted"/>.</param>
 /// <param name="Message">What went wrong, for <see cref="FantomasOutcome.Error"/>.</param>
-internal readonly record struct FantomasReply(FantomasOutcome Outcome, string? Content, string? Message);
+internal readonly record struct FantomasReply(FantomasOutcome Outcome, string? Path, string? Content, string? Message);
 
 /// <summary>The daemon went away, or answered something that is not the protocol.</summary>
 internal sealed class FantomasDaemonException(string message, Exception? inner = null) : Exception(message, inner);
@@ -260,7 +261,7 @@ internal sealed class FantomasDaemonClient : IAsyncDisposable
 	internal static FantomasReply ReadReply(JsonElement result)
 	{
 		if (result.ValueKind == JsonValueKind.String)
-			return new FantomasReply(FantomasOutcome.Unchanged, result.GetString(), null);
+			return new FantomasReply(FantomasOutcome.Unchanged, null, result.GetString(), null);
 
 		if (result.ValueKind != JsonValueKind.Object
 			|| !result.TryGetProperty("Case", out var caseName) || caseName.ValueKind != JsonValueKind.String)
@@ -274,14 +275,17 @@ internal sealed class FantomasDaemonClient : IAsyncDisposable
 				? fields[index].GetString()
 				: null;
 
+		// Every case carries the file's path first. A missing one reads as "" rather than null, so the caller's
+		// check that the answer is for the file it asked about fails instead of passing vacuously.
+		var path = Field(0) ?? "";
 		if (caseName.ValueEquals("Formatted"))
-			return new FantomasReply(FantomasOutcome.Formatted, Field(1) ?? throw new FantomasDaemonException("Formatted arrived without its content"), null);
+			return new FantomasReply(FantomasOutcome.Formatted, path, Field(1) ?? throw new FantomasDaemonException("Formatted arrived without its content"), null);
 		if (caseName.ValueEquals("Unchanged"))
-			return new FantomasReply(FantomasOutcome.Unchanged, null, null);
+			return new FantomasReply(FantomasOutcome.Unchanged, path, null, null);
 		if (caseName.ValueEquals("Error"))
-			return new FantomasReply(FantomasOutcome.Error, null, Field(1) ?? "no message");
+			return new FantomasReply(FantomasOutcome.Error, path, null, Field(1) ?? "no message");
 		if (caseName.ValueEquals("IgnoredFile"))
-			return new FantomasReply(FantomasOutcome.Ignored, null, null);
+			return new FantomasReply(FantomasOutcome.Ignored, path, null, null);
 
 		throw new FantomasDaemonException($"the daemon answered with an unknown case '{caseName.GetString()}'");
 	}
@@ -340,16 +344,26 @@ internal sealed class FantomasDaemonClient : IAsyncDisposable
 		return newline < 0 ? text : text[..newline];
 	}
 
+	/// <summary>Kills the daemon and fails everything still waiting on it. For a daemon that stopped answering, or a cancelled run.</summary>
+	public void Abort()
+	{
+		_process.Kill();
+		Fail(new FantomasDaemonException("the Fantomas daemon was stopped"));
+	}
+
 	/// <summary>
 	/// Closes the daemon's input, which is how it is told to stop, and waits a moment for it to; kills it if
 	/// it does not.
 	/// </summary>
 	public async ValueTask DisposeAsync()
 	{
+		// Bounded: a write stuck on a daemon that stopped reading would otherwise hold the lock for ever.
 		try
 		{
-			await _writeLock.WaitAsync().ConfigureAwait(false);
-			_process.StandardInput.Dispose();
+			if (await _writeLock.WaitAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false))
+				_process.StandardInput.Dispose();
+			else
+				_process.Kill();
 		}
 		catch (Exception exception) when (exception is IOException or ObjectDisposedException)
 		{
@@ -375,7 +389,7 @@ internal sealed class FantomasDaemonClient : IAsyncDisposable
 		}
 
 		Fail(new FantomasDaemonException("the client was disposed"));
+		// The lock is not disposed: it holds no handle, and a writer still stuck on a killed daemon releases it later.
 		_process.Dispose();
-		_writeLock.Dispose();
 	}
 }

@@ -69,6 +69,7 @@ internal static class FormattingRun
 	/// name="write"/> is <see langword="true"/>: a format run leaves nothing unformatted to list.
 	/// </param>
 	/// <param name="languages">Which languages the run covers. <see cref="LanguageRegistry.Default"/> when absent.</param>
+	/// <param name="cancellationToken">Stops the tools other languages hand their files to; the files they had not finished fail.</param>
 	public static FormattingRunSummary Execute(
 		IFileSystem fileSystem,
 		string target,
@@ -79,7 +80,8 @@ internal static class FormattingRun
 		string[]? explicitFiles = null,
 		string? cachePath = null,
 		string? unformattedListPath = null,
-		LanguageRegistry? languages = null)
+		LanguageRegistry? languages = null,
+		CancellationToken cancellationToken = default)
 	{
 		languages ??= LanguageRegistry.Default(fileSystem);
 
@@ -247,7 +249,7 @@ internal static class FormattingRun
 		// Parallel.ForEachAsync consumes the IAsyncEnumerable produced by ReadAllAsync; it
 		// completes only after the channel is drained and the Writer has been marked complete.
 		Parallel.ForEachAsync(
-			channel.Reader.ReadAllAsync(),
+			channel.Reader.ReadAllAsync(CancellationToken.None),
 			new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount },
 			(item, _) =>
 			{
@@ -336,7 +338,7 @@ internal static class FormattingRun
 				results = tool.FormatBatchAsync(
 					[.. batch.Select(file => new ExternalFile(file.Path, file.Source, file.Options, file.Bytes))],
 					produceText: write,
-					CancellationToken.None).GetAwaiter().GetResult();
+					cancellationToken).GetAwaiter().GetResult();
 				if (results.Length != batch.Length)
 					throw new InvalidOperationException($"answered for {results.Length} of {batch.Length} file(s)");
 			}
@@ -381,7 +383,10 @@ internal static class FormattingRun
 				case FormatStatus.TooDeep:
 					Interlocked.Increment(ref failed);
 					Interlocked.Increment(ref tallies[item.Language].Failed);
-					messages.Add($"{item.Path}: {result.Message}");
+
+					// No message: the language says why once for the whole group, rather than once per file.
+					if (result.Message is not null)
+						messages.Add($"{item.Path}: {result.Message}");
 					break;
 
 				case FormatStatus.Ignored:
@@ -488,11 +493,12 @@ internal static class FormattingRun
 
 		for (var i = 0; i < languages.Count; i++)
 		{
-			if (languages[i] is IExternalLanguage { Warnings: { Count: > 0 } warnings })
-			{
-				foreach (var warning in warnings)
-					Console.Error.WriteLine($"{languages[i].Id}: warning: {warning}");
-			}
+			if (languages[i] is not IExternalLanguage tool)
+				continue;
+			foreach (var error in tool.Errors)
+				Console.Error.WriteLine($"{tool.Id}: {error}");
+			foreach (var warning in tool.Warnings)
+				Console.Error.WriteLine($"{tool.Id}: warning: {warning}");
 		}
 
 		var coverage = totalTokens == 0 ? 1 : printedTokens / (double)totalTokens / 1000;
@@ -519,11 +525,12 @@ internal static class FormattingRun
 			}
 		}
 
-		// Once per reason, with a count, rather than a line per file nobody asked to have formatted.
+		// Once per reason, with a count, rather than a line per file nobody asked to have formatted. Information,
+		// not a problem: it changes no counter and no exit code.
 		foreach (var ((language, reason), count) in declined.OrderBy(pair => pair.Key.Language))
 		{
 			Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
-				$"  {languages[language].Id}: {count} file(s) not formatted — {reason}"));
+				$"  {languages[language].Id}: {count} file(s) skipped — {reason}"));
 		}
 
 		var costModel = expandUnhandled ? "  [full-coverage cost model]" : string.Empty;

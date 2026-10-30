@@ -22,13 +22,13 @@ namespace Nullean.Curb.Cli.Languages.FSharp;
 internal sealed class FSharpLanguage(IFileSystem fileSystem, IToolLauncher launcher, ToolEnvironment environment) : IExternalLanguage
 {
 	/// <summary>Said once per run, in place of a line per file, when F# files have no Fantomas to format them.</summary>
-	internal const string NoManifest =
-		"no local tool manifest declares Fantomas; run `dotnet new tool-manifest` and `dotnet tool install fantomas` to format F#";
+	internal const string NoManifest = "no Fantomas in a tool manifest (see https://curb.nullean.net/workflow/fsharp/)";
 
 	private readonly ToolManifestLocator _manifests = new(fileSystem);
 	private readonly Dictionary<string, string> _ignoreByDirectory = new(StringComparer.Ordinal);
 	private readonly Dictionary<(FantomasManifest, string Extension, string Ignore), IReadOnlyDictionary<string, string>> _keys = [];
 	private readonly HashSet<string> _warnings = new(StringComparer.Ordinal);
+	private readonly List<string> _errors = [];
 
 	public FSharpLanguage(IFileSystem fileSystem) : this(fileSystem, ProcessLauncher.Instance, ToolEnvironment.Current) { }
 
@@ -48,9 +48,6 @@ internal sealed class FSharpLanguage(IFileSystem fileSystem, IToolLauncher launc
 			&& generated.Equals("true", StringComparison.OrdinalIgnoreCase);
 
 		var manifest = _manifests.Find(directory);
-		foreach (var warning in _manifests.Warnings)
-			_warnings.Add(warning);
-		_manifests.Warnings.Clear();
 
 		if (manifest is null)
 			return new FSharpOptions(layout, excluded, null, null);
@@ -80,7 +77,7 @@ internal sealed class FSharpLanguage(IFileSystem fileSystem, IToolLauncher launc
 
 	public async Task<FormatResult[]> FormatBatchAsync(IReadOnlyList<ExternalFile> files, bool produceText, CancellationToken cancellationToken)
 	{
-		var runner = new FantomasRunner(fileSystem, launcher, environment, Warn);
+		var runner = new FantomasRunner(fileSystem, launcher, environment, Warn, Error);
 		return await runner.RunAsync(files, produceText, cancellationToken).ConfigureAwait(false);
 	}
 
@@ -93,10 +90,25 @@ internal sealed class FSharpLanguage(IFileSystem fileSystem, IToolLauncher launc
 		}
 	}
 
+	public IReadOnlyCollection<string> Errors
+	{
+		get
+		{
+			lock (_errors)
+				return [.. _errors];
+		}
+	}
+
 	private void Warn(string warning)
 	{
 		lock (_warnings)
 			_warnings.Add(warning);
+	}
+
+	private void Error(string error)
+	{
+		lock (_errors)
+			_errors.Add(error);
 	}
 
 	/// <summary>
