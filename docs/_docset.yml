@@ -36,6 +36,7 @@ toc:
       - file: integrations.md
       - file: msbuild.md
       - file: xml.md
+      - file: fsharp.md
       - file: cleanup.md
       - file: agent-instructions.md
   - folder: why-not

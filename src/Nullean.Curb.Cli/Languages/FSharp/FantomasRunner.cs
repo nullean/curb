@@ -12,13 +12,15 @@ internal sealed class ExternalToolException(string message, Exception? inner = n
 /// <remarks>
 /// <para>
 /// One daemon per manifest per run, started here and stopped here, with about one request per processor
-/// in flight. Measured against one <c>fantomas</c> batch process: equal from 100 files up and faster at
-/// 1000; about 90 ms dearer for a handful of files, which the cache makes the rare case.
+/// in flight. Measured against the batch CLI doing the same job (formatting, then checking what it wrote):
+/// 0.61 s against 1.01 s for one file and 17.6 s against 28.2 s for 1,000. Checking files that are already
+/// formatted, where the CLI needs one pass, the daemon costs about 0.1 s more up to 100 files and about
+/// the same at 1,000; the cache makes that the uncommon case.
 /// </para>
 /// <para>
 /// Curb never writes what Fantomas hands back on the strength of one answer. The daemon does not validate
-/// its own output (the CLI does), and on a 1000-file corpus it returned 15 invalid and 9 unstable results as
-/// <c>Formatted</c>. So every <c>Formatted</c> result is sent back, and only an <c>Unchanged</c> answer to
+/// its own output (the CLI does), and on dotnet/fsharp's <c>src/</c> (518 files) it returned 6 results that
+/// do not parse and 4 that change again as <c>Formatted</c>; the CLI catches the 6 and writes the 4. So every <c>Formatted</c> result is sent back, and only an <c>Unchanged</c> answer to
 /// that lets it through: an error means the output does not parse, another <c>Formatted</c> means it is not
 /// a fixed point, and either way the file is failed and left as it was. That costs one more request for
 /// each file that needed formatting, and nothing for one that did not.
