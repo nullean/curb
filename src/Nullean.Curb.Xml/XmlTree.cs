@@ -136,7 +136,7 @@ internal sealed class XmlTree : IDisposable
 						}
 
 						// Between top-level nodes nothing reads whitespace, so it is always layout.
-						tokens[i] = token.With(XmlTokenFlags.Layout);
+						tokens[i] = token.With(XmlTokenFlags.Layout | XmlTokenFlags.Droppable);
 					}
 
 					AddLeaf(XmlNodeKind.Text, i, parent);

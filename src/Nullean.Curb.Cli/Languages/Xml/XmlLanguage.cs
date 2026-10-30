@@ -24,10 +24,11 @@ internal sealed class XmlLanguage : IInProcessLanguage
 	/// <summary>What the walk hands over: the MSBuild and solution extensions, and every one a repository may opt in.</summary>
 	public string[] Extensions { get; } = [.. XmlOptions.MsBuildExtensions, ".slnx", .. XmlOptions.OptInExtensions];
 
-	public LanguageOptions BindOptions(FileConfiguration configuration)
+	public LanguageOptions BindOptions(FileConfiguration configuration, CurbEditorConfig editorConfig)
 	{
-		var options = XmlOptionsBinder.Bind(configuration);
-		return new XmlLanguageOptions(options, options.Enabled && Formats(configuration.FileName, options));
+		var explicitProperties = editorConfig.ExplicitFor(configuration.FileName);
+		var options = XmlOptionsBinder.Bind(configuration, explicitProperties);
+		return new XmlLanguageOptions(options, options.Enabled && Formats(configuration.FileName, options), explicitProperties);
 	}
 
 	/// <summary>
@@ -56,7 +57,7 @@ internal sealed class XmlLanguage : IInProcessLanguage
 }
 
 /// <summary>A file's bound <see cref="XmlOptions"/>.</summary>
-internal sealed class XmlLanguageOptions(XmlOptions options, bool claimed) : LanguageOptions
+internal sealed class XmlLanguageOptions(XmlOptions options, bool claimed, IReadOnlyDictionary<string, string> explicitProperties) : LanguageOptions
 {
 	public readonly XmlOptions Value = options;
 
@@ -65,6 +66,10 @@ internal sealed class XmlLanguageOptions(XmlOptions options, bool claimed) : Lan
 	public override bool Excluded => Value.Excluded;
 
 	public override bool Claimed { get; } = claimed;
+
+	public override IReadOnlyDictionary<string, string>? AdditionalProperties { get; } = explicitProperties;
+
+	public override bool ReportsCoverage => false;
 }
 
 /// <summary>One thread's <see cref="XmlFormatter"/>.</summary>

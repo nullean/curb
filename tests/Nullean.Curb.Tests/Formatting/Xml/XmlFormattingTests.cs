@@ -6,29 +6,6 @@ namespace Nullean.Curb.Tests.Formatting.Xml;
 /// </summary>
 public class XmlFormattingTests : XmlFormattingTest
 {
-	/// <summary>MSBuild reads `\n true\n` here, which is not `true`. The property moves; its value does not.</summary>
-	[Test]
-	public Task Property_text_is_content_even_when_its_parent_is_reindented() =>
-		Formats(
-			"""
-			<Project>
-			<PropertyGroup>
-			<Flag>
-			 true
-			</Flag>
-			</PropertyGroup>
-			</Project>
-			""",
-			"""
-			<Project>
-			  <PropertyGroup>
-			    <Flag>
-			 true
-			</Flag>
-			  </PropertyGroup>
-			</Project>
-			""");
-
 	/// <summary>MSBuild reads a property that holds elements as its inner XML, whitespace included.</summary>
 	[Test]
 	public Task A_property_holding_elements_keeps_its_inner_xml() =>
@@ -241,17 +218,6 @@ public class XmlFormattingTests : XmlFormattingTest
 			editorConfig: "xml_max_blank_lines_between_tags = 2");
 
 	[Test]
-	public Task Trailing_whitespace_between_nodes_is_dropped() =>
-		Formats(
-			"<Project>   \n  <PropertyGroup />  \n  \n</Project>",
-			"""
-			<Project>
-			  <PropertyGroup />
-
-			</Project>
-			""");
-
-	[Test]
 	public Task Indent_follows_indent_size() =>
 		Formats(
 			"""
@@ -289,25 +255,6 @@ public class XmlFormattingTests : XmlFormattingTest
 			"\n\n<Project>\n</Project>",
 			"""
 			<Project>
-			</Project>
-			""");
-
-	/// <summary>Multi-line comments are not re-indented inside in this version.</summary>
-	[Test]
-	public Task Comments_move_with_their_line_but_keep_their_inner_lines() =>
-		Formats(
-			"""
-			<Project>
-			      <!-- one
-			           two -->
-			  <PropertyGroup />
-			</Project>
-			""",
-			"""
-			<Project>
-			  <!-- one
-			           two -->
-			  <PropertyGroup />
 			</Project>
 			""");
 
@@ -371,32 +318,6 @@ public class XmlFormattingTests : XmlFormattingTest
 			fileName: "Test.xml");
 
 	[Test]
-	public Task Xml_space_preserve_keeps_a_subtree_as_written() =>
-		Formats(
-			"""
-			<root>
-			      <keep xml:space="preserve">
-			            <a/>
-			      </keep>
-			      <b>
-			            <c/>
-			      </b>
-			</root>
-			""",
-			"""
-			<root>
-			  <keep xml:space="preserve">
-			            <a/>
-			      </keep>
-			  <b>
-			    <c/>
-			  </b>
-			</root>
-			""",
-			editorConfig: "curb_xml_extensions = .xml",
-			fileName: "Test.xml");
-
-	[Test]
 	public Task Declaration_and_processing_instructions_are_left_as_written() =>
 		Unchanged(
 			"""
@@ -405,14 +326,6 @@ public class XmlFormattingTests : XmlFormattingTest
 			<Project>
 			</Project>
 			""");
-
-	/// <summary>The printer trims only whitespace it owns; a text node's trailing spaces are content.</summary>
-	[Test]
-	public Task Trailing_spaces_inside_text_survive_trim_trailing_whitespace() =>
-		Formats(
-			"<Project>\n<PropertyGroup>\n<A>x   \n  y</A>\n</PropertyGroup>\n</Project>",
-			"<Project>\n  <PropertyGroup>\n    <A>x   \n  y</A>\n  </PropertyGroup>\n</Project>",
-			editorConfig: "trim_trailing_whitespace = true");
 
 	[Test]
 	public Task Crlf_is_kept_when_end_of_line_is_unset() =>
@@ -481,29 +394,6 @@ public class XmlFormattingTests : XmlFormattingTest
 			<Project>
 			  <Target Name='T' Condition=" '$(A)' == 'b'  ">
 			    <Exec Command="echo &quot;x&quot;   y" />
-			  </Target>
-			</Project>
-			""");
-
-	/// <summary>A value's own continuation lines are content and do not move.</summary>
-	[Test]
-	public Task Broken_attributes_keep_their_offset_from_a_moved_element() =>
-		Formats(
-			"""
-			<Project>
-			      <Target Name="T"
-			              Condition="'$(A)' == 'b'
-			                         and '$(C)' == 'd'"
-			              DependsOnTargets="X">
-			      </Target>
-			</Project>
-			""",
-			"""
-			<Project>
-			  <Target Name="T"
-			          Condition="'$(A)' == 'b'
-			                         and '$(C)' == 'd'"
-			          DependsOnTargets="X">
 			  </Target>
 			</Project>
 			""");
@@ -908,4 +798,413 @@ public class XmlFormattingTests : XmlFormattingTest
 			"""
 			<Project>a ]]> b</Project>
 			""");
+
+	/// <summary>MSBuild reads `\n true\n` here. Its content cannot move, so its start tag does not either, and the end tag stays with it.</summary>
+	[Test]
+	public Task A_multi_line_property_keeps_its_columns_while_its_parent_moves() =>
+		Formats(
+			"""
+			<Project>
+			<PropertyGroup>
+			<Flag>
+			 true
+			</Flag>
+			<Other>x</Other>
+			</PropertyGroup>
+			</Project>
+			""",
+			"""
+			<Project>
+			  <PropertyGroup>
+			<Flag>
+			 true
+			</Flag>
+			    <Other>x</Other>
+			  </PropertyGroup>
+			</Project>
+			""");
+
+	[Test]
+	public Task A_depends_on_list_keeps_its_columns() =>
+		Formats(
+			"""
+			<Project>
+			    <PropertyGroup>
+			    <BuildDependsOn>
+			      Restore;
+			      Build
+			    </BuildDependsOn>
+			      <A>1</A>
+			    </PropertyGroup>
+			</Project>
+			""",
+			"""
+			<Project>
+			  <PropertyGroup>
+			    <BuildDependsOn>
+			      Restore;
+			      Build
+			    </BuildDependsOn>
+			    <A>1</A>
+			  </PropertyGroup>
+			</Project>
+			""");
+
+	[Test]
+	public Task An_inline_task_keeps_its_columns() =>
+		Formats(
+			"""
+			<Project>
+			    <UsingTask TaskName="T" TaskFactory="RoslynCodeTaskFactory" AssemblyFile="x.dll">
+			      <Task>
+			        <Code Type="Fragment" Language="cs">x</Code>
+			      </Task>
+			    </UsingTask>
+			</Project>
+			""",
+			"""
+			<Project>
+			  <UsingTask TaskName="T" TaskFactory="RoslynCodeTaskFactory" AssemblyFile="x.dll">
+			      <Task>
+			        <Code Type="Fragment" Language="cs">x</Code>
+			      </Task>
+			  </UsingTask>
+			</Project>
+			""");
+
+	[Test]
+	public Task An_empty_element_opened_across_lines_moves_with_its_end_tag() =>
+		Formats(
+			"""
+			<Project>
+			    <Target Name="T">
+			       </Target>
+			    <Empty>
+			   </Empty>
+			</Project>
+			""",
+			"""
+			<Project>
+			  <Target Name="T">
+			  </Target>
+			  <Empty>
+			  </Empty>
+			</Project>
+			""");
+
+	[Test]
+	public Task Multi_line_metadata_keeps_its_columns() =>
+		Formats(
+			"""
+			<Project>
+			    <ItemGroup>
+			        <None Include="a.txt">
+			          <Pack>
+			            true</Pack>
+			          <Link>b.txt</Link>
+			        </None>
+			    </ItemGroup>
+			</Project>
+			""",
+			"""
+			<Project>
+			  <ItemGroup>
+			    <None Include="a.txt">
+			          <Pack>
+			            true</Pack>
+			      <Link>b.txt</Link>
+			    </None>
+			  </ItemGroup>
+			</Project>
+			""");
+
+	/// <summary>Moving a comment's first line alone would strand the rest of it.</summary>
+	[Test]
+	public Task A_multi_line_comment_keeps_its_columns() =>
+		Unchanged(
+			"""
+			<Project>
+			      <!-- one
+			           two -->
+			  <PropertyGroup />
+			</Project>
+			""");
+
+	[Test]
+	public Task A_single_line_comment_is_reindented() =>
+		Formats(
+			"""
+			<Project>
+			      <!-- one -->
+			  <PropertyGroup />
+			</Project>
+			""",
+			"""
+			<Project>
+			  <!-- one -->
+			  <PropertyGroup />
+			</Project>
+			""");
+
+	[Test]
+	public Task Xml_space_preserve_keeps_a_subtree_as_written() =>
+		Formats(
+			"""
+			<root>
+			      <keep xml:space="preserve">
+			            <a/>
+			      </keep>
+			      <b>
+			            <c/>
+			      </b>
+			</root>
+			""",
+			"""
+			<root>
+			      <keep xml:space="preserve">
+			            <a/>
+			      </keep>
+			  <b>
+			    <c/>
+			  </b>
+			</root>
+			""",
+			editorConfig: "curb_xml_extensions = .xml",
+			fileName: "Test.xml");
+
+	/// <summary>A value's continuation lines are content. Its element, and the children laid out from it, stay put.</summary>
+	[Test]
+	public Task An_element_with_a_multi_line_value_keeps_its_columns() =>
+		Unchanged(
+			"""
+			<Project>
+			      <Target Name="T"
+			              Condition="'$(A)' == 'b'
+			                         and '$(C)' == 'd'"
+			              DependsOnTargets="X">
+			        <Message Text="m" />
+			      </Target>
+			</Project>
+			""");
+
+	[Test]
+	public Task The_children_of_a_pinned_element_are_laid_out_from_its_column() =>
+		Formats(
+			"""
+			<Project>
+			      <Target Name="T" Condition="'$(A)' == 'b'
+			                         and '$(C)' == 'd'">
+			<Message Text="m" />
+			           </Target>
+			</Project>
+			""",
+			"""
+			<Project>
+			      <Target Name="T" Condition="'$(A)' == 'b'
+			                         and '$(C)' == 'd'">
+			        <Message Text="m" />
+			      </Target>
+			</Project>
+			""");
+
+	[Test]
+	public Task Aligned_attributes_move_with_their_element() =>
+		Formats(
+			"""
+			<Project>
+			      <Target Name="T"
+			              DependsOnTargets="X">
+			      </Target>
+			</Project>
+			""",
+			"""
+			<Project>
+			  <Target Name="T"
+			          DependsOnTargets="X">
+			  </Target>
+			</Project>
+			""");
+
+	/// <summary>The attribute keeps its offset from the element, and an offset that would land left of column 0 lands on it.</summary>
+	[Test]
+	public Task An_attribute_left_of_its_element_is_clamped_to_the_first_column() =>
+		Formats(
+			"""
+			<Project>
+			      <Target Name="T"
+			  Inputs="I" />
+			</Project>
+			""",
+			"""
+			<Project>
+			  <Target Name="T"
+			Inputs="I" />
+			</Project>
+			""");
+
+	[Test]
+	public Task Trailing_whitespace_on_layout_lines_is_kept_by_default() =>
+		Formats(
+			"<Project>   \n<PropertyGroup />  \n  \n</Project>",
+			"<Project>   \n  <PropertyGroup />  \n  \n</Project>");
+
+	[Test]
+	public Task Trim_trailing_whitespace_drops_it_from_layout_lines() =>
+		Formats(
+			"<Project>   \n<PropertyGroup />  \n  \n</Project>",
+			"""
+			<Project>
+			  <PropertyGroup />
+
+			</Project>
+			""",
+			editorConfig: "trim_trailing_whitespace = true");
+
+	/// <summary>The printer trims only whitespace it owns; a text node's trailing spaces are content.</summary>
+	[Test]
+	public Task Trailing_spaces_inside_text_survive_trim_trailing_whitespace() =>
+		Formats(
+			"<Project>\n<PropertyGroup>\n<A>x   \n  y</A>\n<B>z</B>\n</PropertyGroup>\n</Project>",
+			"<Project>\n  <PropertyGroup>\n<A>x   \n  y</A>\n    <B>z</B>\n  </PropertyGroup>\n</Project>",
+			editorConfig: "trim_trailing_whitespace = true");
+
+	[Test]
+	public Task Cr_only_line_endings_are_kept_when_end_of_line_is_unset() =>
+		Formats(
+			"<Project>\r<PropertyGroup />\r</Project>\r",
+			"<Project>\r  <PropertyGroup />\r</Project>\r");
+
+	[Test]
+	public Task Item_metadata_holding_elements_keeps_its_inner_xml() =>
+		Unchanged(
+			"""
+			<Project>
+			  <ItemGroup>
+			    <None Include="a.txt">
+			      <Meta>
+			          <x/>
+			            <y/>
+			      </Meta>
+			    </None>
+			  </ItemGroup>
+			</Project>
+			""");
+
+	[Test]
+	public Task Item_definition_metadata_keeps_its_inner_xml() =>
+		Unchanged(
+			"""
+			<Project>
+			  <ItemDefinitionGroup>
+			    <Compile>
+			      <Meta>
+			          <x/>
+			            <y/>
+			      </Meta>
+			    </Compile>
+			  </ItemDefinitionGroup>
+			</Project>
+			""");
+
+	[Test]
+	public Task Metadata_inside_a_target_keeps_its_inner_xml() =>
+		Unchanged(
+			"""
+			<Project>
+			  <Target Name="T">
+			    <ItemGroup>
+			      <Out Include="a">
+			        <Meta>
+			            <x/>
+			        </Meta>
+			      </Out>
+			    </ItemGroup>
+			  </Target>
+			</Project>
+			""");
+
+	[Test]
+	public Task A_property_inside_a_target_keeps_its_inner_xml() =>
+		Unchanged(
+			"""
+			<Project>
+			  <Target Name="T">
+			    <PropertyGroup>
+			      <Xml>
+			          <a/>
+			            <b/>
+			      </Xml>
+			    </PropertyGroup>
+			  </Target>
+			</Project>
+			""");
+
+	[Test]
+	public Task A_property_under_choose_keeps_its_inner_xml() =>
+		Unchanged(
+			"""
+			<Project>
+			  <Choose>
+			    <When Condition="true">
+			      <PropertyGroup>
+			        <Xml>
+			            <a/>
+			              <b/>
+			        </Xml>
+			      </PropertyGroup>
+			    </When>
+			  </Choose>
+			</Project>
+			""");
+
+	[Test]
+	public Task Project_extensions_nested_deep_are_left_as_written() =>
+		Unchanged(
+			"""
+			<Project>
+			  <ProjectExtensions>
+			    <VisualStudio>
+			          <FlavorProperties>
+			      <Setting A="1" />
+			          </FlavorProperties>
+			    </VisualStudio>
+			  </ProjectExtensions>
+			</Project>
+			""");
+
+	[Test]
+	public Task Project_extensions_holding_a_comment_and_text_are_left_as_written() =>
+		Unchanged(
+			"""
+			<Project>
+			  <ProjectExtensions>
+			        <!-- tool state -->
+			     <State>  on  </State>
+			  </ProjectExtensions>
+			</Project>
+			""");
+
+	[Test]
+	public Task A_utf8_declaration_in_any_case_is_accepted() =>
+		Unchanged(
+			"""
+			<?xml version="1.0" encoding="UTF8"?>
+			<Project>
+			</Project>
+			""");
+
+	/// <summary>
+	/// Bytes that happen to be valid UTF-8 can still declare another encoding; writing them back as
+	/// UTF-8 would make the declaration lie. XDocument reads a string without looking at it, so this
+	/// refusal is Curb's alone.
+	/// </summary>
+	[Test]
+	public Task A_declaration_naming_another_encoding_is_refused() =>
+		Rejects(
+			"""
+			<?xml version="1.0" encoding="windows-1252"?>
+			<Project>
+			</Project>
+			""",
+			parserAgrees: false);
 }

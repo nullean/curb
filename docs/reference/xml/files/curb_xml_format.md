@@ -18,7 +18,7 @@ Format project, props, targets, solution and nuget.config files. false leaves th
 
 **Default:** `true`
 
-On by default. To turn XML formatting off for a whole repository, add a section for the files to the root `.editorconfig`:
+On by default. The first run changes some project files, all of them whitespace, so `curb check` fails until you run `curb format .` once. To turn XML formatting off for a whole repository, add a section for the files to the root `.editorconfig`:
 
 ```ini
 [*.{csproj,fsproj,vbproj,proj,props,targets,slnx,config}]
@@ -58,7 +58,7 @@ curb_xml_format = true
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
-    <Description>
+        <Description>
           Kept exactly as written: MSBuild reads this whitespace.
         </Description>
   </PropertyGroup>

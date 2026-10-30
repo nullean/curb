@@ -53,7 +53,7 @@ xml_space_before_self_closing = true
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
-    <Description>
+        <Description>
           Kept exactly as written: MSBuild reads this whitespace.
         </Description>
   </PropertyGroup>
@@ -101,7 +101,7 @@ xml_space_before_self_closing = false
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
-    <Description>
+        <Description>
           Kept exactly as written: MSBuild reads this whitespace.
         </Description>
   </PropertyGroup>

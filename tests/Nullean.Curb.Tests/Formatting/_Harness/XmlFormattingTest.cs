@@ -75,7 +75,8 @@ public abstract class XmlFormattingTest
 	protected static Task Rejects(
 		[LanguageInjection("xml")][StringSyntax("xml")] string source,
 		FormatStatus status = FormatStatus.SyntaxError,
-		string fileName = Project)
+		string fileName = Project,
+		bool parserAgrees = true)
 	{
 		using var formatter = new XmlFormatter();
 		var result = formatter.Format(source, Options(null, fileName));
@@ -87,7 +88,7 @@ public abstract class XmlFormattingTest
 				+ (result.Message is null ? string.Empty : $" ({result.Message})"));
 		}
 
-		if (status == FormatStatus.SyntaxError)
+		if (status == FormatStatus.SyntaxError && parserAgrees)
 		{
 			try
 			{
@@ -115,7 +116,7 @@ public abstract class XmlFormattingTest
 			fileSystem.AddFile($"{directory}/{key.Item2}", new MockFileData(string.Empty));
 
 			var diagnostics = new List<Nullean.Curb.Options.CurbDiagnostic>();
-			var options = XmlOptionsBinder.Bind(new CurbEditorConfig(fileSystem).For($"{directory}/{key.Item2}"), diagnostics);
+			var options = XmlOptionsBinder.Bind(new CurbEditorConfig(fileSystem), $"{directory}/{key.Item2}", diagnostics);
 			if (diagnostics.Count > 0)
 				throw new FormattingAssertionException("the case's .editorconfig did not bind cleanly: " + diagnostics[0]);
 			if (!options.Enabled)
@@ -151,8 +152,8 @@ public abstract class XmlFormattingTest
 	/// </summary>
 	internal static void AssertSameInfoset(string before, string after, XmlProfile profile)
 	{
-		var left = Infoset(before);
-		var right = Infoset(after);
+		var left = Infoset(before, profile);
+		var right = Infoset(after, profile);
 		if (!XNode.DeepEquals(left, right))
 		{
 			throw new FormattingAssertionException(
@@ -161,12 +162,16 @@ public abstract class XmlFormattingTest
 		}
 	}
 
-	private static XDocument Infoset(string text)
+	/// <remarks>
+	/// Written from the XML and MSBuild rules directly, not from <see cref="XmlTree"/>'s decisions, so a
+	/// tree that wrongly marked a value as layout is caught here rather than agreed with.
+	/// </remarks>
+	private static XDocument Infoset(string text, XmlProfile profile)
 	{
 		var document = XDocument.Parse(text, LoadOptions.PreserveWhitespace);
 		foreach (var element in document.Descendants().ToList())
 		{
-			if (Preserved(element))
+			if (Preserved(element) || (profile == XmlProfile.MsBuild && InsideMsBuildValue(element)))
 				continue;
 
 			var texts = element.Nodes().OfType<XText>().ToList();
@@ -179,6 +184,25 @@ public abstract class XmlFormattingTest
 		foreach (var topLevel in document.Nodes().OfType<XText>().ToList())
 			topLevel.Remove();
 		return document;
+	}
+
+	/// <summary>
+	/// A property, an item's metadata, a project extension or an inline task body, or anything inside
+	/// one: MSBuild reads all of it as a value, whitespace included.
+	/// </summary>
+	private static bool InsideMsBuildValue(XElement element)
+	{
+		for (var current = element; current is not null; current = current.Parent)
+		{
+			var name = current.Name.LocalName;
+			var parent = current.Parent?.Name.LocalName;
+			var grandparent = current.Parent?.Parent?.Name.LocalName;
+			if (name == "ProjectExtensions" || parent == "PropertyGroup" || (name == "Task" && parent == "UsingTask")
+				|| grandparent is "ItemGroup" or "ItemDefinitionGroup")
+				return true;
+		}
+
+		return false;
 	}
 
 	private static bool Preserved(XElement element)

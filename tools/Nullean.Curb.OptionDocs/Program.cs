@@ -113,7 +113,10 @@ internal static class Program
             "Which XML files Curb formats. Project, props, targets, solution and `nuget.config` files are formatted by " +
             "default; set `curb_xml_format = false` to leave them alone, and name other XML extensions in " +
             "`curb_xml_extensions` to opt them in. The `curb` MSBuild package never formats XML, only `curb format` " +
-            "and `curb check` do. The core keys apply to XML too, with a two-space indent when `indent_size` is unset.",
+            "and `curb check` do. The core keys apply to XML only from sections that name its files, such as " +
+            "`[*.csproj]` or `[Directory.Packages.props]`; `[*]`, `[**]` and `[*.*]` are ignored for them. Without such a " +
+            "section XML indents by two, has no width, and keeps each file's own line endings, final newline and " +
+            "trailing whitespace. The `curb_xml_*` and `xml_*` keys apply from any section.",
         [OptionGroup.XmlLayout] =
             "How Curb lays XML out. It keeps the author's layout: it re-indents the lines that start a child element, caps " +
             "blank lines, and tidies the whitespace inside start tags. Text, comments, CDATA, attribute values and anything " +

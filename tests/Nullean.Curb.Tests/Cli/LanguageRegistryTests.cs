@@ -99,7 +99,7 @@ public class LanguageRegistryTests
 
 		public string[] Extensions { get; } = [".shout"];
 
-		public LanguageOptions BindOptions(FileConfiguration configuration) =>
+		public LanguageOptions BindOptions(FileConfiguration configuration, CurbEditorConfig editorConfig) =>
 			new ShoutOptions(LayoutOptionsBinder.Bind(configuration.Properties, null, new LayoutOptions { IndentSize = 2 }));
 
 		public bool SkipSource(string source) => false;

@@ -13,8 +13,8 @@ internal sealed class LanguageRegistry
 {
 	/// <summary>The languages <c>curb format</c> and <c>curb check</c> cover.</summary>
 	/// <remarks>
-	/// XML claims only the files a repository opted in with <c>curb_xml_format</c>, so registering it
-	/// changes nothing for one that did not.
+	/// XML is on by default for project, props, targets, solution and <c>nuget.config</c> files; a file
+	/// whose configuration sets <c>curb_xml_format = false</c> is declined before it is read.
 	/// </remarks>
 	public static LanguageRegistry Default { get; } = new(CSharpLanguage.Instance, XmlLanguage.Instance);
 

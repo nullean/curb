@@ -13,7 +13,7 @@ public class XmlVerifierTests
 
 	[Test]
 	[Arguments("<Project>\n<PropertyGroup>\n<A> x </A>\n</PropertyGroup>\n<!-- c --><B x=\"1\" y='2' />\n</Project>\n")]
-	[Arguments("<Project><PropertyGroup><A> x </A></PropertyGroup><!-- c --><B\n x=\"1\"\n y='2'\n/></Project>")]
+	[Arguments("<Project> <PropertyGroup> <A> x </A> </PropertyGroup> <!-- c --><B\n x=\"1\"\n y='2'\n/> </Project>")]
 	[Arguments("<Project>\r\n  <PropertyGroup>\r\n    <A> x </A>\r\n  </PropertyGroup>\r\n  <!-- c --><B x=\"1\" y='2'/>\r\n</Project>\r\n")]
 	public async Task Layout_changes_pass(string output) =>
 		await Assert(output, pass: true);
@@ -26,6 +26,8 @@ public class XmlVerifierTests
 	[Arguments("<Project>\n  <PropertyGroup>\n    <A> x </A>\n  </PropertyGroup>\n  <!-- c --><B y='2' x=\"1\"/>\n</Project>\n")]
 	[Arguments("<Project>\n  <PropertyGroup>\n    <A> x </A>\n  </PropertyGroup>\n  <!-- c --><B x=\"1\" y='2'></B>\n</Project>\n")]
 	[Arguments("<Project>\n  <PropertyGroup>\n    <A> x </A>\n  </PropertyGroup>\n  <!-- c --><B x=\"1\" y='2'/>\n</Project>\n<!-- extra -->")]
+	[Arguments("<Project><PropertyGroup>\n    <A> x </A>\n  </PropertyGroup>\n  <!-- c --><B x=\"1\" y='2'/>\n</Project>\n")]
+	[Arguments("<Project><PropertyGroup>\n    <A> x </A>\n  </PropertyGroup>\n  <!-- c --><B x=\"1\" y='2'/>\n</Project>\n")]
 	[Arguments("<Project>\n  text<PropertyGroup>\n    <A> x </A>\n  </PropertyGroup>\n  <!-- c --><B x=\"1\" y='2'/>\n</Project>\n")]
 	public async Task Content_changes_fail(string output) =>
 		await Assert(output, pass: false);

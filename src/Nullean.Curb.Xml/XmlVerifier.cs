@@ -13,8 +13,8 @@ namespace Nullean.Curb.Xml;
 /// <item>whitespace inside a start tag (<see cref="XmlTokenKind.TagSpace"/>), which XML does not keep;</item>
 /// <item>
 /// whitespace-only text the tree marked as <see cref="XmlTokenFlags.Layout"/>, which may be
-/// rewritten as other whitespace or dropped, but never turned into anything else. Whitespace the
-/// output has where the source had none fails.
+/// rewritten as other whitespace, and dropped only between top-level nodes, but never turned into
+/// anything else. Whitespace the output has where the source had none fails.
 /// </item>
 /// </list>
 /// <para>
@@ -52,6 +52,13 @@ internal static class XmlVerifier
 			{
 				if (j < after.Length && after[j].Kind == XmlTokenKind.Text && after[j].Is(XmlTokenFlags.WhitespaceOnly))
 					j++;
+				else if (!before[i].Is(XmlTokenFlags.Droppable))
+				{
+					// Inside an element the printer rewrites whitespace; it never removes it.
+					failure = Describe(source, before[i], "was dropped");
+					return false;
+				}
+
 				i++;
 				continue;
 			}

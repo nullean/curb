@@ -21,7 +21,7 @@ internal sealed class CSharpLanguage : IInProcessLanguage
 
 	public string[] Extensions { get; } = [".cs"];
 
-	public LanguageOptions BindOptions(FileConfiguration configuration) =>
+	public LanguageOptions BindOptions(FileConfiguration configuration, CurbEditorConfig editorConfig) =>
 		new CSharpOptions(EditorConfigOptionsBinder.Bind(configuration));
 
 	public bool SkipSource(string source) => CSharpSource.HasGeneratedHeader(source);

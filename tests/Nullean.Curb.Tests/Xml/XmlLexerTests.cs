@@ -57,8 +57,9 @@ public class XmlLexerTests
 		var root = RepositoryRoot();
 		var files = Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories)
 			.Where(path => !path.Contains("/.git/", StringComparison.Ordinal) && !path.Contains("/.artifacts/", StringComparison.Ordinal)
-				&& !path.Contains("/bin/", StringComparison.Ordinal) && !path.Contains("/obj/", StringComparison.Ordinal))
-			.Where(path => XmlOptions.ProfileFor(path) != XmlProfile.Generic || path.EndsWith(".config", StringComparison.OrdinalIgnoreCase))
+				&& !path.Contains("/bin/", StringComparison.Ordinal) && !path.Contains("/obj/", StringComparison.Ordinal)
+				&& !path.Contains("/build/output/", StringComparison.Ordinal))
+			.Where(path => XmlOptions.ProfileFor(path) != XmlProfile.Generic || Path.GetFileName(path).Equals("nuget.config", StringComparison.OrdinalIgnoreCase))
 			.ToArray();
 
 		files.Should().NotBeEmpty();

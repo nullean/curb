@@ -39,6 +39,16 @@ public sealed class XmlFormatter : IDisposable
 			return new FormatResult(status, false, null, 0, error.Describe(span));
 		}
 
+		// A file whose bytes happen to be valid UTF-8 (ASCII, say) can still declare another encoding,
+		// and writing it back as UTF-8 would make the declaration a lie the next edit acts on.
+		var encoding = DeclaredEncoding(span, _tokens);
+		if (!encoding.IsEmpty && !IsUtf8(encoding))
+		{
+			return new FormatResult(
+				FormatStatus.SyntaxError, false, null, 0,
+				$"declares encoding '{encoding}'; only UTF-8 XML is rewritten, so the file is left unchanged");
+		}
+
 		var layout = ResolveLayout(span, options);
 
 		_arena.Reset(source.Length / 8);
@@ -79,14 +89,52 @@ public sealed class XmlFormatter : IDisposable
 		{
 			var lineBreak = source.IndexOfAny('\r', '\n');
 			if (lineBreak >= 0)
-				layout = layout with { EndOfLine = source[lineBreak] == '\r' && lineBreak + 1 < source.Length && source[lineBreak + 1] == '\n' ? EndOfLine.CrLf : EndOfLine.Lf };
+			{
+				layout = layout with
+				{
+					EndOfLine = source[lineBreak] == '\n' ? EndOfLine.Lf
+						: lineBreak + 1 < source.Length && source[lineBreak + 1] == '\n' ? EndOfLine.CrLf
+						: EndOfLine.Cr,
+				};
+			}
 		}
 
 		if (!options.FinalNewLineSet)
 			layout = layout with { InsertFinalNewLine = source.Length > 0 && source[^1] is '\n' or '\r' };
 
+		// Trailing whitespace on a layout line is the author's unless the XML's own configuration asks
+		// for it to go: an unset key, or one inherited from [*], leaves it where it is.
+		if (!options.TrimTrailingWhitespaceSet)
+			layout = layout with { TrimTrailingWhitespace = false };
+
 		return layout;
 	}
+
+	/// <summary>The value of the XML declaration's <c>encoding</c>, or null when there is none.</summary>
+	internal static ReadOnlySpan<char> DeclaredEncoding(ReadOnlySpan<char> source, XmlTokenBuffer tokens)
+	{
+		if (tokens.Count == 0 || tokens[0].Kind != XmlTokenKind.XmlDeclaration)
+			return default;
+
+		var declaration = source.Slice(tokens[0].Start, tokens[0].Length);
+		var at = declaration.IndexOf("encoding", StringComparison.Ordinal);
+		if (at < 0)
+			return default;
+
+		var rest = declaration[(at + "encoding".Length)..].TrimStart(" \t\r\n");
+		if (rest.IsEmpty || rest[0] != '=')
+			return default;
+
+		rest = rest[1..].TrimStart(" \t\r\n");
+		if (rest.IsEmpty || rest[0] is not ('"' or '\''))
+			return default;
+
+		var close = rest[1..].IndexOf(rest[0]);
+		return close < 0 ? default : rest.Slice(1, close);
+	}
+
+	private static bool IsUtf8(ReadOnlySpan<char> encoding) =>
+		encoding.Equals("utf-8", StringComparison.OrdinalIgnoreCase) || encoding.Equals("utf8", StringComparison.OrdinalIgnoreCase);
 
 	/// <summary>Renders the document for a file, for debugging why it laid out the way it did.</summary>
 	public string DumpDocumentTree(string source, in XmlOptions options)

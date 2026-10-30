@@ -1566,12 +1566,16 @@ public static class Snippets
     public static IReadOnlyDictionary<string, string> XmlNotes { get; } = new Dictionary<string, string>
     {
         ["curb_xml_format"] =
-            "On by default. To turn XML formatting off for a whole repository, add a section for the files to the root " +
+            "On by default. The first run changes some project files, all of them whitespace, so `curb check` fails " +
+            "until you run `curb format .` once. To turn XML formatting off for a whole repository, add a section for the files to the root " +
             "`.editorconfig`:\n\n```ini\n[*.{csproj,fsproj,vbproj,proj,props,targets,slnx,config}]\ncurb_xml_format = false\n```",
         ["curb_xml_extensions"] =
             "Accepts `.xml`, `.config`, `.nuspec`, `.resx`, `.runsettings`, `.ruleset`, `.xsd`, `.xsl`, `.xslt`, " +
             "`.manifest`, `.vsixmanifest`, `.xaml`, `.axaml`, `.wxs` and `.wxi`, with or without the dot. Files with " +
             "these extensions are formatted as generic XML, so whitespace in element-only content may be re-indented.",
+        ["xml_max_blank_lines_between_tags"] =
+            "Applies from any section, `[*]` included, since its name says it is XML's. The core keys do not: XML reads " +
+            "them only from sections that name its files.",
         ["xml_space_before_self_closing"] =
             "Unset, each tag keeps whether it had a space, and several spaces become one. Solution files always get " +
             "one, the shape Visual Studio writes.",

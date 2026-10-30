@@ -138,7 +138,7 @@ internal static class FormattingRun
 			// A file given as the target itself never went through the extension filter, and has always
 			// been formatted as C# regardless; the first language keeps it that way.
 			var language = Math.Max(0, languages.IndexOf(files[i]));
-			var options = languages[language].BindOptions(configuration);
+			var options = languages[language].BindOptions(configuration, editorConfig);
 
 			// A file its language declines (XML the repository has not opted into) leaves the run here,
 			// before it is read, hashed or counted.
@@ -150,7 +150,7 @@ internal static class FormattingRun
 				language,
 				options,
 				cache is null ? "" : fileSystem.Path.GetFullPath(files[i]),
-				fingerprinter?.Of(configuration) ?? default));
+				fingerprinter is null ? default : OptionsHash(fingerprinter, configuration, options)));
 		}
 
 		var work = claimed.ToArray();
@@ -165,6 +165,10 @@ internal static class FormattingRun
 		long printedTokens = 0;
 		long totalTokens = 0;
 		var reparsed = 0;
+
+		// Files printed by a language with no printer coverage and no second parse (XML), kept out of
+		// both figures.
+		var uncovered = 0;
 		var unhandled = new Dictionary<(int Language, int Kind), int>();
 
 		// Per language, for the breakdown printed once more than one language ran.
@@ -238,6 +242,9 @@ internal static class FormattingRun
 				// Parallel.ForEachAsync, which would abort every file still queued behind it on the
 				// strength of one the printer was never meant to survive. The file is reported and,
 				// because the catch sits before any write, left exactly as it was found.
+				if (!item.Options.ReportsCoverage)
+					Interlocked.Increment(ref uncovered);
+
 				try
 				{
 					var hadBom = item.Bytes.Length >= 3 && item.Bytes[0] == 0xEF && item.Bytes[1] == 0xBB && item.Bytes[2] == 0xBF;
@@ -249,6 +256,7 @@ internal static class FormattingRun
 					catch (DecoderFallbackException)
 					{
 						Interlocked.Increment(ref unparsable);
+						Interlocked.Increment(ref tallies[item.Language].Unparsable);
 						messages.Add($"{item.Path}: is not valid UTF-8 — left unchanged");
 						return ValueTask.CompletedTask;
 					}
@@ -328,10 +336,14 @@ internal static class FormattingRun
 							break;
 					}
 
-					// Coverage is reported per run so that printer progress is visible as a number.
-					var tokens = result.Coverage;
-					Interlocked.Add(ref printedTokens, (long)(tokens * 1000));
-					Interlocked.Increment(ref totalTokens);
+					// Coverage is reported per run so that printer progress is visible as a number. Only a
+					// language that has printers to cover counts towards it.
+					if (item.Options.ReportsCoverage)
+					{
+						var tokens = result.Coverage;
+						Interlocked.Add(ref printedTokens, (long)(tokens * 1000));
+						Interlocked.Increment(ref totalTokens);
+					}
 				}
 				catch (Exception exception)
 				{
@@ -389,10 +401,12 @@ internal static class FormattingRun
 
 		var coverage = totalTokens == 0 ? 1 : printedTokens / (double)totalTokens / 1000;
 
+		// Coverage is a C# figure. A run that printed only XML has none to report, rather than a
+		// vacuous 100 %; a run that printed nothing at all keeps the line it always had.
+		var coverageText = totalTokens == 0 && uncovered > 0 ? "" : string.Create(CultureInfo.InvariantCulture, $", printer coverage {coverage:P1}");
 		Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
 			$"{(write ? "Formatted" : "Checked")} {files.Length} file(s){CachedText(cached)} in {stopwatch.ElapsedMilliseconds}ms — "
-			+ $"{changed} {(write ? "changed" : "would change")}, {SkippedText(skipped)}{failed} failed, {unparsable} unparsable, "
-			+ $"printer coverage {coverage:P1}"));
+			+ $"{changed} {(write ? "changed" : "would change")}, {SkippedText(skipped)}{failed} failed, {unparsable} unparsable{coverageText}"));
 
 		// Only once a second language ran, so a C#-only run prints exactly what it always has.
 		foreach (var item in work)
@@ -431,14 +445,31 @@ internal static class FormattingRun
 			// Out of the files that were printed, not out of every file named. A cache hit never reaches
 			// the printer, so counting it in the denominator would report a proportion of a population
 			// that was never at risk.
-			var printed = files.Length - cached;
-			Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
-				$"  round-trip verified {reparsed} of {printed} file(s) "
-				+ $"({reparsed / (double)Math.Max(1, printed):P1} needed a second parse)"));
+			//
+			// XML is left out too: every XML output is re-lexed and verified, which is not a second parse.
+			var printed = files.Length - cached - uncovered;
+			if (printed > 0 || uncovered == 0)
+			{
+				Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
+					$"  round-trip verified {reparsed} of {printed} file(s) "
+					+ $"({reparsed / (double)Math.Max(1, printed):P1} needed a second parse)"));
+			}
 		}
 
 		var exitCode = failed > 0 ? 3 : !write && changed > 0 ? 1 : 0;
 		return new FormattingRunSummary(files.Length, changed, cached, skipped, failed, unparsable, reparsed, coverage, exitCode);
+	}
+
+	/// <summary>
+	/// The cache key's options half: the file's merged settings, and whatever else its language bound
+	/// from.
+	/// </summary>
+	private static UInt128 OptionsHash(OptionsFingerprinter fingerprinter, global::EditorConfig.Core.FileConfiguration configuration, LanguageOptions options)
+	{
+		var hash = fingerprinter.Of(configuration);
+		if (options.AdditionalProperties is { } additional)
+			hash = (hash * 1_000_003) ^ Fingerprint.OfProperties(additional);
+		return hash;
 	}
 
 	/// <summary>

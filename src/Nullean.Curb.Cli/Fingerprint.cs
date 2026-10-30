@@ -54,9 +54,11 @@ internal static class Fingerprint
 	/// files silently.
 	/// </para>
 	/// </remarks>
-	internal static UInt128 OfOptions(FileConfiguration configuration)
+	internal static UInt128 OfOptions(FileConfiguration configuration) => OfProperties(configuration.Properties);
+
+	/// <summary>Hashes a set of settings, in key order.</summary>
+	internal static UInt128 OfProperties(IReadOnlyDictionary<string, string> properties)
 	{
-		var properties = configuration.Properties;
 		var count = properties.Count;
 
 		// Sorted, because a dictionary hands its keys back in whatever order it happens to hold them and

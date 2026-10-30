@@ -109,6 +109,12 @@ public readonly record struct XmlOptions
 	/// <summary>True when <c>insert_final_newline</c> was written down; otherwise the file keeps what it had.</summary>
 	public bool FinalNewLineSet { get; init; }
 
+	/// <summary>
+	/// True when <c>trim_trailing_whitespace</c> was written down for XML; otherwise trailing whitespace
+	/// on the lines the printer lays out is kept.
+	/// </summary>
+	public bool TrimTrailingWhitespaceSet { get; init; }
+
 	/// <summary>The configuration asked for the file not to be formatted at all: <c>generated_code = true</c>.</summary>
 	public bool Excluded { get; init; }
 

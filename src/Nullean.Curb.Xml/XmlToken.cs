@@ -66,6 +66,13 @@ internal enum XmlTokenFlags : byte
 	/// <c>xml:space="preserve"</c>, or between the document's top-level nodes. Set by the tree.
 	/// </summary>
 	Layout = 1 << 2,
+
+	/// <summary>
+	/// Layout whitespace between the document's top-level nodes, which the printer may drop outright:
+	/// before the root, insert_final_newline owns the end. Inside an element layout whitespace may be
+	/// rewritten but never removed.
+	/// </summary>
+	Droppable = 1 << 3,
 }
 
 /// <summary>One lexeme of an XML document.</summary>

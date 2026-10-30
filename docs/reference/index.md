@@ -159,7 +159,7 @@ Use the filter above to search by name. Each group below links to its own index.
 
 ## XML: Files
 
-Which XML files Curb formats. Project, props, targets, solution and `nuget.config` files are formatted by default; set `curb_xml_format = false` to leave them alone, and name other XML extensions in `curb_xml_extensions` to opt them in. The `curb` MSBuild package never formats XML, only `curb format` and `curb check` do. The core keys apply to XML too, with a two-space indent when `indent_size` is unset.
+Which XML files Curb formats. Project, props, targets, solution and `nuget.config` files are formatted by default; set `curb_xml_format = false` to leave them alone, and name other XML extensions in `curb_xml_extensions` to opt them in. The `curb` MSBuild package never formats XML, only `curb format` and `curb check` do. The core keys apply to XML only from sections that name its files, such as `[*.csproj]` or `[Directory.Packages.props]`; `[*]`, `[**]` and `[*.*]` are ignored for them. Without such a section XML indents by two, has no width, and keeps each file's own line endings, final newline and trailing whitespace. The `curb_xml_*` and `xml_*` keys apply from any section.
 
 - [curb_xml_format](xml/files/curb_xml_format.md) — Format project, props, targets, solution and nuget.config files. false leaves them unread.
 - [curb_xml_extensions](xml/files/curb_xml_extensions.md) — Further extensions to format as generic XML, comma-separated, such as .xml or .runsettings.

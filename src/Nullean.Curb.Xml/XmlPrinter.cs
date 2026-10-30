@@ -43,6 +43,9 @@ internal ref struct XmlPrinter
 	/// <summary>The anchor register a start tag captures how far its line moved into.</summary>
 	private const int ShiftRegister = 1;
 
+	/// <summary>The anchor register a pinned element captures its line's indent into, for its children.</summary>
+	private const int PinRegister = 2;
+
 	private readonly ReadOnlySpan<char> _source;
 	private readonly XmlTokenBuffer _tokens;
 	private readonly XmlTree _tree;
@@ -52,6 +55,7 @@ internal ref struct XmlPrinter
 	private readonly AttributeIndent _attributeIndent;
 	private readonly bool _width;
 	private readonly int _tabWidth;
+	private readonly bool _trim;
 
 	private XmlPrinter(ReadOnlySpan<char> source, XmlTokenBuffer tokens, XmlTree tree, DocArena arena, in XmlOptions options, in LayoutOptions layout)
 	{
@@ -64,6 +68,7 @@ internal ref struct XmlPrinter
 		_attributeIndent = options.AttributeIndent;
 		_width = layout.MaxLineLength != LayoutOptions.Off;
 		_tabWidth = Math.Max(1, layout.TabWidth);
+		_trim = layout.TrimTrailingWhitespace;
 	}
 
 	public static void Print(ReadOnlySpan<char> source, XmlTokenBuffer tokens, XmlTree tree, DocArena arena, in XmlOptions options, in LayoutOptions layout)
@@ -87,7 +92,7 @@ internal ref struct XmlPrinter
 			// Whitespace before the first node and after the last is dropped: insert_final_newline owns
 			// the end of the file, and nothing may precede an XML declaration.
 			if (child != document.FirstChild && child != document.LastChild)
-				LayoutWhitespace(_tokens[_tree[child].FirstToken]);
+				LayoutWhitespace(_tokens[_tree[child].FirstToken], LinePinned(_tree[child].NextSibling));
 		}
 	}
 
@@ -115,6 +120,21 @@ internal ref struct XmlPrinter
 			return;
 		}
 
+		// An element whose start tag stayed where it was, because an attribute value spans lines, lays
+		// its children out from its own column rather than from its depth.
+		if (IsPinned(element))
+		{
+			_arena.SourceLineAnchor(PinRegister, _tokens[node.FirstToken].Start);
+			using (_arena.AlignedIndent(PinRegister, 0))
+				PrintContent(node);
+			return;
+		}
+
+		PrintContent(node);
+	}
+
+	private readonly void PrintContent(in XmlNode node)
+	{
 		var last = node.LastChild;
 		var trailing = _tree[last].Kind == XmlNodeKind.Text;
 
@@ -126,7 +146,7 @@ internal ref struct XmlPrinter
 					break;
 
 				if (_tree[child].Kind == XmlNodeKind.Text)
-					LayoutWhitespace(_tokens[_tree[child].FirstToken]);
+					LayoutWhitespace(_tokens[_tree[child].FirstToken], LinePinned(_tree[child].NextSibling));
 				else
 					PrintNode(child);
 			}
@@ -134,9 +154,52 @@ internal ref struct XmlPrinter
 
 		// The whitespace before the end tag breaks to the element's own level, not its children's.
 		if (trailing)
-			LayoutWhitespace(_tokens[_tree[last].FirstToken]);
+			LayoutWhitespace(_tokens[_tree[last].FirstToken], pinned: false);
 
 		Verbatim(_tokens[node.LastToken]);
+	}
+
+	/// <summary>
+	/// A node whose own text spans lines the printer cannot move: verbatim content, a multi-line
+	/// comment, an attribute value with a line break in it.
+	/// </summary>
+	/// <remarks>
+	/// Moving its first line alone would strand the rest, end tag included, at their old columns. So
+	/// its whole line keeps the columns it had.
+	/// </remarks>
+	private readonly bool IsPinned(int index)
+	{
+		var node = _tree[index];
+		switch (node.Kind)
+		{
+			case XmlNodeKind.Element:
+				if (node.Is(XmlNodeFlags.MultiLineAttribute))
+					return true;
+				if (node.Is(XmlNodeFlags.SelfClosing) || node.Is(XmlNodeFlags.Relayable))
+					return false;
+				var start = _tokens[node.TagClose].End;
+				return _source[start.._tokens[node.LastToken].End].IndexOfAny('\r', '\n') >= 0;
+
+			case XmlNodeKind.Text:
+				return false;
+
+			default:
+				return _tokens[node.FirstToken].Is(XmlTokenFlags.HasNewLine);
+		}
+	}
+
+	/// <summary>True when a node on the line that starts with <paramref name="first"/> is pinned.</summary>
+	private readonly bool LinePinned(int first)
+	{
+		for (var node = first; node >= 0; node = _tree[node].NextSibling)
+		{
+			if (_tree[node].Kind == XmlNodeKind.Text && _tokens[_tree[node].FirstToken].Is(XmlTokenFlags.HasNewLine))
+				return false;
+			if (IsPinned(node))
+				return true;
+		}
+
+		return false;
 	}
 
 	/// <summary>
@@ -147,7 +210,7 @@ internal ref struct XmlPrinter
 	/// Whitespace with no line break in it stays exactly as written. A break is never added where the
 	/// author had none, so <c>&lt;a/&gt;&lt;b/&gt;</c> stays on one line.
 	/// </remarks>
-	private readonly void LayoutWhitespace(in XmlToken token)
+	private readonly void LayoutWhitespace(in XmlToken token, bool pinned)
 	{
 		var text = _source.Slice(token.Start, token.Length);
 		var lines = 0;
@@ -163,9 +226,49 @@ internal ref struct XmlPrinter
 			return;
 		}
 
-		for (var blank = Math.Min(lines - 1, _maxBlankLines); blank > 0; blank--)
-			_arena.LiteralLine();
-		_arena.HardLine();
+		// The runs between the line breaks: the first ends the line before, the middle ones are blank
+		// lines, the last is the indent of the line after. Blank lines beyond the cap go, and with them
+		// their whitespace; the ones kept are the last ones.
+		var keep = Math.Min(lines - 1, _maxBlankLines);
+		var run = 0;
+		for (var segment = 0; segment <= lines; segment++)
+		{
+			var end = NextLineBreak(text, run);
+			var kept = segment == 0 || segment > lines - 1 - keep;
+
+			if (segment == lines)
+			{
+				// The indent of the next line: the printer's own, or the source's on a pinned line.
+				if (pinned)
+				{
+					_arena.LiteralLine();
+					if (end > run)
+						_arena.SourceText(token.Start + run, end - run);
+				}
+				else
+					_arena.HardLine();
+				break;
+			}
+
+			if (kept)
+			{
+				// A blank line kept is a line break written before it.
+				if (segment > 0)
+					_arena.LiteralLine();
+
+				// Trailing whitespace stays unless trim_trailing_whitespace was asked for, for XML.
+				if (!_trim && end > run)
+					_arena.SourceText(token.Start + run, end - run);
+			}
+
+			run = end + (text[end] == '\r' && end + 1 < text.Length && text[end + 1] == '\n' ? 2 : 1);
+		}
+	}
+
+	private static int NextLineBreak(ReadOnlySpan<char> text, int from)
+	{
+		var at = text[from..].IndexOfAny('\r', '\n');
+		return at < 0 ? text.Length : from + at;
 	}
 
 	private readonly void PrintStartTag(in XmlNode node)

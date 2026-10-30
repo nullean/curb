@@ -17,6 +17,8 @@ The most blank lines kept between two tags of element-only content.
 
 **Default:** `1`
 
+Applies from any section, `[*]` included, since its name says it is XML's. The core keys do not: XML reads them only from sections that name its files.
+
 ### `xml_max_blank_lines_between_tags = 0`
 
 ```ini
@@ -50,7 +52,7 @@ xml_max_blank_lines_between_tags = 0
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
-    <Description>
+        <Description>
           Kept exactly as written: MSBuild reads this whitespace.
         </Description>
   </PropertyGroup>
