@@ -357,7 +357,9 @@ let private perf (arguments:ParseResults<Arguments>) =
 ///
 /// A third build covers the cache, which is the other half of the incrementality story and the half
 /// nothing else would catch.
-let private msbuildSmoketest (arguments:ParseResults<Arguments>) =
+/// Publishes the native binary for this machine and returns its path, for the smoke tests to point
+/// Curb_Exe at.
+let private publishNativeCurb () =
     let rid =
         let os =
             if OperatingSystem.IsWindows() then "win"
@@ -372,9 +374,11 @@ let private msbuildSmoketest (arguments:ParseResults<Arguments>) =
 
     exec "dotnet" ["publish"; "src/Nullean.Curb.Cli"; "-c"; "Release"; "-r"; rid] |> ignore
 
-    let binary =
-        let name = if OperatingSystem.IsWindows() then "curb.exe" else "curb"
-        Path.GetFullPath(Path.Combine(".artifacts", "publish", "Nullean.Curb.Cli", sprintf "release_%s" rid, name))
+    let name = if OperatingSystem.IsWindows() then "curb.exe" else "curb"
+    Path.GetFullPath(Path.Combine(".artifacts", "publish", "Nullean.Curb.Cli", sprintf "release_%s" rid, name))
+
+let private msbuildSmoketest (arguments:ParseResults<Arguments>) =
+    let binary = publishNativeCurb ()
 
     let sample = Path.Combine("examples", "curb-msbuild-smoketest")
     let source = Path.Combine(sample, "Program.cs")
@@ -421,6 +425,79 @@ let private msbuildSmoketest (arguments:ParseResults<Arguments>) =
     File.Copy(pristine, source, true)
     printfn ""
     printfn "MSBuild integration verified: formatted before CoreCompile, cached on the way back, and IDE0055 fails without it"
+
+/// The F# half of the MSBuild smoke test. There is no IDE0055 for F#, so the two directions are read off the
+/// file itself: built with Curb, Program.fs comes out as Fantomas formats it; built with Curb bypassed, it
+/// stays as it was. Between them, a build where nothing changed must skip the target outright (so no
+/// Fantomas starts), a build after one file changed must serve the other from the cache, and a checking build
+/// must fail with CURB0001.
+///
+/// Needs the Fantomas the sample's manifest pins. `dotnet tool restore` fetches it; where that is not
+/// possible (offline, no feed) the test says so and stops, except on CI, where it fails.
+let private fsharpSmoketest (_: ParseResults<Arguments>) =
+    let sample = Path.Combine("examples", "curb-msbuild-smoketest-fsharp")
+    let source = Path.Combine(sample, "Program.fs")
+    let pristine = Path.Combine(sample, "Program.unformatted")
+
+    let restored =
+        let manifest = Path.Combine(sample, ".config", "dotnet-tools.json")
+        let result = Proc.Start("dotnet", [| "tool"; "restore"; "--tool-manifest"; manifest |])
+        result.ExitCode = 0
+
+    if not restored then
+        if Environment.GetEnvironmentVariable "CI" = "true" then
+            failwith "dotnet tool restore failed for the F# smoke test's Fantomas"
+        printfn "SKIPPED: the F# smoke test needs Fantomas, and `dotnet tool restore` in %s could not fetch it" sample
+    else
+
+    let binary = publishNativeCurb ()
+
+    let build (restore: bool) (extra: string list) =
+        if restore then
+            File.Copy(pristine, source, true)
+            File.SetLastWriteTimeUtc(source, DateTime.UtcNow)
+        let args = ["build"; sample; "-c"; "Debug"; "--nologo"; "-v:n"] @ extra
+        let result = Proc.Start("dotnet", List.toArray args)
+        let output = result.ConsoleOut |> Seq.map (fun l -> l.Line) |> String.concat "\n"
+        result.ExitCode, output
+
+    let formatted =
+        "module Program\n\nlet run (x: int) = if x > 0 then Stable.double x else 0\n\n[<EntryPoint>]\nlet main _ =\n    run 1 |> ignore\n    0\n"
+
+    let withCurb = [sprintf "-p:Curb_Exe=%s" binary; "-p:Curb_LogLevel=high"]
+
+    printfn "building the F# sample with Curb"
+    let code, output = build true withCurb
+    if code <> 0 then failwithf "the F# sample must build with Curb, but it failed:\n%s" output
+    if File.ReadAllText(source) <> formatted then
+        failwithf "Curb did not format Program.fs through Fantomas before the compiler read it:\n%s\n--- build output ---\n%s" (File.ReadAllText source) output
+
+    printfn "building again with nothing changed, to prove the target is skipped and no Fantomas starts"
+    let code, output = build false withCurb
+    if code <> 0 then failwithf "the unchanged F# sample must build, but it failed:\n%s" output
+    if not (output.Contains "Skipping target \"CurbFSharp\"") || output.Contains "fsharp:" || output.Contains "Formatted " then
+        failwithf "expected the CurbFSharp target to be skipped as up to date:\n%s" output
+
+    printfn "building after one file changed, to prove the cache serves the other"
+    let code, output = build true withCurb
+    if code <> 0 then failwithf "the F# sample must build a third time, but it failed:\n%s" output
+    if not (output.Contains "(1 from cache)") then
+        failwithf "expected exactly one F# file from the cache on the third build, got:\n%s" output
+
+    printfn "checking the misformatted sample, which must fail with CURB0001"
+    let code, output = build true (withCurb @ ["-p:Curb_Check=true"])
+    if code = 0 || not (output.Contains "CURB0001") || not (output.Contains "Program.fs") then
+        failwithf "expected CURB0001 on Program.fs from a checking build:\n%s" output
+
+    printfn "building with Curb bypassed, which must leave the file alone"
+    let code, output = build true ["-p:Curb_Bypass=true"]
+    if code <> 0 then failwithf "the F# sample must build without Curb, but it failed:\n%s" output
+    if File.ReadAllText(source) <> File.ReadAllText(pristine) then
+        failwith "Program.fs changed with Curb bypassed, so the first build proves nothing"
+
+    File.Copy(pristine, source, true)
+    printfn ""
+    printfn "F# MSBuild integration verified: formatted through Fantomas, skipped when unchanged, cached, checked, and untouched when bypassed"
 
 /// Cleans a corpus that really builds, then requires that it still builds and that dotnet format style has
 /// nothing left to say about the rules Curb owns.
@@ -2389,6 +2466,7 @@ let Setup (parsed:ParseResults<Arguments>) (subCommand:Arguments) =
     cmd Compare.Name (Some [Build.Name]) None <| fun _ -> compare parsed
     cmd Options.Name (Some [Build.Name]) None <| fun _ -> options parsed
     cmd MsbuildSmoketest.Name (Some [Build.Name]) None <| fun _ -> msbuildSmoketest parsed
+    cmd FsharpSmoketest.Name (Some [Build.Name]) None <| fun _ -> fsharpSmoketest parsed
     cmd CleanupSmoketest.Name (Some [Build.Name]) None <| fun _ -> cleanupSmoketest parsed
     cmd CleanupSafety.Name (Some [Build.Name]) None <| fun _ -> cleanupSafety parsed
     cmd CleanupConformance.Name (Some [Build.Name]) None <| fun _ -> cleanupConformance parsed
