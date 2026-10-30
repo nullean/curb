@@ -33,7 +33,7 @@ So ~97% of a formatter's cost is its own work, not parsing. Optimise the printer
 
 ## Current state
 
-M0–M5 are done; see the milestone table in [README.md](README.md) for the caveats. The formatter works
+M0–M5 are done; [docs/known-limitations.md](docs/known-limitations.md) lists what is still wrong. The formatter works
 end to end: arena, printer, verifier, CLI, MSBuild integration, and ~90 `.editorconfig` keys — all 39
 IDE0055 formatting options, the 8 core keys, and 43 further syntax-style, wrapping and blank-line
 options. Native AOT on five RIDs, ~11 MB with ~10 ms startup.
@@ -41,8 +41,9 @@ options. Native AOT on five RIDs, ~11 MB with ~10 ms startup.
 CI gates conformance on every push: byte-identical to `dotnet format whitespace` with reflow off (100%),
 99.9% with reflow on, zero failed or unparsable files across a 1,196-file corpus.
 
-Still open: redundant parentheses (IDE0047/0048), the option-catalog generator that will produce
-`docs/options.md`, and replacing the hand-rolled CLI parser with `Nullean.Argh`.
+Redundant parentheses (IDE0047/0048) were declined (#18). The CLI runs on `Nullean.Argh`, and
+`tools/Nullean.Curb.OptionDocs` generates `docs/reference/` from the option catalog (`./build.sh options`, checked in CI).
+Next on the roadmap: formatting MSBuild/XML project files, F# through Fantomas, and the C# inside Razor `@code` blocks.
 
 ## Public documentation
 
