@@ -55,6 +55,17 @@ internal static partial class Printers
 			return;
 		}
 
+		// One that starts on the header's line and continues below it stays there too, as dotnet format
+		// leaves `if (a) Register(` then `value);`; it was moved onto a line of its own with its
+		// continuation lines after it (issue #145). Not forced flat: its own breaks are laid out as they
+		// would be from a line of its own, which is the line it shares.
+		if (context.Options.PreserveSingleLineStatements && context.AuthorJoined(headerEnd, statement.SpanStart))
+		{
+			SpaceBeforeBody(statement, context);
+			Node.Print(statement, context);
+			return;
+		}
+
 		using (arena.Indent())
 		{
 			arena.HardLine();

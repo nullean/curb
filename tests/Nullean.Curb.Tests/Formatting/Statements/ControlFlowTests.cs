@@ -66,6 +66,65 @@ public class ControlFlowTests : FormattingTest
 		""",
 		editorConfig: "csharp_preserve_single_line_statements = false");
 
+	/// <summary>
+	/// A statement that starts on its header's line and continues below it stays on that line. See
+	/// <see href="https://github.com/nullean/curb/issues/145">issue #145</see>.
+	/// </summary>
+	[Test]
+	public Task A_multi_line_statement_on_its_header_line_stays_there() => Unchanged(
+		"""
+		public class C
+		{
+		    public int M(bool enabled, bool ready, int[] items)
+		    {
+		        if (enabled) Register(
+		            1);
+		        if (enabled) Run();
+		        while (enabled) Register(
+		            2);
+		        if (enabled) Run();
+		        else Register(
+		            3);
+		        foreach (var item in items) Register(
+		            item);
+		        if (enabled) if (ready)
+		            Run();
+		        if (enabled) return Compute(
+		            4);
+		        return 0;
+		    }
+		}
+		""");
+
+	/// <summary>
+	/// The <c>else</c> after one still takes its own line: the <c>if</c> is no longer a single-line
+	/// statement, so there is nothing to keep it on.
+	/// </summary>
+	[Test]
+	public Task An_else_after_a_multi_line_statement_on_its_header_line_takes_its_own_line() => Formats(
+		"""
+		public class C
+		{
+		    public void M(bool enabled)
+		    {
+		        if (enabled) Register(
+		            1); else Run();
+		    }
+		}
+		""",
+		// Checked against dotnet format, which writes exactly this.
+		"""
+		public class C
+		{
+		    public void M(bool enabled)
+		    {
+		        if (enabled) Register(
+		            1);
+		        else Run();
+		    }
+		}
+		""");
+
 	[Test]
 	public Task Space_after_the_if_keyword() => Formats(
 		"""
