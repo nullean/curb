@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using Nullean.Curb;
 using Nullean.Curb.Options;
+using Nullean.Curb.Razor;
 using Nullean.Curb.Xml;
 
 namespace Nullean.Curb.OptionDocs;
@@ -43,6 +44,7 @@ internal static class Program
         [OptionGroup.Suppression] = "suppression",
         [OptionGroup.XmlFiles] = "xml-files",
         [OptionGroup.XmlLayout] = "xml-layout",
+        [OptionGroup.Razor] = "razor",
     };
 
     /// <summary>
@@ -53,6 +55,7 @@ internal static class Program
     {
         OptionGroup.XmlFiles => "files",
         OptionGroup.XmlLayout => "layout",
+        OptionGroup.Razor => "code-blocks",
         _ => GroupSlugs[group],
     };
 
@@ -71,6 +74,7 @@ internal static class Program
         [OptionGroup.Suppression] = "Suppression",
         [OptionGroup.XmlFiles] = "XML: Files",
         [OptionGroup.XmlLayout] = "XML: Layout",
+        [OptionGroup.Razor] = "Razor (experimental)",
     };
 
     private static readonly Dictionary<OptionGroup, string> GroupDescriptions = new()
@@ -121,6 +125,12 @@ internal static class Program
             "How Curb lays XML out. It keeps the author's layout: it re-indents the lines that start a child element, caps " +
             "blank lines, and tidies the whitespace inside start tags. Text, comments, CDATA, attribute values and anything " +
             "MSBuild reads as a value are never changed.",
+        [OptionGroup.Razor] =
+            "Experimental and off by default. Curb can format the C# inside `@code` and `@functions` blocks of `.razor` and " +
+            "`.cshtml` files and leave every other byte of the file as it is. Turn it on with " +
+            "`curb_razor_format_code_blocks = true` in a section that names those files, such as `[*.{razor,cshtml}]`; " +
+            "`[*]` does not count. The C# style comes from the same keys as a `.cs` file's, so a `[*.{cs,razor,cshtml}]` " +
+            "section gives both the same style. See [Razor](../workflow/razor.md).",
     };
 
     /// <summary>One documented case where an option's chosen shape is not a fixed point of a tool.</summary>
@@ -184,14 +194,22 @@ internal static class Program
             var dir = Path.Combine(LanguageRoot(outputRoot, descriptor.Language), GroupDirectory(descriptor.Group));
             Directory.CreateDirectory(dir);
 
-            var snippets = descriptor.Language == OptionLanguage.Xml ? Snippets.Xml : Snippets.All;
+            var snippets = descriptor.Language switch
+            {
+                OptionLanguage.Xml => Snippets.Xml,
+                OptionLanguage.Razor => Snippets.Razor,
+                _ => Snippets.All,
+            };
             var snippet = snippets.TryGetValue(descriptor.SnippetKey, out var s)
                 ? s
                 : throw new InvalidOperationException($"Missing snippet '{descriptor.SnippetKey}' for key '{descriptor.Key}'");
 
-            var page = descriptor.Language == OptionLanguage.Xml
-                ? BuildXmlPage(descriptor, snippet, xmlFormatter)
-                : BuildPage(descriptor, snippet, formatter, defaultOptions, divergences[descriptor.Key]);
+            var page = descriptor.Language switch
+            {
+                OptionLanguage.Xml => BuildXmlPage(descriptor, snippet, xmlFormatter),
+                OptionLanguage.Razor => BuildRazorPage(descriptor, snippet),
+                _ => BuildPage(descriptor, snippet, formatter, defaultOptions, divergences[descriptor.Key]),
+            };
             var path = Path.Combine(dir, descriptor.Key + ".md");
             File.WriteAllText(path, page, Encoding.UTF8);
             Console.WriteLine($"  {Path.GetRelativePath(root, path)}");
@@ -428,6 +446,57 @@ internal static class Program
             }
 
             EmitValueSection(sb, descriptor.Key, value, snippet, after, "xml");
+        }
+
+        return sb.ToString();
+    }
+
+    /// <summary>
+    /// A Razor key's page: what the key does, where it has to go, and a component before and after. Like
+    /// XML there is no reference formatter, so no conformance section.
+    /// </summary>
+    private static string BuildRazorPage(OptionDescriptor descriptor, string snippet)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("---");
+        sb.AppendLine($"listing: {GroupSlugs[descriptor.Group]}");
+        sb.AppendLine($"description: \"{descriptor.Summary} Defaults to `{descriptor.Default}`\"");
+        sb.AppendLine("---");
+        sb.AppendLine();
+        sb.AppendLine(GroupedHeader);
+        sb.AppendLine();
+        sb.AppendLine($"# `{descriptor.Key}`");
+        sb.AppendLine();
+        sb.AppendLine(descriptor.Summary);
+        sb.AppendLine();
+        sb.AppendLine("## Values");
+        sb.AppendLine();
+        sb.AppendLine("| Value | Notes |");
+        sb.AppendLine("|---|---|");
+        foreach (var v in descriptor.Values)
+            sb.AppendLine($"| `{v}` | |");
+        sb.AppendLine();
+        sb.AppendLine($"**Default:** `{descriptor.Default}`");
+        sb.AppendLine();
+        if (Snippets.RazorNotes.TryGetValue(descriptor.Key, out var note))
+        {
+            sb.AppendLine(note);
+            sb.AppendLine();
+        }
+
+        using var razor = new RazorFormatter();
+        foreach (var value in descriptor.Values)
+        {
+            var after = snippet;
+            if (value == "true")
+            {
+                var result = razor.Format(snippet, new FormatOptions { EndOfLine = EndOfLine.Lf });
+                if (!result.Success || result.Declined > 0)
+                    throw new InvalidOperationException($"the {descriptor.Key} = {value} example does not format: {result.Message}");
+                after = result.Text!;
+            }
+
+            EmitValueSection(sb, descriptor.Key, value, snippet, after, "html");
         }
 
         return sb.ToString();

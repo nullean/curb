@@ -1562,6 +1562,39 @@ public static class Snippets
             """,
     };
 
+    /// <summary>Razor fixtures for the Razor key's examples.</summary>
+    public static IReadOnlyDictionary<string, string> Razor { get; } = new Dictionary<string, string>
+    {
+        ["razor_component"] = """
+            @page "/counter"
+
+            <h1>Counter</h1>
+            <p role="status">Current count:   @currentCount</p>
+            <button class="btn" @onclick="IncrementCount">Click me</button>
+
+            @code {
+              private int currentCount=0;
+
+                  private void IncrementCount()
+              {
+                currentCount+=1;
+              }
+            }
+
+            """,
+    };
+
+    /// <summary>A paragraph for a Razor key's page.</summary>
+    public static IReadOnlyDictionary<string, string> RazorNotes { get; } = new Dictionary<string, string>
+    {
+        ["curb_razor_format_code_blocks"] =
+            "Experimental. It has to be set in a section whose glob names Razor files, and `[*]`, `[**]` and `[*.*]` do not " +
+            "count, so a catch-all section cannot turn it on by accident:\n\n```ini\n[*.{razor,cshtml}]\n" +
+            "curb_razor_format_code_blocks = true\n```\n\nWithout it, Curb never reads a `.razor` or `.cshtml` file. With it, " +
+            "only the C# inside `@code` and `@functions` blocks changes: markup, `@{ }` blocks and expressions are never " +
+            "touched, and a block that holds Razor markup is left as written. See [Razor](../../../workflow/razor.md).",
+    };
+
     /// <summary>A paragraph for an XML key's page, where the values alone do not say enough.</summary>
     public static IReadOnlyDictionary<string, string> XmlNotes { get; } = new Dictionary<string, string>
     {

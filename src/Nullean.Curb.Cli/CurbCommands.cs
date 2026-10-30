@@ -32,8 +32,9 @@ internal sealed class CurbCommands
 	/// <param name="cache">-c, --cache, Skip files a previous run watched format to themselves.</param>
 	/// <param name="noVerify">Skip re-parsing output to prove the token stream is unchanged.</param>
 	/// <param name="language">
-	/// Only this language: <c>csharp</c>, <c>xml</c> or <c>fsharp</c>. What the MSBuild integration's F#
-	/// target passes, so a project's compile set reaches only the formatter for its language.
+	/// Only this language: <c>csharp</c>, <c>xml</c>, <c>fsharp</c> or <c>razor</c>. What the MSBuild
+	/// integration's F# target passes, so a project's compile set reaches only the formatter for its
+	/// language. <c>razor</c> still formats only files whose <c>.editorconfig</c> opts in.
 	/// </param>
 	public int Format(
 		[Argument] string path = ".",
@@ -65,8 +66,9 @@ internal sealed class CurbCommands
 	/// back to attach CURB0001 to each unformatted file instead of to the project.
 	/// </param>
 	/// <param name="language">
-	/// Only this language: <c>csharp</c>, <c>xml</c> or <c>fsharp</c>. What the MSBuild integration's F#
-	/// target passes, so a project's compile set reaches only the formatter for its language.
+	/// Only this language: <c>csharp</c>, <c>xml</c>, <c>fsharp</c> or <c>razor</c>. What the MSBuild
+	/// integration's F# target passes, so a project's compile set reaches only the formatter for its
+	/// language. <c>razor</c> still formats only files whose <c>.editorconfig</c> opts in.
 	/// </param>
 	public int Check(
 		[Argument] string path = ".",
@@ -308,8 +310,10 @@ internal sealed class CurbCommands
 				return new LanguageRegistry(Languages.Xml.XmlLanguage.Instance);
 			case "fsharp":
 				return LanguageRegistry.FSharpOnly(_fileSystem);
+			case "razor":
+				return LanguageRegistry.RazorOnly;
 			default:
-				Console.Error.WriteLine($"--language: '{language}' is not one of csharp, xml, fsharp");
+				Console.Error.WriteLine($"--language: '{language}' is not one of csharp, xml, fsharp, razor");
 				return null;
 		}
 	}

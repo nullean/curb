@@ -38,6 +38,10 @@ internal static class FormattingRun
 	private static string SkippedText(int skipped) =>
 		skipped == 0 ? "" : string.Create(CultureInfo.InvariantCulture, $"{skipped} skipped, ");
 
+	/// <summary>Renders the blocks a language left as written only when there are some.</summary>
+	private static string DeclinedText(int declined) =>
+		declined == 0 ? "" : string.Create(CultureInfo.InvariantCulture, $", {declined} block(s) left as written");
+
 	/// <summary>
 	/// Renders the cache hits beside the file count rather than among the verdicts, because every figure
 	/// after it — coverage, megabytes of source, the allocation ratio — covers only the files that were
@@ -104,6 +108,10 @@ internal static class FormattingRun
 			: FormattingCache.Load(fileSystem, fileSystem.Path.GetFullPath(cachePath), DateTimeOffset.UtcNow);
 
 		string[] files;
+
+		// The files were named rather than found by a walk: a language declining one says so, below.
+		var named = explicitFiles is not null;
+		var namedDeclined = 0;
 		if (explicitFiles is not null)
 			// The MSBuild integration hands over a project's whole compile set unfiltered — see this
 			// parameter's own doc comment — and a shared Directory.Build.props reaches every project
@@ -113,9 +121,10 @@ internal static class FormattingRun
 		else
 		{
 			var root = fileSystem.Path.GetFullPath(target);
-			files = fileSystem.Directory.Exists(root)
-				? [.. Walk(fileSystem, root, languages).Where(path => IsFormattable(languages, path))]
-				: [root];
+			named = !fileSystem.Directory.Exists(root);
+			files = named
+				? [root]
+				: [.. Walk(fileSystem, root, languages).Where(path => IsFormattable(languages, path))];
 		}
 
 		var editorConfig = new CurbEditorConfig(fileSystem);
@@ -136,11 +145,19 @@ internal static class FormattingRun
 		var fingerprinter = cache is null ? null : new OptionsFingerprinter();
 		for (var i = 0; i < files.Length; i++)
 		{
-			var configuration = editorConfig.For(files[i]);
-
 			// A file given as the target itself never went through the extension filter, and has always
 			// been formatted as C# regardless; the first language keeps it that way.
 			var language = Math.Max(0, languages.IndexOf(files[i]));
+
+			// A language that can tell from the directory's .editorconfig files alone that it declines the
+			// file (Razor nobody opted into) skips resolving the file's own settings too.
+			if (languages[language].DeclinesUnresolved(files[i], editorConfig))
+			{
+				SayNamedDecline(files[i], languages[language]);
+				continue;
+			}
+
+			var configuration = editorConfig.For(files[i]);
 			var options = languages[language].BindOptions(configuration, editorConfig);
 
 			// A file its language declines (XML the repository has not opted into, F# with no Fantomas) leaves
@@ -153,6 +170,8 @@ internal static class FormattingRun
 					declined.TryGetValue((language, reason), out var count);
 					declined[(language, reason)] = count + 1;
 				}
+				else
+					SayNamedDecline(files[i], languages[language]);
 				continue;
 			}
 
@@ -162,6 +181,17 @@ internal static class FormattingRun
 				options,
 				cache is null ? "" : fileSystem.Path.GetFullPath(files[i]),
 				fingerprinter is null ? default : OptionsHash(fingerprinter, configuration, options)));
+		}
+
+		// A file someone named that its language turns down without a reason the run reports (Razor without
+		// the opt-in) gets a line, so naming it is not answered with silence. A walk's files never do.
+		void SayNamedDecline(string path, IFormattingLanguage language)
+		{
+			if (named && language.NamedDeclineReason is { } why)
+			{
+				namedDeclined++;
+				Console.Error.WriteLine($"{path}: skipped — {why}");
+			}
 		}
 
 		var work = claimed.ToArray();
@@ -176,6 +206,7 @@ internal static class FormattingRun
 		long printedTokens = 0;
 		long totalTokens = 0;
 		var reparsed = 0;
+		var blocksDeclined = 0;
 
 		// Files printed by a language with no printer coverage and no second parse (XML), kept out of
 		// both figures.
@@ -408,6 +439,15 @@ internal static class FormattingRun
 						_ => item.HadBom,
 					};
 
+					// Parts of the file the language left as written (Razor's @code blocks) are reported,
+					// and keep the file out of the cache so they are reported again.
+					if (result.Declined > 0)
+					{
+						Interlocked.Add(ref blocksDeclined, result.Declined);
+						Interlocked.Add(ref tallies[item.Language].Declined, result.Declined);
+						messages.Add($"{item.Path}: {result.Message}");
+					}
+
 					if (result.Changed || wantsBom != item.HadBom)
 					{
 						// After the write, not before: a write that throws is caught below and
@@ -422,7 +462,7 @@ internal static class FormattingRun
 						Interlocked.Increment(ref changed);
 						Interlocked.Increment(ref tallies[item.Language].Changed);
 					}
-					else
+					else if (result.Declined == 0)
 					{
 						// The only place anything is recorded, and deliberately not the branch above:
 						// what is remembered is that the formatter was run over these bytes and handed
@@ -510,10 +550,11 @@ internal static class FormattingRun
 			$"{(write ? "Formatted" : "Checked")} {files.Length} file(s){CachedText(cached)} in {stopwatch.ElapsedMilliseconds}ms — "
 			+ $"{changed} {(write ? "changed" : "would change")}, {SkippedText(skipped)}{failed} failed, {unparsable} unparsable{coverageText}"));
 
-		// Only once a second language ran, so a C#-only run prints exactly what it always has.
+		// Only once a second language ran, or a language declined part of a file, so a C#-only run prints
+		// exactly what it always has.
 		foreach (var item in work)
 			tallies[item.Language].Files++;
-		if (tallies.Count(tally => tally.Files > 0) > 1)
+		if (tallies.Count(tally => tally.Files > 0) > 1 || blocksDeclined > 0)
 		{
 			for (var i = 0; i < tallies.Length; i++)
 			{
@@ -521,7 +562,7 @@ internal static class FormattingRun
 					continue;
 				Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
 					$"  {languages[i].Id}: {tallies[i].Files} file(s) — {tallies[i].Changed} {(write ? "changed" : "would change")}, "
-					+ $"{SkippedText(tallies[i].Skipped)}{tallies[i].Failed} failed, {tallies[i].Unparsable} unparsable"));
+					+ $"{SkippedText(tallies[i].Skipped)}{tallies[i].Failed} failed, {tallies[i].Unparsable} unparsable{DeclinedText(tallies[i].Declined)}"));
 			}
 		}
 
@@ -567,7 +608,7 @@ internal static class FormattingRun
 		}
 
 		var exitCode = failed > 0 ? 3 : !write && changed > 0 ? 1 : 0;
-		return new FormattingRunSummary(files.Length, changed, cached, skipped, failed, unparsable, reparsed, coverage, exitCode);
+		return new FormattingRunSummary(files.Length, changed, cached, skipped, failed, unparsable, reparsed, coverage, exitCode, blocksDeclined, namedDeclined);
 	}
 
 	/// <summary>
@@ -651,7 +692,9 @@ internal readonly record struct FormattingRunSummary(
 	int Unparsable,
 	int Reparsed,
 	double Coverage,
-	int ExitCode);
+	int ExitCode,
+	int Declined = 0,
+	int NamedDeclined = 0);
 
 /// <summary>One language's share of a run's outcomes.</summary>
 internal struct LanguageTally
@@ -661,6 +704,9 @@ internal struct LanguageTally
 	public int Skipped;
 	public int Failed;
 	public int Unparsable;
+
+	/// <summary>Parts of files left as written while the rest was formatted: Razor blocks.</summary>
+	public int Declined;
 }
 
 /// <summary>A file read, decoded and past the skip rules, on its way to a formatter and then to <c>Apply</c>.</summary>
