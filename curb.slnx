@@ -18,6 +18,7 @@
   <Folder Name="/src/">
     <Project Path="src/Nullean.Curb.Layout/Nullean.Curb.Layout.csproj" />
     <Project Path="src/Nullean.Curb.Core/Nullean.Curb.Core.csproj" />
+    <Project Path="src/Nullean.Curb.Xml/Nullean.Curb.Xml.csproj" />
     <Project Path="src/Nullean.Curb.Cleanup/Nullean.Curb.Cleanup.csproj" />
     <Project Path="src/Nullean.Curb.EditorConfig/Nullean.Curb.EditorConfig.csproj" />
     <Project Path="src/Nullean.Curb.Cli/Nullean.Curb.Cli.csproj" />
