@@ -69,6 +69,7 @@ internal static class FormattingRun
 	/// name="write"/> is <see langword="true"/>: a format run leaves nothing unformatted to list.
 	/// </param>
 	/// <param name="languages">Which languages the run covers. <see cref="LanguageRegistry.Default"/> when absent.</param>
+	/// <param name="cancellationToken">Stops the tools other languages hand their files to; the files they had not finished fail.</param>
 	public static FormattingRunSummary Execute(
 		IFileSystem fileSystem,
 		string target,
@@ -79,9 +80,10 @@ internal static class FormattingRun
 		string[]? explicitFiles = null,
 		string? cachePath = null,
 		string? unformattedListPath = null,
-		LanguageRegistry? languages = null)
+		LanguageRegistry? languages = null,
+		CancellationToken cancellationToken = default)
 	{
-		languages ??= LanguageRegistry.Default;
+		languages ??= LanguageRegistry.Default(fileSystem);
 
 		// On by default for both commands: the printer tracks whether it actually put a token
 		// boundary at risk, so on code that does not, the second parse never happens.
@@ -130,6 +132,7 @@ internal static class FormattingRun
 		// when there is a cache to key. The path is absolutised for the cache alone, so the messages and
 		// the writes below still say whatever the caller asked for.
 		var claimed = new List<(string Path, int Language, LanguageOptions Options, string CacheKey, UInt128 OptionsHash)>(files.Length);
+		var declined = new Dictionary<(int Language, string Reason), int>();
 		var fingerprinter = cache is null ? null : new OptionsFingerprinter();
 		for (var i = 0; i < files.Length; i++)
 		{
@@ -140,10 +143,18 @@ internal static class FormattingRun
 			var language = Math.Max(0, languages.IndexOf(files[i]));
 			var options = languages[language].BindOptions(configuration, editorConfig);
 
-			// A file its language declines (XML the repository has not opted into) leaves the run here,
-			// before it is read, hashed or counted.
+			// A file its language declines (XML the repository has not opted into, F# with no Fantomas) leaves
+			// the run here, before it is read, hashed or counted. One the repository would want to hear about
+			// is tallied, for a single line at the end.
 			if (!options.Claimed)
+			{
+				if (options.DeclinedReason is { } reason)
+				{
+					declined.TryGetValue((language, reason), out var count);
+					declined[(language, reason)] = count + 1;
+				}
 				continue;
+			}
 
 			claimed.Add((
 				files[i],
@@ -174,6 +185,13 @@ internal static class FormattingRun
 		// Per language, for the breakdown printed once more than one language ran.
 		var tallies = new LanguageTally[languages.Count];
 		var messages = new System.Collections.Concurrent.ConcurrentBag<string>();
+
+		// Files for a language another tool formats, gathered from the workers and handed over in one batch
+		// per language once the in-process files are done.
+		var external = new System.Collections.Concurrent.ConcurrentBag<PendingFile>[languages.Count];
+		for (var i = 0; i < external.Length; i++)
+			external[i] = [];
+		var toolFailures = new List<string>();
 		var unformatted = write || unformattedListPath is null ? null : new System.Collections.Concurrent.ConcurrentBag<string>();
 
 		var allocatedBefore = GC.GetTotalAllocatedBytes(precise: true);
@@ -231,7 +249,7 @@ internal static class FormattingRun
 		// Parallel.ForEachAsync consumes the IAsyncEnumerable produced by ReadAllAsync; it
 		// completes only after the channel is drained and the Writer has been marked complete.
 		Parallel.ForEachAsync(
-			channel.Reader.ReadAllAsync(),
+			channel.Reader.ReadAllAsync(CancellationToken.None),
 			new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount },
 			(item, _) =>
 			{
@@ -273,10 +291,19 @@ internal static class FormattingRun
 						return ValueTask.CompletedTask;
 					}
 
+					var pending = new PendingFile(item.Path, item.Language, item.Options, item.Bytes, hadBom, source, item.CacheKey, item.ContentHash, item.OptionsHash);
+
+					// Another tool's file goes into its batch, already read, decoded and past the skip rules.
+					if (language is IExternalLanguage)
+					{
+						external[item.Language].Add(pending);
+						return ValueTask.CompletedTask;
+					}
+
 					var worker = workers[item.Language];
 					if (worker is null)
 					{
-						worker = workers[item.Language] = language.CreateWorker(collectUnhandled: coverageReport);
+						worker = workers[item.Language] = ((IInProcessLanguage)language).CreateWorker(collectUnhandled: coverageReport);
 						workerBag.Add((item.Language, worker));
 					}
 
@@ -284,66 +311,7 @@ internal static class FormattingRun
 						source, item.Options, fileSystem.Path.GetFileName(item.Path),
 						produceText: write, expandUnhandled: expandUnhandled, verifyRoundTrip: verifyRoundTrip);
 
-					switch (result.Status)
-					{
-						case FormatStatus.SyntaxError:
-							Interlocked.Increment(ref unparsable);
-							Interlocked.Increment(ref tallies[item.Language].Unparsable);
-							messages.Add($"{item.Path}: does not parse — {result.Message}");
-							break;
-
-						case FormatStatus.VerificationFailed:
-						case FormatStatus.TooDeep:
-							Interlocked.Increment(ref failed);
-							Interlocked.Increment(ref tallies[item.Language].Failed);
-							messages.Add($"{item.Path}: {result.Message}");
-							break;
-
-						default:
-							// A mark that has to be added or removed is a change to the file even when
-							// every byte after it is identical, and dotnet format treats it as one.
-							var wantsBom = item.Options.Layout.Charset switch
-							{
-								Charset.Utf8Bom => true,
-								Charset.Utf8 => false,
-								Charset.Preserve => hadBom,
-								_ => hadBom,
-							};
-
-							if (result.Changed || wantsBom != hadBom)
-							{
-								// After the write, not before: a write that throws is caught below and
-								// counted as failed, and a file only counts as changed once it actually is.
-								if (write)
-									fileSystem.File.WriteAllText(
-										item.Path,
-										result.Text ?? source,
-										wantsBom ? Utf8WithBom : Utf8);
-								else
-									unformatted?.Add(item.Path);
-								Interlocked.Increment(ref changed);
-								Interlocked.Increment(ref tallies[item.Language].Changed);
-							}
-							else
-							{
-								// The only place anything is recorded, and deliberately not the branch above:
-								// what is remembered is that the formatter was run over these bytes and handed
-								// them back, which is something this run watched happen. A file that was just
-								// rewritten would have to be taken on trust instead, and a formatter that
-								// trusts its own output cannot notice when it stops being idempotent.
-								cache?.Record(item.CacheKey, item.ContentHash, item.OptionsHash);
-							}
-							break;
-					}
-
-					// Coverage is reported per run so that printer progress is visible as a number. Only a
-					// language that has printers to cover counts towards it.
-					if (item.Options.ReportsCoverage)
-					{
-						var tokens = result.Coverage;
-						Interlocked.Add(ref printedTokens, (long)(tokens * 1000));
-						Interlocked.Increment(ref totalTokens);
-					}
+					Apply(pending, result);
 				}
 				catch (Exception exception)
 				{
@@ -354,6 +322,127 @@ internal static class FormattingRun
 
 				return ValueTask.CompletedTask;
 			}).GetAwaiter().GetResult();
+
+		// The other tools' batches, one call per language, after the in-process work. A tool is started only
+		// here, so a run whose files all came from the cache starts nothing.
+		for (var language = 0; language < languages.Count; language++)
+		{
+			if (external[language].IsEmpty || languages[language] is not IExternalLanguage tool)
+				continue;
+
+			// Sorted, so the tool sees the same order on every run and its output does too.
+			var batch = external[language].OrderBy(file => file.Path, StringComparer.Ordinal).ToArray();
+			FormatResult[] results;
+			try
+			{
+				results = tool.FormatBatchAsync(
+					[.. batch.Select(file => new ExternalFile(file.Path, file.Source, file.Options, file.Bytes))],
+					produceText: write,
+					cancellationToken).GetAwaiter().GetResult();
+				if (results.Length != batch.Length)
+					throw new InvalidOperationException($"answered for {results.Length} of {batch.Length} file(s)");
+			}
+			catch (Exception exception)
+			{
+				// The tool could not run at all. Every file it was handed failed for the one reason, said once
+				// rather than once per file.
+				Interlocked.Add(ref failed, batch.Length);
+				Interlocked.Add(ref tallies[language].Failed, batch.Length);
+				toolFailures.Add($"{tool.Id}: {batch.Length} file(s) not formatted — {exception.Message}");
+				continue;
+			}
+
+			for (var i = 0; i < batch.Length; i++)
+			{
+				try
+				{
+					Apply(batch[i], results[i]);
+				}
+				catch (Exception exception)
+				{
+					Interlocked.Increment(ref failed);
+					Interlocked.Increment(ref tallies[language].Failed);
+					messages.Add($"{batch[i].Path}: internal error — {exception.Message}");
+				}
+			}
+		}
+
+		// One result, from whichever language produced it, onto the counters and the disk. Throws only for a
+		// failed write, which the caller counts as failed: the catch sits before anything else is recorded.
+		void Apply(PendingFile item, FormatResult result)
+		{
+			switch (result.Status)
+			{
+				case FormatStatus.SyntaxError:
+					Interlocked.Increment(ref unparsable);
+					Interlocked.Increment(ref tallies[item.Language].Unparsable);
+					messages.Add($"{item.Path}: does not parse — {result.Message}");
+					break;
+
+				case FormatStatus.VerificationFailed:
+				case FormatStatus.TooDeep:
+					Interlocked.Increment(ref failed);
+					Interlocked.Increment(ref tallies[item.Language].Failed);
+
+					// No message: the language says why once for the whole group, rather than once per file.
+					if (result.Message is not null)
+						messages.Add($"{item.Path}: {result.Message}");
+					break;
+
+				case FormatStatus.Ignored:
+					// The tool's own ignore rules, such as .fantomasignore. Recorded, because the language keys
+					// the rules into the options hash: the entry stops matching the moment they change.
+					Interlocked.Increment(ref skipped);
+					Interlocked.Increment(ref tallies[item.Language].Skipped);
+					cache?.Record(item.CacheKey, item.ContentHash, item.OptionsHash);
+					break;
+
+				default:
+					// A mark that has to be added or removed is a change to the file even when
+					// every byte after it is identical, and dotnet format treats it as one.
+					var wantsBom = item.Options.Layout.Charset switch
+					{
+						Charset.Utf8Bom => true,
+						Charset.Utf8 => false,
+						Charset.Preserve => item.HadBom,
+						_ => item.HadBom,
+					};
+
+					if (result.Changed || wantsBom != item.HadBom)
+					{
+						// After the write, not before: a write that throws is caught below and
+						// counted as failed, and a file only counts as changed once it actually is.
+						if (write)
+							fileSystem.File.WriteAllText(
+								item.Path,
+								result.Text ?? item.Source,
+								wantsBom ? Utf8WithBom : Utf8);
+						else
+							unformatted?.Add(item.Path);
+						Interlocked.Increment(ref changed);
+						Interlocked.Increment(ref tallies[item.Language].Changed);
+					}
+					else
+					{
+						// The only place anything is recorded, and deliberately not the branch above:
+						// what is remembered is that the formatter was run over these bytes and handed
+						// them back, which is something this run watched happen. A file that was just
+						// rewritten would have to be taken on trust instead, and a formatter that
+						// trusts its own output cannot notice when it stops being idempotent.
+						cache?.Record(item.CacheKey, item.ContentHash, item.OptionsHash);
+					}
+					break;
+			}
+
+			// Coverage is reported per run so that printer progress is visible as a number. Only a
+			// language that has printers to cover counts towards it.
+			if (item.Options.ReportsCoverage)
+			{
+				var tokens = result.Coverage;
+				Interlocked.Add(ref printedTokens, (long)(tokens * 1000));
+				Interlocked.Increment(ref totalTokens);
+			}
+		}
 
 		threadWorkers.Dispose();
 		foreach (var (language, worker) in workerBag)
@@ -399,6 +488,19 @@ internal static class FormattingRun
 		if (reported.Length > 20)
 			Console.Error.WriteLine($"… and {reported.Length - 20} more not shown");
 
+		foreach (var failure in toolFailures)
+			Console.Error.WriteLine(failure);
+
+		for (var i = 0; i < languages.Count; i++)
+		{
+			if (languages[i] is not IExternalLanguage tool)
+				continue;
+			foreach (var error in tool.Errors)
+				Console.Error.WriteLine($"{tool.Id}: {error}");
+			foreach (var warning in tool.Warnings)
+				Console.Error.WriteLine($"{tool.Id}: warning: {warning}");
+		}
+
 		var coverage = totalTokens == 0 ? 1 : printedTokens / (double)totalTokens / 1000;
 
 		// Coverage is a C# figure. A run that printed only XML has none to report, rather than a
@@ -423,6 +525,14 @@ internal static class FormattingRun
 			}
 		}
 
+		// Once per reason, with a count, rather than a line per file nobody asked to have formatted. Information,
+		// not a problem: it changes no counter and no exit code.
+		foreach (var ((language, reason), count) in declined.OrderBy(pair => pair.Key.Language))
+		{
+			Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
+				$"  {languages[language].Id}: {count} file(s) skipped — {reason}"));
+		}
+
 		var costModel = expandUnhandled ? "  [full-coverage cost model]" : string.Empty;
 		Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
 			$"  {sourceBytes / 1024.0 / 1024.0:F2} MB source, allocated {allocated / 1024.0 / 1024.0:F1} MB "
@@ -435,7 +545,7 @@ internal static class FormattingRun
 			foreach (var (key, count) in unhandled.OrderByDescending(p => p.Value).Take(25))
 			{
 				Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
-					$"  {count,8}  {languages[key.Language].DescribeUnhandledKind(key.Kind)}"));
+					$"  {count,8}  {((IInProcessLanguage)languages[key.Language]).DescribeUnhandledKind(key.Kind)}"));
 			}
 			Console.WriteLine();
 		}
@@ -552,3 +662,15 @@ internal struct LanguageTally
 	public int Failed;
 	public int Unparsable;
 }
+
+/// <summary>A file read, decoded and past the skip rules, on its way to a formatter and then to <c>Apply</c>.</summary>
+internal readonly record struct PendingFile(
+	string Path,
+	int Language,
+	LanguageOptions Options,
+	byte[] Bytes,
+	bool HadBom,
+	string Source,
+	string CacheKey,
+	UInt128 ContentHash,
+	UInt128 OptionsHash);

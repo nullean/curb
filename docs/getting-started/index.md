@@ -29,6 +29,9 @@ curb check ./src      # exit non-zero if anything would change
 Out of the box {{product}} uses Roslyn's defaults, which are the same defaults Visual Studio and Rider
 use. On a repository that is already IDE0055-clean, `curb format` should change nothing.
 
+{{product}} also formats project and solution files ([Project and solution files](../workflow/xml.md)),
+and F# when your tool manifest declares Fantomas ([F# through Fantomas](../workflow/fsharp.md)).
+
 ## Turn on reflow
 
 Reflow is opt-in. Add `max_line_length = 120` to your `.editorconfig` and {{product}} wraps long

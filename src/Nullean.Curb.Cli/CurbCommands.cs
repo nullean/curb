@@ -31,16 +31,23 @@ internal sealed class CurbCommands
 	/// </param>
 	/// <param name="cache">-c, --cache, Skip files a previous run watched format to themselves.</param>
 	/// <param name="noVerify">Skip re-parsing output to prove the token stream is unchanged.</param>
+	/// <param name="language">
+	/// Only this language: <c>csharp</c>, <c>xml</c> or <c>fsharp</c>. What the MSBuild integration's F#
+	/// target passes, so a project's compile set reaches only the formatter for its language.
+	/// </param>
 	public int Format(
 		[Argument] string path = ".",
 		List<FileInfo>? files = null,
 		[Existing] FileInfo? msbuildListFile = null,
 		string? cache = null,
-		bool noVerify = false
+		bool noVerify = false,
+		string? language = null
 	) =>
-		FormattingRun.Execute(
-			_fileSystem, path, write: true, verify: !noVerify, explicitFiles: ResolveExplicitFiles(files, msbuildListFile), cachePath: cache,
-			languages: LanguagesFor(msbuildListFile)).ExitCode;
+		LanguagesFor(msbuildListFile, language) is { } languages
+			? FormattingRun.Execute(
+				_fileSystem, path, write: true, verify: !noVerify, explicitFiles: ResolveExplicitFiles(files, msbuildListFile), cachePath: cache,
+				languages: languages, cancellationToken: Interrupted()).ExitCode
+			: 2;
 
 	/// <summary>Exit non-zero if anything would change.</summary>
 	/// <param name="path">A file or directory to check.</param>
@@ -57,6 +64,10 @@ internal sealed class CurbCommands
 	/// Write the paths that would change to this file, one per line. What the MSBuild integration reads
 	/// back to attach CURB0001 to each unformatted file instead of to the project.
 	/// </param>
+	/// <param name="language">
+	/// Only this language: <c>csharp</c>, <c>xml</c> or <c>fsharp</c>. What the MSBuild integration's F#
+	/// target passes, so a project's compile set reaches only the formatter for its language.
+	/// </param>
 	public int Check(
 		[Argument] string path = ".",
 		List<FileInfo>? files = null,
@@ -65,20 +76,24 @@ internal sealed class CurbCommands
 		bool noVerify = false,
 		bool expandUnhandled = false,
 		bool coverage = false,
-		FileInfo? unformattedListFile = null
+		FileInfo? unformattedListFile = null,
+		string? language = null
 	) =>
-		FormattingRun.Execute(
-			_fileSystem,
-			path,
-			write: false,
-			expandUnhandled: expandUnhandled,
-			verify: !noVerify,
-			coverageReport: coverage,
-			explicitFiles: ResolveExplicitFiles(files, msbuildListFile),
-			cachePath: cache,
-			unformattedListPath: unformattedListFile?.FullName,
-			languages: LanguagesFor(msbuildListFile)
-		).ExitCode;
+		LanguagesFor(msbuildListFile, language) is { } languages
+			? FormattingRun.Execute(
+				_fileSystem,
+				path,
+				write: false,
+				expandUnhandled: expandUnhandled,
+				verify: !noVerify,
+				coverageReport: coverage,
+				explicitFiles: ResolveExplicitFiles(files, msbuildListFile),
+				cachePath: cache,
+				unformattedListPath: unformattedListFile?.FullName,
+				languages: languages,
+				cancellationToken: Interrupted()
+			).ExitCode
+			: 2;
 
 	/// <summary>
 	/// Apply the code style fixes a build already reported.
@@ -260,11 +275,44 @@ internal sealed class CurbCommands
 	}
 
 	/// <summary>
-	/// C# alone when the MSBuild integration is calling, which must never format the project files a
-	/// build is reading; every language otherwise.
+	/// Cancelled by the first Ctrl+C, which stops Fantomas and lets the run report and exit rather than leave a
+	/// daemon behind; a second one ends the process as usual.
 	/// </summary>
-	private static LanguageRegistry LanguagesFor(FileInfo? msbuildListFile) =>
-		msbuildListFile is null ? LanguageRegistry.Default : LanguageRegistry.CSharpOnly;
+	private static CancellationToken Interrupted()
+	{
+		var source = new CancellationTokenSource();
+		Console.CancelKeyPress += (_, args) =>
+		{
+			if (source.IsCancellationRequested)
+				return;
+			args.Cancel = true;
+			source.Cancel();
+		};
+		return source.Token;
+	}
+
+	/// <summary>
+	/// The one language asked for; else C# alone when the MSBuild integration is calling, which must never
+	/// format the project files a build is reading; every language otherwise. Null, after saying why, for a
+	/// language Curb does not know.
+	/// </summary>
+	private LanguageRegistry? LanguagesFor(FileInfo? msbuildListFile, string? language)
+	{
+		switch (language?.ToLowerInvariant())
+		{
+			case null:
+				return msbuildListFile is null ? LanguageRegistry.Default(_fileSystem) : LanguageRegistry.CSharpOnly;
+			case "csharp":
+				return LanguageRegistry.CSharpOnly;
+			case "xml":
+				return new LanguageRegistry(Languages.Xml.XmlLanguage.Instance);
+			case "fsharp":
+				return LanguageRegistry.FSharpOnly(_fileSystem);
+			default:
+				Console.Error.WriteLine($"--language: '{language}' is not one of csharp, xml, fsharp");
+				return null;
+		}
+	}
 
 	/// <summary>
 	/// Merges <c>--files</c> with the contents of <c>--msbuild-list-file</c> (one path per line, blank

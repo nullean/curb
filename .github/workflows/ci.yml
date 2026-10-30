@@ -285,6 +285,13 @@ jobs:
       - name: MSBuild integration runs before the compiler
         run: ./build.sh msbuildsmoketest -s true
 
+      # The F# target, against the Fantomas the sample's manifest pins (restored from nuget.org here, so it
+      # needs the network the restore above already used). There is no IDE0055 for F#, so the two sides are
+      # read off the file: formatted with Curb, untouched with Curb bypassed. Between them it proves an
+      # unchanged project skips the target, so no Fantomas starts, and a checking build fails with CURB0001.
+      - name: MSBuild formats F# through the pinned Fantomas
+        run: ./build.sh fsharpsmoketest -s true
+
       # Four-sided, where the formatting smoke test above needs two. Two of them are the same idea —
       # cleanup works, and the build would have failed without it. The other two exist because cleanup
       # can be wrong in ways a formatter cannot: it could silence a rule instead of fixing it, so the
@@ -408,6 +415,12 @@ jobs:
 
       - name: Build
         run: ./build.sh build -s true
+
+      # The tests that run the real Fantomas, through its daemon and its command line, skip where it is not
+      # restored. Here it is, from the fixture manifest that pins the version they expect, and they fail
+      # rather than skip when CI=true.
+      - name: Restore the Fantomas the F# tests run against
+        run: dotnet tool restore --tool-manifest tests/Nullean.Curb.Tests/Cli/FSharp/Fixture/dotnet-tools.json
 
       - name: Test
         run: ./build.sh test -s true

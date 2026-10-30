@@ -30,6 +30,7 @@ type Arguments =
     | [<Inherit>] Minimum of double
     | [<Inherit>] MaxAllocationRatio of double
     | [<CliPrefix(CliPrefix.None);SubCommand>] MsbuildSmoketest
+    | [<CliPrefix(CliPrefix.None);SubCommand>] FsharpSmoketest
     | [<CliPrefix(CliPrefix.None);SubCommand>] CleanupSmoketest
     | [<CliPrefix(CliPrefix.None);SubCommand>] CleanupSafety
     | [<CliPrefix(CliPrefix.None);SubCommand>] CleanupConformance
@@ -72,6 +73,7 @@ with
             | Maximum _ -> "fail if churn rises above this percentage of files"
             | MaxAllocationRatio _ -> "fail if perf allocates more than this multiple of the source size"
             | MsbuildSmoketest -> "prove the MSBuild integration runs before the compiler"
+            | FsharpSmoketest -> "prove the MSBuild integration formats an F# project through its pinned Fantomas, and skips when nothing changed"
             | CleanupSmoketest -> "prove curb cleanup fixes what a build reported, and only that"
             | CleanupSafety -> "feed a corpus wrong verdicts and prove none of them damages a file (--corpus <path>)"
             | XmlSafety -> "format a corpus's project files and prove MSBuild evaluates every project the same before and after (--corpus <path>)"

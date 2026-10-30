@@ -80,6 +80,13 @@ dotnet build && curb cleanup
 
 `curb rules` lists what Curb fixes and what it leaves to `dotnet format style`.
 
+### F#, through Fantomas
+
+Declare Fantomas in your tool manifest (`dotnet tool install fantomas`) and `curb format` and `curb check`
+cover your `.fs`, `.fsi` and `.fsx` files too, through that exact version, with Curb's cache, MSBuild target
+and safety check on top: a result is written only if Fantomas leaves it unchanged when it is sent back.
+Without the manifest entry nothing changes. See [F# through Fantomas](https://curb.nullean.net/workflow/fsharp/).
+
 ## Building from source
 
 Requires the .NET 10 SDK.
