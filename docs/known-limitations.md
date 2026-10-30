@@ -39,22 +39,3 @@ The shapes that used to account for most unsettled files settle in one pass now:
 `case` label's trailing comment, a chain line in a lambda argument whose body has an operator, a tuple
 broken after its `(`, an initializer opened out inside a lambda argument, and an expression body
 converted after a trailing comment. The run is `curb format` twice over a copy, then a diff.
-
-## Blank lines grow around a region in an enum
-
-An enum whose members are wrapped in `#region` blocks gains blank lines inside each region on the first
-pass and another before an `#endregion` on the second. Its last `#endregion` also moves to column 0:
-
-```csharp
-internal enum E
-{
-    #region first
-    A = 1,
-    #endregion first
-    #region second
-    C = 3,
-    #endregion second
-}
-```
-
-Two of roslyn's files change on a second pass for this reason.
