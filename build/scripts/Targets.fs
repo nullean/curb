@@ -20,6 +20,16 @@ let private execResult binary args =
     let result = Proc.Start(binary, List.toArray args)
     result.ExitCode
 
+/// Like execResult, but nothing is echoed while the process runs: its output comes back with the exit code,
+/// for a caller running several at once to print in order rather than interleaved.
+let private execQuiet binary (args: string list) =
+    let quiet =
+        { new Std.IConsoleOutWriter with
+            member _.Write(_: exn) = ()
+            member _.Write(_: Std.ConsoleOut) = () }
+    let result = Proc.Start(StartArguments(binary, List.toArray args, ConsoleOutWriter = quiet), Threading.CancellationToken.None)
+    result.ExitCode, result.ConsoleOut |> Seq.map (fun l -> l.Line) |> String.concat "\n"
+
 /// dotnet/sdk#53783: on a cold tool-resolver cache (every fresh CI runner, every fresh container),
 /// restoring 2+ RID-specific tool packages in one manifest can misattribute one package's
 /// DotnetToolSettings.xml to another, failing with "The command ... is not contained in the
@@ -1453,64 +1463,76 @@ and private verifyCleanupExpectations (arguments:ParseResults<Arguments>) =
 
     let divergences = loadDivergences "dotnet-format-style"
 
-    let results =
-        cases
-        |> Array.map (fun d ->
-            let testCase = (File.ReadAllText(Path.Combine(d, "TestCase.txt"))).Trim()
-            let ruleIds =
-                (File.ReadAllText(Path.Combine(d, "RuleIds.txt"))).Trim().Split(' ')
-                |> Array.filter (fun s -> s.Length > 0)
+    let check (d: string) =
+        let testCase = (File.ReadAllText(Path.Combine(d, "TestCase.txt"))).Trim()
+        let ruleIds =
+            (File.ReadAllText(Path.Combine(d, "RuleIds.txt"))).Trim().Split(' ')
+            |> Array.filter (fun s -> s.Length > 0)
 
-            // A .globalconfig rather than an ordinary .editorconfig: this directory sits under the repo,
-            // which has its own root .editorconfig on the walk, and a global config outranks it without
-            // needing to reason about section globs — the same reasoning cleanupConformance documents
-            // next to its own globalConfig.
-            let severities =
-                ruleIds |> Array.map (sprintf "dotnet_diagnostic.%s.severity = warning") |> String.concat "\n"
+        // A .globalconfig rather than an ordinary .editorconfig: this directory sits under the repo,
+        // which has its own root .editorconfig on the walk, and a global config outranks it without
+        // needing to reason about section globs — the same reasoning cleanupConformance documents
+        // next to its own globalConfig.
+        let severities =
+            ruleIds |> Array.map (sprintf "dotnet_diagnostic.%s.severity = warning") |> String.concat "\n"
 
-            // IDE0040 only reports on an interface member at all when the project asks for accessibility
-            // everywhere, not just dotnet format's default of for_non_interface_members — a case supplying
-            // that diagnostic by hand for an interface member is implicitly asserting that preference, or
-            // the compiler could never have reported it. Safe for every other case here regardless: for a
-            // non-interface declaration, always and for_non_interface_members require the same thing.
-            let preferences = "dotnet_style_require_accessibility_modifiers = always"
+        // IDE0040 only reports on an interface member at all when the project asks for accessibility
+        // everywhere, not just dotnet format's default of for_non_interface_members — a case supplying
+        // that diagnostic by hand for an interface member is implicitly asserting that preference, or
+        // the compiler could never have reported it. Safe for every other case here regardless: for a
+        // non-interface declaration, always and for_non_interface_members require the same thing.
+        let preferences = "dotnet_style_require_accessibility_modifiers = always"
 
-            File.WriteAllText(
-                Path.Combine(d, "case.globalconfig"),
-                sprintf "is_global = true\nglobal_level = 100\n\n%s\n%s\n" severities preferences)
+        File.WriteAllText(
+            Path.Combine(d, "case.globalconfig"),
+            sprintf "is_global = true\nglobal_level = 100\n\n%s\n%s\n" severities preferences)
 
-            File.WriteAllText(
-                Path.Combine(d, "Directory.Build.targets"),
-                [ "<Project>"
-                  "  <ItemGroup>"
-                  "    <EditorConfigFiles Include=\"$(MSBuildThisFileDirectory)case.globalconfig\" />"
-                  "  </ItemGroup>"
-                  "</Project>" ]
-                |> String.concat "\n")
+        File.WriteAllText(
+            Path.Combine(d, "Directory.Build.targets"),
+            [ "<Project>"
+              "  <ItemGroup>"
+              "    <EditorConfigFiles Include=\"$(MSBuildThisFileDirectory)case.globalconfig\" />"
+              "  </ItemGroup>"
+              "</Project>" ]
+            |> String.concat "\n")
 
-            // Checked one at a time, so the shared obj never raced here; isolated anyway, so no case can see another's.
-            isolateCaseOutput d
+        // Concurrent cases would otherwise share one obj; see isolateCaseOutput.
+        isolateCaseOutput d
 
-            File.WriteAllText(
-                Path.Combine(d, "Case.csproj"),
-                [ "<Project Sdk=\"Microsoft.NET.Sdk\">"
-                  "  <PropertyGroup>"
-                  "    <TargetFramework>net10.0</TargetFramework>"
-                  "    <Nullable>disable</Nullable>"
-                  "    <ImplicitUsings>disable</ImplicitUsings>"
-                  "  </PropertyGroup>"
-                  "</Project>" ]
-                |> String.concat "\n")
+        File.WriteAllText(
+            Path.Combine(d, "Case.csproj"),
+            [ "<Project Sdk=\"Microsoft.NET.Sdk\">"
+              "  <PropertyGroup>"
+              "    <TargetFramework>net10.0</TargetFramework>"
+              "    <Nullable>disable</Nullable>"
+              "    <ImplicitUsings>disable</ImplicitUsings>"
+              "  </PropertyGroup>"
+              "</Project>" ]
+            |> String.concat "\n")
 
-            // --verify-no-changes reports rather than rewrites, so the exit code alone says whether Case.cs
-            // (Z) is already a fixed point — no before/after diff needed, unlike the whitespace side.
-            let exitCode =
-                execResult "dotnet"
-                    (List.concat [
-                        ["format"; "style"; d; "--verify-no-changes"; "--severity"; "info"; "--diagnostics"]
-                        List.ofArray ruleIds ])
+        // --verify-no-changes reports rather than rewrites, so the exit code alone says whether Case.cs
+        // (Z) is already a fixed point — no before/after diff needed, unlike the whitespace side.
+        let exitCode, output =
+            execQuiet "dotnet"
+                (List.concat [
+                    ["format"; "style"; d; "--verify-no-changes"; "--severity"; "info"; "--diagnostics"]
+                    List.ofArray ruleIds ])
 
-            {| Directory = d; TestCase = testCase; StaysFixedPoint = (exitCode = 0) |})
+        {| Directory = d; TestCase = testCase; StaysFixedPoint = (exitCode = 0); Output = output |}
+
+    // Concurrently, and bounded the way verifyExpectationsIde0055 bounds its builds: one `dotnet format`
+    // per processor. Each case reads and writes only its own directory (see the props file above). Each
+    // result, its captured output included, lands at its case's index and is printed from there, so the
+    // log reads exactly as a sequential run's did rather than as interleaved lines from several cases. 35
+    // cases one at a time were 109-222 s of a corpus job on every push.
+    let results = Array.zeroCreate cases.Length
+    System.Threading.Tasks.Parallel.For(
+        0, cases.Length,
+        System.Threading.Tasks.ParallelOptions(MaxDegreeOfParallelism = Environment.ProcessorCount),
+        fun i -> Array.set results i (check cases[i]))
+    |> ignore
+    for r in results do
+        if r.Output.Length > 0 then printfn "%s" r.Output
 
     let notFixedPoint = results |> Array.filter (fun r -> not r.StaysFixedPoint)
 
