@@ -14,6 +14,7 @@ type Arguments =
     | [<CliPrefix(CliPrefix.None);SubCommand>] Compare
     | [<CliPrefix(CliPrefix.None);SubCommand>] Options
     | [<CliPrefix(CliPrefix.None);SubCommand>] Docs
+    | [<CliPrefix(CliPrefix.None);SubCommand>] CloneCorpus
 
     | [<CliPrefix(CliPrefix.None);Hidden;SubCommand>] PristineCheck
     | [<CliPrefix(CliPrefix.None);Hidden;SubCommand>] GeneratePackages
@@ -48,6 +49,7 @@ type Arguments =
     | [<Inherit>] Preserve
     | [<Inherit>] Width of int
     | [<Inherit>] Maximum of double
+    | [<Inherit>] Shard of string
     | [<Inherit;AltCommandLine("-s")>] SingleTarget of bool
     | [<Inherit>] Token of string
     | [<Inherit>] Push
@@ -65,12 +67,14 @@ with
             | Perf -> "times the AOT binary over a corpus (--corpus <path>); never measure the JIT build"
             | Compare -> "times curb, csharpier and dotnet format over a directory of repos (--corpus <dir>)"
             | Options -> "generates docs/reference/**/*.md by running Curb against each option's snippet"
+            | CloneCorpus -> "clones the corpus the corpus gates run against into --corpus <path>; the one place CI gets it from"
             | Docs -> "builds the public docs, applies the landing page override, and serves them"
             | Port _ -> "port to serve the documentation on (default 8080)"
             | NoServe -> "build the documentation without serving it"
             | Corpus _ -> "path to a checkout (or a directory of checkouts for compare)"
             | Minimum _ -> "fail if conformance falls below this percentage"
             | Maximum _ -> "fail if churn rises above this percentage of files"
+            | Shard _ -> "verifyexpectationside0055 only: check shard i of n (e.g. 1/4); a case's shard is a stable hash of its test name, so the n shards together cover every case exactly once"
             | MaxAllocationRatio _ -> "fail if perf allocates more than this multiple of the source size"
             | MsbuildSmoketest -> "prove the MSBuild integration runs before the compiler"
             | FsharpSmoketest -> "prove the MSBuild integration formats an F# project through its pinned Fantomas, and skips when nothing changed"
