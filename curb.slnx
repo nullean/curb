@@ -29,6 +29,9 @@
     <Project Path="tests/Nullean.Curb.Tests/Nullean.Curb.Tests.csproj" />
     <Project Path="tests/Nullean.Curb.Benchmarks/Nullean.Curb.Benchmarks.csproj" />
   </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/Nullean.Curb.CorpusGenerator/Nullean.Curb.CorpusGenerator.csproj" />
+  </Folder>
   <Folder Name="/examples/">
     <Project Path="examples/curb-aot-smoketest/curb-aot-smoketest.csproj" />
   </Folder>
