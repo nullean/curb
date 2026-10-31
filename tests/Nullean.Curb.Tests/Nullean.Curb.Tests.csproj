@@ -20,6 +20,7 @@
     <ProjectReference Include="../../src/Nullean.Curb.EditorConfig/Nullean.Curb.EditorConfig.csproj" />
     <ProjectReference Include="../../src/Nullean.Curb.Cli/Nullean.Curb.Cli.csproj" />
     <ProjectReference Include="../../src/Nullean.Curb.Xml/Nullean.Curb.Xml.csproj" />
+    <ProjectReference Include="../../tools/Nullean.Curb.CorpusGenerator/Nullean.Curb.CorpusGenerator.csproj" />
   </ItemGroup>
 
 </Project>
