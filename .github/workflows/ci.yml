@@ -56,8 +56,7 @@ permissions:
 #          default path. It must not be conditional.
 #
 # The weekly run is a strict superset of a push-to-main run. A tag push is also full, so the gates have run
-# on the commit being released — though the publishing job (build) waits only for the AOT legs, not for
-# the corpus jobs, so a release can publish before they finish or even if they fail.
+# on the commit being released, and the release job publishes nothing until every one of them has passed.
 #
 # Every job that needs the corpus gets it from `./build.sh clonecorpus`, so where it comes from is decided in
 # one place (cloneCorpus in build/scripts/Targets.fs). Today that is elastic/docs-builder at HEAD.
@@ -445,7 +444,7 @@ jobs:
       - name: Expectations report no IDE0055 under a real build
         run: ./build.sh verifyexpectationside0055 -s true --shard ${{ matrix.shard }}/4
 
-  # ── Managed build / test / pack / publish ───────────────────────────────────
+  # ── Managed build / test / pack (and the canary on a branch push) ───────────
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -514,9 +513,64 @@ jobs:
       # ghcr.io/nullean/curb, matching elastic/docs-builder's own tagging: "edge" and the commit SHA on
       # every push, plus "latest", the semver and "v<major>" when this push is an exact release tag — see
       # publishContainers/containerImageTags in Targets.fs for how that split is decided. action.yml
-      # picks among these tags by the ref a workflow pins.
+      # picks among these tags by the ref a workflow pins. A tag's push happens in the release job below.
       - name: Log in to ghcr.io
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads')
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish container image (branch push)
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads')
+        run: ./build.sh publishcontainers -s true --push
+
+      # The packages the release job publishes are exactly the ones validated here, with the breaking-changes
+      # notes the API inspection above wrote for the GitHub release body.
+      - name: Hand the validated packages to the release job (tag push)
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags')
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-packages
+          path: |
+            build/output/*.nupkg
+            build/output/breaking-changes-*.md
+          if-no-files-found: error
+
+  # ── Release ─────────────────────────────────────────────────────────────────
+  # A tag publishes only once every gate has passed. Publishing used to hang off `build` alone, so 0.9.0
+  # and 0.10.0 both went out while a corpus gate was still running and then failed. Needing the gate jobs
+  # also skips this job if any of them is skipped, which on a tag none is: CURB_FULL_GATES is true.
+  release:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [build, corpus, cleanup-conformance, ide0055]
+    permissions:
+      contents: write   # create GitHub release
+      packages: write   # push the container image
+      issues: write     # release-notes creates labels for its categories
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      # MinVer derives the version from tags, so the full tag list must be present.
+      - run: git fetch --prune --tags
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      - name: Download the validated packages
+        uses: actions/download-artifact@v8
+        with:
+          name: release-packages
+          path: build/output
+
+      - name: Log in to ghcr.io
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -524,19 +578,15 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publish container image
-        if: github.event_name == 'push'
         run: ./build.sh publishcontainers -s true --push
 
-      - name: Generate release notes (tag push)
-        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags')
+      - name: Generate release notes
         run: ./build.sh generatereleasenotes -s true
 
-      - name: Create GitHub release (tag push)
-        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags')
+      - name: Create GitHub release
         run: ./build.sh createreleaseongithub -s true --token ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Publish to nuget.org (tag push)
-        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags')
+      - name: Publish to nuget.org
         run: |
           dotnet nuget push 'build/output/*.nupkg' \
             -k ${{ secrets.NUGET_ORG_API_KEY }} \
