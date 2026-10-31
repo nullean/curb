@@ -18,6 +18,7 @@ width-aware reflow. It ships as a native-AOT `dotnet tool`.
 ./build.sh cleanupsafety --corpus <path> # feed a corpus wrong verdicts; none may damage a file
 ./build.sh xmlsafety --corpus <path>     # format project files; MSBuild must evaluate every project the same
 ./build.sh cleanupconformance            # clean a solution that builds; it must still build
+./build.sh clonecorpus --corpus <path>   # write the generated corpus the gates above run against (see "The corpus")
 ./build.sh verifyexpectations            # expectations survive dotnet format
 ./build.sh verifycleanupexpectations     # cleanup-rule cases are a fixed point of dotnet format style
 ./build.sh verifyexpectationsjb          # measures the same against jb cleanupcode; reported, not gated yet
@@ -43,6 +44,7 @@ Microsoft.Testing.Platform, so they are launched with `dotnet run`, not `dotnet 
 | `examples/curb-msbuild-smoketest` | Proves the formatter runs before `CoreCompile`. Not in the solution. |
 | `examples/curb-cleanup-smoketest` | Proves cleanup fixes what a build reported, and only that. Not in the solution. |
 | `tools/Nullean.Curb.OptionDocs` | Generates `docs/reference/` from the option catalog. `./build.sh options`; CI fails when it is stale. |
+| `tools/Nullean.Curb.CorpusGenerator` | Writes the corpus every corpus gate runs against. `./build.sh clonecorpus --corpus <path>`. |
 | `build/scripts` | F# Bullseye build runner. |
 
 ## Non-negotiables
@@ -124,7 +126,7 @@ the diagnostic does not carry, it is not a cleanup rule — record why and stop.
    discipline `verifyexpectations` holds the formatting side to, applied to `dotnet format style`. If the
    fix is not a fixed point of it, that needs a `build/conformance-divergences.json` entry (tool
    `dotnet-format-style`) with a reason, same as [conformance divergences](docs/design-principles/conformance-divergences.md).
-6. Run **both** corpus gates before claiming it is done, and record the numbers in
+6. Run **both** corpus gates (against `./build.sh clonecorpus --corpus <path>`) before claiming it is done, and record the numbers in
    `docs/workflow/cleanup.md` rather than the intent. It claims every rule fires everywhere it could, so it
    feeds deliberately wrong verdicts and requires that none of them damages a file. **It found four defects
    on its first run that no unit test reached**, listed in that document. `cleanupconformance` is the other
@@ -178,7 +180,8 @@ is not a preference among others.
 
 - **No width — preservation.** A construct the author opened out stays opened out at their breaks; only one
   they left on a single line is handed to width. Curb never changes a line's length; output is byte-identical
-  to `dotnet format whitespace`. 742/1,196 corpus files of churn, almost all blank-line collapsing.
+  to `dotnet format whitespace`. 742/1,196 files of churn on elastic/docs-builder when this was decided, almost
+  all blank-line collapsing. (The numbers in this section are docs-builder's; CI now runs the generated corpus.)
 - **A width — deterministic.** `layout = f(tokens, width)`, so idempotency holds by construction rather than
   by measurement, and it is the *better* fixed point of `dotnet format` (1196/1196 against preservation's
   1195/1196 with reflow). 892 files of churn but ~2.7× the changed lines, which is the number that decided
@@ -210,6 +213,30 @@ itself decides. That one mistake has killed more features than every other cause
 carries the measurements so they are not re-derived, and records which of them deterministic mode has
 since brought back.
 
+
+## The corpus
+
+Every corpus gate (check, cache, idempotency, conformance, churn, perf, cleanupsafety, cleanupconformance,
+xmlsafety) runs against a corpus `tools/Nullean.Curb.CorpusGenerator` writes, and CI gets it from one place:
+`./build.sh clonecorpus --corpus <path>`. It is generated at the start of each job, outside the repository, and
+never committed, so Curb's own formatting never touches it. The same seed (`--seed`, default 1) and the same test
+suite give a byte-identical corpus; `--corpus-size` sets the megabytes of generated C# (default 10).
+
+- **What is in it:** a solution that builds (multi-targeted abstractions, libraries, a console app, a test-like
+  project), C# generated from the templates in `Templates.*.cs`, every `Formats`/`Unchanged` source the test suite
+  dumps as a snippet under `snippets/` with its own settings (not built), project files in varied layouts, and
+  F# and Razor samples. Each C# file gets a layout drawn from the seed by `Permuter`, which re-parses the result
+  and rejects any permutation that changes a token.
+- **Extending it:** add a member to `Templates.Members` or a type to `Templates.Types`; it must compile in any
+  class the synthesiser writes (the `Service` and `NetStandard` flags say where). A new test case reaches the corpus
+  on its own. Then run the gates: `cleanupconformance` proves the solution still builds.
+- **A gate fails on a new shape:** that is a Curb defect, which is the point. Fix it, or, if it fails an
+  all-or-nothing gate (check, idempotency, cleanup) and belongs in its own change, add a named rule to
+  `KnownDefects` so the corpus steers around it, and delete the rule in the change that fixes it. Conformance
+  findings stay in the corpus and lower the floor in `ci.yml` instead.
+- **What it cannot do:** it covers only the shapes the templates and tests contain, and it no longer moves with an
+  upstream repository, which is how docs-builder found some bugs. `--corpus-source docs-builder` clones that
+  repository for a manual comparison.
 
 ## Style
 

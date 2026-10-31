@@ -5,13 +5,19 @@ description: How Curb's output is measured as a fixed point of dotnet format —
 
 # Conformance
 
-{{product}} states compatibility with `dotnet format` as a measurement, gated in CI on every push
-against a 1,196-file corpus:
+{{product}} states compatibility with `dotnet format` as a measurement. On elastic/docs-builder, a real
+repository of 1,702 files that its authors keep formatted:
 
-- With reflow off, {{product}}'s output is **byte-identical to `dotnet format whitespace`** — 100%, enforced as a build gate.
-- With reflow on, also **100%** — deterministic layout has no arrangement inherited from the source for `dotnet format` to disagree with, so it is the cleaner of the two.
-- With reflow on *and* `csharp_keep_existing_linebreaks = true`, **99.9%**. One file falls short: a property pattern that reflow breaks, and whose brace `dotnet format` then moves. Measured and held rather than quietly rounded up.
-- **Zero** failed or unparsable files across the corpus, also gated.
+- With reflow off, {{product}}'s output is **byte-identical to `dotnet format whitespace`**: 100%.
+- With reflow on, also **100%**. Deterministic layout has no arrangement inherited from the source for `dotnet format` to disagree with, so it is the cleaner of the two.
+- With reflow on *and* `csharp_keep_existing_linebreaks = true`, also **100%**.
+- **Zero** failed or unparsable files.
+
+CI gates the same measurement on every push against a generated corpus instead: a solution of about 1,800
+files written to be untidy, in every layout people leave code in. There {{product}} holds 85% with reflow on
+and 83% with it off, and each number is a floor that must not go down. The rest are disagreements the untidy
+input exposes and that docs-builder never reached, listed in [known limitations](../known-limitations.md).
+Zero failed files and two identical format passes are gated there too.
 
 What is measured is that {{product}}'s output is a *fixed point* of `dotnet format`: run `dotnet format`
 over a {{product}}-formatted file and nothing changes. That is what decides whether Format Document in
