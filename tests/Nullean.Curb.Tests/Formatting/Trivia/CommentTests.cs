@@ -451,6 +451,164 @@ public class CommentTests : FormattingTest
 		}
 		""");
 
+	[Test]
+	public Task Under_tabs_a_comment_under_a_trailing_comment_aligns_under_it() => Formats(
+		// dotnet format re-lays any trivia indented with a tab, so with indent_style = tab the comment
+		// at the member column is never in shape: it goes under the trailing comment, as tabs then
+		// spaces. A blank line still parts it from the trailing comment. The source has no tab, so it
+		// is Curb's own output that dotnet format would re-lay.
+		"""
+		public class C
+		{
+		    enum E
+		    {
+		        A, // one
+		        // before b
+		        B,
+		    }
+
+		    void M()
+		    {
+		        Call(); // one
+		        // first
+		        // second
+		        Call(); // one
+
+		        // after a blank line
+		        Call();
+		    }
+		}
+		""",
+		"public class C\n{\n\tenum E\n\t{\n\t\tA, // one\n\t\t   // before b\n\t\tB,\n\t}\n\n\tvoid M()\n\t{\n\t\tCall(); // one\n\t\t\t\t// first\n\t\t\t\t// second\n\t\tCall(); // one\n\n\t\t// after a blank line\n\t\tCall();\n\t}\n}",
+		editorConfig: "indent_style = tab\ntab_width = 4\nindent_size = 4");
+
+	[Test]
+	public Task Under_tabs_a_comment_between_collection_elements_stays_at_the_element_column() => Formats(
+		// dotnet format leaves the trivia between collection elements alone, tabs or not, but re-lays
+		// it between the members of an object initializer. The width drops the blank lines, which brings
+		// each comment directly under the trailing one.
+		"public class C\n{\n\tvoid M()\n\t{\n\t\tvar l = new List<int>\n\t\t{\n\t\t\t1, // one\n\n\t\t\t// collection\n\t\t\t2,\n\t\t};\n\t\tvar d = new Dictionary<int, int>\n\t\t{\n\t\t\t{ 1, 2 }, // one\n\n\t\t\t// entry\n\t\t\t{ 3, 4 },\n\t\t};\n\t\tint[] c =\n\t\t[\n\t\t\t1, // one\n\n\t\t\t// expression\n\t\t\t2,\n\t\t];\n\t\tint[] a =\n\t\t{\n\t\t\t1, // one\n\n\t\t\t// array\n\t\t\t2,\n\t\t};\n\t\tvar o = new V\n\t\t{\n\t\t\tA = 1, // one\n\t\t\t// member\n\t\t\tB = 2,\n\t\t};\n\t}\n}",
+		"public class C\n{\n\tvoid M()\n\t{\n\t\tvar l = new List<int>\n\t\t{\n\t\t\t1, // one\n\t\t\t// collection\n\t\t\t2,\n\t\t};\n\t\tvar d = new Dictionary<int, int>\n\t\t{\n\t\t\t{ 1, 2 }, // one\n\t\t\t// entry\n\t\t\t{\n\t\t\t\t3,\n\t\t\t\t4\n\t\t\t},\n\t\t};\n\t\tint[] c =\n\t\t[\n\t\t\t1, // one\n\t\t\t// expression\n\t\t\t2,\n\t\t];\n\t\tint[] a = {\n\t\t\t1, // one\n\t\t\t// array\n\t\t\t2,\n\t\t};\n\t\tvar o = new V\n\t\t{\n\t\t\tA = 1, // one\n\t\t\t\t   // member\n\t\t\tB = 2,\n\t\t};\n\t}\n}",
+		editorConfig: "indent_style = tab\ntab_width = 4\nindent_size = 4\nmax_line_length = 120");
+
+	[Test]
+	public Task Under_tabs_a_comment_a_dropped_blank_line_brings_under_a_trailing_comment_aligns() => Formats(
+		// Curb drops the blank line after an opening brace, so the comment ends up directly under the
+		// brace's trailing comment, where dotnet format aligns it: two columns in, which takes no tab.
+		"""
+		public class C
+		{ // opener
+
+		    // legacy
+		    public int First;
+		}
+		""",
+		"public class C\n{ // opener\n  // legacy\n\tpublic int First;\n}",
+		editorConfig: "indent_style = tab\ntab_width = 4\nindent_size = 4");
+
+	[Test]
+	public Task A_tab_indented_comment_under_a_trailing_comment_aligns_under_it() => Formats(
+		// The source's tabs put the trivia out of shape even when Curb writes spaces, though the comment
+		// starts its line the way the statement does.
+		"public class C\n{\n\tvoid M()\n\t{\n\t\tCall(); // one\n\t\t// tabbed\n\t\tCall();\n\t}\n}",
+		"""
+		public class C
+		{
+		    void M()
+		    {
+		        Call(); // one
+		                // tabbed
+		        Call();
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_comment_under_a_statement_printed_verbatim_aligns_under_its_trailing_comment() => Formats(
+		// goto has no printer of its own, and the verbatim path did not record its last token, so the
+		// comment below never saw the trailing comment and went to the statement column.
+		"""
+		public class C
+		{
+		    int M()
+		    {
+		        goto done; // order
+		   // out of shape
+		        return 1;
+		    done:
+		        return 0;
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    int M()
+		    {
+		        goto done; // order
+		                   // out of shape
+		        return 1;
+		    done:
+		        return 0;
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_comment_under_a_declaration_kept_as_written_aligns_under_its_trailing_comment() => Formats(
+		// The same, through the path the = ignore settings take.
+		"""
+		public class C
+		{
+		    void M()
+		    {
+		        var x  =  1; // one
+		   // out of shape
+		        Use(x);
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    void M()
+		    {
+		        var x  =  1; // one
+		                     // out of shape
+		        Use(x);
+		    }
+		}
+		""",
+		editorConfig: "csharp_space_around_declaration_statements = ignore");
+
+	[Test]
+	public Task A_comment_under_a_multi_line_string_aligns_under_its_trailing_comment() => Formats(
+		// The column is the one on the string's last line, not the string's whole length.
+		"""
+		public class C
+		{
+		    void M()
+		    {
+		        var s = @"first
+		second"; // verbatim
+		   // out of shape
+		        Use(s);
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    void M()
+		    {
+		        var s = @"first
+		second"; // verbatim
+		         // out of shape
+		        Use(s);
+		    }
+		}
+		""");
+
 	// Issue #16: the comment above a section's first statement sits where that statement does. The
 	// label's comment broke the line at the label's column, the comment stayed there, and the next
 	// run read it as out of shape and moved it under the label's comment.
