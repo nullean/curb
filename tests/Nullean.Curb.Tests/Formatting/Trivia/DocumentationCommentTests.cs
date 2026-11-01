@@ -167,4 +167,100 @@ public class DocumentationCommentTests : FormattingTest
 		"public class C\r\n{\r\n    /// <summary>\r\n    /// One.\r\n    /// </summary>\r\n    public int P { get; }\r\n}\r\n",
 		editorConfig: "end_of_line = crlf");
 
+	// ---- continuation lines take the first line's indent (issue #180) ---------------------------
+	//
+	// Every expectation below is what `dotnet format whitespace` writes for the same input and
+	// settings. The whitespace in front of each later `///` sits inside the trivia, so it used to be
+	// emitted as written: only the first line moved, and dotnet format then moved the rest.
+
+	[Test]
+	public Task Converting_spaces_to_tabs_reindents_every_line() => Formats(
+		"namespace N\n{\n    public class C\n    {\n        /// <summary>\n        /// Adds one.\n        /// </summary>\n        /// <param name=\"x\">\n        /// The value.\n        /// </param>\n        /// <code>\n        /// if (x > 0)\n        ///     return x + 1;\n        /// </code>\n        public int M(int x) => x + 1;\n    }\n}\n",
+		"namespace N\n{\n\tpublic class C\n\t{\n\t\t/// <summary>\n\t\t/// Adds one.\n\t\t/// </summary>\n\t\t/// <param name=\"x\">\n\t\t/// The value.\n\t\t/// </param>\n\t\t/// <code>\n\t\t/// if (x > 0)\n\t\t///     return x + 1;\n\t\t/// </code>\n\t\tpublic int M(int x) => x + 1;\n\t}\n}\n",
+		editorConfig: "indent_style = tab");
+
+	[Test]
+	public Task Converting_tabs_to_spaces_reindents_every_line() => Formats(
+		// The tab after the marker is the comment's own text and stays.
+		"namespace N\n{\n\tpublic class C\n\t{\n\t\t/// <summary>\n\t\t/// Adds one.\n\t\t/// </summary>\n\t\t/// <code>\n\t\t///\tindented with a tab\n\t\t/// </code>\n\t\tpublic int M(int x) => x + 1;\n\t}\n}\n",
+		"namespace N\n{\n    public class C\n    {\n        /// <summary>\n        /// Adds one.\n        /// </summary>\n        /// <code>\n        ///\tindented with a tab\n        /// </code>\n        public int M(int x) => x + 1;\n    }\n}\n");
+
+	[Test]
+	public Task Every_line_moves_with_a_member_two_types_deep() => Formats(
+		"""
+		public class A
+		{
+		public class B
+		{
+		public class C
+		{
+		/// <summary>
+		/// Deep.
+		/// </summary>
+		public void M()
+		{
+		/// <summary>Not a member.</summary>
+		/// more
+		M();
+		/// before the brace
+		/// too
+		}
+		}
+		}
+		}
+		""",
+		"""
+		public class A
+		{
+		    public class B
+		    {
+		        public class C
+		        {
+		            /// <summary>
+		            /// Deep.
+		            /// </summary>
+		            public void M()
+		            {
+		                /// <summary>Not a member.</summary>
+		                /// more
+		                M();
+		                /// before the brace
+		                /// too
+		            }
+		        }
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Misaligned_lines_move_to_the_first_lines_indent() => Formats(
+		// dotnet format does not keep a later line's offset from the first: every `///` lands on the
+		// same column, whatever mix of tabs and spaces it had.
+		"public class C\n{\n    /// <summary>\n\t  /// a\n  \t/// b\n          /// </summary>\n    public void M() { }\n}\n",
+		"public class C\n{\n    /// <summary>\n    /// a\n    /// b\n    /// </summary>\n    public void M() { }\n}\n");
+
+	[Test]
+	public Task Misaligned_lines_move_to_the_first_lines_indent_in_tabs() => Formats(
+		"public class C\n{\n    /// <summary>\n\t  /// a\n  \t/// b\n          /// </summary>\n    public void M() { }\n}\n",
+		"public class C\n{\n\t/// <summary>\n\t/// a\n\t/// b\n\t/// </summary>\n\tpublic void M() { }\n}\n",
+		editorConfig: "indent_style = tab");
+
+	[Test]
+	public Task Text_after_the_marker_keeps_its_indentation_and_trailing_whitespace() => Formats(
+		"public class C\n{\n  /// <summary>   \n  /// <code>\n  ///   var x = 1;  \n  ///\t\tvar y = 2;\n  /// </code>\n  /// </summary>\n  public void M() { }\n}\n",
+		"public class C\n{\n    /// <summary>   \n    /// <code>\n    ///   var x = 1;  \n    ///\t\tvar y = 2;\n    /// </code>\n    /// </summary>\n    public void M() { }\n}\n");
+
+	[Test]
+	public Task Converting_to_tabs_with_crlf_endings() => Formats(
+		"public class C\r\n{\r\n    /// <summary>\r\n    /// One.\r\n    /// </summary>\r\n    public int P { get; }\r\n}\r\n",
+		"public class C\r\n{\r\n\t/// <summary>\r\n\t/// One.\r\n\t/// </summary>\r\n\tpublic int P { get; }\r\n}\r\n",
+		editorConfig: "indent_style = tab\nend_of_line = crlf");
+
+	[Test]
+	public Task A_delimited_comment_on_the_same_column_keeps_its_continuation_lines() => Formats(
+		// `/** */` is not `///`: dotnet format moves its later lines only by as far as the first line
+		// moved, and four spaces to one tab moves it nowhere.
+		"public class C\n{\n    /**\n     * <summary>Does a thing.</summary>\n     */\n    public int Value;\n}\n",
+		"public class C\n{\n\t/**\n     * <summary>Does a thing.</summary>\n     */\n\tpublic int Value;\n}\n",
+		editorConfig: "indent_style = tab");
 }

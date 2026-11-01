@@ -247,7 +247,9 @@ internal static class TokenPrinter
 						alignedRun = false;
 					}
 
-					pendingNewLines = EmitTriviaText(trivia, context, CommentFlags(trivia));
+					pendingNewLines = trivia.IsKind(SyntaxKind.SingleLineDocumentationCommentTrivia)
+						? EmitDocumentationLines(trivia, context, aligned, alignRegister, alignOffset)
+						: EmitTriviaText(trivia, context, CommentFlags(trivia));
 					if (trailingBreak)
 						arena.HardLine();
 					emittedAnything = true;
@@ -649,6 +651,58 @@ internal static class TokenPrinter
 
 		if (end > chunk)
 			context.Arena.SourceText(chunk, end - chunk, flags);
+	}
+
+	/// <summary>
+	/// Emits a <c>///</c> doc comment with every line at the indent its first line takes.
+	/// </summary>
+	/// <remarks>
+	/// Roslyn groups consecutive <c>///</c> lines into one trivia, so the whitespace in front of each
+	/// later <c>///</c> sits inside the span. Emitted verbatim, it kept the source's indentation while
+	/// the first line moved: a file converted from spaces to tabs, or a member moved to another level,
+	/// came out with the first line at the new indent and the rest at the old (issue #180). dotnet
+	/// format puts every <c>///</c> at the indent of the first, whatever column each had, so the
+	/// whitespace in front of the marker is dropped and the break supplies it. Everything after the
+	/// marker, trailing whitespace included, stays as written, so indentation inside a
+	/// <c>&lt;code&gt;</c> block keeps its shape.
+	/// </remarks>
+	/// <returns>The number of line endings trimmed off the end, as <see cref="EmitTriviaText"/>.</returns>
+	private static int EmitDocumentationLines(SyntaxTrivia trivia, PrintContext context, bool aligned, int alignRegister, int alignOffset)
+	{
+		var text = context.Text;
+		var arena = context.Arena;
+		var span = trivia.FullSpan;
+		var length = TrimTrailingNewLines(context, span.Start, span.Length);
+		var end = span.Start + length;
+		var chunk = span.Start;
+
+		for (var i = chunk; i < end; i++)
+		{
+			if (text[i] != '\n')
+				continue;
+
+			// Back off a CR so it is not emitted as content; the printer supplies the ending.
+			var stop = i > chunk && text[i - 1] == '\r' ? i - 1 : i;
+			if (stop > chunk)
+				arena.SourceText(chunk, stop - chunk, DocFlags.LineComment);
+
+			// The same break the first line took. Trailing whitespace on a doc comment line is the
+			// comment's own, which dotnet format leaves alone.
+			if (aligned)
+				arena.AlignedLine(alignRegister, alignOffset);
+			else
+				arena.HardLine(DocFlags.NoTrim);
+
+			chunk = i + 1;
+			while (chunk < end && text[chunk] is ' ' or '\t')
+				chunk++;
+			i = chunk - 1;
+		}
+
+		if (end > chunk)
+			arena.SourceText(chunk, end - chunk, DocFlags.LineComment);
+
+		return CountNewLines(context, end, span.Length - length);
 	}
 
 	/// <summary>Counts the line endings in a range, treating CRLF as one.</summary>

@@ -14,8 +14,8 @@ repository of 1,702 files that its authors keep formatted:
 - **Zero** failed or unparsable files.
 
 CI gates the same measurement on every push against a generated corpus instead: a solution of about 1,800
-files written to be untidy, in every layout people leave code in. There {{product}} holds 85% with reflow on
-and 83% with it off, and each number is a floor that must not go down. The rest are disagreements the untidy
+files written to be untidy, in every layout people leave code in. There {{product}} holds 94% with reflow on
+and 90% with it off, and each number is a floor that must not go down. The rest are disagreements the untidy
 input exposes and that docs-builder never reached, listed in [known limitations](../known-limitations.md).
 Zero failed files and two identical format passes are gated there too.
 
