@@ -334,7 +334,7 @@ public static class Permuter
 			return;
 		}
 
-		if (r.Chance(p.SpaceDrop) && CanTouch(previous, token) && KnownDefects.AllowsTouching(previous, token))
+		if (r.Chance(p.SpaceDrop) && CanTouch(previous, token))
 		{
 			return;
 		}

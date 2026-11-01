@@ -65,7 +65,9 @@ drops it again, so the output is a fixed point.
 
 A multi-targeted project writes one log per target framework, so a site every framework agrees on is
 reported once per log. Each site is fixed once: repeats are folded across logs, and a diagnostic asking
-for exactly the edits another already asked for counts as fixed without editing again.
+for exactly the edits another already asked for counts as fixed without editing again. An edit never
+joins two tokens into one; where a replacement would leave `var` touching the name after it, a space
+goes between them.
 
 ## What is fixed
 

@@ -354,11 +354,21 @@ public sealed class CSharpCleaner
 		{
 			output.Append(source, cursor, fix.Removed.Start - cursor);
 
+			// Never weld two tokens into one. `List<string>names` is legal C# because the `>` separates the
+			// type from the name; replace the type with `var` and nothing does, so the output read `varnames`,
+			// a different identifier. Whether a space is needed is a property of the two characters that end
+			// up touching, whatever the rule, so it is decided here for every edit rather than in each rule.
+			if (fix.Inserted.Length > 0 && Welds(output, fix.Inserted[0]))
+				output.Append(' ');
+
 			// Where the inserted text lands in the output, which is what the verifiers match on. Taken here
 			// because this is the only place that knows it: the offset shifts by every edit before it.
 			var at = output.Length;
 			output.Append(fix.Inserted);
 			cursor = fix.Removed.End;
+
+			if (cursor < source.Length && Welds(output, source[cursor]))
+				output.Append(' ');
 
 			_dropped.AddRange(fix.DroppedTokens);
 
@@ -372,4 +382,10 @@ public sealed class CSharpCleaner
 		output.Append(source, cursor, source.Length - cursor);
 		return output.ToString();
 	}
+
+	/// <summary>True when <paramref name="next"/> written after <paramref name="output"/> would join one word.</summary>
+	private static bool Welds(StringBuilder output, char next) =>
+		output.Length > 0
+		&& Microsoft.CodeAnalysis.CSharp.SyntaxFacts.IsIdentifierPartCharacter(output[^1])
+		&& Microsoft.CodeAnalysis.CSharp.SyntaxFacts.IsIdentifierPartCharacter(next);
 }
