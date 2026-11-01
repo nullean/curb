@@ -275,6 +275,12 @@ internal static partial class Printers
 		if (node.Parent is not CompilationUnitSyntax unit || unit.Members.Count != 1)
 			return false;
 
+		// A comment or directive on its own line above the opening brace would have to cross the
+		// semicolon that replaces the brace. The conversion used to drop it, and the content check
+		// refused the file; rare enough to leave the block as it is instead.
+		if (TokenPrinter.HasLeadingContent(node.OpenBraceToken))
+			return false;
+
 		foreach (var member in node.Members)
 		{
 			if (member is BaseNamespaceDeclarationSyntax)
@@ -312,6 +318,17 @@ internal static partial class Printers
 		// under the brace, and a file that had one came out with two.
 		var previousEnd = -1;
 
+		// A comment after the opening brace, which the output no longer has (issue #182). It is the
+		// first thing under the declaration, and then reads as the leading comment of whatever comes
+		// next, as it does on the next run: no blank line is forced under it, and one the author left
+		// is kept.
+		if (TokenPrinter.PrintTrailingCommentsOnOwnLine(node.OpenBraceToken, context))
+		{
+			SyntaxNode? next = node.Usings.Count > 0 ? node.Usings[0] : node.Members.Count > 0 ? node.Members[0] : null;
+			if (next is not null && !NextStartsWithDirective(next))
+				context.BlankLines(context.DeclarationSeparation(node.OpenBraceToken.Span.End, EffectiveStart(next)));
+		}
+
 		PrintUsings(node, node.Usings, context, ref previousEnd);
 
 		foreach (var member in node.Members)
@@ -333,6 +350,12 @@ internal static partial class Printers
 			}
 
 			TokenPrinter.PrintLeadingTrivia(node.CloseBraceToken, context, trailingBreak: false);
+
+			// The line the comment ends, which the brace would otherwise have ended. Left open, the
+			// comment kept its trailing whitespace, and the next run, reading it as the file's last
+			// trivia, removed it.
+			if (node.SemicolonToken.RawKind == 0)
+				arena.HardLine();
 		}
 
 		TokenPrinter.PrintIfPresent(node.SemicolonToken, context);

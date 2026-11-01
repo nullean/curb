@@ -560,6 +560,35 @@ internal static class TokenPrinter
 	}
 
 	/// <summary>
+	/// Emits a token's trailing comments on a line of their own, for a token the printer is not writing.
+	/// </summary>
+	/// <remarks>
+	/// The opening brace of a block namespace made file-scoped has no counterpart in the output, but a
+	/// comment written after it does. It goes on the line below the declaration, where Roslyn's own
+	/// fixer puts it (issue #182). Each comment takes a line of its own, as it does when the next run
+	/// reads them as leading trivia; keeping two on one line was undone by that run.
+	/// </remarks>
+	/// <returns>True when anything was written.</returns>
+	internal static bool PrintTrailingCommentsOnOwnLine(SyntaxToken token, PrintContext context)
+	{
+		var arena = context.Arena;
+		var emitted = false;
+
+		foreach (var trivia in token.TrailingTrivia)
+		{
+			if (!trivia.IsKind(SyntaxKind.SingleLineCommentTrivia) && !trivia.IsKind(SyntaxKind.MultiLineCommentTrivia))
+				continue;
+
+			arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
+			EmitTriviaText(trivia, context, CommentFlags(trivia));
+			arena.HardLine();
+			emitted = true;
+		}
+
+		return emitted;
+	}
+
+	/// <summary>
 	/// True when the whitespace beside an inline <c>/* */</c> comment is wider than the one space the
 	/// printer would write, and is written as it stands.
 	/// </summary>

@@ -16,8 +16,6 @@ namespace Nullean.Curb.CorpusGenerator;
 /// damaged a file.
 /// </para>
 /// <list type="number">
-/// <item><c>curb check</c>: a comment as the first thing inside a block namespace is lost by file-scoped conversion,
-/// "formatting changed content" (5).</item>
 /// <item><c>curb check</c>: a trailing <c>//</c> comment after the <c>{</c> of an empty block; collapsing the block
 /// puts the <c>}</c> inside the comment, "formatted output no longer parses" (4).</item>
 /// <item><c>curb check</c>: comments among using directives that move into a block namespace, "formatting lost
@@ -44,7 +42,7 @@ namespace Nullean.Curb.CorpusGenerator;
 /// </remarks>
 public static class KnownDefects
 {
-	/// <summary>Test cases whose own settings, combined with the corpus's, Curb refuses (item 4).</summary>
+	/// <summary>Test cases whose own settings, combined with the corpus's, Curb refuses (item 3).</summary>
 	public static readonly IReadOnlySet<string> SettingsConflicts = new HashSet<string>(StringComparer.Ordinal)
 	{
 		"UsingPlacementAndHeaderTests.Directives_move_inside_a_block_namespace",
@@ -89,15 +87,13 @@ public static class KnownDefects
 		return false;
 	}
 
-	/// <summary>Whether a generated trailing comment may end the line between two tokens (item 6).</summary>
+	/// <summary>Whether a generated trailing comment may end the line between two tokens (item 5).</summary>
 	public static bool AllowsTrailingComment(SyntaxToken previous, SyntaxToken token) =>
 		previous.IsKind(SyntaxKind.OpenBraceToken) && !token.IsKind(SyntaxKind.CloseBraceToken);
 
-	/// <summary>Whether the gap between two tokens may only have its indentation and blank lines changed (items 1 to 3).</summary>
+	/// <summary>Whether the gap between two tokens may only have its indentation and blank lines changed (items 1 and 2).</summary>
 	public static bool Avoid(SyntaxToken previous, SyntaxToken token) =>
-		InUsing(previous) || InUsing(token) || previous.IsKind(SyntaxKind.OpenBraceToken) && previous.Parent is NamespaceDeclarationSyntax || previous.IsKind(
-			SyntaxKind.OpenBraceToken
-		) && token.IsKind(SyntaxKind.CloseBraceToken);
+		InUsing(previous) || InUsing(token) || previous.IsKind(SyntaxKind.OpenBraceToken) && token.IsKind(SyntaxKind.CloseBraceToken);
 
 	private static bool InUsing(SyntaxToken token) => token.Parent?.AncestorsAndSelf().Any(n => n is UsingDirectiveSyntax) == true;
 }
