@@ -294,6 +294,29 @@ public class UsingOrderTests : FormattingTest
 		""",
 		editorConfig: "dotnet_sort_system_directives_first = true");
 
+	// ---- whitespace inside a directive ---------------------------------------------------------------
+
+	[Test]
+	public Task Spaces_inside_a_directive_do_not_stop_it_sorting() => Formats(
+		// The spaces go, as they would anywhere, and the directives still sort. The verifier compared
+		// the directives written with the ones read as text, so `using Zebra.Things ;` was no longer
+		// among them and every such file was refused (issue #181). Checked against dotnet format style.
+		"""
+		using Zebra.Things ;
+		using  System.Linq;
+		using System . Text;
+
+		public class C { }
+		""",
+		"""
+		using System.Linq;
+		using System.Text;
+		using Zebra.Things;
+
+		public class C { }
+		""",
+		editorConfig: "dotnet_sort_system_directives_first = true");
+
 	// ---- block namespaces -------------------------------------------------------------------------
 
 	[Test]

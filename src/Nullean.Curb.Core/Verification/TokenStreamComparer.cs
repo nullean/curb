@@ -455,7 +455,7 @@ internal static class TokenStreamComparer
 		return true;
 	}
 
-	/// <summary>Compares the two using lists as multisets of their text.</summary>
+	/// <summary>Compares the two using lists as multisets of their tokens.</summary>
 	private static bool SameDirectives(SyntaxNode before, SyntaxNode after, out string? failure)
 	{
 		var original = Directives(before);
@@ -483,10 +483,17 @@ internal static class TokenStreamComparer
 		return true;
 	}
 
+	/// <remarks>
+	/// Each directive as its tokens, one space apart, rather than as its text. The printer normalises
+	/// the whitespace inside a directive as it does anywhere else, so <c>using System.Text ;</c> is
+	/// written <c>using System.Text;</c>; compared as text the two differed and every such file was
+	/// refused (issue #181). The tokens are what has to survive a reorder; the comments, which a token
+	/// list cannot see, are held to the content check's multiset compare over the same region.
+	/// </remarks>
 	private static string[] Directives(SyntaxNode root) =>
 		[.. root.DescendantNodes(descendIntoChildren: node => node is CompilationUnitSyntax or BaseNamespaceDeclarationSyntax)
 			.OfType<UsingDirectiveSyntax>()
-			.Select(directive => directive.ToString())];
+			.Select(directive => string.Join(' ', directive.DescendantTokens().Select(token => token.Text)))];
 
 	/// <summary>The span the using directives occupy, or an empty span at zero when there are none.</summary>
 	private static TextSpan DirectiveRegion(SyntaxNode root)
