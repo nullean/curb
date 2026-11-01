@@ -52,7 +52,7 @@ public static class Scaffold
 		csharp_style_var_when_type_is_apparent = true
 		csharp_style_var_elsewhere = true
 
-		# csharp_style_expression_bodied_methods is left out: see KnownDefects, item 6.
+		csharp_style_expression_bodied_methods = true
 		csharp_style_expression_bodied_constructors = true
 		csharp_style_expression_bodied_operators = true
 		csharp_style_expression_bodied_properties = true

@@ -120,6 +120,11 @@ internal static class TokenPrinter
 			context.HeaderSkipCount = 0;
 		}
 
+		// A blank line a separator wrote in front of this token parts its comments from a trailing comment
+		// above them, whatever the source had.
+		var separated = context.BlankLineBeforeTrivia;
+		context.BlankLineBeforeTrivia = false;
+
 		if (count <= skip)
 			return;
 
@@ -236,6 +241,7 @@ internal static class TokenPrinter
 					var startsAligned = isLineComment
 						&& !emittedAnything
 						&& priorNewLines == 0
+						&& !separated
 						&& !(aligned && alignElement)
 						&& AlignsUnderTrailingComment(token, trivia, context);
 
@@ -647,10 +653,30 @@ internal static class TokenPrinter
 	{
 		var span = trivia.FullSpan;
 		var length = TrimTrailingNewLines(context, span.Start, span.Length);
-		if (length > 0)
-			EmitSourceLines(span.Start, length, context, flags);
+		var emitted = trivia.IsKind(SyntaxKind.SingleLineCommentTrivia) ? CommentLength(context, span.Start, length) : length;
+		if (emitted > 0)
+			EmitSourceLines(span.Start, emitted, context, flags);
 
 		return CountNewLines(context, span.Start + length, span.Length - length);
+	}
+
+	/// <summary>
+	/// The length of a <c>//</c> comment as it will be written: without the trailing whitespace Roslyn counts
+	/// as part of it, where <c>trim_trailing_whitespace</c> will strip that anyway.
+	/// </summary>
+	/// <remarks>
+	/// The output trimmed it, but a width decision measured it, so a line that fitted only without it broke
+	/// on the first run and, with the whitespace gone, joined on the second (issue #188).
+	/// </remarks>
+	private static int CommentLength(PrintContext context, int start, int length)
+	{
+		if (!context.Options.TrimTrailingWhitespace)
+			return length;
+
+		var source = context.Text;
+		while (length > 0 && source[start + length - 1] is ' ' or '\t')
+			length--;
+		return length;
 	}
 
 	/// <summary>

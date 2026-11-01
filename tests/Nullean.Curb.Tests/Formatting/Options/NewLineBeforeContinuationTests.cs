@@ -417,4 +417,28 @@ public class NewLineBeforeContinuationTests : FormattingTest
 		}
 		""",
 		editorConfig: "csharp_new_line_before_finally = no");
+
+	[Test]
+	public Task A_trailing_comment_after_a_one_line_block_keeps_the_next_keyword_off_its_line() => Unchanged(
+		// The `}` of a block kept on one line carries its comment inside the region that holds the block
+		// flat, which wrote a space where the comment ends its line, and the joined `catch`, `finally` or
+		// `else` landed inside the comment (issue #188). dotnet format leaves this as it is.
+		"""
+		public class C {
+		    void M() {
+		        try { A(); } // after try
+		        catch { B(); } // after catch
+		        finally { C(); }
+
+		        if (x) { A(); } // after if
+		        else { B(); }
+		    }
+		}
+		""",
+		editorConfig: """
+		csharp_new_line_before_open_brace = none
+		csharp_new_line_before_else = false
+		csharp_new_line_before_catch = false
+		csharp_new_line_before_finally = false
+		""");
 }

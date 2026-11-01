@@ -313,4 +313,83 @@ public class EmptyBlockStyleTests : FormattingTest
 		}
 		""",
 		editorConfig: "empty_block_style = together_same_line");
+
+	// ---- a // comment after the brace keeps the pair open (issue #183) -------------------------------
+	//
+	// Collapsing `{ // note` / `}` put the `}` inside the comment, so the output no longer parsed and the
+	// verifier refused the file. The commented pairs stay open under every setting that collapses the
+	// uncommented `E()` beside them; without a width the expected output is what dotnet format whitespace
+	// writes.
+
+	private const string CommentAfterTheBrace =
+		"""
+		public class C
+		{
+		    void E()
+		    {
+		    }
+
+		    void M() { // note
+		    }
+
+		    void N()
+		    {
+		        try { // a
+		        }
+		        catch { // b
+		        }
+		        finally { // c
+		        }
+
+		        if (true) { // d
+		        }
+		    }
+		}
+		""";
+
+	private static string CommentAfterTheBraceKept(string emptyMethod) =>
+		$$"""
+		public class C
+		{
+		{{emptyMethod}}
+
+		    void M()
+		    { // note
+		    }
+
+		    void N()
+		    {
+		        try
+		        { // a
+		        }
+		        catch
+		        { // b
+		        }
+		        finally
+		        { // c
+		        }
+
+		        if (true)
+		        { // d
+		        }
+		    }
+		}
+		""";
+
+	[Test]
+	public Task A_comment_after_an_empty_brace_keeps_the_pair_open() =>
+		Formats(CommentAfterTheBrace, CommentAfterTheBraceKept("    void E()\n    {\n    }"));
+
+	[Test]
+	public Task A_comment_after_an_empty_brace_keeps_the_pair_open_at_a_width() =>
+		Formats(CommentAfterTheBrace, CommentAfterTheBraceKept("    void E()\n    { }"), editorConfig: "max_line_length = 120");
+
+	[Test]
+	public Task A_comment_after_an_empty_brace_keeps_the_pair_open_under_together_same_line() => Formats(
+		CommentAfterTheBrace,
+		CommentAfterTheBraceKept("    void E() { }"),
+		editorConfig: """
+		max_line_length = 120
+		csharp_empty_block_style = together_same_line
+		""");
 }

@@ -1144,8 +1144,15 @@ internal static partial class Printers
 	}
 
 	/// <summary>True when <see cref="BodyOnArrowLine"/> indents <paramref name="body"/> a level of its own.</summary>
+	/// <remarks>
+	/// A property pattern's braces do not: dotnet format leaves `=&gt; value is Version` / `{` with the brace
+	/// at the member's column, as it leaves `return value is Version` / `{` at the statement's. Indented, the
+	/// seven property-pattern cases of the generated corpus moved a level in once a
+	/// <c>csharp_style_expression_bodied_methods</c> conversion started putting their bodies on the arrow's line.
+	/// </remarks>
 	private static bool HangsOnArrowLine(ExpressionSyntax body) =>
-		body is BinaryExpressionSyntax || !(BringsOwnBlock(body) || BreaksWithoutHelp(body));
+		body is BinaryExpressionSyntax
+		|| !(BringsOwnBlock(body) || BreaksWithoutHelp(body) || body is IsPatternExpressionSyntax { Pattern: RecursivePatternSyntax { PropertyPatternClause: not null } });
 
 	/// <summary>The <c>delegate (T x) { }</c> form that predates lambdas.</summary>
 	public static void AnonymousMethodExpression(AnonymousMethodExpressionSyntax node, PrintContext context)

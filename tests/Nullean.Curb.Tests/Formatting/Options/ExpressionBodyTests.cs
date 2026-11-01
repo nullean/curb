@@ -470,4 +470,234 @@ public class ExpressionBodyTests : FormattingTest
 		""",
 		editorConfig: "csharp_style_expression_bodied_properties = true\ncsharp_style_expression_bodied_accessors = true");
 
+	// ---- settling in one pass (issue #186) --------------------------------------------------------
+	//
+	// The run after a conversion reads back the arrow it wrote, so the conversion has to write the layout
+	// that run gives an arrow. It laid its body out in a group of its own, which put a switch below the
+	// arrow, and the next run hugged it to the arrow: 216 files of the generated corpus that changed on a
+	// second pass. Every expected output below is what `dotnet format style` (IDE0021 to IDE0027, IDE0061)
+	// followed by `dotnet format whitespace` wrote, except where a case names a width.
+
+	private const string Switch =
+		"""
+		public class C
+		{
+		    public string Name(int x)
+		    {
+		        return x switch
+		        {
+		            1 => "one",
+		            _ => "other",
+		        };
+		    }
+		}
+		""";
+
+	private const string SwitchOnTheArrow =
+		"""
+		public class C
+		{
+		    public string Name(int x) => x switch
+		    {
+		        1 => "one",
+		        _ => "other",
+		    };
+		}
+		""";
+
+	[Test]
+	public Task A_converted_switch_hugs_the_arrow_on_the_run_that_converts_it() => Formats(Switch, SwitchOnTheArrow, editorConfig: Methods);
+
+	[Test]
+	public Task A_converted_switch_hugs_the_arrow_at_a_width_too() =>
+		Formats(Switch, SwitchOnTheArrow, editorConfig: Methods + "\nmax_line_length = 140");
+
+	[Test]
+	public Task A_converted_switch_after_a_hugging_paren_follows_the_arrow_a_level_in() => Formats(
+		"""
+		public class C
+		{
+		    public string Name(
+		        int a,
+		        int b)
+		    {
+		        return a switch
+		        {
+		            1 => "one",
+		            _ => "other",
+		        };
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public string Name(
+		        int a,
+		        int b) => a switch
+		        {
+		            1 => "one",
+		            _ => "other",
+		        };
+		}
+		""",
+		editorConfig: Methods);
+
+	[Test]
+	public Task A_converted_getter_switch_hugs_the_arrow() => Formats(
+		"""
+		public class C
+		{
+		    public string Kind
+		    {
+		        get
+		        {
+		            return _x switch
+		            {
+		                1 => "one",
+		                _ => "other",
+		            };
+		        }
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public string Kind => _x switch
+		    {
+		        1 => "one",
+		        _ => "other",
+		    };
+		}
+		""",
+		editorConfig: "csharp_style_expression_bodied_properties = true\ncsharp_style_expression_bodied_accessors = true\nmax_line_length = 140");
+
+	[Test]
+	public Task A_converted_local_function_switch_hugs_the_arrow() => Formats(
+		"""
+		public class C
+		{
+		    public int M()
+		    {
+		        int Inner(int y)
+		        {
+		            return y switch
+		            {
+		                1 => 1,
+		                _ => 0,
+		            };
+		        }
+
+		        return Inner(1);
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public int M()
+		    {
+		        int Inner(int y) => y switch
+		        {
+		            1 => 1,
+		            _ => 0,
+		        };
+
+		        return Inner(1);
+		    }
+		}
+		""",
+		editorConfig: "csharp_style_expression_bodied_local_functions = true");
+
+	[Test]
+	public Task A_converted_call_the_author_opened_out_starts_on_the_arrow_line() => Formats(
+		// The arrow takes over the line `return` was on, so the value stays where the author started it,
+		// as it does after an arrow the author wrote.
+		"""
+		public class C
+		{
+		    public string Call(int a, int b)
+		    {
+		        return string.Join(
+		            ",",
+		            a,
+		            b);
+		    }
+
+		    public int Fail(int x)
+		    {
+		        throw new System.ArgumentOutOfRangeException(
+		            nameof(x));
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public string Call(int a, int b) => string.Join(
+		            ",",
+		            a,
+		            b);
+
+		    public int Fail(int x) => throw new System.ArgumentOutOfRangeException(
+		            nameof(x));
+		}
+		""",
+		editorConfig: Methods);
+
+	[Test]
+	public Task A_converted_property_pattern_keeps_its_braces_at_the_member_column() => Formats(
+		// On the arrow's line, a body indents its own continuation lines a level, but a property pattern's
+		// braces stay at the member's column, as they stay at the statement's after `return`.
+		"""
+		public class C
+		{
+		    public bool M(object value)
+		    {
+		        return value is System.Version
+		        {
+		            Major: 1,
+		            Minor: 2
+		        };
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public bool M(object value) => value is System.Version
+		    {
+		        Major: 1,
+		        Minor: 2
+		    };
+		}
+		""",
+		editorConfig: Methods);
+
+	[Test]
+	public Task A_converted_body_measures_its_semicolon_as_the_next_run_does() => Formats(
+		// Curb's own layout, at a width dotnet format has no opinion on. The conversion printed the `;`
+		// inside the body's group, where the next run prints it after the clause, so at this width the
+		// first run broke the ternary and the second joined it back.
+		"""
+		public class C
+		{
+		    private object value;
+
+		    public void M(bool condition) {
+		        value = condition ? alpha : beta;
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    private object value;
+
+		    public void M(bool condition) =>
+		        value = condition ? alpha : beta;
+		}
+		""",
+		editorConfig: Methods + "\nmax_line_length = 40");
 }
