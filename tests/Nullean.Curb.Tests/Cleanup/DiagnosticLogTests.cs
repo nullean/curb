@@ -300,4 +300,26 @@ public class DiagnosticLogTests
 
 		await Task.CompletedTask;
 	}
+
+	[Test]
+	public async Task A_site_reported_by_two_logs_is_kept_once()
+	{
+		// One log per target framework: the second carries the same site, possibly at another severity.
+		var start = new LinePosition(7, 16);
+		var end = new LinePosition(7, 21);
+		var sites = new DiagnosticSites();
+
+		sites.Add(new CleanupDiagnostic("IDE0044", "/repo/Widget.cs", start, end, DiagnosticLevel.Warning)).Should().BeTrue();
+		sites.Add(new CleanupDiagnostic("IDE0044", "/repo/Widget.cs", start, end, DiagnosticLevel.Note))
+			.Should().BeFalse("the same rule at the same span of the same file is the same verdict");
+		sites.Add(new CleanupDiagnostic("ide0044", "/repo/Widget.cs", start, end)).Should().BeFalse();
+
+		// Anything that names a different site is not a repeat.
+		sites.Add(new CleanupDiagnostic("IDE0040", "/repo/Widget.cs", start, end)).Should().BeTrue();
+		sites.Add(new CleanupDiagnostic("IDE0044", "/repo/Other.cs", start, end)).Should().BeTrue();
+		sites.Add(new CleanupDiagnostic("IDE0044", "/repo/Widget.cs", start, new LinePosition(7, 30))).Should().BeTrue();
+		sites.Add(new CleanupDiagnostic("IDE0044", "/repo/Widget.cs", new LinePosition(8, 16), end)).Should().BeTrue();
+
+		await Task.CompletedTask;
+	}
 }

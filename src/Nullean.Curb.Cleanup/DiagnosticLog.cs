@@ -1,4 +1,5 @@
 using System.Text;
+using Microsoft.CodeAnalysis.Text;
 
 namespace Nullean.Curb.Cleanup;
 
@@ -76,4 +77,28 @@ public static class DiagnosticLog
 		public IEnumerator<CleanupDiagnostic> GetEnumerator() => target.GetEnumerator();
 		System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
 	}
+}
+
+/// <summary>
+/// The sites already seen across several logs, so a diagnostic reported by more than one is handled once.
+/// </summary>
+/// <remarks>
+/// <para>
+/// <see cref="DiagnosticLog.TryRead"/> folds repeats inside one log. A multi-targeted project writes one log
+/// per target framework, so every site the frameworks agree on arrives once per log, and cleanup handed each
+/// to the cleaner: an inserted modifier was written once per report, <c>readonly readonly</c>, CS1004. Found
+/// by the generated corpus's multi-targeted project.
+/// </para>
+/// <para>
+/// Keyed on the site (rule, file, start, end) rather than the whole record, so the same site reported at a
+/// different severity by another log is still the same site. The first report wins.
+/// </para>
+/// </remarks>
+public sealed class DiagnosticSites
+{
+	private readonly HashSet<(string RuleId, string FilePath, LinePosition Start, LinePosition? End)> _seen = [];
+
+	/// <summary>True the first time a site is seen, false for every repeat.</summary>
+	public bool Add(in CleanupDiagnostic diagnostic) =>
+		_seen.Add((diagnostic.RuleId.ToUpperInvariant(), diagnostic.FilePath, diagnostic.Start, diagnostic.End));
 }

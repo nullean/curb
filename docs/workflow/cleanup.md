@@ -63,6 +63,10 @@ Three layers keep applying a verdict from a previous build safe:
 Overlapping fixes drop both, never one. Dropping both means a second pass sees the same overlap and
 drops it again, so the output is a fixed point.
 
+A multi-targeted project writes one log per target framework, so a site every framework agrees on is
+reported once per log. Each site is fixed once: repeats are folded across logs, and a diagnostic asking
+for exactly the edits another already asked for counts as fixed without editing again.
+
 ## What is fixed
 
 `curb rules` is the live answer. Ten rules today: IDE0005, IDE0007, IDE0034, IDE0040, IDE0044, IDE0071,

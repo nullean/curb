@@ -64,6 +64,10 @@ internal static class CleanupRun
 		var stopwatch = Stopwatch.StartNew();
 
 		var byFile = new Dictionary<string, List<CleanupDiagnostic>>(StringComparer.Ordinal);
+
+		// Across logs, not only within one: a multi-targeted project writes one log per target framework, and
+		// a site handed to the cleaner twice had its modifier inserted twice. See DiagnosticSites.
+		var sites = new DiagnosticSites();
 		var notOurs = new List<CleanupDiagnostic>();
 		var newest = DateTime.MinValue;
 
@@ -89,6 +93,9 @@ internal static class CleanupRun
 
 			foreach (var diagnostic in DiagnosticLog.Fixable(all))
 			{
+				if (!sites.Add(diagnostic))
+					continue;
+
 				if (!byFile.TryGetValue(diagnostic.FilePath, out var forFile))
 					byFile[diagnostic.FilePath] = forFile = [];
 

@@ -36,8 +36,7 @@ public static partial class Templates
 		}
 		b.Append("\n{\n");
 
-		// No IDE0040 site in the multi-targeted project: KnownDefects, item 9.
-		var modifier = netStandard ? "private " : c.Either("", "private ", 0.15);
+		var modifier = c.Either("", "private ", 0.15);
 		if (primary)
 		{
 			b.Append(modifier).Append("readonly IClock _clock = clock;\n");
@@ -48,13 +47,12 @@ public static partial class Templates
 		{
 			b.Append(modifier).Append("readonly IClock _clock;\n");
 			b.Append("private readonly IRepository<Customer> _customers;\n");
-			b.Append("private ").Append(netStandard ? "readonly " : c.Either("", "readonly ")).Append("string _name;\n");
+			b.Append("private ").Append(c.Either("", "readonly ")).Append("string _name;\n");
 		}
 
-		// No IDE0044 site in the multi-targeted project: KnownDefects, item 9.
 		b
 			.Append("private ")
-			.Append(netStandard ? "readonly " : c.Either("", "readonly ", 0.3))
+			.Append(c.Either("", "readonly ", 0.3))
 			.Append("List<string> _log = ")
 			.Append(c.Either("new List<string>()", "new()", 0.5))
 			.Append(";\n");
@@ -105,7 +103,6 @@ public static partial class Templates
 
 	private static readonly Func<Ctx, string>[] StandardTypes =
 	[
-		// Neither struct candidate: their IDE0250 and IDE0251 sites would hit KnownDefects, item 9.
 		RecordType,
 		EnumType,
 		ExceptionType,
@@ -114,6 +111,8 @@ public static partial class Templates
 		GenericCache,
 		StaticDefaultsStandard,
 		PartialType,
+		StructReadonlyCandidate,
+		StructMemberCandidate,
 		OperatorStruct,
 	];
 
