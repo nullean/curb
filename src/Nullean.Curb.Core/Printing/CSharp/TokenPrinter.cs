@@ -99,20 +99,28 @@ internal static class TokenPrinter
 	/// must be at the outer one. Emitting both breaks would insert a blank line, and the next run
 	/// would then preserve it and add another.
 	/// </param>
-	internal static void PrintLeadingTrivia(SyntaxToken token, PrintContext context, bool trailingBreak = true)
+	/// <param name="start">The first trivia entry to emit; the ones before it were printed elsewhere.</param>
+	/// <param name="end">
+	/// One past the last trivia entry to emit. A using block's file banner is printed by itself, ahead
+	/// of the directives (<see cref="UsingOrganiser.BannerEnd"/>), and the rest of that trivia later
+	/// with its directive; both halves go through this walk, so the banner comes out exactly as it
+	/// would have had the block not moved, and a second run that leaves the block where it is agrees.
+	/// </param>
+	internal static void PrintLeadingTrivia(SyntaxToken token, PrintContext context, bool trailingBreak = true, int start = 0, int end = int.MaxValue)
 	{
 		var leading = token.LeadingTrivia;
+		var count = Math.Min(leading.Count, end);
 
 		// A file-header replacement or blank-line skip pending for exactly this token. See
 		// PrintContext.HeaderSkipTokenPosition for why this cannot be a simple "skip the next call".
-		var skip = 0;
+		var skip = start;
 		if (context.HeaderSkipCount > 0 && token.SpanStart == context.HeaderSkipTokenPosition)
 		{
-			skip = context.HeaderSkipCount;
+			skip = Math.Max(skip, context.HeaderSkipCount);
 			context.HeaderSkipCount = 0;
 		}
 
-		if (leading.Count <= skip)
+		if (count <= skip)
 			return;
 
 		var arena = context.Arena;
@@ -147,7 +155,7 @@ internal static class TokenPrinter
 		// confirm before relying on it.
 		int? forcedGapPending = null;
 
-		for (var i = skip; i < leading.Count; i++)
+		for (var i = skip; i < count; i++)
 		{
 			var trivia = leading[i];
 

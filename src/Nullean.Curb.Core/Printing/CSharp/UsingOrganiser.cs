@@ -136,6 +136,25 @@ internal static class UsingOrganiser
 		return end;
 	}
 
+	/// <summary>How many of the first directive's leading trivia entries make up its file banner.</summary>
+	/// <remarks>Zero when there is no banner; see <see cref="BannerEnd"/>.</remarks>
+	public static int BannerTriviaCount(UsingDirectiveSyntax first)
+	{
+		var end = BannerEnd(first);
+		if (end == first.FullSpan.Start)
+			return 0;
+
+		var count = 0;
+		foreach (var trivia in first.GetLeadingTrivia())
+		{
+			if (trivia.FullSpan.End > end)
+				break;
+			count++;
+		}
+
+		return count;
+	}
+
 	/// <summary>True when the first directive carries a comment of its own as well as a file banner.</summary>
 	private static bool HasContentAfterBanner(UsingDirectiveSyntax first)
 	{

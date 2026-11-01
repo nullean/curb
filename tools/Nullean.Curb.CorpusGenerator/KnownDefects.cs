@@ -29,8 +29,6 @@ namespace Nullean.Curb.CorpusGenerator;
 /// <c>csharp_style_expression_bodied_methods = true</c> comes out as <c>=&gt;</c> with the expression on the next line,
 /// and a second pass joins it (210, nearly all <c>{ return x switch { ... }; }</c>). The corpus configuration leaves
 /// that one key out.</item>
-/// <item>Idempotency: trailing whitespace on a file header line, or on the blank line after it, survives the first pass
-/// and goes on the second (18). None is written into a file's leading trivia.</item>
 /// <item>Idempotency: a trailing <c>//</c> comment on a line a width decision covers (a method header, an expression
 /// body, an accessor list, a switch arm) is counted by the first pass, which breaks the construct, and not by the
 /// second, which joins it back (1; 2 each at seeds 2 and 3). <c>curb check</c>: a trailing comment after a <c>}</c>
@@ -52,9 +50,6 @@ public static class KnownDefects
 		"UsingPlacementAndHeaderTests.Directives_move_inside_a_block_namespace",
 		"UsingPlacementAndHeaderTests.The_header_lands_above_directives_that_moved_inside",
 	};
-
-	/// <summary>The profile for a file's leading trivia: no trailing whitespace (item 6).</summary>
-	public static LayoutProfile InHeader(LayoutProfile p) => p with { TrailingWhitespace = 0 };
 
 	/// <summary>
 	/// Syntax Curb prints verbatim today (<c>curb check --coverage</c>), by design rather than by defect: an unhandled
@@ -94,7 +89,7 @@ public static class KnownDefects
 		return false;
 	}
 
-	/// <summary>Whether a generated trailing comment may end the line between two tokens (item 7).</summary>
+	/// <summary>Whether a generated trailing comment may end the line between two tokens (item 6).</summary>
 	public static bool AllowsTrailingComment(SyntaxToken previous, SyntaxToken token) =>
 		previous.IsKind(SyntaxKind.OpenBraceToken) && !token.IsKind(SyntaxKind.CloseBraceToken);
 

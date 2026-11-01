@@ -207,10 +207,14 @@ internal static partial class Printers
 	/// </summary>
 	/// <remarks>
 	/// A file banner — everything above the last blank line before the first directive — belongs to
-	/// the file rather than to whichever directive happens to come first, so it is emitted verbatim
-	/// where it was and that directive is printed without it. The span that moved is recorded so the
-	/// content verifier can check the region as a multiset instead of in order.
+	/// the file rather than to whichever directive happens to come first, so it is emitted where it
+	/// was and that directive is printed without it. The span that moved is recorded so the content
+	/// verifier can check the region as a multiset instead of in order.
 	/// </remarks>
+	/// <param name="container">The node that owns <paramref name="usings"/> in the source.</param>
+	/// <param name="usings">The directives, in source order.</param>
+	/// <param name="context">Per-file printing state.</param>
+	/// <param name="previousEnd">Where the previous item ended, for blank-line separation.</param>
 	private static void PrintUsings(
 		SyntaxNode container,
 		SyntaxList<UsingDirectiveSyntax> usings,
@@ -232,16 +236,18 @@ internal static partial class Printers
 
 		var arena = context.Arena;
 		var firstInSource = usings[0];
-		var bannerEnd = UsingOrganiser.BannerEnd(firstInSource);
-		var hasBanner = bannerEnd > firstInSource.FullSpan.Start;
+		var bannerCount = UsingOrganiser.BannerTriviaCount(firstInSource);
 
-		if (hasBanner)
+		if (bannerCount > 0)
 		{
 			if (previousEnd >= 0)
 				arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
 
-			TokenPrinter.EmitVerbatimRange(context, firstInSource.FullSpan.Start, bannerEnd - firstInSource.FullSpan.Start);
-			previousEnd = bannerEnd;
+			// Through the ordinary trivia walk rather than verbatim, so it comes out exactly as it does
+			// on the next run, when the block is already in order and nothing splits the trivia: a
+			// verbatim copy kept trailing whitespace on a header line that the next run then removed.
+			TokenPrinter.PrintLeadingTrivia(firstInSource.GetFirstToken(includeZeroWidth: true), context, end: bannerCount);
+			previousEnd = UsingOrganiser.BannerEnd(firstInSource);
 		}
 
 		for (var i = 0; i < ordered.Length; i++)
@@ -261,7 +267,7 @@ internal static partial class Printers
 					arena.HardLine();
 			}
 
-			UsingDirective(directive, context, skipBanner: hasBanner && directive == firstInSource);
+			UsingDirective(directive, context, directive == firstInSource ? bannerCount : 0);
 		}
 
 		previousEnd = usings[^1].Span.End;
@@ -274,31 +280,31 @@ internal static partial class Printers
 	}
 
 	public static void UsingDirective(UsingDirectiveSyntax node, PrintContext context) =>
-		UsingDirective(node, context, skipBanner: false);
+		UsingDirective(node, context, leadingFrom: 0);
 
 	/// <param name="node">The directive.</param>
 	/// <param name="context">Per-file printing state.</param>
-	/// <param name="skipBanner">
-	/// Drop the leading trivia of the first token. Set only for the directive that owned a file
-	/// banner which has already been emitted in its original place.
+	/// <param name="leadingFrom">
+	/// The first entry of the directive's leading trivia to print. Non-zero only for the directive
+	/// that owned a file banner, which has already been printed in its original place; whatever
+	/// follows the banner is still this directive's own and travels with it.
 	/// </param>
-	private static void UsingDirective(UsingDirectiveSyntax node, PrintContext context, bool skipBanner)
+	private static void UsingDirective(UsingDirectiveSyntax node, PrintContext context, int leadingFrom)
 	{
+		var first = node.GlobalKeyword.RawKind != 0 ? node.GlobalKeyword : node.UsingKeyword;
+		if (leadingFrom > 0)
+		{
+			TokenPrinter.PrintLeadingTrivia(first, context, start: leadingFrom);
+			TokenPrinter.PrintWithoutLeadingTrivia(first, context);
+		}
+		else
+			TokenPrinter.Print(first, context);
+
 		if (node.GlobalKeyword.RawKind != 0)
 		{
-			if (skipBanner)
-				TokenPrinter.PrintWithoutLeadingTrivia(node.GlobalKeyword, context);
-			else
-				TokenPrinter.Print(node.GlobalKeyword, context);
-
 			context.Arena.Synthetic(SyntheticText.Space);
-			skipBanner = false;
-		}
-
-		if (skipBanner)
-			TokenPrinter.PrintWithoutLeadingTrivia(node.UsingKeyword, context);
-		else
 			TokenPrinter.Print(node.UsingKeyword, context);
+		}
 
 		context.Arena.Synthetic(SyntheticText.Space);
 
@@ -1184,7 +1190,7 @@ internal static partial class Printers
 	/// <remarks>
 	/// Only called on a <see cref="NameSyntax"/> about to go through <see cref="Tokens"/>, to rule out
 	/// the one shape that helper cannot space correctly — see the caller in
-	/// <see cref="UsingDirective(UsingDirectiveSyntax, PrintContext, bool)"/>. A plain dotted name never
+	/// <see cref="UsingDirective(UsingDirectiveSyntax, PrintContext, int)"/>. A plain dotted name never
 	/// nests one, so this walk only ever runs its full length on a generic argument list, which is rare
 	/// enough on a using directive's target that a real printer being correct matters more than this
 	/// being free.
