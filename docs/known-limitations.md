@@ -10,8 +10,12 @@ description: Current limitations in Curb's formatting output and what to expect 
 On source that was never formatted, {{product}} indents a few kinds of continuation line differently from
 `dotnet format`: multi-dimensional array initializers, `select new { }` in a query, tuple patterns in switch
 arms, members of a `with` initializer, and some `//` comments on a line of their own. The CI corpus, which is written to be untidy, finds these in about
-170 of its 1,844 files, which is the gap between its conformance floor and 100%. elastic/docs-builder, whose
+205 of its 1,868 files, which is the gap between its conformance floor and 100%. elastic/docs-builder, whose
 authors had already formatted it, shows none.
+
+Most of the comment cases are a `//` comment on the line below a trailing `//` comment. dotnet format aligns
+it under the trailing comment where {{product}} leaves it at the statement's indent. In 128 of those 205 files
+it is the only difference.
 
 ## An expression body can move on a second pass at a width
 
