@@ -159,10 +159,6 @@ public static class Permuter
 			{
 				AppendVerbatim(output, gap);
 			}
-			else if (KnownDefects.Avoid(previous, token) && gap.All(t => t.IsKind(SyntaxKind.WhitespaceTrivia) || t.IsKind(SyntaxKind.EndOfLineTrivia)))
-			{
-				AppendQuietGap(output, gap, level, i == 0, token, p, r);
-			}
 			else if (gap.All(t => t.IsKind(SyntaxKind.WhitespaceTrivia) || t.IsKind(SyntaxKind.EndOfLineTrivia)))
 			{
 				AppendWhitespaceGap(output, gap, previous, token, level, i == 0, p, r);
@@ -198,23 +194,6 @@ public static class Permuter
 		}
 
 		return output.ToString();
-	}
-
-	/// <summary>Indentation and blank lines only, for a gap <see cref="KnownDefects"/> keeps away from.</summary>
-	private static void AppendQuietGap(StringBuilder output, SyntaxTriviaList gap, int level, bool first, SyntaxToken token, LayoutProfile p, Rng r)
-	{
-		var newlines = gap.Count(t => t.IsKind(SyntaxKind.EndOfLineTrivia));
-		if (newlines == 0)
-		{
-			output.Append(string.Concat(gap.Select(t => t.ToFullString())));
-			return;
-		}
-
-		output.Append('\n', newlines);
-		if (!first && !token.IsKind(SyntaxKind.EndOfFileToken))
-		{
-			output.Append(Indent(level, p, r));
-		}
 	}
 
 	private static void AppendVerbatim(StringBuilder output, SyntaxTriviaList gap)

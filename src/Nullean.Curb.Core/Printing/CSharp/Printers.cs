@@ -1603,9 +1603,15 @@ internal static partial class Printers
 			: context.Options.PreserveSingleLineBlocks && context.AuthorJoined(body.SpanStart, body.Span.End);
 	}
 
-	/// <summary>An empty block whose closing brace carries no trivia a collapse would have to drop.</summary>
+	/// <summary>An empty block whose braces carry no trivia a collapse would have to drop or break.</summary>
+	/// <remarks>
+	/// That includes a <c>//</c> comment trailing the <c>{</c>: collapsing the pair put the <c>}</c> inside it,
+	/// which the verifier refused (issue #183). Such a block stays open, as dotnet format leaves it.
+	/// </remarks>
 	private static bool IsEmptyBraces(SyntaxNode body) =>
-		body is BlockSyntax { Statements.Count: 0 } block && !TokenPrinter.HasLeadingContent(block.CloseBraceToken);
+		body is BlockSyntax { Statements.Count: 0 } block
+		&& !TokenPrinter.HasLeadingContent(block.CloseBraceToken)
+		&& !EndsWithLineComment(block.OpenBraceToken);
 
 	/// <summary>
 	/// True when an empty brace pair should print as <c>{ }</c> rather than opened out.
