@@ -712,10 +712,7 @@ internal static partial class Printers
 			// Where the `)` is left to the source, the source answers. Where an option forces it to
 			// hug, the arrow is a level deeper exactly when the list breaks — which is this run's
 			// decision, so it is asked of the list's own group rather than of the text.
-			var forced = context.Options.WrapBeforeDeclarationRpar;
-			using (forced == false
-				? arena.IndentIfBroken(context.ParameterListGroup)
-				: arena.IndentIf(forced is null && ClosingParenHugsTheLastParameter(owner, context)))
+			using (IndentToArrowLine(owner, context))
 			{
 				arena.Synthetic(SyntheticText.Space);
 				Node.Print(expression, context);
@@ -738,7 +735,12 @@ internal static partial class Printers
 		if (!arrowLeadsTheBody && startsOnArrowLine)
 		{
 			arena.Synthetic(SyntheticText.Space);
-			using (arena.IndentIf(throws || HangsOnArrowLine(expression)))
+			// An object initializer's braces sit at the indent of the line the arrow landed on, as a switch's
+			// do above, and that line is a level deeper when the `)` hugs the last parameter. Printed at the
+			// member's level, dotnet format indented the braces and Curb took them back — issue #197.
+			using (BracesFollowTheArrowLine(expression, context)
+				? IndentToArrowLine(owner, context)
+				: arena.IndentIf(throws || HangsOnArrowLine(expression)))
 				PrintArrowBody(throwKeyword, expression, context);
 			return;
 		}
@@ -766,6 +768,50 @@ internal static partial class Printers
 			PrintArrowBody(throwKeyword, expression, context);
 		}
 	}
+
+	/// <summary>A level of indent when the line an expression body's arrow lands on is deeper than the member.</summary>
+	/// <remarks>
+	/// Where the <c>)</c> is left to the source, the source answers. Where an option forces it to hug, the arrow
+	/// is a level deeper exactly when the list breaks, which is this run's decision, so it is asked of the list's
+	/// own group. A member with no parameters has no such group: the one in the context is an earlier member's.
+	/// </remarks>
+	private static DocScope IndentToArrowLine(SyntaxNode? owner, PrintContext context)
+	{
+		var parameters = ParameterListOf(owner);
+		if (parameters is not { Parameters.Count: > 0 })
+			return default;
+
+		var forced = context.Options.WrapBeforeDeclarationRpar;
+		return forced == false
+			? context.Arena.IndentIfBroken(context.ParameterListGroup)
+			: context.Arena.IndentIf(forced is null && ClosingParenHugsTheLastParameter(parameters, context));
+	}
+
+	/// <summary>True for a body on the arrow's line whose braces dotnet format places from that line's indent.</summary>
+	/// <remarks>
+	/// Array and collection initializers are the exception: dotnet format leaves those where the author put them.
+	/// </remarks>
+	private static bool BracesFollowTheArrowLine(ExpressionSyntax body, PrintContext context) =>
+		body switch
+		{
+			BaseObjectCreationExpressionSyntax { Initializer: { } initializer } => initializer.IsKind(SyntaxKind.ObjectInitializerExpression),
+			AnonymousObjectCreationExpressionSyntax or WithExpressionSyntax => true,
+			IsPatternExpressionSyntax { Pattern: RecursivePatternSyntax { PropertyPatternClause: not null } } => true,
+			AssignmentExpressionSyntax assignment => BracesFollowTheArrowLine(assignment.Right, context),
+			AwaitExpressionSyntax awaited => BracesFollowTheArrowLine(awaited.Expression, context),
+			CastExpressionSyntax cast => BracesFollowTheArrowLine(cast.Expression, context),
+			ThrowExpressionSyntax thrown => BracesFollowTheArrowLine(thrown.Expression, context),
+			BinaryExpressionSyntax binary => context.AuthorJoined(binary.SpanStart, binary.Right.SpanStart)
+				&& BracesFollowTheArrowLine(binary.Right, context),
+			ConditionalExpressionSyntax conditional => context.AuthorJoined(conditional.SpanStart, conditional.WhenTrue.SpanStart)
+				&& (BracesFollowTheArrowLine(conditional.WhenTrue, context) || BracesFollowTheArrowLine(conditional.WhenFalse, context)),
+			MemberAccessExpressionSyntax access => BracesFollowTheArrowLine(access.Expression, context),
+			InvocationExpressionSyntax invocation => BracesFollowTheArrowLine(invocation.Expression, context)
+				|| (invocation.ArgumentList.Arguments is [.., var last]
+					&& context.AuthorJoined(invocation.SpanStart, last.SpanStart)
+					&& BracesFollowTheArrowLine(last.Expression, context)),
+			_ => false,
+		};
 
 	/// <summary>The written arrow, or a synthesised one where <paramref name="arrow"/> is default.</summary>
 	private static void PrintArrow(SyntaxToken arrow, PrintContext context)
@@ -795,9 +841,16 @@ internal static partial class Printers
 	/// Which is the one shape that leaves an expression body's arrow a level deeper than the member,
 	/// and so the one shape where dotnet format puts a switch or query body a level deeper too.
 	/// </remarks>
-	private static bool ClosingParenHugsTheLastParameter(SyntaxNode? owner, PrintContext context)
+	private static bool ClosingParenHugsTheLastParameter(ParameterListSyntax parameters, PrintContext context)
 	{
-		var parameters = owner switch
+		if (!SpansLines(parameters, context))
+			return false;
+
+		return context.AuthorJoined(parameters.Parameters[^1].Span.End, parameters.CloseParenToken.SpanStart);
+	}
+
+	private static ParameterListSyntax? ParameterListOf(SyntaxNode? owner) =>
+		owner switch
 		{
 			MethodDeclarationSyntax method => method.ParameterList,
 			LocalFunctionStatementSyntax local => local.ParameterList,
@@ -806,12 +859,6 @@ internal static partial class Printers
 			ConversionOperatorDeclarationSyntax conversion => conversion.ParameterList,
 			_ => null,
 		};
-
-		if (parameters is not { Parameters.Count: > 0 } || !SpansLines(parameters, context))
-			return false;
-
-		return context.AuthorJoined(parameters.Parameters[^1].Span.End, parameters.CloseParenToken.SpanStart);
-	}
 
 	public static void TypeParameterList(TypeParameterListSyntax node, PrintContext context)
 	{

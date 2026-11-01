@@ -17,6 +17,13 @@ Most of the comment cases are a `//` comment on the line below a trailing `//` c
 it under the trailing comment where {{product}} leaves it at the statement's indent. In 128 of those 205 files
 it is the only difference.
 
+## Braces after an expression body's arrow
+
+{{product}} and `dotnet format` still undo each other's indent on two rare shapes of `=> … { }`:
+
+- An initializer on the left of an operator, such as `=> new T { … } ?? other`.
+- A constructor with `: base(…)` and a wrapped parameter list under `csharp_wrap_before_declaration_rpar = false`.
+
 ## An expression body can move on a second pass at a width
 
 With a width set, an expression body Curb moved below its `=>` on the first pass can be joined back
