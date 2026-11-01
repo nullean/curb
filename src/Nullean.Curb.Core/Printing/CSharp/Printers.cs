@@ -610,8 +610,6 @@ internal static partial class Printers
 
 	public static void ArrowExpressionClause(ArrowExpressionClauseSyntax node, PrintContext context)
 	{
-		var arena = context.Arena;
-
 		// csharp_wrap_before_arrow_with_expressions moves the arrow to the far side of the break, so
 		// a body that wraps reads `M()` / `=> expr` rather than `M() =>` / `expr`. Only the break
 		// moves: flat, both spellings print `M() => expr`, so the option costs nothing on a body that
@@ -629,7 +627,7 @@ internal static partial class Printers
 		// one construct where that costs nothing at all, because csharp_wrap_before_arrow_with_expressions
 		// and the group already decide the arrow's side of the break between them. It is the exemplar the
 		// layout note uses for a rule aimed at a group rather than at the source.
-		var hugs = node.Expression is SwitchExpressionSyntax or QueryExpressionSyntax;
+		var hugs = HugsTheArrow(node.Expression);
 		var breakBeforeArrow = !hugs
 			&& context.AuthorBroke(node.ArrowToken.GetPreviousToken().Span.End, node.ArrowToken.SpanStart);
 		var breakAfterArrow = context.AuthorBroke(node.ArrowToken.Span.End, node.Expression.SpanStart);
@@ -647,13 +645,60 @@ internal static partial class Printers
 			return;
 		}
 
+		ArrowAndBody(
+			node.Parent,
+			node.ArrowToken,
+			default,
+			node.Expression,
+			breakBeforeArrow,
+			context.AuthorJoined(node.ArrowToken.Span.End, node.Expression.SpanStart),
+			context);
+	}
+
+	/// <summary>True for the bodies that hug an expression body's arrow rather than hang below it.</summary>
+	private static bool HugsTheArrow(ExpressionSyntax body) => body is SwitchExpressionSyntax or QueryExpressionSyntax;
+
+	/// <summary>
+	/// Prints an expression body's arrow and the body after it: the one layout both a written arrow and an
+	/// arrow a <c>csharp_style_expression_bodied_*</c> conversion synthesises go through.
+	/// </summary>
+	/// <remarks>
+	/// <para>
+	/// One layout for both, because the run after a conversion reads the arrow it wrote through
+	/// <see cref="ArrowExpressionClause"/>. The conversion used to lay its body out in a group of its own,
+	/// which put a switch below `=&gt;` where the next run hugged it to the arrow — issue #186, 216 files of
+	/// the generated corpus that changed on a second pass.
+	/// </para>
+	/// <para>
+	/// <paramref name="arrow"/> is the written arrow, or default for a synthesised one.
+	/// <paramref name="throwKeyword"/> is set when the body is a <c>throw</c> statement being converted, so
+	/// it prints as the <c>throw</c> expression the next run reads. <paramref name="startsOnArrowLine"/> is
+	/// whether the author started the body on the arrow's line, or for a conversion on its keyword's line,
+	/// which is the line the arrow takes over. Both predicates behind it answer false under deterministic
+	/// layout.
+	/// </para>
+	/// </remarks>
+	private static void ArrowAndBody(
+		SyntaxNode? owner,
+		SyntaxToken arrow,
+		SyntaxToken throwKeyword,
+		ExpressionSyntax expression,
+		bool breakBeforeArrow,
+		bool startsOnArrowLine,
+		PrintContext context)
+	{
+		var arena = context.Arena;
+		var throws = throwKeyword.RawKind != 0;
+		var hugs = !throws && HugsTheArrow(expression);
+		var arrowLeadsTheBody = !hugs && (context.Options.WrapBeforeArrowWithExpressions || breakBeforeArrow);
+
 		if (!arrowLeadsTheBody)
-			TokenPrinter.Print(node.ArrowToken, context);
+			PrintArrow(arrow, context);
 
 		// Narrower than an initializer's rule. dotnet format leaves `=> x switch { … }` level with
 		// the member but indents `=> new() { … }` one further, so only the constructs that own a
 		// whole block of their own hug here; an object or collection initializer does not.
-		if (node.Expression is SwitchExpressionSyntax or QueryExpressionSyntax)
+		if (hugs)
 		{
 			// dotnet format anchors this to the indent of the line the *arrow* ends up on, which is
 			// not the same as whether the parameter list wrapped — an earlier note here said it was,
@@ -670,10 +715,10 @@ internal static partial class Printers
 			var forced = context.Options.WrapBeforeDeclarationRpar;
 			using (forced == false
 				? arena.IndentIfBroken(context.ParameterListGroup)
-				: arena.IndentIf(forced is null && ClosingParenHugsTheLastParameter(node, context)))
+				: arena.IndentIf(forced is null && ClosingParenHugsTheLastParameter(owner, context)))
 			{
 				arena.Synthetic(SyntheticText.Space);
-				Node.Print(node.Expression, context);
+				Node.Print(expression, context);
 			}
 
 			return;
@@ -690,9 +735,11 @@ internal static partial class Printers
 		// not whether it spans lines. A body the author started on the arrow's line stays there. The
 		// group below broke as soon as the body kept a break of its own, so `=> b ?` / `1 :` / `2`
 		// gained a break after the arrow — issue #102.
-		if (!arrowLeadsTheBody && context.AuthorJoined(node.ArrowToken.Span.End, node.Expression.SpanStart))
+		if (!arrowLeadsTheBody && startsOnArrowLine)
 		{
-			BodyOnArrowLine(node.Expression, context);
+			arena.Synthetic(SyntheticText.Space);
+			using (arena.IndentIf(throws || HangsOnArrowLine(expression)))
+				PrintArrowBody(throwKeyword, expression, context);
 			return;
 		}
 
@@ -708,7 +755,7 @@ internal static partial class Printers
 				else
 					arena.SoftLine();
 
-				TokenPrinter.Print(node.ArrowToken, context);
+				PrintArrow(arrow, context);
 				arena.Synthetic(SyntheticText.Space);
 			}
 			else
@@ -716,8 +763,29 @@ internal static partial class Printers
 				arena.Line();
 			}
 
-			Node.Print(node.Expression, context);
+			PrintArrowBody(throwKeyword, expression, context);
 		}
+	}
+
+	/// <summary>The written arrow, or a synthesised one where <paramref name="arrow"/> is default.</summary>
+	private static void PrintArrow(SyntaxToken arrow, PrintContext context)
+	{
+		if (arrow.RawKind != 0)
+			TokenPrinter.Print(arrow, context);
+		else
+			context.Arena.Synthetic(CSharpSyntheticText.Arrow);
+	}
+
+	/// <summary>The body after an arrow; a converted <c>throw</c> statement prints as a throw expression would.</summary>
+	private static void PrintArrowBody(SyntaxToken throwKeyword, ExpressionSyntax expression, PrintContext context)
+	{
+		if (throwKeyword.RawKind != 0)
+		{
+			TokenPrinter.Print(throwKeyword, context);
+			context.Arena.Synthetic(SyntheticText.Space);
+		}
+
+		Node.Print(expression, context);
 	}
 
 	/// <summary>
@@ -727,9 +795,9 @@ internal static partial class Printers
 	/// Which is the one shape that leaves an expression body's arrow a level deeper than the member,
 	/// and so the one shape where dotnet format puts a switch or query body a level deeper too.
 	/// </remarks>
-	private static bool ClosingParenHugsTheLastParameter(SyntaxNode arrow, PrintContext context)
+	private static bool ClosingParenHugsTheLastParameter(SyntaxNode? owner, PrintContext context)
 	{
-		var parameters = arrow.Parent switch
+		var parameters = owner switch
 		{
 			MethodDeclarationSyntax method => method.ParameterList,
 			LocalFunctionStatementSyntax local => local.ParameterList,
@@ -1647,40 +1715,30 @@ internal static partial class Printers
 		if (HasAnyTrivia(body.OpenBraceToken) || HasAnyTrivia(body.CloseBraceToken) || HasAnyTrivia(statement, context))
 			return false;
 
-		var arena = context.Arena;
-
-		// The same arrow placement ArrowExpressionClause applies. A body synthesised here never
-		// reaches that printer, so leaving it out made a converted member print the arrow trailing on
-		// the run that converted it and leading on the next — thirteen corpus files, and none of the
-		// unit tests, which all started from a body that already had its arrow.
-		var arrowLeadsTheBody = context.Options.WrapBeforeArrowWithExpressions;
-
-		BeforeSynthesisedArrow(body.OpenBraceToken.GetPreviousToken(), context);
-		if (!arrowLeadsTheBody)
-			arena.Synthetic(CSharpSyntheticText.Arrow);
-
-		using (arena.Group())
-		using (arena.Indent())
+		// The layout ArrowExpressionClause gives the arrow the next run reads back, so the run that converts
+		// a body writes the one that settles. Laid out by a group of its own here, a converted member
+		// printed its arrow trailing on the run that converted it and leading on the next (thirteen corpus
+		// files), and a switch below the arrow that the next run hugged to it (issue #186). The keyword's
+		// line stands in for the arrow's: the arrow takes over the line the `{` and `return` leave.
+		var throwKeyword = statement is ThrowStatementSyntax thrown ? thrown.ThrowKeyword : default;
+		var carried = throws ? ((ThrowStatementSyntax)statement).Expression! : value!;
+		var keywordEnd = statement switch
 		{
-			if (arrowLeadsTheBody)
-			{
-				arena.SoftLine();
-				arena.Synthetic(CSharpSyntheticText.Arrow);
-				arena.Synthetic(SyntheticText.Space);
-			}
-			else
-			{
-				arena.Line();
-			}
+			ReturnStatementSyntax r => r.ReturnKeyword.Span.End,
+			ThrowStatementSyntax t => t.ThrowKeyword.Span.End,
+			_ => carried.SpanStart,
+		};
 
-			if (throws)
-				Node.Print(statement, context);
-			else
-			{
-				Node.Print(value, context);
-				TokenPrinter.Print(SemicolonOf(statement), context);
-			}
-		}
+		context.Arena.Synthetic(SyntheticText.Space);
+		ArrowAndBody(
+			body.Parent,
+			default,
+			throwKeyword,
+			carried,
+			SynthesisedArrowBreaksBefore(body.OpenBraceToken.GetPreviousToken(), context),
+			context.AuthorJoined(keywordEnd, carried.SpanStart),
+			context);
+		TokenPrinter.Print(SemicolonOf(statement), context);
 
 		// In source order: the verifier walks these with a single cursor.
 		context.Dropped(body.OpenBraceToken.Span);
@@ -1754,39 +1812,24 @@ internal static partial class Printers
 			|| HasAnyTrivia(accessor, context))
 			return false;
 
-		var arena = context.Arena;
+		// The third place an arrow is emitted, and it takes the same layout as the other two.
+		var expression = thrown is not null ? thrown.Expression! : value!;
+		var keywordEnd = accessor.ExpressionBody is { } written
+			? written.ArrowToken.Span.End
+			: returned is not null
+				? returned.ReturnKeyword.Span.End
+				: thrown!.ThrowKeyword.Span.End;
 
-		// The third place an arrow is emitted, and it takes the same placement as the other two.
-		var arrowLeadsTheBody = context.Options.WrapBeforeArrowWithExpressions;
-
-		BeforeSynthesisedArrow(accessors.OpenBraceToken.GetPreviousToken(), context);
-		if (!arrowLeadsTheBody)
-			arena.Synthetic(CSharpSyntheticText.Arrow);
-
-		using (arena.Group())
-		using (arena.Indent())
-		{
-			if (arrowLeadsTheBody)
-			{
-				arena.SoftLine();
-				arena.Synthetic(CSharpSyntheticText.Arrow);
-				arena.Synthetic(SyntheticText.Space);
-			}
-			else
-			{
-				arena.Line();
-			}
-
-			if (thrown is not null)
-			{
-				Node.Print(thrown, context);
-			}
-			else
-			{
-				Node.Print(value!, context);
-				TokenPrinter.Print(semicolon, context);
-			}
-		}
+		context.Arena.Synthetic(SyntheticText.Space);
+		ArrowAndBody(
+			accessors.Parent,
+			default,
+			thrown is not null ? thrown.ThrowKeyword : default,
+			expression,
+			SynthesisedArrowBreaksBefore(accessors.OpenBraceToken.GetPreviousToken(), context),
+			context.AuthorJoined(keywordEnd, expression.SpanStart),
+			context);
+		TokenPrinter.Print(thrown is not null ? thrown.SemicolonToken : semicolon, context);
 
 		// A getter that already used an arrow carries its own across, so only the block forms add one.
 		if (returned is not null || thrown is not null)
@@ -3014,8 +3057,8 @@ internal static partial class Printers
 			or ContinueStatementSyntax or GotoStatementSyntax or YieldStatementSyntax;
 
 	/// <summary>
-	/// The space before an arrow a conversion synthesises, or the break onto a line one level in when a
-	/// trailing <c>// comment</c> already ends <paramref name="previous"/>'s line.
+	/// True when a trailing <c>// comment</c> already ends <paramref name="previous"/>'s line, so an arrow a
+	/// conversion synthesises after it starts the next line, one level in.
 	/// </summary>
 	/// <remarks>
 	/// The comment's own break left the arrow at the member's column, and the next run, reading an
@@ -3024,17 +3067,8 @@ internal static partial class Printers
 	/// <see cref="ArrowExpressionClause"/> leaves an arrow after a comment at the member's column, and
 	/// so does this.
 	/// </remarks>
-	private static void BeforeSynthesisedArrow(SyntaxToken previous, PrintContext context)
-	{
-		if (!context.Options.KeepExistingLinebreaks || !EndsWithLineComment(previous))
-		{
-			context.Arena.Synthetic(SyntheticText.Space);
-			return;
-		}
-
-		using (context.Arena.Indent())
-			context.Arena.HardLine();
-	}
+	private static bool SynthesisedArrowBreaksBefore(SyntaxToken previous, PrintContext context) =>
+		context.Options.KeepExistingLinebreaks && EndsWithLineComment(previous);
 
 	/// <summary>
 	/// True when a token is followed by a line comment, which has already ended the line.

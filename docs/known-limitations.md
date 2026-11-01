@@ -13,22 +13,6 @@ arms, members of a `with` initializer, and some `//` comments on a line of their
 170 of its 1,844 files, which is the gap between its conformance floor and 100%. elastic/docs-builder, whose
 authors had already formatted it, shows none.
 
-## Expression-body conversions do not compose in one pass
-
-With both `csharp_style_expression_bodied_properties = true` and
-`csharp_style_expression_bodied_accessors = true`, the two conversions can produce different output
-on consecutive passes:
-
-```csharp
-public int Count { get { throw new NotImplementedException(); } }   // source
-public int Count { get => throw new NotImplementedException(); }    // run 1
-public int Count => throw new NotImplementedException();            // run 2 — different
-```
-
-The accessor-level conversion fires on run 1. The property-level conversion only recognises an
-accessor list that already has an arrow getter, so it fires on run 2. Two rules that should compose
-in one pass currently do not.
-
 ## An expression body can move on a second pass at a width
 
 With a width set, an expression body Curb moved below its `=>` on the first pass can be joined back
@@ -57,3 +41,8 @@ has an operator, a tuple broken after its `(`, an initializer opened out inside 
 expression body converted after a trailing comment, a switch expression opened out inside a one-line
 argument list, a `//` comment run between an argument's `name:` and its value, and a lone `)` closing
 a list whose `(` the author put on a line of its own.
+
+A block body that a `csharp_style_expression_bodied_*` key converts settles in one pass too, in both layout
+modes: the conversion writes the layout the next run gives the arrow it wrote. A `return x switch { … };`
+used to come out with the switch below the `=>`, and the next run hugged it to the arrow. The generated CI corpus
+now sets `csharp_style_expression_bodied_methods` again, which it left out while that was open.
