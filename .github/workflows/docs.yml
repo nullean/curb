@@ -26,11 +26,15 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      # The design-system layout is behind a feature flag, read from the environment only.
       - name: Build documentation
         uses: elastic/docs-builder@main
+        env:
+          FEATURE_NAVIGATION_PREVIEW: true
 
-      - name: Use custom landing page
-        run: cp docs/curb-landing.html .artifacts/docs/html/index.html
+      # The same post-build steps as scripts/docs.sh: theme, root links, animated header lockup, landing page, robots.txt, fonts.
+      - name: Theme and landing page
+        run: scripts/docs-finish.sh .artifacts/docs/html
 
       - name: Setup Pages
         uses: actions/configure-pages@v6.0.0
