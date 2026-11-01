@@ -20,6 +20,33 @@ namespace Nullean.Curb.Printing.CSharp;
 /// directive makes the whole list unorderable, not just that entry.
 /// </para>
 /// </remarks>
+/// <summary>A run of a container's using directives, or all of them.</summary>
+/// <remarks>
+/// A struct over the syntax list rather than a copy, so the common case — every directive of one container —
+/// costs nothing. A run is needed only when <c>csharp_using_directive_placement</c> moves the non-global
+/// directives inside the namespace and leaves the global ones, which cannot move, where they are.
+/// </remarks>
+/// <param name="list">The container's directives.</param>
+/// <param name="start">The first directive in the run.</param>
+/// <param name="count">How many directives the run holds.</param>
+internal readonly struct UsingRange(SyntaxList<UsingDirectiveSyntax> list, int start, int count)
+{
+	/// <summary>How many directives the run holds.</summary>
+	public int Count => count;
+
+	/// <summary>The run's <paramref name="index"/>th directive.</summary>
+	public UsingDirectiveSyntax this[int index] => list[start + index];
+
+	/// <summary>
+	/// How many of the first directive's leading trivia entries were already printed elsewhere: the file
+	/// banner, kept at the top of the file when the run moved into the namespace. Zero otherwise.
+	/// </summary>
+	public int HoistedBanner { get; init; }
+
+	/// <summary>Every directive of a container.</summary>
+	public static implicit operator UsingRange(SyntaxList<UsingDirectiveSyntax> list) => new(list, 0, list.Count);
+}
+
 internal static class UsingOrganiser
 {
 	/// <summary>
@@ -29,7 +56,7 @@ internal static class UsingOrganiser
 	/// Null rather than a copy of the input, so the caller can take the allocation-free path — which
 	/// is every file, on every repository that has not opted in.
 	/// </remarks>
-	public static UsingDirectiveSyntax[]? Order(SyntaxNode container, SyntaxList<UsingDirectiveSyntax> usings, in FormatOptions options)
+	public static UsingDirectiveSyntax[]? Order(SyntaxNode container, UsingRange usings, in FormatOptions options)
 	{
 		if (options.SortUsings == UsingOrder.AsWritten || usings.Count < 2)
 			return null;
@@ -83,11 +110,20 @@ internal static class UsingOrganiser
 	/// caller declined to touch on the first run it would happily touch on the second — a formatter
 	/// that is not idempotent on its own output.
 	/// </remarks>
-	public static bool IsEligible(SyntaxNode container, SyntaxList<UsingDirectiveSyntax> usings, in FormatOptions options) =>
+	public static bool IsEligible(SyntaxNode container, UsingRange usings, in FormatOptions options) =>
 		options.SortUsings != UsingOrder.AsWritten
 		&& usings.Count >= 2
 		&& !container.ContainsDirectives
 		&& !HasContentAfterBanner(usings[0]);
+
+	/// <summary>How many of a container's directives lead it as <c>global using</c>s.</summary>
+	public static int GlobalCount(SyntaxList<UsingDirectiveSyntax> usings)
+	{
+		var count = 0;
+		while (count < usings.Count && usings[count].GlobalKeyword.RawKind != 0)
+			count++;
+		return count;
+	}
 
 	/// <summary>True when a blank line belongs between these two directives.</summary>
 	/// <remarks>
@@ -175,6 +211,13 @@ internal static class UsingOrganiser
 
 	private static int Compare(UsingDirectiveSyntax left, UsingDirectiveSyntax right, bool systemFirst)
 	{
+		// Global usings ahead of everything else, as dotnet format sorts them. It is not taste: one after
+		// a directive that is not global does not compile (CS8915), and sorting `using System;` above
+		// `global using static ...` used to write exactly that.
+		var global = (right.GlobalKeyword.RawKind != 0 ? 1 : 0).CompareTo(left.GlobalKeyword.RawKind != 0 ? 1 : 0);
+		if (global != 0)
+			return global;
+
 		// Aliases and `using static` sort after plain directives, matching what the IDE produces.
 		var rank = Rank(left).CompareTo(Rank(right));
 		if (rank != 0)

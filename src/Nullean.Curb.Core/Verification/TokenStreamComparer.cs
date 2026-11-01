@@ -70,6 +70,9 @@ internal static class TokenStreamComparer
 		if (usingsReordered && !SameDirectives(originalRoot, reparsed.Root, out failure))
 			return false;
 
+		if (usingsReordered && !GlobalUsingsStayFirst(originalRoot, reparsed.Root, out failure))
+			return false;
+
 		// The directives have been checked as a set; walking them in order would only re-discover the
 		// reordering that was asked for. Each walk steps over the directives themselves rather than
 		// the span from the first to the last, which once a namespace had directives of its own as
@@ -469,6 +472,53 @@ internal static class TokenStreamComparer
 
 		failure = null;
 		return true;
+	}
+
+	/// <summary>
+	/// Refuses a reorder that put a <c>global using</c> inside a namespace, or after a directive that is not
+	/// global.
+	/// </summary>
+	/// <remarks>
+	/// Moving a directive across a namespace boundary changes what it means, which no comparison of tokens
+	/// can see: every token is still there, only somewhere else. Neither place compiles for a global using
+	/// (CS8914, CS8915), and moving one into a namespace once wrote exactly that. The printer no longer
+	/// moves them; this is the structural check that fails safe if it ever does again. A source that was
+	/// already out of order is not the formatter's doing, so only a placement the source did not have
+	/// fails.
+	/// </remarks>
+	private static bool GlobalUsingsStayFirst(SyntaxNode before, SyntaxNode after, out string? failure)
+	{
+		if (MisplacesGlobalUsing(after) && !MisplacesGlobalUsing(before))
+		{
+			failure = "a global using was written inside a namespace or after a using that is not global";
+			return false;
+		}
+
+		failure = null;
+		return true;
+	}
+
+	private static bool MisplacesGlobalUsing(SyntaxNode root)
+	{
+		var seenLocal = false;
+		foreach (var directive in root
+			.DescendantNodes(descendIntoChildren: node => node is CompilationUnitSyntax or BaseNamespaceDeclarationSyntax)
+			.OfType<UsingDirectiveSyntax>())
+		{
+			var global = directive.GlobalKeyword.RawKind != 0;
+			if (directive.Parent is not CompilationUnitSyntax)
+			{
+				if (global)
+					return true;
+				continue;
+			}
+
+			if (global && seenLocal)
+				return true;
+			seenLocal |= !global;
+		}
+
+		return false;
 	}
 
 	/// <remarks>

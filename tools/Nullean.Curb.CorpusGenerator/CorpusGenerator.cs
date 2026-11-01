@@ -119,6 +119,7 @@ public static class CorpusGenerator
 			WriteCSharp("src/Corpus.Abstractions/" + name, source + "\n");
 		}
 		WriteCSharp("src/Corpus.Cli/Program.cs", TestTemplates.CliProgram(plan));
+		WriteCSharp("src/Corpus.Core/GlobalUsings.cs", Domain.GlobalUsings + "\n");
 		WriteCSharp("tests/Corpus.Tests/Framework.cs", TestTemplates.Framework + "\n");
 		WriteCSharp("tests/Corpus.Tests/Program.cs", TestTemplates.TestProgram + "\n");
 

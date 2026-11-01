@@ -37,14 +37,18 @@ internal static partial class Printers
 
 		// Held back when they are to be printed inside the namespace instead. Nothing is added or
 		// removed, so the whole region from the first directive to the namespace's opening is a
-		// permutation of itself, and that is what the content check is told.
+		// permutation of itself, and that is what the content check is told. A global using never
+		// moves: it has to come before everything else in the file, and inside a namespace it does not
+		// compile. They lead the list (the compiler requires that too), so the ones that stay are a
+		// prefix and the ones that move are the rest.
 		var moveInside = MovesUsingsInside(node, context);
-		if (!moveInside)
-			PrintUsings(node, node.Usings, context, ref previousEnd);
+		var staying = moveInside ? UsingOrganiser.GlobalCount(node.Usings) : node.Usings.Count;
+		if (staying > 0)
+			PrintUsings(node, new UsingRange(node.Usings, 0, staying), context, ref previousEnd);
 		var nextAfterUsings = node.AttributeLists.Count > 0 ? NextStartsWithDirective(node.AttributeLists[0])
 			: node.Members.Count > 0 ? NextStartsWithDirective(node.Members[0])
 			: NextStartsWithDirective(node.EndOfFileToken);
-		AfterUsingList(context, ref previousEnd, !moveInside && node.Usings.Count > 0, nextAfterUsings);
+		AfterUsingList(context, ref previousEnd, staying > 0, nextAfterUsings);
 
 		foreach (var attributeList in node.AttributeLists)
 		{
@@ -55,13 +59,15 @@ internal static partial class Printers
 		foreach (var member in node.Members)
 		{
 			var regionStart = 0;
+			var banner = 0;
 			if (moveInside && member is BaseNamespaceDeclarationSyntax)
 			{
 				// The file's banner (a licence header, say) belongs to the file, not to whichever
 				// directive comes first, so it stays at the top while the directives move. It ends in
-				// a blank line by definition, which is the gap to the namespace.
-				var first = node.Usings[0];
-				var banner = UsingOrganiser.BannerTriviaCount(first);
+				// a blank line by definition, which is the gap to the namespace. With global usings
+				// staying, it stays with the first of them and was printed with it already.
+				var first = node.Usings[staying];
+				banner = staying == 0 ? UsingOrganiser.BannerTriviaCount(first) : 0;
 				regionStart = first.FullSpan.Start;
 				if (banner > 0)
 				{
@@ -77,7 +83,7 @@ internal static partial class Printers
 
 			if (moveInside && member is BaseNamespaceDeclarationSyntax)
 			{
-				context.UsingsToPlaceInside = node.Usings;
+				context.UsingsToPlaceInside = new UsingRange(node.Usings, staying, node.Usings.Count - staying) { HoistedBanner = banner };
 				context.Reordered(TextSpan.FromBounds(regionStart, InsertionPoint(member)));
 
 				// The token stream genuinely reorders, so the comparer lifts the directives out of the
@@ -235,13 +241,13 @@ internal static partial class Printers
 	/// <param name="context">Per-file printing state.</param>
 	/// <param name="previousEnd">Where the previous item ended, for blank-line separation.</param>
 	/// <param name="moved">
-	/// The compilation unit's directives, printed inside the namespace. Their banner has already been
-	/// printed at the top of the file (<see cref="CompilationUnit"/>), and the compilation unit has
-	/// already declared the whole move as one permuted region, so neither is done again here.
+	/// The compilation unit's directives, printed inside the namespace. The compilation unit has already
+	/// declared the whole move as one permuted region, so it is not declared again here, and a banner
+	/// it kept at the top of the file (<see cref="UsingRange.HoistedBanner"/>) is not printed again.
 	/// </param>
 	private static void PrintUsings(
 		SyntaxNode container,
-		SyntaxList<UsingDirectiveSyntax> usings,
+		UsingRange usings,
 		PrintContext context,
 		ref int previousEnd,
 		bool moved = false)
@@ -251,11 +257,12 @@ internal static partial class Printers
 
 		if (ordered is null)
 		{
-			foreach (var directive in usings)
+			for (var i = 0; i < usings.Count; i++)
 			{
+				var directive = usings[i];
 				Separate(context, ref previousEnd, directive);
-				if (moved && directive == firstInSource)
-					UsingDirective(directive, context, UsingOrganiser.BannerTriviaCount(directive));
+				if (i == 0 && usings.HoistedBanner > 0)
+					UsingDirective(directive, context, usings.HoistedBanner);
 				else
 					Node.Print(directive, context);
 			}
@@ -266,7 +273,7 @@ internal static partial class Printers
 		var arena = context.Arena;
 		var bannerCount = UsingOrganiser.BannerTriviaCount(firstInSource!);
 
-		if (bannerCount > 0 && !moved)
+		if (bannerCount > 0 && usings.HoistedBanner == 0)
 		{
 			if (previousEnd >= 0)
 				arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
@@ -2638,11 +2645,15 @@ internal static partial class Printers
 	/// the next run finds no directives at the top to defer to: leaving the header alone on this run
 	/// meant the next one rewrote it.
 	/// </remarks>
-	private static bool UsingOrganiserOwnsLeadingTrivia(CompilationUnitSyntax node, SyntaxToken first, PrintContext context) =>
-		node.Usings.Count > 0
-		&& first == node.Usings[0].GetFirstToken(includeZeroWidth: true)
-		&& UsingOrganiser.IsEligible(node, node.Usings, context.Options)
-		&& !MovesUsingsInside(node, context);
+	private static bool UsingOrganiserOwnsLeadingTrivia(CompilationUnitSyntax node, SyntaxToken first, PrintContext context)
+	{
+		if (node.Usings.Count == 0 || first != node.Usings[0].GetFirstToken(includeZeroWidth: true))
+			return false;
+
+		// Global usings stay at the top when the rest move, and the sort's banner stays with them.
+		var staying = MovesUsingsInside(node, context) ? UsingOrganiser.GlobalCount(node.Usings) : node.Usings.Count;
+		return UsingOrganiser.IsEligible(node, new UsingRange(node.Usings, 0, staying), context.Options);
+	}
 
 	/// <summary>What scanning the compilation unit's leading trivia from its very start found.</summary>
 	/// <param name="ConsumedCount">
@@ -2748,13 +2759,32 @@ internal static partial class Printers
 	/// Nor where the namespace has directives of its own and they are to be sorted. The two lists are
 	/// sorted apart on this run and as one on the next, so the output would not be a fixed point.
 	/// </para>
+	/// <para>
+	/// Global usings never move: one inside a namespace, or after one, does not compile. Only the
+	/// directives after them do, as dotnet format style moves them, so there has to be at least one,
+	/// and no global using after it (which does not compile either, and is left as written).
+	/// </para>
 	/// </remarks>
-	private static bool MovesUsingsInside(CompilationUnitSyntax node, PrintContext context) =>
-		context.Options.UsingPlacement == UsingPlacement.InsideNamespace
-		&& node.Usings.Count > 0
-		&& node.AttributeLists.Count == 0
-		&& node.Members is [BaseNamespaceDeclarationSyntax only]
-		&& (only.Usings.Count == 0 || context.Options.SortUsings == UsingOrder.AsWritten);
+	private static bool MovesUsingsInside(CompilationUnitSyntax node, PrintContext context)
+	{
+		if (context.Options.UsingPlacement != UsingPlacement.InsideNamespace
+			|| node.AttributeLists.Count != 0
+			|| node.Members is not [BaseNamespaceDeclarationSyntax only]
+			|| (only.Usings.Count > 0 && context.Options.SortUsings != UsingOrder.AsWritten))
+			return false;
+
+		var globals = UsingOrganiser.GlobalCount(node.Usings);
+		if (globals == node.Usings.Count)
+			return false;
+
+		for (var i = globals; i < node.Usings.Count; i++)
+		{
+			if (node.Usings[i].GlobalKeyword.RawKind != 0)
+				return false;
+		}
+
+		return true;
+	}
 
 	/// <summary>
 	/// Where the directives land: just past the brace or semicolon that opens the namespace, and past a

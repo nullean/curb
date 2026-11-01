@@ -294,6 +294,32 @@ public class UsingOrderTests : FormattingTest
 		""",
 		editorConfig: "dotnet_sort_system_directives_first = true");
 
+	// ---- global usings -----------------------------------------------------------------------------
+
+	[Test]
+	public Task Global_usings_sort_ahead_of_the_rest() => Formats(
+		// Not a preference: a global using after one that is not global does not compile (CS8915). The
+		// rank used to put `using System;` above `global using static ...`. Checked against dotnet format.
+		"""
+		global using System.Collections.Concurrent;
+		global using static System.StringComparison;
+		global using Clock = System.IO.Stream;
+		using Zebra;
+		using System;
+
+		public class C { }
+		""",
+		"""
+		global using System.Collections.Concurrent;
+		global using static System.StringComparison;
+		global using Clock = System.IO.Stream;
+		using System;
+		using Zebra;
+
+		public class C { }
+		""",
+		editorConfig: "dotnet_sort_system_directives_first = true");
+
 	// ---- whitespace inside a directive ---------------------------------------------------------------
 
 	[Test]

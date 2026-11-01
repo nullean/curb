@@ -350,6 +350,177 @@ public class UsingPlacementAndHeaderTests : FormattingTest
 		""",
 		editorConfig: Inside + "\n" + FileScoped);
 
+	// ---- global usings stay where they are --------------------------------------------------------------
+
+	[Test]
+	public Task A_global_using_stays_at_the_top_while_the_rest_move() => Formats(
+		// A global using inside a namespace, or after one, does not compile (CS8914, CS8915). They stay,
+		// and the directives after them move, which is what dotnet format style writes.
+		"""
+		global using System.Linq;
+		using System;
+
+		namespace N
+		{
+		    class C { }
+		}
+		""",
+		"""
+		global using System.Linq;
+
+		namespace N
+		{
+		    using System;
+
+		    class C { }
+		}
+		""",
+		editorConfig: Inside);
+
+	[Test]
+	public Task A_global_using_stays_at_the_top_of_a_namespace_made_file_scoped() => Formats(
+		"""
+		global using System.Linq;
+		using System;
+
+		namespace N
+		{
+		    class C { }
+		}
+		""",
+		"""
+		global using System.Linq;
+
+		namespace N;
+
+		using System;
+
+		class C { }
+		""",
+		editorConfig: Inside + "\n" + FileScoped);
+
+	[Test]
+	public Task Global_aliases_and_static_usings_stay_too() => Formats(
+		"""
+		global using static System.Math;
+		global using L = System.Collections.Generic.List<int>;
+		using System.Text;
+		using System;
+
+		namespace N
+		{
+		    class C { }
+		}
+		""",
+		"""
+		global using static System.Math;
+		global using L = System.Collections.Generic.List<int>;
+
+		namespace N;
+
+		using System.Text;
+		using System;
+
+		class C { }
+		""",
+		editorConfig: Inside + "\n" + FileScoped);
+
+	[Test]
+	public Task Global_usings_sort_where_they_are_and_the_rest_sort_inside() => Formats(
+		"""
+		global using System.Text;
+		global using System.Collections;
+		using Zebra;
+		using System;
+
+		namespace N
+		{
+		    class C { }
+		}
+		""",
+		"""
+		global using System.Collections;
+		global using System.Text;
+
+		namespace N
+		{
+		    using System;
+		    using Zebra;
+
+		    class C { }
+		}
+		""",
+		editorConfig: Inside + "\ndotnet_sort_system_directives_first = true");
+
+	[Test]
+	public Task Only_global_usings_have_nothing_to_move() => Unchanged(
+		"""
+		global using System;
+		global using System.Linq;
+
+		namespace N
+		{
+		    class C { }
+		}
+		""",
+		editorConfig: Inside);
+
+	[Test]
+	public Task The_header_lands_above_global_usings_that_stayed() => Formats(
+		"""
+		global using System.Linq;
+		using System;
+
+		namespace N
+		{
+		    class C { }
+		}
+		""",
+		"""
+		// Licensed to the Foo Foundation.
+		// See LICENSE.
+
+		global using System.Linq;
+
+		namespace N;
+
+		using System;
+
+		class C { }
+		""",
+		editorConfig: Header + "\n" + Inside + "\n" + FileScoped);
+
+	[Test]
+	public Task A_banner_stays_with_the_global_usings() => Formats(
+		// The banner is the first directive's, and that directive stays, so the banner never moves; a
+		// mismatched header above a sorted global block is the sort's to keep, as it is without the move.
+		"""
+		// Copyright someone else, all rights reserved.
+
+		global using System.Text;
+		global using System.Collections;
+		using System;
+
+		namespace N
+		{
+		    class C { }
+		}
+		""",
+		"""
+		// Copyright someone else, all rights reserved.
+
+		global using System.Collections;
+		global using System.Text;
+
+		namespace N
+		{
+		    using System;
+
+		    class C { }
+		}
+		""",
+		editorConfig: Header + "\n" + Inside + "\ndotnet_sort_system_directives_first = true");
+
 	// ---- file header -------------------------------------------------------------------------------
 
 	[Test]
