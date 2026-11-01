@@ -64,6 +64,9 @@ internal static class TokenStreamComparer
 
 		var formattedText = formatted;
 
+		if (inserted is not null && !NoDuplicatedKeyword(reparsed.Root, formattedText, inserted, out failure))
+			return false;
+
 		var originalUsings = TextSpan.FromBounds(0, 0);
 		var producedUsings = TextSpan.FromBounds(0, 0);
 
@@ -312,6 +315,45 @@ internal static class TokenStreamComparer
 
 			index++;
 		}
+	}
+
+	/// <summary>
+	/// Refuses an inserted keyword that sits beside the same keyword, whichever side that copy came from.
+	/// </summary>
+	/// <remarks>
+	/// <para>
+	/// The walk accepts any token that was declared inserted, and declaring is all a duplicate needs: a
+	/// multi-targeted project reports each site once per target framework, cleanup planned the insertion once
+	/// per report, both were declared, and <c>readonly readonly</c> passed (CS1004). The same word beside a
+	/// copy the source already had is the other way to get there, if a rule's own "already present" gate
+	/// ever regresses.
+	/// </para>
+	/// <para>
+	/// Keywords only. No C# construct puts the same keyword twice in a row, so this refuses nothing
+	/// legitimate. <c>var</c> parses as an identifier and is left alone: <c>var var = 1;</c> is legal.
+	/// </para>
+	/// </remarks>
+	private static bool NoDuplicatedKeyword(
+		SyntaxNode root, ReadOnlySpan<char> text, IReadOnlyList<InsertedToken> inserted, out string? failure)
+	{
+		foreach (var insertion in inserted)
+		{
+			var token = root.FindToken(insertion.Offset);
+			if (token.SpanStart != insertion.Offset || !SyntaxFacts.IsKeywordKind((SyntaxKind)token.RawKind))
+				continue;
+
+			if (Same(text, token, token.GetPreviousToken()) || Same(text, token, token.GetNextToken()))
+			{
+				failure = $"'{insertion.Text}' was inserted beside another '{insertion.Text}', at output offset {insertion.Offset}";
+				return false;
+			}
+		}
+
+		failure = null;
+		return true;
+
+		static bool Same(ReadOnlySpan<char> text, SyntaxToken token, SyntaxToken neighbour) =>
+			neighbour.RawKind == token.RawKind && Text(text, neighbour).SequenceEqual(Text(text, token));
 	}
 
 	private static bool Mismatch(

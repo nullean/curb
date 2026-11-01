@@ -206,6 +206,50 @@ public class TypeNameRulesTests
 	}
 
 	[Test]
+	public async Task Var_is_not_welded_onto_a_name_the_type_touched()
+	{
+		// `List<string>names` is legal C#: the `>` already separates the type from the name. Replacing the
+		// type with `var` wrote `varnames`, a different identifier and a different program. Found by the
+		// generated corpus, which drops optional spaces.
+		const string source = """
+			using System.Collections.Generic;
+
+			namespace N;
+
+			public sealed class Widget
+			{
+				public int Count(int? seed)
+				{
+					List<string>names = new List<string>();
+					int?first = seed;
+					string[]words = new string[0];
+					foreach (KeyValuePair<string, int>pair in new Dictionary<string, int>())
+						names.Add(pair.Key);
+
+					return names.Count + (first ?? 0) + words.Length;
+				}
+			}
+
+			""";
+
+		var result = Clean(
+			source,
+			At("IDE0007", source, "List<string>names"),
+			At("IDE0007", source, "int?first"),
+			At("IDE0007", source, "string[]words"),
+			At("IDE0007", source, "KeyValuePair<string, int>pair"));
+
+		result.Status.Should().Be(CleanupStatus.Cleaned, result.Message);
+		result.Applied.Should().Be(4);
+		result.Text.Should().Contain("var names = new List<string>();")
+			.And.Contain("var first = seed;")
+			.And.Contain("var words = new string[0];")
+			.And.Contain("foreach (var pair in");
+
+		await Task.CompletedTask;
+	}
+
+	[Test]
 	public async Task A_foreach_variable_becomes_var()
 	{
 		const string source = """

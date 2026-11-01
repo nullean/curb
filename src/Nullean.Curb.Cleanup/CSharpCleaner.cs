@@ -77,7 +77,14 @@ public sealed class CSharpCleaner
 	/// </summary>
 	internal static IReadOnlyList<string> ImplementedRuleIds { get; } = [.. Rules.Select(rule => rule.RuleId)];
 
-	private readonly List<(PlannedFix Fix, CleanupDiagnostic Diagnostic)> _planned = [];
+	private readonly List<(PlannedFix Fix, CleanupDiagnostic Diagnostic, int Order)> _planned = [];
+
+	/// <summary>Diagnostics whose fix was the same edit as another's, and whose fate follows that one.</summary>
+	private readonly List<(CleanupDiagnostic Duplicate, CleanupDiagnostic Kept)> _duplicates = [];
+
+	/// <summary>Every diagnostic's planned edits, keyed by its first, for <see cref="TrackDuplicate"/>.</summary>
+	private readonly Dictionary<(TextSpan, string), List<(CleanupDiagnostic Diagnostic, PlannedFix[] Edits)>> _editsByFirst = [];
+
 	private readonly List<string> _refusals = [];
 	private readonly List<CleanupDiagnostic> _unfixed = [];
 	private readonly List<TextSpan> _dropped = [];
@@ -93,6 +100,8 @@ public sealed class CSharpCleaner
 	public CleanupResult Clean(string source, IReadOnlyList<CleanupDiagnostic> diagnostics)
 	{
 		_planned.Clear();
+		_duplicates.Clear();
+		_editsByFirst.Clear();
 		_refusals.Clear();
 		_unfixed.Clear();
 		_dropped.Clear();
@@ -148,8 +157,13 @@ public sealed class CSharpCleaner
 			_scratch.Clear();
 			if (rule.TryFix(context, diagnostic, span, _scratch, out var refusal) && _scratch.Count > 0)
 			{
-				foreach (var fix in _scratch)
-					_planned.Add((fix, diagnostic));
+				// The same verdict reported again — once per target framework, or by two logs — plans the same
+				// edits again. Made once, and the repeat counts as fixed (see TrackDuplicate).
+				if (!TrackDuplicate(diagnostic))
+				{
+					foreach (var fix in _scratch)
+						_planned.Add((fix, diagnostic, _planned.Count));
+				}
 
 				_appliedDiagnostics++;
 			}
@@ -163,7 +177,14 @@ public sealed class CSharpCleaner
 		if (_planned.Count == 0)
 			return new CleanupResult(CleanupStatus.Cleaned, false, null, 0, [.. _refusals], [.. _unfixed], null);
 
-		_planned.Sort(static (left, right) => left.Fix.Removed.Start.CompareTo(right.Fix.Removed.Start));
+		// Stable, by plan order on a tie, so two insertions at one offset (IDE0040 and IDE0044 on a bare
+		// field) come out in the same order every run rather than whichever way an unstable sort left them.
+		_planned.Sort(static (left, right) =>
+		{
+			var byStart = left.Fix.Removed.Start.CompareTo(right.Fix.Removed.Start);
+			return byStart != 0 ? byStart : left.Order.CompareTo(right.Order);
+		});
+
 		DropOverlaps();
 
 		if (_planned.Count == 0)
@@ -192,6 +213,74 @@ public sealed class CSharpCleaner
 
 		return null;
 	}
+
+	/// <summary>
+	/// Records <paramref name="diagnostic"/> as a repeat when its edits, now in <see cref="_scratch"/>, are
+	/// exactly the edits an earlier diagnostic planned, and remembers them otherwise.
+	/// </summary>
+	/// <remarks>
+	/// <para>
+	/// A multi-targeted project writes one log per target framework, and a site every framework agrees on is
+	/// reported in each. Two reports of one verdict plan the same edits twice. For a deletion or a replacement
+	/// the overlap check would drop both, which is safe but fixes nothing; for an insertion it was worse,
+	/// because two zero-width edits at one offset do not overlap, so both were applied and the output read
+	/// <c>readonly readonly</c>, which is CS1004 and a broken build.
+	/// </para>
+	/// <para>
+	/// Whole edit lists, not single edits. Two IDE0005 reports that disagree about how long a run of
+	/// directives is share their first deletion and differ after it; they are a conflict, and the overlap
+	/// check still drops both. Only a diagnostic that asks for precisely what another asked for is a repeat.
+	/// </para>
+	/// <para>
+	/// <c>CleanupRun</c> also deduplicates diagnostics across logs; this is the per-site half, which holds
+	/// whatever a caller passes, including a console log and a SARIF log describing one site with and without
+	/// an end position.
+	/// </para>
+	/// </remarks>
+	/// <returns>True when the diagnostic repeats an earlier one, whose fate it then shares.</returns>
+	private bool TrackDuplicate(CleanupDiagnostic diagnostic)
+	{
+		var key = (_scratch[0].Removed, _scratch[0].Inserted);
+
+		if (_editsByFirst.TryGetValue(key, out var candidates))
+		{
+			foreach (var (earlier, edits) in candidates)
+			{
+				if (!SameEdits(edits, _scratch))
+					continue;
+
+				_duplicates.Add((diagnostic, earlier));
+				return true;
+			}
+		}
+		else
+		{
+			_editsByFirst[key] = candidates = [];
+		}
+
+		candidates.Add((diagnostic, [.. _scratch]));
+		return false;
+	}
+
+	private static bool SameEdits(PlannedFix[] left, List<PlannedFix> right)
+	{
+		if (left.Length != right.Count)
+			return false;
+
+		for (var i = 0; i < left.Length; i++)
+		{
+			if (!SameEdit(left[i], right[i]))
+				return false;
+		}
+
+		return true;
+	}
+
+	private static bool SameEdit(PlannedFix left, PlannedFix right) =>
+		left.Removed == right.Removed
+		&& string.Equals(left.Inserted, right.Inserted, StringComparison.Ordinal)
+		&& left.DroppedTokens.SequenceEqual(right.DroppedTokens)
+		&& left.InsertedTokens.SequenceEqual(right.InsertedTokens, StringComparer.Ordinal);
 
 	/// <summary>
 	/// Removes both of any two fixes whose spans touch.
@@ -226,6 +315,13 @@ public sealed class CSharpCleaner
 				abandoned.Add(_planned[i].Diagnostic);
 		}
 
+		// A repeat of another diagnostic planned no edits of its own; it shares that one's fate.
+		foreach (var (duplicate, kept) in _duplicates)
+		{
+			if (abandoned.Contains(kept))
+				abandoned.Add(duplicate);
+		}
+
 		if (abandoned.Count > 0)
 		{
 			for (var i = 0; i < _planned.Count; i++)
@@ -254,15 +350,25 @@ public sealed class CSharpCleaner
 		var output = new StringBuilder(source.Length);
 		var cursor = 0;
 
-		foreach (var (fix, _) in _planned)
+		foreach (var (fix, _, _) in _planned)
 		{
 			output.Append(source, cursor, fix.Removed.Start - cursor);
+
+			// Never weld two tokens into one. `List<string>names` is legal C# because the `>` separates the
+			// type from the name; replace the type with `var` and nothing does, so the output read `varnames`,
+			// a different identifier. Whether a space is needed is a property of the two characters that end
+			// up touching, whatever the rule, so it is decided here for every edit rather than in each rule.
+			if (fix.Inserted.Length > 0 && Welds(output, fix.Inserted[0]))
+				output.Append(' ');
 
 			// Where the inserted text lands in the output, which is what the verifiers match on. Taken here
 			// because this is the only place that knows it: the offset shifts by every edit before it.
 			var at = output.Length;
 			output.Append(fix.Inserted);
 			cursor = fix.Removed.End;
+
+			if (cursor < source.Length && Welds(output, source[cursor]))
+				output.Append(' ');
 
 			_dropped.AddRange(fix.DroppedTokens);
 
@@ -276,4 +382,10 @@ public sealed class CSharpCleaner
 		output.Append(source, cursor, source.Length - cursor);
 		return output.ToString();
 	}
+
+	/// <summary>True when <paramref name="next"/> written after <paramref name="output"/> would join one word.</summary>
+	private static bool Welds(StringBuilder output, char next) =>
+		output.Length > 0
+		&& Microsoft.CodeAnalysis.CSharp.SyntaxFacts.IsIdentifierPartCharacter(output[^1])
+		&& Microsoft.CodeAnalysis.CSharp.SyntaxFacts.IsIdentifierPartCharacter(next);
 }

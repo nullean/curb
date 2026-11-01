@@ -187,6 +187,102 @@ public class DeclaredDeltaTests
 		await Task.CompletedTask;
 	}
 
+	// ---- the same word twice at one site ----------------------------------------------------------
+
+	// A multi-targeted project reports each site once per target framework, and cleanup applied the
+	// insertion once per report. Both insertions were declared, so a check that only asked "was every
+	// inserted word declared?" passed `readonly readonly`, which is CS1004. A site takes a word once.
+
+	[Test]
+	public async Task A_word_declared_twice_at_one_site_is_damage()
+	{
+		Verify("private string _n;", "private readonly readonly string _n;", inserted: ["readonly", "readonly"])
+			.Should().BeFalse("the content check must refuse a duplicated insertion");
+
+		Compare("private string _n;", "private readonly readonly string _n;", ["readonly", "readonly"])
+			.Should().BeFalse("the token check must refuse a duplicated insertion");
+
+		Verify("int _n;", "private private int _n;", inserted: ["private", "private"]).Should().BeFalse();
+		Compare("int _n;", "private private int _n;", ["private", "private"]).Should().BeFalse();
+
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task A_word_inserted_beside_the_same_keyword_is_damage()
+	{
+		// One declared insertion, but next to a copy the source already had. The rules refuse this up front;
+		// the token check refuses it too, so that gate regressing cannot write CS1004 either.
+		var after = new[] { new InsertedToken("private readonly ".Length, "readonly") };
+		CompareAt("private readonly string _n;", "private readonly readonly string _n;", after).Should().BeFalse();
+
+		var before = new[] { new InsertedToken("private ".Length, "readonly") };
+		CompareAt("private readonly string _n;", "private readonly readonly string _n;", before).Should().BeFalse();
+
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task Different_words_at_one_site_are_still_allowed()
+	{
+		// IDE0040 and IDE0044 on one field both insert at the head of an empty modifier list.
+		Verify("int _n;", "private readonly int _n;", inserted: ["private", "readonly"]).Should().BeTrue();
+		Compare("int _n;", "private readonly int _n;", ["private", "readonly"]).Should().BeTrue();
+
+		// The same word at two different sites is two fixes, not a duplicate.
+		Compare("string _n; int _c;", "private string _n; private int _c;", ["private", "private"]).Should().BeTrue();
+
+		await Task.CompletedTask;
+	}
+
+	// ---- welded tokens ----------------------------------------------------------------------------
+
+	[Test]
+	public async Task A_declared_word_welded_onto_the_name_after_it_is_damage()
+	{
+		// IDE0007 on `List<string>names`: the type went and `var` landed against the name.
+		var dropped = new[] { new TextSpan(0, "List<string>".Length) };
+
+		Verify("List<string>names = x;", "varnames = x;", inserted: ["var"], dropped: dropped).Should().BeFalse();
+		CompareAt("List<string>names = x;", "varnames = x;", [new InsertedToken(0, "var")], dropped).Should().BeFalse();
+
+		Verify("List<string>names = x;", "var names = x;", inserted: ["var"], dropped: dropped).Should().BeTrue();
+		CompareAt("List<string>names = x;", "var names = x;", [new InsertedToken(0, "var")], dropped).Should().BeTrue();
+
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task A_declared_word_welded_onto_the_name_before_it_is_damage()
+	{
+		// The content check looked only at the character after an inserted word, so `x` then `readonly`,
+		// read as the one identifier `xreadonly`, satisfied it. The boundary holds on both sides now.
+		var inserted = new[] { new InsertedToken("int x".Length, "readonly") };
+
+		ContentVerifier.Verify("int x;", "int xreadonly;", out _, inserted: inserted).Should().BeFalse();
+
+		await Task.CompletedTask;
+	}
+
+	/// <summary>The re-parse check, with insertions located the way <see cref="Locate"/> finds them.</summary>
+	private static bool Compare(string source, string output, IReadOnlyList<string> inserted) =>
+		CompareAt(source, output, Locate(output, inserted)!);
+
+	/// <summary>The re-parse check over a class body, so a field declaration parses as one.</summary>
+	private static bool CompareAt(
+		string source, string output, IReadOnlyList<InsertedToken> inserted, IReadOnlyList<TextSpan>? dropped = null)
+	{
+		const string prefix = "class C { ";
+		var original = prefix + source + " }";
+		var produced = prefix + output + " }";
+		CSharpSource.TryParse(original, out var parsed, out _).Should().BeTrue();
+
+		var shifted = inserted.Select(token => token with { Offset = token.Offset + prefix.Length }).ToList();
+		var shiftedDropped = dropped?.Select(span => new TextSpan(span.Start + prefix.Length, span.Length)).ToList();
+
+		return TokenStreamComparer.Verify(parsed.Root, original, produced, produced, out _, dropped: shiftedDropped, inserted: shifted);
+	}
+
 	// ---- trailing commas --------------------------------------------------------------------------
 
 	[Test]

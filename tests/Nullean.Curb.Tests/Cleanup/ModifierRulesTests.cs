@@ -460,4 +460,61 @@ public class ModifierRulesTests
 
 		await Task.CompletedTask;
 	}
+
+	// ---- The same verdict twice ------------------------------------------------------------------
+
+	// A multi-targeted project writes one log per target framework, and a site both frameworks agree on is
+	// reported in each. Applying the insertion once per report wrote `readonly readonly` and `private private`,
+	// which is CS1004 — found by the generated corpus's multi-targeted project.
+
+	[Test]
+	public async Task Readonly_reported_twice_at_one_field_is_inserted_once()
+	{
+		const string source = """
+			namespace N;
+
+			public sealed class Widget
+			{
+				private string _name;
+
+				public Widget() => _name = "w";
+			}
+
+			""";
+
+		var result = Clean(source, At("IDE0044", source, "_name;"), At("IDE0044", source, "_name;"));
+
+		result.Status.Should().Be(CleanupStatus.Cleaned);
+		result.Text.Should().Contain("private readonly string _name;");
+		result.Text.Should().NotContain("readonly readonly");
+		result.Refusals.Should().BeEmpty("the second report describes the same fix, which was made");
+
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task Accessibility_reported_twice_at_one_member_is_inserted_once()
+	{
+		const string source = """
+			namespace N;
+
+			public sealed class Widget
+			{
+				string _name;
+
+				public Widget() => _name = "w";
+			}
+
+			""";
+
+		var result = Clean(
+			source, At("IDE0040", source, "_name;"), At("IDE0044", source, "_name;"), At("IDE0040", source, "_name;"), At("IDE0044", source, "_name;"));
+
+		result.Status.Should().Be(CleanupStatus.Cleaned);
+		result.Text.Should().Contain("\tprivate readonly string _name;");
+		result.Text.Should().NotContain("private private");
+		result.Text.Should().NotContain("readonly readonly");
+
+		await Task.CompletedTask;
+	}
 }

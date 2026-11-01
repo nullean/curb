@@ -105,6 +105,10 @@ internal static class ContentVerifier
 		// Insertions arrive in output order and are consulted only at a mismatch, so one cursor is enough.
 		var nextInserted = 0;
 
+		// Where the source stood when the last insertion was consumed, so a second identical word at the same
+		// site is recognised as the duplicate it is.
+		var lastInsertedAt = -1;
+
 		while (true)
 		{
 			while (sourceIndex < source.Length && IsSkippable(source[sourceIndex]))
@@ -213,6 +217,18 @@ internal static class ContentVerifier
 				&& outputIndex == inserted[nextInserted].Offset
 				&& StartsWithWord(output, outputIndex, inserted[nextInserted].Text))
 			{
+				// The same word twice with no source between: one site, two insertions. Each was declared, so
+				// without this the pair passed. A multi-targeted project reports a site once per target
+				// framework, and applying the fix per report wrote `readonly readonly` (CS1004). A site takes
+				// a given word once; two different words at one site (`private readonly`) are still fine.
+				if (nextInserted > 0 && lastInsertedAt == sourceIndex
+					&& string.Equals(inserted[nextInserted - 1].Text, inserted[nextInserted].Text, StringComparison.Ordinal))
+				{
+					failure = $"'{inserted[nextInserted].Text}' was inserted twice at one site, at output offset {outputIndex}";
+					return false;
+				}
+
+				lastInsertedAt = sourceIndex;
 				outputIndex += inserted[nextInserted].Text.Length;
 				nextInserted++;
 				continue;
@@ -416,8 +432,9 @@ internal static class ContentVerifier
 	/// True when <paramref name="text"/> sits at <paramref name="at"/> as a whole word.
 	/// </summary>
 	/// <remarks>
-	/// The word boundary matters: without it a declared insertion of <c>readonly</c> would also be
-	/// satisfied by an output that wrote <c>readonlyish</c>, which is a different identifier.
+	/// The word boundary matters, on both sides: without it a declared insertion of <c>readonly</c> would
+	/// also be satisfied by an output that wrote <c>readonlyish</c>, or <c>xreadonly</c>, each a different
+	/// identifier. Only the trailing side was checked at first; the leading one costs the same.
 	/// </remarks>
 	private static bool StartsWithWord(ReadOnlySpan<char> output, int at, string text)
 	{
@@ -425,8 +442,11 @@ internal static class ContentVerifier
 			return false;
 
 		var after = at + text.Length;
-		return after >= output.Length || (!char.IsLetterOrDigit(output[after]) && output[after] != '_');
+		return (at == 0 || !IsWordCharacter(output[at - 1]))
+			&& (after >= output.Length || !IsWordCharacter(output[after]));
 	}
+
+	private static bool IsWordCharacter(char value) => char.IsLetterOrDigit(value) || value == '_';
 
 	private static string Excerpt(ReadOnlySpan<char> text, int start)
 	{

@@ -39,13 +39,6 @@ namespace Nullean.Curb.CorpusGenerator;
 /// that <c>csharp_new_line_before_catch</c> or <c>_finally = false</c> joins to the next keyword swallows it (1 each at
 /// seeds 2 and 4). Generated trailing comments only follow the <c>{</c> of a non-empty block; snippets keep every
 /// comment their tests wrote.</item>
-/// <item>Cleanup: a multi-targeted project writes one log per target framework, and a site reported in both gets its
-/// modifier inserted twice, <c>readonly readonly</c> for IDE0044, IDE0250 and IDE0251 and <c>private private</c> for
-/// IDE0040, so the cleaned solution stops building (CS1004). The multi-targeted project gets no site for those four
-/// rules; its sites for the rules that remove or replace text stay.</item>
-/// <item>Cleanup: IDE0007 on a type that touches its variable, <c>List&lt;string&gt;names</c>, writes <c>varnames</c>;
-/// the verifier refuses and <c>curb cleanup</c> exits non-zero (6). No space is dropped between a type's closing
-/// <c>&gt;</c>, <c>]</c> or <c>?</c> and an identifier.</item>
 /// </list>
 /// <para>
 /// Conformance with dotnet format is a percentage, so its findings stay in the corpus and set the floor instead: for
@@ -103,11 +96,6 @@ public static class KnownDefects
 
 		return false;
 	}
-
-	/// <summary>Whether the space between two tokens may be dropped (item 10).</summary>
-	public static bool AllowsTouching(SyntaxToken previous, SyntaxToken token) =>
-		!(token.IsKind(SyntaxKind.IdentifierToken) &&
-			(previous.IsKind(SyntaxKind.GreaterThanToken) || previous.IsKind(SyntaxKind.CloseBracketToken) || previous.IsKind(SyntaxKind.QuestionToken)));
 
 	/// <summary>Whether a generated trailing comment may end the line between two tokens (item 8).</summary>
 	public static bool AllowsTrailingComment(SyntaxToken previous, SyntaxToken token) =>

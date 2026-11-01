@@ -188,4 +188,93 @@ public class CleanupRunTests
 
 		await Task.CompletedTask;
 	}
+
+	[Test]
+	public async Task A_site_every_target_framework_reported_is_fixed_once()
+	{
+		// A multi-targeted project writes one log per target framework, and a site both frameworks agree on is
+		// in each. Cleanup handed both reports to the cleaner and inserted every modifier twice: `readonly
+		// readonly`, `private private`, CS1004. Found by the generated corpus's multi-targeted project.
+		var fs = Repo("root = true\n\n[*.cs]\nindent_style = tab\n");
+
+		const string source =
+			"""
+			namespace N;
+
+			public sealed class Widget
+			{
+				string _label = "w";
+				private string _name;
+
+				public Widget() => _name = "w";
+
+				public override string ToString() => _label + _name;
+			}
+
+			public struct Point
+			{
+				public readonly int X;
+
+				public Point(int x) => X = x;
+			}
+
+			""";
+
+		var sites = new[] { ("IDE0040", "_label"), ("IDE0044", "_name;"), ("IDE0250", "Point\n") };
+
+		fs.AddFile($"{Root}/Widget.cs", new MockFileData(source));
+		fs.File.SetLastWriteTimeUtc($"{Root}/Widget.cs", DateTime.UtcNow);
+
+		// The real layout: one log under each framework's intermediate directory, found by discovery. The
+		// second reports at another severity, which is still the same site.
+		foreach (var (framework, level) in new[] { ("net10.0", "warning"), ("netstandard2.0", "note") })
+		{
+			var log = $"{Root}/obj/Debug/{framework}/curb.sarif";
+			fs.AddFile(log, new MockFileData(Sarif(source, level, sites)));
+			fs.File.SetLastWriteTimeUtc(log, DateTime.UtcNow.AddMinutes(1));
+		}
+
+		var exitCode = CleanupRun.Execute(fs, Root, write: true);
+
+		exitCode.Should().Be(0);
+
+		var cleaned = fs.File.ReadAllText($"{Root}/Widget.cs");
+		cleaned.Should().Contain("private string _label").And.Contain("private readonly string _name;").And.Contain("public readonly struct Point");
+		cleaned.Should().NotContain("private private").And.NotContain("readonly readonly");
+
+		await Task.CompletedTask;
+	}
+
+	/// <summary>A SARIF log reporting each rule at the first occurrence of its text in <paramref name="source"/>.</summary>
+	private static string Sarif(string source, string level, IEnumerable<(string RuleId, string At)> sites)
+	{
+		var text = SourceText.From(source);
+		var results = sites.Select(site =>
+		{
+			var offset = source.IndexOf(site.At, StringComparison.Ordinal);
+			var line = text.Lines.GetLineFromPosition(offset);
+			var column = offset - line.Start + 1;
+			var length = site.At.TrimEnd(';', '\n').Length;
+
+			return $$"""
+				{
+				  "ruleId": "{{site.RuleId}}",
+				  "level": "{{level}}",
+				  "message": { "text": "m" },
+				  "locations": [ { "physicalLocation": {
+				    "artifactLocation": { "uri": "file://{{Root}}/Widget.cs" },
+				    "region": { "startLine": {{line.LineNumber + 1}}, "startColumn": {{column}}, "endLine": {{line.LineNumber + 1}}, "endColumn": {{column + length}} }
+				  } } ]
+				}
+				""";
+		});
+
+		return $$"""
+			{
+			  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+			  "version": "2.1.0",
+			  "runs": [ { "results": [ {{string.Join(",\n", results)}} ], "columnKind": "utf16CodeUnits" } ]
+			}
+			""";
+	}
 }

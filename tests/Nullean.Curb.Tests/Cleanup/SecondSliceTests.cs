@@ -199,6 +199,35 @@ public class SecondSliceTests
 		await Task.CompletedTask;
 	}
 
+	[Test]
+	public async Task Both_readonly_rules_reported_once_per_target_framework_insert_once()
+	{
+		// One log per target framework reports each site twice. Inserting once per report wrote
+		// `readonly readonly`, CS1004.
+		const string source = """
+			namespace N;
+
+			public struct Point
+			{
+				public int X { get; init; }
+
+				public int Doubled() => X * 2;
+			}
+
+			""";
+
+		var result = Clean(
+			source,
+			At("IDE0250", source, "Point"), At("IDE0251", source, "Doubled"),
+			At("IDE0250", source, "Point"), At("IDE0251", source, "Doubled"));
+
+		result.Status.Should().Be(CleanupStatus.Cleaned);
+		result.Text.Should().Contain("public readonly struct Point").And.Contain("public readonly int Doubled()");
+		result.Text.Should().NotContain("readonly readonly");
+
+		await Task.CompletedTask;
+	}
+
 	// ---- IDE0034, default(T) ----------------------------------------------------------------------
 
 	[Test]
