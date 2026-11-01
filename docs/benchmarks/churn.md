@@ -36,8 +36,8 @@ width, the line count is the honest number.
 Churn is a one-time cost. Once the initial commit is in, idempotency takes over.
 
 Curb's output is a fixed point of `dotnet format whitespace`: run `dotnet format` over Curb-formatted
-code and nothing changes. This is not a claim — it is a CI-gated measurement, checked against
-1,196 files on every push.
+code and nothing changes. This is not a claim. It's a measurement, gated in CI on every push (see
+[conformance](../design-principles/conformance.md)).
 
 The practical consequence: Format Document in your IDE won't undo what Curb wrote. `dotnet format`
 in CI won't produce a diff. The two tools genuinely agree, and they stay that way. That is what

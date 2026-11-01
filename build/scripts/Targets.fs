@@ -550,18 +550,73 @@ let private fsharpSmoketest (_: ParseResults<Arguments>) =
     printfn ""
     printfn "F# MSBuild integration verified: formatted through Fantomas, skipped when unchanged, cached, checked, and untouched when bypassed"
 
-/// Where the corpus comes from, in one place: every CI job that needs it calls `./build.sh clonecorpus`, and
-/// cleanupconformance clones through here when no --corpus is given. Today that is elastic/docs-builder at
-/// HEAD; replacing it is a change to this function alone.
-let private cloneCorpus (destination: string) =
+/// Clones elastic/docs-builder at HEAD: the corpus every gate ran against before the generated one, kept as a
+/// comparison (`--corpus-source docs-builder`). CI no longer uses it.
+let private cloneDocsBuilder (destination: string) =
     printfn "cloning elastic/docs-builder into %s" destination
     exec "git" ["clone"; "--depth"; "1"; "https://github.com/elastic/docs-builder.git"; destination] |> ignore
+
+/// The share of a corpus's C# files Curb would change below which the generated input is too close to Curb's own
+/// output to measure anything. Every gate that compares Curb with dotnet format, or with itself, passes trivially on
+/// a corpus Curb already formatted.
+let private minimumChangedShare = 0.5
+
+/// Writes the generated corpus (tools/Nullean.Curb.CorpusGenerator) into `destination`.
+///
+/// Its input is the test suite's expectation sources, dumped the way verifyexpectations dumps them, plus the
+/// generator's own templates; every C# file then gets a layout drawn from the seed. Nothing is fetched. The same
+/// seed and the same test suite give a byte-identical corpus, so a gate's number moves only when Curb, the tests or
+/// the generator do.
+///
+/// Fails if Curb would leave most of the C# alone: a corpus that is already Curb's output proves nothing.
+let private generateCorpus (arguments:ParseResults<Arguments>) (destination: string) =
+    let dump = Path.Combine(Paths.Output.FullName, "corpus-expectations")
+    if Directory.Exists dump then Directory.Delete(dump, true)
+    Directory.CreateDirectory dump |> ignore
+    Environment.SetEnvironmentVariable("CURB_EXPECTATION_DUMP", dump)
+    exec "dotnet" ["run"; "--project"; "tests/Nullean.Curb.Tests"; "-c"; "Release"] |> ignore
+    Environment.SetEnvironmentVariable("CURB_EXPECTATION_DUMP", null)
+
+    let seed = arguments.TryGetResult Seed |> Option.defaultValue 1
+    let size = arguments.TryGetResult CorpusSize |> Option.defaultValue 10.0
+    exec "dotnet"
+        [ "run"; "--project"; "tools/Nullean.Curb.CorpusGenerator"; "-c"; "Release"; "--"
+          "--output"; destination
+          "--expectations"; dump
+          "--seed"; string seed
+          "--size-mb"; size.ToString(Globalization.CultureInfo.InvariantCulture)
+          "--global-json"; Path.Combine(Paths.Root.FullName, "global.json")
+          "--divergences"; Path.Combine(Paths.Root.FullName, "build", "conformance-divergences.json") ]
+
+    let _, lines = startCurb ["check"; destination]
+    let summary =
+        lines
+        |> Seq.choose (fun l ->
+            let m = Text.RegularExpressions.Regex.Match(l, @"csharp: (\d+) file\(s\) — (\d+) would change")
+            if m.Success then Some (int m.Groups[1].Value, int m.Groups[2].Value) else None)
+        |> Seq.tryHead
+    match summary with
+    | None -> failwith "could not read the C# line of `curb check` over the generated corpus"
+    | Some (total, changed) ->
+        let share = float changed / float total
+        printfn "the generated corpus is not Curb's output: %d of %d C# file(s) (%.1f%%) would change" changed total (100.0 * share)
+        if share < minimumChangedShare then
+            failwithf "only %.1f%% of the generated C# would change; below %.0f%% the formatting gates measure nothing" (100.0 * share) (100.0 * minimumChangedShare)
+
+/// Where the corpus comes from, in one place: every CI job that needs it calls `./build.sh clonecorpus`, and
+/// cleanupconformance writes one through here when no --corpus is given. Generated unless `--corpus-source
+/// docs-builder` asks for the clone the gates used to run against.
+let private materialiseCorpus (arguments:ParseResults<Arguments>) (destination: string) =
+    match arguments.TryGetResult CorpusSource |> Option.defaultValue "generated" with
+    | "generated" -> generateCorpus arguments destination
+    | "docs-builder" -> cloneDocsBuilder destination
+    | other -> failwithf "--corpus-source must be generated or docs-builder, not %s" other
 
 let private cloneCorpusTarget (arguments:ParseResults<Arguments>) =
     match arguments.TryGetResult Corpus with
     | Some destination when Directory.Exists destination -> failwithf "%s already exists; clonecorpus needs a fresh path" destination
-    | Some destination -> cloneCorpus destination
-    | None -> failwith "clonecorpus needs --corpus <path> to clone into"
+    | Some destination -> materialiseCorpus arguments destination
+    | None -> failwith "clonecorpus needs --corpus <path> to write into"
 
 /// Cleans a corpus that really builds, then requires that it still builds and that dotnet format style has
 /// nothing left to say about the rules Curb owns.
@@ -570,9 +625,8 @@ let private cloneCorpusTarget (arguments:ParseResults<Arguments>) =
 /// proves a wrong verdict cannot damage a file; it cannot prove a *right* verdict was applied correctly,
 /// because it never compiles anything. This does: the corpus is built, cleaned, and built again.
 ///
-/// Needs a corpus that builds with the SDK in global.json, which is why it is elastic/docs-builder rather
-/// than dotnet/roslyn — Roslyn pins an SDK only its own Arcade bootstrap fetches. Clones it if `--corpus` is
-/// not given.
+/// Needs a corpus that builds with the SDK in global.json. The generated corpus is a solution written to build, with
+/// sites for every owned rule planted across it; it is generated into build/output if `--corpus` is not given.
 let private cleanupConformance (arguments:ParseResults<Arguments>) =
     let corpus =
         match arguments.TryGetResult Corpus with
@@ -581,10 +635,11 @@ let private cleanupConformance (arguments:ParseResults<Arguments>) =
             if not d.Exists then failwithf "corpus not found: %s" d.FullName
             d
         | None ->
-            let cached = DirectoryInfo(Path.Combine(Paths.Output.FullName, "corpus", "docs-builder"))
+            let source = arguments.TryGetResult CorpusSource |> Option.defaultValue "generated"
+            let cached = DirectoryInfo(Path.Combine(Paths.Output.FullName, "corpus", source))
             if not cached.Exists then
                 Directory.CreateDirectory(cached.Parent.FullName) |> ignore
-                cloneCorpus cached.FullName
+                materialiseCorpus arguments cached.FullName
             cached
 
     let work = DirectoryInfo(Path.Combine(Paths.Output.FullName, "cleanup-conformance"))
@@ -615,6 +670,7 @@ let private cleanupConformance (arguments:ParseResults<Arguments>) =
 
     printfn "rules: %s" (String.concat " " ownedIds)
 
+    // docs-builder only (`--corpus-source docs-builder`); the generated corpus has no package.json.
     // Frontend builds need npm, which a CI runner for a C# repository has no reason to have. Both npm
     // targets in docs-builder are Inputs/Outputs-gated, so writing their outputs makes MSBuild skip them.
     // If a future corpus needs something else the build fails loudly, which is the right way to find out.
@@ -723,11 +779,12 @@ let private cleanupConformance (arguments:ParseResults<Arguments>) =
         output
 
     // One site per rule, in a file of its own, so the fixing half runs against a solution that really
-    // compiles. The 1,200 files around it are what the rebuild and the dotnet-format check are for: cleanup
-    // must not break any of them.
-    let seedProject = Path.Combine(work.FullName, "src", "Elastic.Documentation")
-    if not (Directory.Exists seedProject) then
-        failwithf "the corpus does not have the project this gate seeds into: %s" seedProject
+    // compiles. The files around it are what the rebuild and the dotnet-format check are for: cleanup must not
+    // break any of them. The generated corpus plants sites of its own across them too.
+    let seedProject =
+        [ Path.Combine(work.FullName, "src", "Corpus.Core"); Path.Combine(work.FullName, "src", "Elastic.Documentation") ]
+        |> List.tryFind Directory.Exists
+        |> Option.defaultWith (fun () -> failwithf "the corpus has none of the projects this gate seeds into (src/Corpus.Core, src/Elastic.Documentation)")
 
     let seed =
         [ "#nullable enable"                                  // IDE0240, the project already enables it
@@ -2630,7 +2687,8 @@ let Setup (parsed:ParseResults<Arguments>) (subCommand:Arguments) =
     // No dependency on build: the documentation is markdown and one static HTML file, and waiting on
     // a Release compile to preview a paragraph would make nobody run it.
     step Docs.Name docs
-    // No dependency on build either: it is a git clone.
+    // No dependency on build: generating runs the test suite and the generator with `dotnet run`, which builds
+    // what they need, and the docs-builder source is a git clone.
     step CloneCorpus.Name cloneCorpusTarget
     cmd VerifyExpectations.Name (Some [Build.Name]) None <| fun _ -> verifyExpectations parsed
     cmd VerifyCleanupExpectations.Name (Some [Build.Name]) None <| fun _ -> verifyCleanupExpectations parsed

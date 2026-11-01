@@ -5,6 +5,26 @@ description: Current limitations in Curb's formatting output and what to expect 
 
 # Known limitations
 
+## Doc comments keep their old indentation when it changes style
+
+When a file's indentation changes from spaces to tabs, or the other way round, only the first line of a
+`///` doc comment is re-indented. The lines after it keep their spaces, and `dotnet format` then fixes them:
+
+```csharp
+class C
+{
+	/// <summary>                     // re-indented with a tab
+    /// Doc.                          // still four spaces
+    /// </summary>
+	void M() { }
+}
+```
+
+The CI corpus finds this in about 170 of its files, which is most of the gap between its conformance
+floor and 100%. The rest are continuation lines of untidy source that {{product}} indents differently from
+`dotnet format`: multi-dimensional array initializers, `select new { }` in a query, tuple patterns in switch
+arms, and members of a `with` initializer.
+
 ## Expression-body conversions do not compose in one pass
 
 With both `csharp_style_expression_bodied_properties = true` and
@@ -39,8 +59,8 @@ public ImmutableArray<CustomModifier> RefCustomModifiers =>
 roslyn at `dcfa99c3` (18,283 files, its own `.editorconfig`) is the hardest case found. With no width it
 now settles in one pass. At width 120, eight of its files still change on a second pass, all of them
 this shape: a property's or an accessor's expression body, including a switch expression hung off the
-arrow. The two docs-builder corpora the conformance gate runs (1,702 and 1,688 files) settle in one pass
-with widths off, with their own widths, and at width 120. The run is `curb format` twice over a copy,
+arrow. elastic/docs-builder (1,702 files) and the generated CI corpus settle in one pass with widths off, with
+their own widths, and at width 120. The run is `curb format` twice over a copy,
 then a diff.
 
 The argument-line shapes that used to account for unsettled files with no width settle in one pass
