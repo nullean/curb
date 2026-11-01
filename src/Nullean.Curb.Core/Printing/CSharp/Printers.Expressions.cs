@@ -617,10 +617,12 @@ internal static partial class Printers
 		// initializer's — see BeforeOpenBraceWhenOwnerBroke. This is the deterministic half of the
 		// `ownerSpansLines` question above: that one reads where the author put the brace, which is right
 		// in preservation mode and unavailable in deterministic mode, and this one reads the decision the
-		// argument list took on this run, which is available in both.
+		// argument list took on this run, which is available in both. Only one of them may answer: where
+		// the source already says the owner broke, the group below places the brace, and a second break
+		// here left a blank line above it (issue #195).
 		if (ownerBrokeAlone)
 			BeforeOpenBrace(BraceStyle.ObjectCollectionArrayInitializers, context);
-		else if (leadingLine && !oneMemberPerLine && elementBrace < 0)
+		else if (leadingLine && !oneMemberPerLine && elementBrace < 0 && !ownerSpansLines)
 			BeforeOpenBraceWhenOwnerBroke(BraceStyle.ObjectCollectionArrayInitializers, ownerGroup, context);
 
 		// Named and published so an enclosing construct can aim at it — see PrintContext.OwnBlockGroup.

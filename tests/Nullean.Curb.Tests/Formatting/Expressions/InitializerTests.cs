@@ -17,6 +17,104 @@ public class InitializerTests : FormattingTest
 		}
 		""");
 
+	// A creation whose argument list the author broke, with the initializer's brace on its own line, had
+	// two breaks ahead of that brace: one aimed at the list's group, one for where the author put it.
+	// Printed together they left a blank line, issue #195.
+	[Test]
+	public Task Broken_arguments_keep_the_initializer_brace_on_the_next_line() => Unchanged(
+		"""
+		public class C
+		{
+		    public static Settings Create() =>
+		        new Settings(
+		            "first")
+		        {
+		            Value = 1,
+		        };
+		}
+		""");
+
+	[Test]
+	public Task Broken_arguments_of_a_creation_passed_as_an_argument_keep_the_initializer_brace_on_the_next_line() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        list.Add(new Settings(
+		            "first")
+		        {
+		            Value = 1,
+		        });
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Broken_arguments_of_an_implicit_creation_keep_the_initializer_brace_on_the_next_line() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        Settings value = new(
+		            "first")
+		        {
+		            Value = 1,
+		        };
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Broken_arguments_of_a_with_expression_keep_the_initializer_brace_on_the_next_line() => Unchanged(
+		"""
+		public class C
+		{
+		    public Settings M()
+		    {
+		        return Make(
+		            "first") with
+		        {
+		            Value = 1,
+		        };
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Broken_arguments_followed_by_a_comment_keep_the_initializer_brace_on_the_next_line() => Unchanged(
+		"""
+		public class C
+		{
+		    public Settings M()
+		    {
+		        return new Settings(
+		            "first") // comment
+		        {
+		            Value = 1,
+		        };
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Broken_arguments_with_one_member_per_line_keep_the_initializer_brace_on_the_next_line() => Unchanged(
+		"""
+		public class C
+		{
+		    public Settings M()
+		    {
+		        return new Settings(
+		            "first")
+		        {
+		            Value = 1,
+		        };
+		    }
+		}
+		""",
+		editorConfig: "csharp_new_line_before_members_in_object_initializers = true");
+
 	[Test]
 	public Task Object_creation_with_arguments() => Unchanged(
 		"""
