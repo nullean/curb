@@ -614,3 +614,19 @@ jobs:
             -s https://api.nuget.org/v3/index.json \
             --skip-duplicate \
             --no-symbols
+
+  # The docs build as docs.yml publishes it, without publishing, so a PR proves the build and post-build steps.
+  docs:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Build documentation
+        uses: elastic/docs-builder@main
+        env:
+          FEATURE_NAVIGATION_PREVIEW: true
+
+      - name: Theme and landing page
+        run: scripts/docs-finish.sh .artifacts/docs/html

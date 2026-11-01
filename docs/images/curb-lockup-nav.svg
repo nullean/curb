@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 176 96" width="176" height="96" role="img" aria-label="curb">
+  <!-- The animated lockup from the landing page's header (docs/curb-landing.html, svg.nav-lockup), standalone for the
+       docs header, where it is an <img>: the animation lives in this file's <style>, and the glyphs come from an
+       embedded JetBrains Mono Bold subset ({}curb; SIL Open Font License 1.1, see docs/fonts/OFL-jetbrains-mono.txt),
+       because an SVG loaded as an image cannot reach the page's fonts. Keep it in step with the landing page. -->
+  <style>
+    @font-face { font-family: 'Curb Lockup Mono'; font-weight: 700; src: url(data:font/woff2;base64,d09GMgABAAAAAAPYAA8AAAAAB4QAAAN+AAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAGhYbIBwqBmA/U1RBVEwAVBEICoQ4g2QBNgIkAxALEAAEIAWEJgcgGxsGAC4G7JbjEK8iRUzTwy063se92fix1obxEMy9vrvkU1IYAApTPSJWgCDUjJhbjR8JM3ZzhZ9fc+9u2A08kcTnkszlTxRrW8W85DVCI5IYuuYHVlEl/40qASt0SFE4oQKrBBxWNAB19Mj+B8j//D+X47tNcLsSD3HM37WmLtpY3Dvr+RRKYKwFvLWXWGSUbTZkuegR6NRTa8S/GxDoAqSQSiFQmWIPtmyF2Q0rShgeDghU5qHAMc1tnDuMqrCLRAwuc1eOoQb5HNkFrF23jgN4EQdJh9AOf9GaJQA+OGJc/Ie2FAPBAAJyXp4xw6IQ2hJj4JgDv3IyjzCI0xcTZYwSShPgEM3sh+QukP9QCBkjAAIkCoxBEhhjwSKgS1sqHdXUNjQeFkc8n5l33njuWYGWCTGsXtACPdaAT/gDQImSKfBVx/co43YolMR0HwsrqGrUttXevUP9Ysfddsw2EffW1fMldw/UsS0ABk5uJw/noaL6xWL66jYsP1gvOpxVJuSMRVEnUt4Y9m2lfNP3Ma2qOE+aTfN+Hz5jter5eKrna1vFi90M9+ukrm2HVNSeJzl3ZCEd997TSW80q+ZSYfA3fkbvy/P/e85zpRqJu8Zio0mJ4xNMAz4O28+fAj+wOtlTAmlcOU1JY4bummxYxMu3aFUO7x7MwIPPqdLGeDlQANF5ncK+LSDfwhrIVBKUG1VY4HANQj/QO80rKOMde4QSDlsv9Iy9mT6Cn6rETadbz4iWV2B1W11W4Zzo23SLmyrRtPgnVzzRC1p02uXMBr2c6EEPx0dgvYD4x7c00QsRaKK0Tnbn/JXFb2kkbirdckr03T6z2+oy+xSi5dCtbroEAALZV76uzrKxzfD/FVLxA77/jp7h+9/y+vCwmuXiIjQlCL5yT+5C0EPbNWCELcZPCbLQijKxscHQ8k7bR82c5QqJ2nOFKDvox2bDFHM2tX1hC33+2dK8ENmGSRFmmuZETiPoiuvhplre6I0Rj/cbgRzvoaVq6vqaCnLykAM8HB094PYiGTDeUUSJFCcUVLXEFjVVtX3smmqKMlKQAwptSF5NEy1TavdE6lpk2NhyClDfaUtiSampYHcq7bf0Lp/6ZKDU4rI0HhZwJ8hzGlWSV3UxM5W8swWJeHUopGWIhg/0U94H8Vn2HQwaEpFUQYpzR5ZKqCIBw8fxgCAIAAAA) format('woff2'); }
+    @keyframes cuSnapL {
+      0%   { transform: translate(0, 0);          animation-timing-function: linear; }
+      38%  { transform: translate(0, 0);          animation-timing-function: cubic-bezier(0.2, 1.4, 0.3, 1); }
+      45%  { transform: translate(-6.5px, 2.9px); animation-timing-function: linear; }
+      64%  { transform: translate(-6.5px, 2.9px); animation-timing-function: cubic-bezier(0.2, 1.4, 0.3, 1); }
+      78%  { transform: translate(0, 0);          animation-timing-function: linear; }
+      100% { transform: translate(0, 0); }
+    }
+    @keyframes cuSnapR {
+      0%   { transform: translate(0, 0);          animation-timing-function: linear; }
+      38%  { transform: translate(0, 0);          animation-timing-function: cubic-bezier(0.2, 1.4, 0.3, 1); }
+      45%  { transform: translate(7.2px, -3.6px); animation-timing-function: linear; }
+      64%  { transform: translate(7.2px, -3.6px); animation-timing-function: cubic-bezier(0.2, 1.4, 0.3, 1); }
+      78%  { transform: translate(0, 0);          animation-timing-function: linear; }
+      100% { transform: translate(0, 0); }
+    }
+    @keyframes cuSheen {
+      0%   { transform: skewX(-18deg) translateX(0); }
+      100% { transform: skewX(-18deg) translateX(260px); }
+    }
+    .cu-l { animation: cuSnapL 3.6s linear infinite; }
+    .cu-r { animation: cuSnapR 3.6s linear infinite; }
+    .cu-sheen { animation: cuSheen 1.4s cubic-bezier(0.4, 0, 0.6, 1) 0.3s both; }
+    @media (prefers-reduced-motion: reduce) {
+      .cu-l, .cu-r { animation: none; }
+      .cu-sheen { animation: none; visibility: hidden; }
+    }
+  </style>
+  <defs>
+    <linearGradient id="fN" x1="0" y1="0.2" x2="1" y2="0.8"><stop offset="0.44" stop-color="#FFB03D"/><stop offset="0.56" stop-color="#A96BFF"/></linearGradient>
+    <radialGradient id="gN" cx="0.18" cy="0.12" r="1.2"><stop offset="0" stop-color="#1B2126"/><stop offset="0.55" stop-color="#0D1013"/><stop offset="1" stop-color="#08090B"/></radialGradient>
+    <linearGradient id="shN" x1="0" y1="0" x2="1" y2="0"><stop offset="0.35" stop-color="#FFFFFF" stop-opacity="0"/><stop offset="0.5" stop-color="#FFFFFF" stop-opacity="0.8"/><stop offset="0.65" stop-color="#FFFFFF" stop-opacity="0"/></linearGradient>
+    <mask id="ringN"><rect width="176" height="96" fill="#FFFFFF"/><rect x="5" y="5" width="166" height="86" fill="#000000"/></mask>
+  </defs>
+  <path d="M24 0 H176 V96 H0 V24 A24 24 0 0 1 24 0 Z" fill="url(#fN)"/>
+  <g mask="url(#ringN)"><rect class="cu-sheen" x="-120" y="-20" width="120" height="136" fill="url(#shN)" transform="skewX(-18)"/></g>
+  <path d="M25 5 H171 V91 H5 V25 A20 20 0 0 1 25 5 Z" fill="url(#gN)"/>
+  <g font-family="'Curb Lockup Mono', 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-weight="700">
+    <g class="cu-l"><text x="26" y="56.95" font-size="30" fill="#FFB03D">{</text></g>
+    <g class="cu-r"><text x="44.06" y="56.95" font-size="30" fill="#C39BFF">}</text></g>
+    <text x="74" y="59.93" font-size="32" letter-spacing="-1" fill="#FFFFFF">curb</text>
+  </g>
+</svg>

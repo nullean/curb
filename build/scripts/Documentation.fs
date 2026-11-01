@@ -28,7 +28,6 @@ let PathPrefix = ""
 
 let private docsSource = "docs"
 let private landingPage = Path.Combine(docsSource, "curb-landing.html")
-let private robotsTxt = Path.Combine(docsSource, "robots.txt")
 let private workflow = Path.Combine(".github", "workflows", "docs.yml")
 
 /// docs-builder always writes here; the GitHub action does not make it configurable, so neither
@@ -150,14 +149,15 @@ let build () =
     let args =
         if PathPrefix = "" then ["build"; "--path"; docsSource]
         else ["build"; "--path"; docsSource; "--path-prefix"; PathPrefix]
+    // The design-system layout the theme targets is behind a feature flag, read from the environment only.
+    Environment.SetEnvironmentVariable("FEATURE_NAVIGATION_PREVIEW", "true")
     exec tool args
 
     if not (Directory.Exists htmlOutput) then
         failwithf "docs-builder reported success but %s does not exist" htmlOutput
 
-    File.Copy(landingPage, Path.Combine(htmlOutput, "index.html"), true)
-    File.Copy(robotsTxt, Path.Combine(htmlOutput, "robots.txt"), true)
-    printfn "applied the landing page override -> %s" (Path.Combine(htmlOutput, "index.html"))
+    // The landing page, robots.txt, fonts, theme and HTML patches: the same script the workflow runs.
+    exec "bash" [Path.Combine("scripts", "docs-finish.sh"); htmlOutput; PathPrefix]
 
 // ─────────────────────────────  serve  ─────────────────────────────
 

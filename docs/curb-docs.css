@@ -1,0 +1,261 @@
+/*
+ * docs/curb-docs.css: the Curb theme for docs-builder's design system (NAVIGATION_PREVIEW).
+ * Appended to the emitted _static/ds.css by scripts/docs-finish.sh, so it comes after the default theme and wins by
+ * cascade order within the same layer, without !important. The palette is the landing page's (docs/curb-landing.html):
+ * near-black, amber and violet in dark, a warm paper counterpart in light. Roles are named in docs-builder's
+ * Assets/ds/themes/bold-minimal.css; each pair is `var(--ds-l, light) var(--ds-d, dark)`.
+ */
+
+/* docs-builder ships Inter and JetBrains Mono; Space Grotesk (the landing page's display face) is self-hosted from
+   docs/fonts, copied to /fonts by scripts/docs-finish.sh. */
+@font-face {
+	font-family: 'Space Grotesk';
+	font-style: normal;
+	font-weight: 300 700;
+	font-display: swap;
+	src: url('/fonts/space-grotesk-latin-wght-normal.woff2') format('woff2');
+}
+
+@layer ds.tokens {
+	:root {
+		--font-body: 'Inter', system-ui, sans-serif;
+		--font-heading: 'Space Grotesk', 'Inter', system-ui, sans-serif;
+		--font-display: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+		--font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+		--radius-sm: 4px;
+		--radius-md: 6px;
+		--radius-lg: 8px;
+		/* Tall enough for the landing page's 88x48 lockup with room around it (the design system's is 3rem). */
+		--header-height: 4rem;
+	}
+}
+
+@layer ds.theme {
+	:root,
+	[data-theme],
+	.hero-block:not(.hero-block--paper),
+	.band--ink,
+	.band--blue,
+	.band--dusk,
+	.band--aurora,
+	.cta-band:not(.cta-band--teal),
+	.band--lagoon,
+	.cta-band--teal {
+		--color-page: var(--ds-l, #faf8f4) var(--ds-d, #08090b);
+		--color-surface: var(--ds-l, #ffffff) var(--ds-d, #0d1013);
+		--color-surface-sunken: var(--ds-l, #f3f0ea) var(--ds-d, #0b0d10);
+
+		--color-heading: var(--ds-l, #08090b) var(--ds-d, #f4f6f9);
+		--color-text: var(--ds-l, #1e232a) var(--ds-d, #e9ecf1);
+		--color-text-muted: var(--ds-l, #59616d) var(--ds-d, #98a1ae);
+
+		/* The landing page's hairlines are amber at low alpha; these are those lines flattened onto each page. */
+		--color-border: var(--ds-l, #ebe3d5) var(--ds-d, #221b12);
+		--color-border-strong: var(--ds-l, #08090b) var(--ds-d, #e9ecf1);
+		--color-border-control: var(--ds-l, #8c8273) var(--ds-d, #6b6456);
+
+		/* Amber: as on the landing page in dark; a deep amber in light so links hold 4.5:1 on paper. */
+		--color-accent: var(--ds-l, #8a5200) var(--ds-d, #ffb03d);
+		--color-accent-hover: var(--ds-l, #663c00) var(--ds-d, #f7c970);
+		--color-on-accent: var(--ds-l, #ffffff) var(--ds-d, #08090b);
+		--color-accent-surface: var(--ds-l, #fff3df) var(--ds-d, #17120a);
+		--color-accent-border: var(--ds-l, #f0cf96) var(--ds-d, #3d2c10);
+
+		/* Buttons: the landing page's primary button, near-black on amber, in both modes. */
+		--color-action: #ffb03d;
+		--color-action-hover: #f7c970;
+		--color-action-hover-deep: #e5a43f;
+		--color-action-deep: #e5901f;
+		--color-action-edge: #b86f0e;
+		--color-action-border: var(--ds-l, #e5901f) var(--ds-d, #ffb03d);
+		--color-on-action: #08090b;
+
+		--color-brand-deep: var(--ds-l, #08090b) var(--ds-d, #ffb03d);
+		--color-brand-bright: #ffb03d;
+		/* Violet, the landing page's second colour (the closing brace of the mark). */
+		--color-highlight: var(--ds-l, #6a34d0) var(--ds-d, #c39bff);
+		--color-highlight-surface: var(--ds-l, #f2eaff) var(--ds-d, rgb(169 107 255 / 12%));
+		--color-emphasis: var(--ds-l, #08090b) var(--ds-d, #1b2126);
+		--color-on-emphasis: #ffb03d;
+
+		--gradient-wash: var(--ds-l, linear-gradient(180deg, #faf8f4 0%, #f4efe6 100%))
+			var(--ds-d, linear-gradient(180deg, #0d1013 0%, #08090b 100%));
+		--color-hatch: var(--ds-l, rgb(8 9 11 / 4%)) var(--ds-d, rgb(255 176 61 / 4%));
+
+		/* Code is a dark panel in both modes, like the landing page's terminal and code panels. */
+		--color-code-bg: #0d1013;
+		--color-code-border: var(--ds-l, transparent) var(--ds-d, #1f2329);
+		--color-code-text: #e9ecf1;
+		--color-code-danger: #ff8a7a;
+		--color-code-warning: #ffb03d;
+		--color-code-info: #c39bff;
+		--color-code-muted: #8a93a0;
+		--color-code-gutter: #7d8692;
+		--color-code-keyword: #ffb03d;
+		--color-code-string: #9fd3a6;
+		--color-code-number: #f7c970;
+		--color-code-attr: #f7c970;
+		--color-code-type: #c39bff;
+		--color-code-variable: #dcc6ff;
+		--color-code-literal: #9fd3a6;
+		--color-code-punctuation: #98a1ae;
+
+		--color-focus-ring: var(--ds-l, #8a5200) var(--ds-d, #ffb03d);
+
+		--color-success: var(--ds-l, #17673e) var(--ds-d, #6fcf97);
+		--color-success-surface: var(--ds-l, #eaf7ef) var(--ds-d, rgb(111 207 151 / 10%));
+		--color-warning: var(--ds-l, #8a5200) var(--ds-d, #ffb03d);
+		--color-warning-surface: var(--ds-l, #fff3df) var(--ds-d, rgb(255 176 61 / 9%));
+		--color-danger: var(--ds-l, #b42a20) var(--ds-d, #ff8a7a);
+		--color-danger-surface: var(--ds-l, #fff1ee) var(--ds-d, rgb(255 138 122 / 10%));
+		--color-important: var(--ds-l, #6a34d0) var(--ds-d, #c39bff);
+		--color-important-surface: var(--ds-l, #f5efff) var(--ds-d, rgb(169 107 255 / 10%));
+
+		/* No offset slabs: the landing page lifts its panels with a long soft shadow. */
+		--color-slab-plate: var(--ds-l, #ebe3d5) var(--ds-d, #0d1013);
+		--shadow-slab: 0 24px 60px -20px rgb(0 0 0 / var(--ds-l, 22%) var(--ds-d, 70%));
+		--shadow-slab-sm: 0 10px 24px -10px rgb(0 0 0 / var(--ds-l, 18%) var(--ds-d, 60%));
+		--shadow-slab-rest: 0 1px 0 var(--color-border);
+		--shadow-overlay: 0 24px 60px rgb(0 0 0 / var(--ds-l, 18%) var(--ds-d, 60%));
+
+		/* The teal call to action becomes the landing page's amber button. */
+		--cta-top: #f7c970;
+		--cta-bottom: #ffb03d;
+		--cta-edge: #b86f0e;
+		--cta-border: #ffb03d;
+		--cta-fg: #08090b;
+		--cta-glow: rgb(255 176 61 / 35%);
+		--cta-hover-top: #fad58c;
+		--cta-hover-bottom: #ffbd5c;
+		--cta-active-top: #ffb03d;
+		--cta-active-bottom: #e5901f;
+
+		--swatch-light: #faf8f4;
+		--swatch-dark: #08090b;
+		--swatch-black: #000;
+	}
+
+	/* True black keeps the dark roles, on black. */
+	[data-theme='black'] {
+		--color-page: #000;
+		--color-surface: #08090b;
+		--color-surface-sunken: #050607;
+		--color-border: #1c160e;
+		--color-code-bg: #08090b;
+	}
+}
+
+@layer ds.pages {
+	/* The landing page's mesh: amber and violet glows fixed behind the page, as its body::before does. Toned down to
+	   about two thirds so long prose stays calm; in light the same glows are pastel washes on paper. True black stays
+	   black. */
+	body.navigation-preview {
+		background-color: var(--color-page);
+		background-image:
+			radial-gradient(at 8% 18%, rgb(255 176 61 / var(--ds-l, 10%) var(--ds-d, 12%)) 0, transparent 55%),
+			radial-gradient(at 92% 6%, rgb(169 107 255 / var(--ds-l, 12%) var(--ds-d, 18%)) 0, transparent 50%),
+			radial-gradient(at 60% 78%, rgb(169 107 255 / var(--ds-l, 8%) var(--ds-d, 12%)) 0, transparent 55%),
+			radial-gradient(at 22% 88%, rgb(255 176 61 / var(--ds-l, 6%) var(--ds-d, 5%)) 0, transparent 50%),
+			radial-gradient(at 80% 48%, rgb(195 155 255 / var(--ds-l, 6%) var(--ds-d, 9%)) 0, transparent 50%);
+		background-attachment: fixed;
+	}
+
+	[data-theme='black'] body.navigation-preview {
+		background-image: none;
+	}
+
+	/* Light: the mesh spread over paper tints the whole reading column, and where amber meets violet it turns muddy.
+	   Instead the two brand glows sit apart at the top of the page, behind the header and title, and scroll away, so
+	   prose reads on clean paper. */
+	body.navigation-preview {
+		--glow-light:
+			radial-gradient(55% 520px at 0% 0%, rgb(255 176 61 / 24%), transparent 72%),
+			radial-gradient(50% 460px at 100% 0%, rgb(169 107 255 / 16%), transparent 72%);
+	}
+
+	:root[data-theme='light'] body.navigation-preview {
+		background-image: var(--glow-light);
+		background-attachment: scroll;
+		background-repeat: no-repeat;
+	}
+
+	@media (prefers-color-scheme: light) {
+		:root:not([data-theme]) body.navigation-preview {
+			background-image: var(--glow-light);
+			background-attachment: scroll;
+			background-repeat: no-repeat;
+		}
+	}
+
+	.site-header {
+		background: color-mix(in srgb, var(--color-page) 72%, transparent);
+		backdrop-filter: blur(12px);
+		border-bottom: 1px solid var(--color-border);
+	}
+
+	/* The landing page's animated lockup (scripts/docs-pages.py inserts it), at its landing-header size. It carries
+	   the wordmark, so the text title stays for screen readers only. */
+	.site-header__logo {
+		display: block;
+		width: 88px;
+		height: 48px;
+	}
+
+	.site-header__logo + .site-header__title {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip-path: inset(50%);
+		white-space: nowrap;
+	}
+
+	/* The wordmark is set in JetBrains Mono, as in the landing page's lockup. */
+	.site-header__brand,
+	.site-header__title {
+		font-family: var(--font-mono);
+		font-weight: 700;
+		font-size: 1.2rem;
+		letter-spacing: -0.02em;
+	}
+
+	/* The landing page sets its navigation in mono; so does the sidebar. */
+	.nav-tree__link {
+		font-family: var(--font-mono);
+		font-size: 0.84rem;
+		letter-spacing: -0.01em;
+	}
+
+	.prose :is(h1, h2, h3, h4) {
+		font-family: var(--font-heading);
+		font-weight: 700;
+		letter-spacing: -0.028em;
+		text-wrap: balance;
+	}
+
+	/* Sidebar: the current page in amber, as the landing page marks what matters. */
+	.nav-tree__link[aria-current='page'] {
+		color: var(--color-accent);
+	}
+
+	/* A long unbroken heading (EnforceCodeStyleInBuild) otherwise runs out of the narrow on-this-page column. */
+	.toc__link {
+		overflow-wrap: anywhere;
+	}
+
+	/* The design system leaves .prose img uncapped, so a wide image runs past the column. */
+	.prose img {
+		max-width: 100%;
+		height: auto;
+	}
+
+	/* .prose table's top margin sits inside .table-wrapper, which paints the surface: a blank strip above the head. */
+	.prose .table-wrapper table {
+		margin-top: 0;
+	}
+
+	.prose kbd,
+	.kbd {
+		font-family: var(--font-mono);
+	}
+}
