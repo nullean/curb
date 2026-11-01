@@ -378,8 +378,8 @@ public static class Permuter
 
 			if (t.IsKind(SyntaxKind.SingleLineDocumentationCommentTrivia))
 			{
-				// Every line at the same indentation, the way people write them. Curb and dotnet format still disagree
-				// when the indentation changes style (see KnownDefects); that is a conformance finding, left in.
+				// Every line at the same indentation, the way people write them. When the indentation changes style,
+				// every line has to move with the first (issue #180).
 				var lines = t.ToFullString().Replace("\r\n", "\n").Split('\n');
 				var indent = Indent(level, p with { Jitter = 0, MixTabs = 0 }, r);
 				for (var n = 0; n < lines.Length; n++)

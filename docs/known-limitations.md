@@ -5,25 +5,13 @@ description: Current limitations in Curb's formatting output and what to expect 
 
 # Known limitations
 
-## Doc comments keep their old indentation when it changes style
+## Some continuation lines of untidy source differ from `dotnet format`
 
-When a file's indentation changes from spaces to tabs, or the other way round, only the first line of a
-`///` doc comment is re-indented. The lines after it keep their spaces, and `dotnet format` then fixes them:
-
-```csharp
-class C
-{
-	/// <summary>                     // re-indented with a tab
-    /// Doc.                          // still four spaces
-    /// </summary>
-	void M() { }
-}
-```
-
-The CI corpus finds this in about 170 of its files, which is most of the gap between its conformance
-floor and 100%. The rest are continuation lines of untidy source that {{product}} indents differently from
+On source that was never formatted, {{product}} indents a few kinds of continuation line differently from
 `dotnet format`: multi-dimensional array initializers, `select new { }` in a query, tuple patterns in switch
-arms, and members of a `with` initializer.
+arms, members of a `with` initializer, and some `//` comments on a line of their own. The CI corpus, which is written to be untidy, finds these in about
+170 of its 1,844 files, which is the gap between its conformance floor and 100%. elastic/docs-builder, whose
+authors had already formatted it, shows none.
 
 ## Expression-body conversions do not compose in one pass
 

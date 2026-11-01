@@ -41,10 +41,9 @@ namespace Nullean.Curb.CorpusGenerator;
 /// comment their tests wrote.</item>
 /// </list>
 /// <para>
-/// Conformance with dotnet format is a percentage, so its findings stay in the corpus and set the floor instead: for
-/// one, converting space indentation to tabs re-indents only the first line of a <c>///</c> doc comment. Separately,
-/// the syntax Curb prints verbatim by design (<see cref="InsideVerbatimNode"/>) is kept free of untidy spacing, since
-/// that measures a missing printer <c>curb check --coverage</c> already reports.
+/// Conformance with dotnet format is a percentage, so its findings stay in the corpus and set the floor instead.
+/// Separately, the syntax Curb prints verbatim by design (<see cref="InsideVerbatimNode"/>) is kept free of untidy
+/// spacing, since that measures a missing printer <c>curb check --coverage</c> already reports.
 /// </para>
 /// </remarks>
 public static class KnownDefects
