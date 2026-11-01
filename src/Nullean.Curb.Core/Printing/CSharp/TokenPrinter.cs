@@ -543,12 +543,17 @@ internal static class TokenPrinter
 	/// mis-indented, which dotnet format counts as out of shape and Curb does not. Either answer is
 	/// a fixed point: once printed, the token sits at its indent and the comments at it or under
 	/// the trailing comment.
+	///
+	/// A label one less than the current indent is the exception: its comments belong a level in,
+	/// where the statements are (see <see cref="Printers.LabeledStatement"/>).
 	/// </remarks>
 	private static bool CommentsSitAtTokenColumn(SyntaxToken token, PrintContext context)
 	{
 		var lines = context.Text.Lines;
 		var tokenStart = token.SpanStart;
 		var tokenColumn = tokenStart - lines.GetLineFromPosition(tokenStart).Start;
+		if (Printers.LabelCommentsSitALevelIn(token, context))
+			tokenColumn += context.Options.IndentSize;
 
 		foreach (var trivia in token.LeadingTrivia)
 		{

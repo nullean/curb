@@ -235,33 +235,33 @@ jobs:
 
       # The product claim, as a number that must not go down: Curb's output is a fixed point of dotnet format.
       #
-      # Measured 92.34% (1725/1868). What is left is continuation lines Curb indents differently on untidy
+      # Measured 92.67% (1731/1868). What is left is continuation lines Curb indents differently on untidy
       # input, listed in docs/known-limitations.md; with no width that is mostly initializers and patterns
       # kept as written. docs-builder held 100% because its authors had already formatted it.
       # Gated weekly: the no-width conformance path is slower to regress and adds ~10 s per run.
       - name: Conformance with dotnet format
         if: env.CURB_FULL_GATES == 'true'
-        run: ./build.sh conformance -s true --corpus /tmp/corpus --minimum 92.0
+        run: ./build.sh conformance -s true --corpus /tmp/corpus --minimum 92.4
 
       # The corpus sets max_line_length = 140, so --reflow is the *default* path for it: a width selects
-      # deterministic layout as well as the column. Measured 97.64% (1824/1868): deterministic layout has no
+      # deterministic layout as well as the column. Measured 98.18% (1834/1868): deterministic layout has no
       # source arrangement for dotnet format to disagree with, so it is cleaner than the preserving opt-out
       # below on the same corpus. If this drops, the default is not shippable however good its churn looks.
       - name: Conformance with a width (deterministic, the default)
-        run: ./build.sh conformance -s true --corpus /tmp/corpus --reflow --minimum 97.3
+        run: ./build.sh conformance -s true --corpus /tmp/corpus --reflow --minimum 97.9
 
-      # A non-default width. Measured 97.70% (1825/1868).
+      # A non-default width. Measured 98.23% (1835/1868).
       # Gated weekly: a regression here shows up in the default-width gate too.
       - name: Conformance with a width of 120 columns
         if: env.CURB_FULL_GATES == 'true'
-        run: ./build.sh conformance -s true --corpus /tmp/corpus --width 120 --minimum 97.4
+        run: ./build.sh conformance -s true --corpus /tmp/corpus --width 120 --minimum 97.9
 
-      # The opt-out, which has to stay measurable now that a width no longer selects it. Measured 92.34%, the
+      # The opt-out, which has to stay measurable now that a width no longer selects it. Measured 92.67%, the
       # same files as the no-width run.
       # Gated weekly: the opt-out is a non-default mode; a regression there will not affect the default path.
       - name: Conformance with the preservation opt-out
         if: env.CURB_FULL_GATES == 'true'
-        run: ./build.sh conformance -s true --corpus /tmp/corpus --reflow --preserve --minimum 92.0
+        run: ./build.sh conformance -s true --corpus /tmp/corpus --reflow --preserve --minimum 92.4
 
       # Idempotency is what the default now buys by construction rather than by measurement: layout is a
       # function of tokens and width, and tokens do not move. A failure here means something in the

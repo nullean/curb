@@ -672,6 +672,13 @@ internal static partial class Printers
 		var arena = context.Arena;
 		var placement = context.Options.IndentLabels;
 
+		// The comments above a label one less than the current indent stay where the statements
+		// are, as dotnet format leaves them; they went out with the label. A flush_left label takes
+		// its comments to column zero with it.
+		var commentsStayIn = LabelCommentsSitALevelIn(node.Identifier, context);
+		if (commentsStayIn)
+			TokenPrinter.PrintLeadingTrivia(node.Identifier, context);
+
 		// flush_left is column zero rather than a level relative to anything, so it needs the scope
 		// that ignores the enclosing indent instead of one that shifts it.
 		using (placement == LabelIndent.FlushLeft
@@ -679,13 +686,25 @@ internal static partial class Printers
 			: arena.Indent(placement == LabelIndent.OneLessThanCurrent ? -1 : 0))
 		{
 			arena.HardLine(DocFlags.Reindent);
-			TokenPrinter.Print(node.Identifier, context);
+			if (commentsStayIn)
+				TokenPrinter.PrintWithoutLeadingTrivia(node.Identifier, context);
+			else
+				TokenPrinter.Print(node.Identifier, context);
 			TokenPrinter.Print(node.ColonToken, context);
 		}
 
 		arena.HardLine();
 		Node.Print(node.Statement, context);
 	}
+
+	/// <summary>
+	/// True when <paramref name="token"/> names a label printed one less than the current indent,
+	/// whose comments sit a level in from it.
+	/// </summary>
+	internal static bool LabelCommentsSitALevelIn(SyntaxToken token, PrintContext context) =>
+		context.Options.IndentLabels == LabelIndent.OneLessThanCurrent
+		&& token.Parent is LabeledStatementSyntax label
+		&& label.Identifier == token;
 
 	public static void FixedStatement(FixedStatementSyntax node, PrintContext context)
 	{

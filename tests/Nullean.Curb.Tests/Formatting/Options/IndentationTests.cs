@@ -605,6 +605,69 @@ public class IndentationTests : FormattingTest
 		editorConfig: "csharp_indent_labels = flush_left");
 
 	[Test]
+	public Task A_comment_above_a_label_sits_where_the_statements_do() => Formats(
+		// dotnet format leaves the label one level out but its comments where the statements are,
+		// a comment under a trailing comment included; Curb took them out with the label.
+		"""
+		public class C
+		{
+		    public int M()
+		    {
+		        var x = 0;
+		    // at the label
+		    retry:
+		        x++;
+		        Call(); // trailing
+		        // under the trailing comment
+		    done:
+		        return x;
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public int M()
+		    {
+		        var x = 0;
+		        // at the label
+		    retry:
+		        x++;
+		        Call(); // trailing
+		        // under the trailing comment
+		    done:
+		        return x;
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Flush_left_takes_the_comments_above_a_label_to_column_zero() => Formats(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        // above
+		        outer:
+		        Call();
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		// above
+		outer:
+		        Call();
+		    }
+		}
+		""",
+		editorConfig: "csharp_indent_labels = flush_left");
+
+	[Test]
 	public Task A_label_inside_a_switch_section_follows_the_same_rule() => Unchanged(
 		"""
 		public class C
