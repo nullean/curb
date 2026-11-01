@@ -1,5 +1,4 @@
 using System.Text;
-using Microsoft.CodeAnalysis.Text;
 
 namespace Nullean.Curb.Cleanup;
 
@@ -42,6 +41,58 @@ public static class DiagnosticLog
 		return true;
 	}
 
+	/// <summary>
+	/// Reads a log keeping which compilation reported each diagnostic, deduplicated per compilation.
+	/// </summary>
+	/// <remarks>
+	/// What <see cref="TargetAgreement"/> needs, which <see cref="TryRead(ReadOnlySpan{byte}, out List{CleanupDiagnostic}, out string?)"/>
+	/// folds away. A SARIF log is one compilation, so every diagnostic's <see cref="LoggedDiagnostic.Context"/>
+	/// is null and <paramref name="contexts"/> stays empty. A console log carries every compilation of a build,
+	/// each line naming its own; a site two target frameworks reported is kept once for each.
+	/// </remarks>
+	/// <param name="utf8">The log's bytes, SARIF or console output.</param>
+	/// <param name="diagnostics">What it reported, in the order first seen.</param>
+	/// <param name="contexts">Every project and target framework a console log names, whether or not it reported anything Curb owns.</param>
+	/// <param name="failure">Why the log could not be read, when it could not.</param>
+	/// <returns>False when the bytes looked like SARIF but could not be read.</returns>
+	public static bool TryRead(
+		ReadOnlySpan<byte> utf8, out List<LoggedDiagnostic> diagnostics, out HashSet<string> contexts, out string? failure)
+	{
+		var seen = new HashSet<LoggedDiagnostic>();
+		diagnostics = [];
+		contexts = new HashSet<string>(StringComparer.Ordinal);
+
+		if (SarifReader.LooksLikeSarif(utf8))
+		{
+			var plain = new List<CleanupDiagnostic>();
+			if (!SarifReader.TryRead(utf8, plain, out failure))
+			{
+				diagnostics.Clear();
+				return false;
+			}
+
+			foreach (var diagnostic in plain)
+			{
+				var logged = new LoggedDiagnostic(diagnostic, null);
+				if (seen.Add(logged))
+					diagnostics.Add(logged);
+			}
+
+			return true;
+		}
+
+		var all = new List<LoggedDiagnostic>();
+		BuildLogReader.Read(Encoding.UTF8.GetString(utf8), all, contexts);
+		foreach (var logged in all)
+		{
+			if (seen.Add(logged))
+				diagnostics.Add(logged);
+		}
+
+		failure = null;
+		return true;
+	}
+
 	/// <summary>Keeps only the rules <c>curb cleanup</c> attempts, leaving the rest to be reported.</summary>
 	public static List<CleanupDiagnostic> Fixable(IReadOnlyList<CleanupDiagnostic> diagnostics)
 	{
@@ -79,26 +130,10 @@ public static class DiagnosticLog
 	}
 }
 
-/// <summary>
-/// The sites already seen across several logs, so a diagnostic reported by more than one is handled once.
-/// </summary>
-/// <remarks>
-/// <para>
-/// <see cref="DiagnosticLog.TryRead"/> folds repeats inside one log. A multi-targeted project writes one log
-/// per target framework, so every site the frameworks agree on arrives once per log, and cleanup handed each
-/// to the cleaner: an inserted modifier was written once per report, <c>readonly readonly</c>, CS1004. Found
-/// by the generated corpus's multi-targeted project.
-/// </para>
-/// <para>
-/// Keyed on the site (rule, file, start, end) rather than the whole record, so the same site reported at a
-/// different severity by another log is still the same site. The first report wins.
-/// </para>
-/// </remarks>
-public sealed class DiagnosticSites
-{
-	private readonly HashSet<(string RuleId, string FilePath, LinePosition Start, LinePosition? End)> _seen = [];
-
-	/// <summary>True the first time a site is seen, false for every repeat.</summary>
-	public bool Add(in CleanupDiagnostic diagnostic) =>
-		_seen.Add((diagnostic.RuleId.ToUpperInvariant(), diagnostic.FilePath, diagnostic.Start, diagnostic.End));
-}
+/// <summary>A diagnostic and the compilation that reported it.</summary>
+/// <param name="Diagnostic">What was reported.</param>
+/// <param name="Context">
+/// MSBuild's <c>project::TargetFramework=tfm</c> suffix for a console log line, or null for a SARIF log, which
+/// is one compilation throughout.
+/// </param>
+public readonly record struct LoggedDiagnostic(CleanupDiagnostic Diagnostic, string? Context);

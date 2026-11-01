@@ -71,9 +71,24 @@
       <Curb_WroteDiagnostics>true</Curb_WroteDiagnostics>
     </PropertyGroup>
 
+    <!--
+      The files this compilation is given, beside its log. `curb cleanup` applies a fix only when every
+      target framework that compiled the file reported it, and a log alone cannot say whether a framework
+      that reported nothing for a file compiled it and found nothing, or never saw it (a Compile item with
+      a framework condition). Without this list cleanup assumes the first and declines; with it, a file only
+      one framework compiles keeps its fixes. The same name and shape as the list the Curb target below
+      writes for the formatter, so the two only ever agree.
+    -->
+    <WriteLinesToFile Condition="'$(Curb_WroteDiagnostics)' == 'true'"
+                      File="$(IntermediateOutputPath)curb.files"
+                      Lines="@(Compile->'%(FullPath)')"
+                      Overwrite="true"
+                      WriteOnlyWhenDifferent="true" />
+
     <!-- So `dotnet clean` takes it away again. Only the log this target asked for, never a consumer's. -->
     <ItemGroup Condition="'$(Curb_WroteDiagnostics)' == 'true'">
       <FileWrites Include="$(IntermediateOutputPath)curb.sarif" />
+      <FileWrites Include="$(IntermediateOutputPath)curb.files" />
     </ItemGroup>
   </Target>
 

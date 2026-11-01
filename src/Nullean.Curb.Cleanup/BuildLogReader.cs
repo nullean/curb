@@ -34,6 +34,59 @@ public static class BuildLogReader
 		}
 	}
 
+	/// <summary>
+	/// Appends every code style diagnostic with the project and target framework that reported it, and every
+	/// project and target framework the log names at all.
+	/// </summary>
+	/// <remarks>
+	/// One console log holds every compilation of a build, told apart only by the trailing
+	/// <c>[/repo/e1.csproj::TargetFramework=net10.0]</c>. <see cref="Read(ReadOnlySpan{char}, ICollection{CleanupDiagnostic})"/>
+	/// folds that away, which is right for counting sites and wrong for asking whether every target framework
+	/// agreed on one (see <see cref="TargetAgreement"/>). <paramref name="contexts"/> takes the suffix of any
+	/// line that carries one, a compiler warning included, so a target framework that reported nothing Curb
+	/// owns is still known to exist.
+	/// </remarks>
+	public static void Read(ReadOnlySpan<char> log, ICollection<LoggedDiagnostic> into, ICollection<string> contexts)
+	{
+		foreach (var line in log.EnumerateLines())
+		{
+			var context = TryReadContext(line, out var found) ? found.ToString() : null;
+			if (context is not null)
+				contexts.Add(context);
+
+			if (TryReadLine(line, out var diagnostic))
+				into.Add(new LoggedDiagnostic(diagnostic, context));
+		}
+	}
+
+	/// <summary>
+	/// Reads the <c>[project]</c> or <c>[project::TargetFramework=tfm]</c> MSBuild appends to a diagnostic line.
+	/// </summary>
+	internal static bool TryReadContext(ReadOnlySpan<char> line, out ReadOnlySpan<char> context)
+	{
+		context = default;
+
+		var trimmed = line.TrimEnd();
+		if (trimmed.IsEmpty || trimmed[^1] != ']')
+			return false;
+
+		var open = trimmed.LastIndexOf('[');
+		if (open < 0)
+			return false;
+
+		var inside = trimmed[(open + 1)..^1].Trim();
+		var separator = inside.IndexOf("::", StringComparison.Ordinal);
+		var project = separator < 0 ? inside : inside[..separator];
+
+		// A project file: .csproj, .vbproj, .fsproj, or anything else MSBuild builds under that convention. A
+		// bracketed URL or note at the end of a message is not one.
+		if (!project.EndsWith("proj", StringComparison.OrdinalIgnoreCase))
+			return false;
+
+		context = inside;
+		return true;
+	}
+
 	internal static bool TryReadLine(ReadOnlySpan<char> line, out CleanupDiagnostic diagnostic)
 	{
 		diagnostic = default;

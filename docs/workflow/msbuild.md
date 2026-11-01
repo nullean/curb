@@ -65,7 +65,7 @@ dotnet build -p:Curb_Check=true               # check without rewriting
 | `Curb_StampFile` | `$(IntermediateOutputPath)curb.stamp` | Incrementality stamp. |
 | `Curb_Cache` | `true` | Reuse the previous run's verdict for files that have not changed. Set `false` to build without a cache. |
 | `Curb_CacheFile` | `$(IntermediateOutputPath)curb.cache` | Where that cache lives. |
-| `Curb_FileList` | `$(IntermediateOutputPath)curb.files` | The compile set handed to the CLI. |
+| `Curb_FileList` | `$(IntermediateOutputPath)curb.files` | The compile set handed to the CLI. Whenever {{product}} writes `curb.sarif`, it also writes the compile set to `curb.files` beside it, whatever this property says, so `curb cleanup` can tell which target frameworks compiled a file (see [Cleanup](cleanup.md#target-frameworks-must-agree)). |
 | `Curb_FSharp` | `true` | Format F# projects through the Fantomas their tool manifest pins. Set `false` to leave them alone; the C# target is unaffected. See [F#](fsharp.md). |
 | `Curb_UnformattedFile` | `$(IntermediateOutputPath)curb.unformatted` | The paths `check` reports back as unformatted, one per line — what the target reads to attach CURB0001 to each of them. |
 

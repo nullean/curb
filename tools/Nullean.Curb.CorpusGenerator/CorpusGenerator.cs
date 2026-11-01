@@ -114,7 +114,7 @@ public static class CorpusGenerator
 		}
 
 		// The hand-written model, then the generated code, until the size is reached.
-		foreach (var (name, source) in Domain.Files())
+		foreach (var (name, source) in Domain.Files().Concat(Domain.ModernFiles()))
 		{
 			WriteCSharp("src/Corpus.Abstractions/" + name, source + "\n");
 		}
@@ -258,15 +258,28 @@ public static class CorpusGenerator
 		_ => r.Next(100, 220),
 	};
 
+	/// <summary>Removes <see cref="Domain.ModernFolder"/> from the netstandard2.0 build of a project file.</summary>
+	private static string WithModernExclusion(string project)
+	{
+		var close = project.LastIndexOf("</Project>", StringComparison.Ordinal);
+		return project[..close]
+			+ "\n  <ItemGroup Condition=\"'$(TargetFramework)' == 'netstandard2.0'\">\n"
+			+ "    <Compile Remove=\"" + Domain.ModernFolder + "/**\" />\n"
+			+ "  </ItemGroup>\n"
+			+ project[close..];
+	}
+
 	private static void WriteProjects(Rng r, Action<string, string> write)
 	{
 		(string, string)[] P(params (string, string)[] p) => p;
 
 		(string, string, string?)[] I(params (string, string, string?)[] i) => i;
 
+		// The netstandard2.0 exclusion is spliced in rather than passed as an item, so the project's layout draws
+		// the same numbers from `r` as before and the rest of the corpus is unchanged.
 		write(
 			"src/Corpus.Abstractions/Corpus.Abstractions.csproj",
-			Scaffold.Project(
+			WithModernExclusion(Scaffold.Project(
 				r,
 				"Microsoft.NET.Sdk",
 				P(
@@ -277,7 +290,7 @@ public static class CorpusGenerator
 					("Version", "1.2.3")
 				),
 				I(("InternalsVisibleTo", "Corpus.Core", null), ("InternalsVisibleTo", "Corpus.Tests", null))
-			)
+			))
 		);
 
 		write(

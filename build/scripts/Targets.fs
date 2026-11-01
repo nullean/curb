@@ -728,7 +728,7 @@ let private cleanupConformance (arguments:ParseResults<Arguments>) =
             printfn "neutralised rule severities in %s" (Paths.RootRelative config)
             File.WriteAllLines(config, neutralised)
 
-    // Only $(ErrorLog) goes in a file, because it needs $(TargetFramework) — a single path shared by two
+    // Only $(ErrorLog) and its compile list go in a file, because they need $(TargetFramework) — a single path shared by two
     // inner builds produces two concatenated JSON documents, which the reader refuses. Directory.Build.targets
     // rather than .props, because the corpus has nested props files (src/, tests/, src/tooling/) that would
     // override a root one.
@@ -747,6 +747,11 @@ let private cleanupConformance (arguments:ParseResults<Arguments>) =
           "  <ItemGroup>"
           "    <EditorConfigFiles Include=\"$(MSBuildThisFileDirectory)curb-conformance.globalconfig\" />"
           "  </ItemGroup>"
+          // The compile list the MSBuild package writes beside its log (src/Nullean.Curb.MSBuild/build/curb.targets),
+          // so a file only one target framework compiles keeps its fixes, as it would for a package user.
+          "  <Target Name=\"CurbConformanceCompileList\" BeforeTargets=\"CoreCompile\" Condition=\"'$(TargetFramework)' != ''\">"
+          "    <WriteLinesToFile File=\"$(IntermediateOutputPath)curb.files\" Lines=\"@(Compile->'%(FullPath)')\" Overwrite=\"true\" WriteOnlyWhenDifferent=\"true\" />"
+          "  </Target>"
           "</Project>" ]
         |> String.concat "\n"
 
