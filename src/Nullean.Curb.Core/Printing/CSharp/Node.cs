@@ -689,7 +689,11 @@ internal static class Node
 		TokenPrinter.EmitVerbatimRange(context, span.Start, span.Length);
 
 		if (last.RawKind != 0)
+		{
 			TokenPrinter.PrintTrailingTrivia(last, context);
+			// What follows reads the trailing comment through it: a comment on the next line aligns under it.
+			context.PreviousToken = last;
+		}
 
 		var tokens = 0;
 		foreach (var _ in node.DescendantTokens())

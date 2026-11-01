@@ -255,7 +255,7 @@ internal sealed class DocPrinter<TLanguage>
 					if (doc.A >= _anchors.Length)
 						Array.Resize(ref _anchors, Math.Max(doc.A + 1, _anchors.Length * 2));
 					if (doc.B == Doc.AnchorAtColumn)
-						_anchors[doc.A] = _column;
+						_anchors[doc.A] = OutputColumn();
 					else if (doc.B < 0)
 						_anchors[doc.A] = IndentOfLineStartingAt(Doc.SourceLinePosition(doc.B));
 					else if (_lineOpen)
@@ -978,7 +978,10 @@ internal sealed class DocPrinter<TLanguage>
 	/// Surrogate pairs count once. East Asian wide characters should count twice; that table is not
 	/// wired up yet and is tracked for when the syntax printers start handling string literals.
 	/// </remarks>
-	private int TextWidth(ReadOnlySpan<char> text)
+	private int TextWidth(ReadOnlySpan<char> text) => TextWidth(text, _column);
+
+	/// <summary>Columns a run of text occupies when it starts at column <paramref name="from"/>.</summary>
+	private int TextWidth(ReadOnlySpan<char> text, int from)
 	{
 		var width = 0;
 		for (var i = 0; i < text.Length; i++)
@@ -988,7 +991,7 @@ internal sealed class DocPrinter<TLanguage>
 			// of tab-indented source measure narrower than they print.
 			if (text[i] == '\t')
 			{
-				width += _tabWidth - ((_column + width) % _tabWidth);
+				width += _tabWidth - ((from + width) % _tabWidth);
 				continue;
 			}
 
@@ -1006,6 +1009,19 @@ internal sealed class DocPrinter<TLanguage>
 		}
 
 		return width;
+	}
+
+	/// <summary>The column the current line of output has reached.</summary>
+	/// <remarks>
+	/// Measured from the output rather than read from <see cref="_column"/>, which counts every character
+	/// of text that spans lines, a verbatim or raw string, and so runs past the line such text ends on.
+	/// An anchor taken there put a comment aligned under it far to the right of where dotnet format puts
+	/// it. Only an anchor asks, and an anchor is rare, so walking back to the line start costs nothing.
+	/// </remarks>
+	private int OutputColumn()
+	{
+		var written = _output.Written;
+		return TextWidth(written[(written.LastIndexOf('\n') + 1)..], 0);
 	}
 
 	private void Push(Scope scope)

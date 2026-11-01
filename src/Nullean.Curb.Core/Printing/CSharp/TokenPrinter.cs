@@ -186,6 +186,7 @@ internal static class TokenPrinter
 					// Captured before the flush, which zeroes it — the old check read it afterwards
 					// and so was always true.
 					var priorNewLines = pendingNewLines;
+					bool blankLineBefore;
 					if (forcedGapPending is int pendingBeforeComment)
 					{
 						// A region's forced "after" gap already settled the spacing in front of this
@@ -196,6 +197,7 @@ internal static class TokenPrinter
 						forcedGapPending = null;
 						priorNewLines = pendingBeforeComment;
 						pendingNewLines = 0;
+						blankLineBefore = pendingBeforeComment > 0;
 					}
 					else
 					{
@@ -219,9 +221,13 @@ internal static class TokenPrinter
 						{
 							pendingNewLines = Math.Max(pendingNewLines, 2);
 							FlushBlankLine(arena, ref pendingNewLines, emittedAnything: true);
+							blankLineBefore = true;
 						}
 						else
+						{
+							blankLineBefore = pendingNewLines > 1 && emittedAnything;
 							FlushBlankLine(arena, ref pendingNewLines, emittedAnything);
+						}
 					}
 
 					// dotnet format aligns a comment sitting directly under a trailing comment to
@@ -237,10 +243,13 @@ internal static class TokenPrinter
 					// anything under a trailing /* */, goes to the statement indent as usual. Nor
 					// between collection or initializer elements, where dotnet format leaves the
 					// comment on the element's line.
+					//
+					// What counts is the output: a blank line the source had but Curb drops, after an
+					// opening brace say, leaves the comment directly under the trailing one.
 					var isLineComment = trivia.IsKind(SyntaxKind.SingleLineCommentTrivia);
 					var startsAligned = isLineComment
 						&& !emittedAnything
-						&& priorNewLines == 0
+						&& !blankLineBefore
 						&& !separated
 						&& !(aligned && alignElement)
 						&& AlignsUnderTrailingComment(token, trivia, context);
@@ -418,8 +427,8 @@ internal static class TokenPrinter
 	private const int TrailingCommentAnchor = 0;
 
 	/// <summary>
-	/// True when this comment sits on the line directly below one that ended in a trailing <c>//</c>
-	/// comment, and the comments in front of <paramref name="token"/> are not already where it is.
+	/// True when nothing but line breaks parts this comment from a trailing <c>//</c> comment before it,
+	/// and the comments in front of <paramref name="token"/> are not already where dotnet format wants them.
 	/// </summary>
 	/// <remarks>
 	/// Walking to the previous token allocates, so it is asked only of a token that actually carries
@@ -451,12 +460,72 @@ internal static class TokenPrinter
 		if (Printers.ClosesSynthesisedBlock(previous, context))
 			return false;
 
-		var lines = context.Text.Lines;
-		if (lines.GetLineFromPosition(comment.SpanStart).LineNumber
-			!= lines.GetLineFromPosition(last.SpanStart).LineNumber + 1)
-			return false;
+		// Whether a blank line between them survives is the caller's to say.
+		foreach (var trivia in token.LeadingTrivia)
+		{
+			if (trivia == comment)
+				break;
+			if (!trivia.IsKind(SyntaxKind.WhitespaceTrivia) && !trivia.IsKind(SyntaxKind.EndOfLineTrivia))
+				return false;
+		}
 
-		return !CommentsSitAtTokenColumn(token, context);
+		return !TriviaIsInShape(token, context);
+	}
+
+	/// <summary>
+	/// True when dotnet format would leave the trivia in front of <paramref name="token"/> alone, so a
+	/// comment at the token's column stays there instead of aligning under the trailing comment.
+	/// </summary>
+	/// <remarks>
+	/// Roslyn's quick check (<c>CodeShapeAnalyzer</c>) gives up on any line indented with a tab and
+	/// re-lays the whole trivia, so tab-indented trivia is never in shape: neither tabs in the source,
+	/// nor tabs in Curb's own output under <c>indent_style = tab</c>. Leaving the comment at the
+	/// token's column there was not a fixed point; dotnet format moved it under the trailing comment.
+	///
+	/// Aligning is a fixed point at any indent, so <c>indent_style = tab</c> aligns even at a column
+	/// shallow enough to need no tab, where dotnet format would have accepted either.
+	///
+	/// Between the elements of a collection, dotnet format leaves the trivia as written whatever it is
+	/// indented with, so there a comment at the token's column stays there under tabs too.
+	/// </remarks>
+	private static bool TriviaIsInShape(SyntaxToken token, PrintContext context) =>
+		CommentsSitAtTokenColumn(token, context)
+		&& (BetweenCollectionElements(token) || (!context.Options.UseTabs && !IndentsWithATab(token.LeadingTrivia)));
+
+	/// <summary>
+	/// True when <paramref name="token"/> starts an element of a collection or array initializer or a
+	/// collection expression.
+	/// </summary>
+	/// <remarks>
+	/// Object, indexer and anonymous object initializers are not collections here: dotnet format
+	/// re-lays the trivia between their members the way it does between statements.
+	/// </remarks>
+	private static bool BetweenCollectionElements(SyntaxToken token)
+	{
+		// The outermost node the token starts is the element; the list holds it.
+		var element = token.Parent;
+		while (element?.Parent is { } parent && parent.SpanStart == token.SpanStart)
+			element = parent;
+		var list = element?.Parent;
+
+		return list is CollectionExpressionSyntax
+			|| list.IsKind(SyntaxKind.CollectionInitializerExpression)
+			|| list.IsKind(SyntaxKind.ArrayInitializerExpression);
+	}
+
+	/// <summary>True when a line in <paramref name="leading"/> is indented with a tab.</summary>
+	/// <remarks>Leading trivia starts on a fresh line: the line ending is in the previous token's trailing trivia.</remarks>
+	private static bool IndentsWithATab(SyntaxTriviaList leading)
+	{
+		var atLineStart = true;
+		foreach (var trivia in leading)
+		{
+			if (atLineStart && trivia.IsKind(SyntaxKind.WhitespaceTrivia) && trivia.ToString().Contains('\t'))
+				return true;
+			atLineStart = trivia.IsKind(SyntaxKind.EndOfLineTrivia);
+		}
+
+		return false;
 	}
 
 	/// <summary>

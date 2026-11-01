@@ -2189,7 +2189,11 @@ internal static partial class Printers
 		TokenPrinter.EmitVerbatimRange(context, span.Start, span.Length);
 
 		if (last.RawKind != 0)
+		{
 			TokenPrinter.PrintTrailingTrivia(last, context);
+			// What follows reads the trailing comment through it: a comment on the next line aligns under it.
+			context.PreviousToken = last;
+		}
 	}
 
 	private static void PrintModifiers(SyntaxTokenList modifiers, PrintContext context, bool reorder = true)
