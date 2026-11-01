@@ -523,9 +523,15 @@ internal sealed class DocPrinter<TLanguage>
 		// A trailing // comment still ends its line in a flat group. The group is flat only because the
 		// comment is the last thing in it (see BreakPropagation), so this is the group's last line and
 		// the next break after the group merges into it.
+		//
+		// In a ForceFlat too, because nothing may follow a // comment on its line. A one-line block's `}`
+		// keeps its trailing comment inside the ForceFlat that holds the block on one line, and the space
+		// written there put the `catch` that csharp_new_line_before_catch = false joins to that brace
+		// inside the comment (issue #188). Where the comment is the last thing before a break of its own,
+		// that break merges into this one and the output is what the space gave.
 		var endsLineComment = BreakPropagation.IsLineCommentBreak(doc);
 
-		if (scope.Mode is PrintMode.ForceFlat || (scope.Mode is PrintMode.Flat && !endsLineComment))
+		if ((scope.Mode is PrintMode.ForceFlat or PrintMode.Flat) && !endsLineComment)
 		{
 			// The comment has already broken where this line would have put a space, so the line it
 			// opened is this line's. It takes this line's indent rather than the comment's, which is

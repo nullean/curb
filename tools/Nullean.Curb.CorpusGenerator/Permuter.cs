@@ -262,7 +262,7 @@ public static class Permuter
 				lines = Math.Min(lines + 1, 3);
 			}
 
-			if (r.Chance(p.TrailingComment) && KnownDefects.AllowsTrailingComment(previous, token))
+			if (r.Chance(p.TrailingComment))
 			{
 				output.Append(" // ").Append(r.Pick(Comments));
 			}

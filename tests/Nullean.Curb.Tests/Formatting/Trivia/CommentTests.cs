@@ -1146,4 +1146,45 @@ public class CommentTests : FormattingTest
 		}
 		""",
 		editorConfig: "max_line_length = 120");
+
+	[Test]
+	public Task Whitespace_after_a_line_comment_does_not_count_toward_the_width() => Formats(
+		// Roslyn counts the whitespace after a `//` comment as part of it, and the width decision measured
+		// it although trim_trailing_whitespace strips it: the first line broke on the first run and, with
+		// the whitespace gone, joined on the second (issue #188). The second line is too long either way.
+		"public class C\n{\n    public int Total(int a, int b) => a + b; // note  \t\n    public int Longer(int alpha, int beta) => alpha + beta;\n}",
+		"""
+		public class C
+		{
+		    public int Total(int a, int b) => a + b; // note
+		    public int Longer(int alpha, int beta) =>
+		        alpha + beta;
+		}
+		""",
+		editorConfig: "max_line_length = 52");
+
+	[Test]
+	public Task A_comment_under_a_trailing_comment_leaves_its_column_once_a_blank_line_parts_them() => Formats(
+		// The blank line csharp_blank_lines_around_type adds between the types parts the comment from the
+		// trailing comment above it. Aligned under that comment anyway, it kept the column on the first run,
+		// and the second, which no longer found it directly under, moved it to the type's (issue #188).
+		"""
+		public class A
+		{
+		} // trailing
+		   // leading
+		public class B
+		{
+		}
+		""",
+		"""
+		public class A
+		{
+		} // trailing
+
+		// leading
+		public class B
+		{
+		}
+		""");
 }

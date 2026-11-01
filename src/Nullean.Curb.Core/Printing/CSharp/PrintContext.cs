@@ -487,5 +487,19 @@ internal sealed class PrintContext(DocArena arena, SourceText text, string sourc
 	{
 		for (var i = 0; i < count; i++)
 			Arena.HardLine();
+
+		if (count > 0)
+			BlankLineBeforeTrivia = true;
 	}
+
+	/// <summary>
+	/// True when <see cref="BlankLines"/> wrote a blank line since the last token's leading trivia was printed,
+	/// so a comment the source had directly under a trailing comment is no longer under it.
+	/// </summary>
+	/// <remarks>
+	/// Read and cleared by <see cref="TokenPrinter.PrintLeadingTrivia"/>. Aligned to the trailing comment
+	/// anyway, the comment kept that column across the blank line a separator added, and the next run, which
+	/// no longer found it directly under the trailing comment, moved it to the member's column (issue #188).
+	/// </remarks>
+	public bool BlankLineBeforeTrivia { get; set; }
 }

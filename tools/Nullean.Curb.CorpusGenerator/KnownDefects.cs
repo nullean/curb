@@ -15,14 +15,9 @@ namespace Nullean.Curb.CorpusGenerator;
 /// the seed-1 corpus unless another seed is named. Every refusal was Curb's own verifier declining to write; none
 /// damaged a file.
 /// </para>
-/// <list type="number">
-/// <item>Idempotency: a trailing <c>//</c> comment on a line a width decision covers (a method header, an expression
-/// body, an accessor list, a switch arm) is counted by the first pass, which breaks the construct, and not by the
-/// second, which joins it back (1; 2 each at seeds 2 and 3). <c>curb check</c>: a trailing comment after a <c>}</c>
-/// that <c>csharp_new_line_before_catch</c> or <c>_finally = false</c> joins to the next keyword swallows it (1 each at
-/// seeds 2 and 4). Generated trailing comments only follow a <c>{</c>; snippets keep every
-/// comment their tests wrote.</item>
-/// </list>
+/// <para>
+/// None at the moment: every shape the corpus has found so far is fixed, and the generator writes all of them.
+/// </para>
 /// <para>
 /// Conformance with dotnet format is a percentage, so its findings stay in the corpus and set the floor instead.
 /// Separately, the syntax Curb prints verbatim by design (<see cref="InsideVerbatimNode"/>) is kept free of untidy
@@ -68,7 +63,4 @@ public static class KnownDefects
 
 		return false;
 	}
-
-	/// <summary>Whether a generated trailing comment may end the line between two tokens (item 1).</summary>
-	public static bool AllowsTrailingComment(SyntaxToken previous, SyntaxToken token) => previous.IsKind(SyntaxKind.OpenBraceToken);
 }
