@@ -65,7 +65,45 @@ drops it again, so the output is a fixed point.
 
 A multi-targeted project writes one log per target framework, so a site every framework agrees on is
 reported once per log. Each site is fixed once: repeats are folded across logs, and a diagnostic asking
-for exactly the edits another already asked for counts as fixed without editing again. An edit never
+for exactly the edits another already asked for counts as fixed without editing again.
+
+### Target frameworks must agree
+
+Each target framework compiles a file separately and reaches its own verdict, and they do not always
+match. `net10.0` reports `using MyCompat;` unnecessary (IDE0005) because `string.Contains(char)` exists
+there, while `netstandard2.0` needs the directive for the extension method that fills the gap. Removing
+it would break the `netstandard2.0` build. A `LangVersion` or `Nullable` that differs by framework does the
+same to IDE0090, IDE0034 or IDE0240.
+
+So a site (rule, file, start and end) is fixed only when every compilation that read the file reported
+it. Otherwise it is declined, counted under `refused`, and printed with which frameworks reported it and
+which did not:
+
+```
+src/Lib/Tags.cs: IDE0005: reported for net10.0 but not for netstandard2.0, which compiles this file too, so fixing it could break that build
+```
+
+Sites are compared exactly. If two frameworks report IDE0005 runs of different lengths over the same
+directives, those are two different sites, and both are declined.
+
+A compilation read a file when:
+
+1. its log reported anything at all in the file, any rule at any severity; or
+2. its compile list names the file. The MSBuild package writes `curb.files`, the project's `@(Compile)`,
+   beside each `curb.sarif`; or
+3. it has no compile list and is the same project built for another framework. Logs are grouped by the
+   target framework directory in their path: `obj/Debug/net10.0/` and `obj/Debug/netstandard2.0/` are one
+   project's two frameworks.
+
+The third rule is the cautious one. A log that says nothing about a file may have compiled it and found
+nothing to report, or may never have seen it, as with a `Compile` item that has a framework condition.
+Without a compile list the two cases look the same, so {{product}} assumes the framework compiled the file
+and declines. With the list, a file only one framework compiles keeps its fixes.
+
+A single-target project, or a log whose path has no target framework directory, forms a group of its own,
+so it behaves exactly as before. In a console build log the frameworks come from MSBuild's
+`[project.csproj::TargetFramework=net10.0]` suffix. A framework that printed nothing at all for the
+project cannot be seen there, which is one more reason SARIF is the primary format. An edit never
 joins two tokens into one; where a replacement would leave `var` touching the name after it, a space
 goes between them.
 

@@ -302,23 +302,53 @@ public class DiagnosticLogTests
 	}
 
 	[Test]
-	public async Task A_site_reported_by_two_logs_is_kept_once()
+	public async Task A_console_log_keeps_each_target_frameworks_report_apart()
 	{
-		// One log per target framework: the second carries the same site, possibly at another severity.
-		var start = new LinePosition(7, 16);
-		var end = new LinePosition(7, 21);
-		var sites = new DiagnosticSites();
+		// The compilation-aware read keeps what the plain one folds: which target framework reported a site.
+		// The CS warning reports nothing Curb owns, and still proves netstandard2.1 compiled the project.
+		const string log = """
+			/repo/Widget.cs(8,17): warning IDE0044: Make field readonly [/repo/e1.csproj::TargetFramework=net10.0]
+			/repo/Widget.cs(8,17): warning IDE0044: Make field readonly [/repo/e1.csproj::TargetFramework=netstandard2.0]
+			/repo/Widget.cs(8,17): warning IDE0044: Make field readonly [/repo/e1.csproj::TargetFramework=net10.0]
+			/repo/Other.cs(1,1): warning CS0168: The variable 'x' is declared but never used [/repo/e1.csproj::TargetFramework=netstandard2.1]
+			  e1 -> /repo/bin/Debug/net10.0/e1.dll
+			""";
 
-		sites.Add(new CleanupDiagnostic("IDE0044", "/repo/Widget.cs", start, end, DiagnosticLevel.Warning)).Should().BeTrue();
-		sites.Add(new CleanupDiagnostic("IDE0044", "/repo/Widget.cs", start, end, DiagnosticLevel.Note))
-			.Should().BeFalse("the same rule at the same span of the same file is the same verdict");
-		sites.Add(new CleanupDiagnostic("ide0044", "/repo/Widget.cs", start, end)).Should().BeFalse();
+		DiagnosticLog.TryRead(Encoding.UTF8.GetBytes(log), out List<LoggedDiagnostic> logged, out var contexts, out var failure)
+			.Should().BeTrue(failure);
 
-		// Anything that names a different site is not a repeat.
-		sites.Add(new CleanupDiagnostic("IDE0040", "/repo/Widget.cs", start, end)).Should().BeTrue();
-		sites.Add(new CleanupDiagnostic("IDE0044", "/repo/Other.cs", start, end)).Should().BeTrue();
-		sites.Add(new CleanupDiagnostic("IDE0044", "/repo/Widget.cs", start, new LinePosition(7, 30))).Should().BeTrue();
-		sites.Add(new CleanupDiagnostic("IDE0044", "/repo/Widget.cs", new LinePosition(8, 16), end)).Should().BeTrue();
+		logged.Select(l => l.Context).Should().Equal(
+			"/repo/e1.csproj::TargetFramework=net10.0", "/repo/e1.csproj::TargetFramework=netstandard2.0");
+		contexts.Should().BeEquivalentTo(
+			"/repo/e1.csproj::TargetFramework=net10.0",
+			"/repo/e1.csproj::TargetFramework=netstandard2.0",
+			"/repo/e1.csproj::TargetFramework=netstandard2.1");
+
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task A_sarif_log_is_one_compilation()
+	{
+		DiagnosticLog.TryRead(Encoding.UTF8.GetBytes(Sarif), out List<LoggedDiagnostic> logged, out var contexts, out var failure)
+			.Should().BeTrue(failure);
+
+		logged.Should().HaveCount(2).And.OnlyContain(l => l.Context == null);
+		contexts.Should().BeEmpty();
+
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task A_bracketed_note_that_is_not_a_project_is_not_a_compilation()
+	{
+		const string log = "/repo/Widget.cs(8,17): warning IDE0044: Make field readonly [see the docs]";
+
+		DiagnosticLog.TryRead(Encoding.UTF8.GetBytes(log), out List<LoggedDiagnostic> logged, out var contexts, out _)
+			.Should().BeTrue();
+
+		logged.Single().Context.Should().BeNull();
+		contexts.Should().BeEmpty();
 
 		await Task.CompletedTask;
 	}

@@ -63,11 +63,11 @@ internal static class CleanupRun
 
 		var stopwatch = Stopwatch.StartNew();
 
-		var byFile = new Dictionary<string, List<CleanupDiagnostic>>(StringComparer.Ordinal);
-
-		// Across logs, not only within one: a multi-targeted project writes one log per target framework, and
-		// a site handed to the cleaner twice had its modifier inserted twice. See DiagnosticSites.
-		var sites = new DiagnosticSites();
+		// Across logs, not only within one: a multi-targeted project writes one log per target framework. A site
+		// handed to the cleaner once per log had its modifier inserted twice (#178), and a site only one framework
+		// reported could break the others (#189). TargetAgreement settles both: one diagnostic per site, and only
+		// for sites every framework that compiled the file agreed on.
+		var agreement = new TargetAgreement();
 		var notOurs = new List<CleanupDiagnostic>();
 		var newest = DateTime.MinValue;
 
@@ -79,7 +79,7 @@ internal static class CleanupRun
 				return 3;
 			}
 
-			if (!DiagnosticLog.TryRead(fileSystem.File.ReadAllBytes(log), out var all, out var failure))
+			if (!DiagnosticLog.TryRead(fileSystem.File.ReadAllBytes(log), out var all, out var contexts, out var failure))
 			{
 				Console.Error.WriteLine($"{log}: {failure}");
 				return 3;
@@ -91,33 +91,56 @@ internal static class CleanupRun
 			if (written > newest)
 				newest = written;
 
-			foreach (var diagnostic in DiagnosticLog.Fixable(all))
+			var full = fileSystem.Path.GetFullPath(log);
+			var whole = Compilation.ForLog(full);
+
+			// A SARIF log is one compilation; a console log names one per line. A console log that names none
+			// is treated as one compilation, which is how it was read before frameworks were compared.
+			if (contexts.Count == 0)
 			{
-				if (!sites.Add(diagnostic))
-					continue;
-
-				if (!byFile.TryGetValue(diagnostic.FilePath, out var forFile))
-					byFile[diagnostic.FilePath] = forFile = [];
-
-				forFile.Add(diagnostic);
+				agreement.Declare(whole);
+				if (ReadCompileList(fileSystem, full) is { } compiled)
+					agreement.Compiled(whole, compiled);
 			}
 
-			// Everything the log reported that is not Curb's to fix. Kept separately so `--forward` can
-			// name the remainder exactly rather than making someone run the whole command over everything.
-			foreach (var diagnostic in all)
+			foreach (var context in contexts)
+				agreement.Declare(Compilation.ForConsole(full, context));
+
+			foreach (var (diagnostic, context) in all)
 			{
+				agreement.Report(context is null ? whole : Compilation.ForConsole(full, context), diagnostic);
+
+				// Everything the log reported that is not Curb's to fix. Kept separately so `--forward` can
+				// name the remainder exactly rather than making someone run the whole command over everything.
 				if (!RuleCatalog.IsCleanupRule(diagnostic.RuleId))
 					notOurs.Add(diagnostic);
 			}
+		}
+
+		var verdict = agreement.Resolve();
+
+		var declinedByFile = new Dictionary<string, List<DeclinedSite>>(StringComparer.Ordinal);
+		foreach (var declined in verdict.Declined)
+		{
+			if (!declinedByFile.TryGetValue(declined.Diagnostic.FilePath, out var forFile))
+				declinedByFile[declined.Diagnostic.FilePath] = forFile = [];
+
+			forFile.Add(declined);
 		}
 
 		var wanted = explicitFiles is { Length: > 0 }
 			? new HashSet<string>(explicitFiles.Select(fileSystem.Path.GetFullPath), StringComparer.Ordinal)
 			: null;
 
-		var work = byFile
-			.Where(pair => wanted is null || wanted.Contains(pair.Key))
-			.Select(pair => (Path: pair.Key, Diagnostics: (IReadOnlyList<CleanupDiagnostic>)pair.Value))
+		// A file whose every site was declined is still work: it is counted, and says why, only once it has
+		// passed the same gates a fixed file would (opted out, generated, stale).
+		var work = verdict.Agreed.Keys
+			.Concat(declinedByFile.Keys.Where(path => !verdict.Agreed.ContainsKey(path)))
+			.Where(path => wanted is null || wanted.Contains(path))
+			.Select(path => (
+				Path: path,
+				Diagnostics: verdict.Agreed.TryGetValue(path, out var agreed) ? (IReadOnlyList<CleanupDiagnostic>)agreed : [],
+				Declined: declinedByFile.TryGetValue(path, out var declined) ? (IReadOnlyList<DeclinedSite>)declined : []))
 			.ToArray();
 
 		var editorConfig = new CurbEditorConfig(fileSystem);
@@ -134,6 +157,7 @@ internal static class CleanupRun
 		var stale = 0;
 		var failed = 0;
 		var refused = 0;
+		var disagreed = 0;
 		var messages = new System.Collections.Concurrent.ConcurrentBag<string>();
 		var unfixed = new System.Collections.Concurrent.ConcurrentBag<CleanupDiagnostic>();
 
@@ -143,7 +167,7 @@ internal static class CleanupRun
 			() => (Cleaner: new CSharpCleaner(), Formatter: new CSharpFormatter()),
 			(index, _, worker) =>
 			{
-				var (path, diagnostics) = work[index];
+				var (path, diagnostics, declinedHere) = work[index];
 
 				if (!fileSystem.File.Exists(path))
 				{
@@ -192,6 +216,20 @@ internal static class CleanupRun
 						Interlocked.Increment(ref stale);
 						return worker;
 					}
+
+					// Declined rather than refused by a rule, but reported the same way: counted, and each with its
+					// reason. Not added to `unfixed`, so --forward does not hand them to a tool that would make the
+					// same one-framework fix.
+					if (declinedHere.Count > 0)
+					{
+						Interlocked.Add(ref refused, declinedHere.Count);
+						Interlocked.Add(ref disagreed, declinedHere.Count);
+						foreach (var declined in declinedHere)
+							messages.Add($"{path}: {declined.Reason}");
+					}
+
+					if (diagnostics.Count == 0)
+						return worker;
 
 					var result = worker.Cleaner.Clean(source, diagnostics);
 					Interlocked.Add(ref refused, result.Refusals.Count);
@@ -260,6 +298,13 @@ internal static class CleanupRun
 			$"{(write ? "Cleaned" : "Checked")} {work.Length} file(s) from {logs.Length} log(s) in {stopwatch.ElapsedMilliseconds}ms — "
 			+ $"{applied} fix(es) in {changed} file(s){(write ? "" : " would change")}, "
 			+ $"{refused} refused, {stale} stale, {skipped} skipped, {failed} failed"));
+
+		if (disagreed > 0)
+		{
+			Console.WriteLine(
+				$"  {disagreed} of the refused were reported by only some of the target frameworks that compile the file, "
+				+ "so fixing them could break the others. They are counted as refused and left as they are.");
+		}
 
 		if (stale > 0)
 		{
@@ -390,6 +435,34 @@ internal static class CleanupRun
 
 		process.WaitForExit();
 		return process.ExitCode;
+	}
+
+	/// <summary>The name of the compile list the MSBuild integration writes beside <see cref="LogName"/>.</summary>
+	private const string CompileListName = "curb.files";
+
+	/// <summary>
+	/// The files the compilation behind a log was given, when the MSBuild integration wrote them down beside it.
+	/// </summary>
+	/// <remarks>
+	/// Only beside a log with the integration's own name. A log someone named themselves may share its
+	/// directory with another framework's, and a list beside it could belong to either.
+	/// </remarks>
+	private static string[]? ReadCompileList(IFileSystem fileSystem, string log)
+	{
+		if (!string.Equals(fileSystem.Path.GetFileName(log), LogName, StringComparison.OrdinalIgnoreCase))
+			return null;
+
+		var list = fileSystem.Path.Combine(fileSystem.Path.GetDirectoryName(log) ?? "", CompileListName);
+		if (!fileSystem.File.Exists(list))
+			return null;
+
+		return
+		[
+			.. fileSystem.File.ReadAllLines(list)
+				.Select(line => line.Trim())
+				.Where(line => line.Length > 0)
+				.Select(fileSystem.Path.GetFullPath),
+		];
 	}
 
 	/// <summary>Finds the compiler's error logs under a directory. They live in <c>obj</c>, so nothing is excluded.</summary>
