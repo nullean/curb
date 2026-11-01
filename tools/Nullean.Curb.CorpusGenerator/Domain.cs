@@ -223,5 +223,69 @@ internal static class Domain
 				public string What { get; }
 			}
 			""");
+
+		// The target frameworks disagree here, on purpose (#189). net10.0 has string.Contains(char), so the using
+		// directive in Tags.cs is unnecessary there (IDE0005); netstandard2.0 needs it for the extension method
+		// below. Cleanup must leave it, or the netstandard2.0 build breaks. The #if lives in this file so that
+		// Tags.cs has none: IDE0005 is refused outright in a file with #if, which would hide the disagreement.
+		yield return ("Compat.cs", """
+			namespace Corpus.Abstractions.Compat;
+
+			/// <summary>The string members netstandard2.0 lacks, so one call compiles for both frameworks.</summary>
+			internal static class StringCompat
+			{
+			#if NETSTANDARD2_0
+				public static bool Contains(this string text, char value) => text.IndexOf(value) >= 0;
+			#endif
+			}
+			""");
+
+		yield return ("Tags.cs", """
+			using Corpus.Abstractions.Compat;
+
+			namespace Corpus.Abstractions;
+
+			/// <summary>Tags of the form <c>scope:name</c>.</summary>
+			public static class Tags
+			{
+				public static bool IsScoped(string tag) => tag.Contains(':');
+			}
+			""");
 	}
+
+	/// <summary>
+	/// Files only net10.0 compiles: the project removes <see cref="ModernFolder"/> from netstandard2.0. Their sites
+	/// are net10.0's alone, so cleanup applies them; it may not treat netstandard2.0's silence as disagreement.
+	/// </summary>
+	public static IEnumerable<(string Name, string Source)> ModernFiles()
+	{
+		yield return (ModernFolder + "/Counter.cs", """
+			using System;
+			using System.Collections.Generic;
+
+			namespace Corpus.Abstractions;
+
+			/// <summary>Counts names, using what only net10.0 has.</summary>
+			public sealed class Counter
+			{
+				private string _prefix;
+				private readonly List<string> _seen = new List<string>();
+
+				public Counter(string prefix)
+				{
+					ArgumentNullException.ThrowIfNull(prefix);
+					_prefix = prefix;
+				}
+
+				public int Count(string name)
+				{
+					_seen.Add(_prefix + name);
+					return _seen.Count;
+				}
+			}
+			""");
+	}
+
+	/// <summary>The folder <see cref="ModernFiles"/> live in, relative to the project.</summary>
+	public const string ModernFolder = "Modern";
 }
