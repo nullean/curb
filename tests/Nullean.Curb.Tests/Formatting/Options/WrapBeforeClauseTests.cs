@@ -7,22 +7,21 @@ namespace Nullean.Curb.Tests.Formatting.Options;
 /// <para>
 /// Three of them — <c>csharp_wrap_before_first_type_parameter_constraint</c>,
 /// <c>csharp_wrap_before_extends_colon</c> and
-/// <c>csharp_place_constructor_initializer_on_same_line</c> — govern clauses Curb joins onto the
-/// signature line whatever the author wrote. Rider gives all three a line of their own, which makes
-/// them the places a Rider-formatted repository differs from Curb by a whole line rather than by a
-/// column. The fourth, <c>csharp_wrap_before_arrow_with_expressions</c>, moves the <c>=&gt;</c> to
-/// the far side of a break the printer was making anyway.
+/// <c>csharp_place_constructor_initializer_on_same_line</c> — govern clauses that are otherwise the
+/// author's to place. Rider gives all three a line of their own. The fourth,
+/// <c>csharp_wrap_before_arrow_with_expressions</c>, moves the <c>=&gt;</c> to the far side of a break
+/// the printer was making anyway.
 /// </para>
 /// <para>
 /// Free ground, measured in both directions: <c>dotnet format</c> neither joins a clause the author
 /// broke nor breaks one they joined, so either rendering is a fixed point.
 /// </para>
 /// <para>
-/// None of them reads layout. The first three force their break unconditionally, so it is always
-/// there or never; the arrow's is width-driven but only relocates a break already decided on this
-/// run, and prints identically where the body fits. That is what separates them from the single-line
-/// blank-line family, which had to be dropped for asking a question this run's own output changed
-/// the answer to.
+/// Set, the first three force their placement unconditionally. Unset, they read only a break the
+/// author owns and Curb reproduces, which is why no run can change the answer. The arrow's is
+/// width-driven but only relocates a break already decided on this run, and prints identically where
+/// the body fits. That is what separates them from the single-line blank-line family, which had to be
+/// dropped for asking a question this run's own output changed the answer to.
 /// </para>
 /// </remarks>
 public class WrapBeforeClauseTests : FormattingTest
@@ -33,9 +32,20 @@ public class WrapBeforeClauseTests : FormattingTest
 	// ---- type parameter constraints ------------------------------------------------------------------
 
 	[Test]
-	public Task A_constraint_joins_the_signature_by_default() => Formats(
-		// Including one the author had already put on its own line: the default joins regardless, which
-		// is the behaviour this option exists to let a repository turn off.
+	public Task A_constraint_the_author_broke_stays_broken() => Unchanged(
+		"""
+		public class C
+		{
+		    public T M<T>()
+		        where T : class
+		    {
+		        return default;
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Setting_the_key_to_false_joins_a_constraint_the_author_broke() => Formats(
 		"""
 		public class C
 		{
@@ -54,6 +64,240 @@ public class WrapBeforeClauseTests : FormattingTest
 		        return default;
 		    }
 		}
+		""",
+		editorConfig: "csharp_wrap_before_first_type_parameter_constraint = false");
+
+	[Test]
+	public Task A_width_decides_where_a_constraint_goes() => Formats(
+		"""
+		public class C
+		{
+		    public T M<T>()
+		        where T : class
+		    {
+		        return default;
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public T M<T>() where T : class
+		    {
+		        return default;
+		    }
+		}
+		""",
+		editorConfig: "max_line_length = 120");
+
+	[Test]
+	public Task A_width_with_existing_linebreaks_kept_leaves_the_author_in_charge() => Unchanged(
+		"""
+		public class C
+		{
+		    public C(int x)
+		        : this()
+		    {
+		    }
+
+		    public T M<T>()
+		        where T : class
+		    {
+		        return default;
+		    }
+		}
+		""",
+		editorConfig: "max_line_length = 120\ncsharp_keep_existing_linebreaks = true");
+
+	[Test]
+	public Task Each_constraint_keeps_its_own_place() => Unchanged(
+		// dotnet format reads each break on its own, so one clause moving down says nothing about another.
+		"""
+		public class A<T, U>
+		    where T : class where U : class
+		{
+		}
+
+		public class B<T, U> where T : class
+		    where U : class
+		{
+		}
+		""");
+
+	[Test]
+	public Task A_constraint_below_a_broken_parameter_list_stays_below_it() => Unchanged(
+		"""
+		public class C
+		{
+		    void M<T>(
+		        int a,
+		        int b)
+		        where T : class
+		    {
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_constraint_on_every_declaration_that_takes_one() => Unchanged(
+		"""
+		public delegate void D<T>()
+		    where T : class;
+
+		public record R<T>(int X)
+		    where T : class;
+
+		public abstract class C
+		{
+		    protected abstract void P<T>()
+		        where T : class;
+
+		    void O<T>()
+		        where T : class => P<T>();
+
+		    void S()
+		    {
+		        T L<T>()
+		            where T : class => default;
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_clause_stays_as_far_in_as_the_author_put_it() => Unchanged(
+		// dotnet format leaves these lines at whatever indent they have, however odd.
+		"""
+		public class Base(string name);
+
+		public class C<T>(string name)
+		: Base(name)
+		              where T : class
+		{
+		    public C(int id)
+		    : this(id.ToString())
+		    {
+		    }
+
+		    public C(long id)
+		                : this(id.ToString())
+		    {
+		    }
+
+		    public static void M<T2>()
+		    where T2 : new()
+		    {
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_clause_moves_as_far_as_its_declaration_does() => Formats(
+		"""
+		namespace N
+		{
+		public class C<T>
+		    : B
+		    where T : class
+		{
+		public C()
+		    : base(1)
+		{
+		}
+		}
+		}
+		""",
+		"""
+		namespace N
+		{
+		    public class C<T>
+		        : B
+		        where T : class
+		    {
+		        public C()
+		            : base(1)
+		        {
+		        }
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_clause_after_a_trailing_comment_is_indented_as_the_author_put_it() => Unchanged(
+		"""
+		public interface I // note
+		    : System.IDisposable
+		{
+		}
+
+		public class C : B
+		{
+		    public C(int a) // note
+		        : base(a)
+		    {
+		    }
+
+		    void M<T>() // note
+		        where T : class
+		    {
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_comment_above_a_clause_stays_on_its_column() => Unchanged(
+		"""
+		public class C : B
+		{
+		    public C(int a)
+		        // note
+		        : base(a)
+		    {
+		    }
+
+		    void M<T>()
+		        // note
+		        where T : class
+		    {
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_directive_ahead_of_a_clause_stays_at_the_margin() => Unchanged(
+		"""
+		public class C
+		#if X
+		    : B
+		#endif
+		{
+		}
+		""");
+
+	[Test]
+	public Task A_one_line_type_body_follows_a_clause_the_author_broke() => Formats(
+		// The brace follows the clause down, as it does when the option moved it: measured.
+		"""
+		public class C<T>
+		    where T : class { }
+
+		public class D
+		    : B { }
+
+		public enum E
+		    : byte { A }
+		""",
+		"""
+		public class C<T>
+		    where T : class
+		{ }
+
+		public class D
+		    : B
+		{ }
+
+		public enum E
+		    : byte
+		{ A }
 		""");
 
 	[Test]
@@ -138,10 +382,89 @@ public class WrapBeforeClauseTests : FormattingTest
 		""",
 		editorConfig: Constraint);
 
+	[Test]
+	public Task A_one_line_method_body_follows_a_constraint_the_author_broke() => Formats(
+		// Measured, and unlike a constructor's below its initializer.
+		"""
+		public class C
+		{
+		    void M<T>()
+		        where T : class { }
+
+		    void N()
+		    {
+		        void L<T>()
+		            where T : class { }
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    void M<T>()
+		        where T : class
+		    { }
+
+		    void N()
+		    {
+		        void L<T>()
+		            where T : class
+		        { }
+		    }
+		}
+		""");
+
+	[Test]
+	public Task An_empty_body_collapsed_by_its_option_follows_the_constraint_too() => Formats(
+		// together_same_line joins an empty pair to its header, and dotnet format moves it back below a
+		// `where` line, so the two would undo each other on every run.
+		"""
+		public class C
+		{
+		    void M<T>()
+		        where T : class
+		    {
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    void M<T>()
+		        where T : class
+		    { }
+		}
+		""",
+		editorConfig: "csharp_empty_block_style = together_same_line");
+
 	// ---- the base list ---------------------------------------------------------------------------------
 
 	[Test]
-	public Task A_base_list_joins_the_declaration_by_default() => Formats(
+	public Task A_base_list_the_author_broke_stays_broken() => Unchanged(
+		"""
+		public class C
+		    : System.Object
+		{
+		}
+
+		public class D<T>(string name)
+		    : B(name)
+		    where T : class
+		{
+		}
+
+		public enum E
+		    : byte
+		{
+		    A,
+		}
+
+		public record R(int X)
+		    : System.IDisposable;
+		""");
+
+	[Test]
+	public Task Setting_the_key_to_false_joins_a_base_list_the_author_broke() => Formats(
 		"""
 		public class C
 		    : System.Object
@@ -152,7 +475,8 @@ public class WrapBeforeClauseTests : FormattingTest
 		public class C : System.Object
 		{
 		}
-		""");
+		""",
+		editorConfig: "csharp_wrap_before_extends_colon = false");
 
 	[Test]
 	public Task The_key_puts_the_colon_on_the_next_line() => WithAndWithout(
@@ -218,7 +542,29 @@ public class WrapBeforeClauseTests : FormattingTest
 	private const string Initializer = "csharp_place_constructor_initializer_on_same_line = false";
 
 	[Test]
-	public Task An_initializer_joins_the_signature_by_default() => Formats(
+	public Task An_initializer_the_author_broke_stays_broken() => Unchanged(
+		"""
+		public class C : B
+		{
+		    public C()
+		        : base(1)
+		    {
+		    }
+
+		    public C(int a)
+		        : base(a) { }
+
+		    public C(long a)
+		        : base(
+		            1,
+		            2)
+		    {
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Setting_the_key_to_true_joins_an_initializer_the_author_broke() => Formats(
 		"""
 		public class C : B
 		{
@@ -235,7 +581,8 @@ public class WrapBeforeClauseTests : FormattingTest
 		    {
 		    }
 		}
-		""");
+		""",
+		editorConfig: "csharp_place_constructor_initializer_on_same_line = true");
 
 	[Test]
 	public Task The_key_gives_the_initializer_its_own_line() => WithAndWithout(

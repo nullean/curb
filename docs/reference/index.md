@@ -70,9 +70,9 @@ Use the filter above to search by name. Each group below links to its own index.
 - [csharp_preserve_single_line_statements](wrapping/csharp_preserve_single_line_statements.md) — Allow a control-flow body the author left on its header's line to stay there. Chained using statements are the exception and take their own lines unless this key is written out and set to true.
 - [csharp_keep_existing_linebreaks](wrapping/csharp_keep_existing_linebreaks.md) — Preservation mode. Defaults to true when max_line_length is off.
 - [csharp_wrap_before_first_method_call](wrapping/csharp_wrap_before_first_method_call.md) — When a chain breaks, break before the first call too, leaving the receiver on its own line.
-- [csharp_wrap_before_first_type_parameter_constraint](wrapping/csharp_wrap_before_first_type_parameter_constraint.md) — Put a where clause on its own line.
-- [csharp_wrap_before_extends_colon](wrapping/csharp_wrap_before_extends_colon.md) — Put a base list on its own line, colon first.
-- [csharp_place_constructor_initializer_on_same_line](wrapping/csharp_place_constructor_initializer_on_same_line.md) — Keep : base(...) on the constructor's line rather than giving it its own.
+- [csharp_wrap_before_first_type_parameter_constraint](wrapping/csharp_wrap_before_first_type_parameter_constraint.md) — Put a where clause on its own line, or keep it on the signature's. Not set, a clause the author broke stays broken unless a width decides layout.
+- [csharp_wrap_before_extends_colon](wrapping/csharp_wrap_before_extends_colon.md) — Put a base list on its own line, colon first, or keep it on the declaration's. Not set, a list the author broke stays broken unless a width decides layout.
+- [csharp_place_constructor_initializer_on_same_line](wrapping/csharp_place_constructor_initializer_on_same_line.md) — Keep : base(...) on the constructor's line, or give it its own. Not set, one the author broke stays broken unless a width decides layout.
 - [csharp_wrap_before_arrow_with_expressions](wrapping/csharp_wrap_before_arrow_with_expressions.md) — When an expression body wraps, put => at the start of the new line.
 - [csharp_wrap_after_dot_in_method_calls](wrapping/csharp_wrap_after_dot_in_method_calls.md) — When a chain breaks, leave the dot at the end of the preceding line.
 - [csharp_wrap_chained_method_calls](wrapping/csharp_wrap_chained_method_calls.md) — Break a chain of three or more calls onto its own line per call once it does not fit. Curb's default behaviour either way; setting the key only makes it explicit.

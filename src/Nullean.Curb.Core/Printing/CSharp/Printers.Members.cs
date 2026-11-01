@@ -25,18 +25,14 @@ internal static partial class Printers
 		}
 
 		var oneLine = KeepsOneLine(node.OpenBraceToken, node.CloseBraceToken, context)
-			&& context.Options.PlaceSimpleEnumOnSingleLine
-			&& !HeaderWasBroken(node.BaseList, constraintCount: 0, context);
+			&& context.Options.PlaceSimpleEnumOnSingleLine;
+		if (!oneLine || HeaderWasBroken(node.BaseList, default, context))
+			BeforeOpenBrace(BraceStyle.Types, context);
+		else
+			arena.Synthetic(SyntheticText.Space);
 
 		using (arena.ForceFlatIf(oneLine))
-		{
-			if (oneLine)
-				arena.Synthetic(SyntheticText.Space);
-			else
-				BeforeOpenBrace(BraceStyle.Types, context);
-
 			PrintEnumBody(node, context);
-		}
 	}
 
 	private static void PrintEnumBody(EnumDeclarationSyntax node, PrintContext context)

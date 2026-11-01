@@ -998,7 +998,7 @@ internal static partial class Printers
 				// function's brace, and `local_functions` alone moves nothing. Curb reading the
 				// documented flag meant its output was not a fixed point for anyone who set
 				// `methods` — the same resolution as indexers and events, and found the same way.
-				PrintBody(node.Body, BraceStyle.Methods, context);
+				PrintBody(node.Body, BraceStyle.Methods, context, belowClause: HeaderWasBroken(null, node.ConstraintClauses, context));
 			return;
 		}
 
