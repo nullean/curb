@@ -384,7 +384,7 @@ public static class CorpusGenerator
 				writeCSharp($"snippets/{byClass.Key}/{file}", item.Source, null);
 				written++;
 
-				if (!options.SnippetSettings || options.DivergentCases.Contains(item.TestCase) || KnownDefects.SettingsConflicts.Contains(item.TestCase))
+				if (!options.SnippetSettings || options.DivergentCases.Contains(item.TestCase))
 				{
 					continue;
 				}

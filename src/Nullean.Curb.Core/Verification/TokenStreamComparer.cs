@@ -67,20 +67,15 @@ internal static class TokenStreamComparer
 		if (inserted is not null && !NoDuplicatedKeyword(reparsed.Root, formattedText, inserted, out failure))
 			return false;
 
-		var originalUsings = TextSpan.FromBounds(0, 0);
-		var producedUsings = TextSpan.FromBounds(0, 0);
+		if (usingsReordered && !SameDirectives(originalRoot, reparsed.Root, out failure))
+			return false;
 
-		if (usingsReordered)
-		{
-			if (!SameDirectives(originalRoot, reparsed.Root, out failure))
-				return false;
-
-			originalUsings = DirectiveRegion(originalRoot);
-			producedUsings = DirectiveRegion(reparsed.Root);
-		}
-
-		using var original = TokenWalker(originalRoot);
-		using var produced = TokenWalker(reparsed.Root);
+		// The directives have been checked as a set; walking them in order would only re-discover the
+		// reordering that was asked for. Each walk steps over the directives themselves rather than
+		// the span from the first to the last, which once a namespace had directives of its own as
+		// well as moved-in ones took the namespace's own declaration with it on the source side only.
+		using var original = TokenWalker(originalRoot, usingsReordered);
+		using var produced = TokenWalker(reparsed.Root, usingsReordered);
 
 		var index = 0;
 
@@ -105,10 +100,8 @@ internal static class TokenStreamComparer
 
 		while (true)
 		{
-			// The using block has been checked as a set; walking it in order would only re-discover
-			// the reordering it was asked for.
-			var hasOriginal = carryOriginal || Next(original, originalUsings, out before);
-			var hasProduced = carryProduced || Next(produced, producedUsings, out after);
+			var hasOriginal = carryOriginal || Next(original, out before);
+			var hasProduced = carryProduced || Next(produced, out after);
 			carryOriginal = carryProduced = false;
 
 			// The owed closing brace, when it is the last thing in the file and the output has already
@@ -276,8 +269,8 @@ internal static class TokenStreamComparer
 				&& IsModifier(after))
 			{
 				if (!SameModifierRun(
-					original, originalUsings, originalText, ref before, ref carryOriginal,
-					produced, producedUsings, formattedText, ref after, ref carryProduced,
+					original, originalText, ref before, ref carryOriginal,
+					produced, formattedText, ref after, ref carryProduced,
 					out failure))
 					return false;
 
@@ -293,12 +286,12 @@ internal static class TokenStreamComparer
 			var isMismatch = Mismatch(originalText, before, formattedText, after);
 			if (trailingCommas && isMismatch)
 			{
-				if (IsComma(before) && IsCloser(after) && Next(original, originalUsings, out var nextBefore))
+				if (IsComma(before) && IsCloser(after) && Next(original, out var nextBefore))
 				{
 					before = nextBefore;
 					isMismatch = Mismatch(originalText, before, formattedText, after);
 				}
-				else if (IsCloser(before) && IsComma(after) && Next(produced, producedUsings, out var nextAfter))
+				else if (IsCloser(before) && IsComma(after) && Next(produced, out var nextAfter))
 				{
 					after = nextAfter;
 					isMismatch = Mismatch(originalText, before, formattedText, after);
@@ -370,14 +363,11 @@ internal static class TokenStreamComparer
 	private static bool IsCloser(SyntaxToken token) =>
 		token.RawKind is (int)SyntaxKind.CloseBraceToken or (int)SyntaxKind.CloseBracketToken;
 
-	/// <summary>Pulls the next token outside the region checked as a set.</summary>
-	private static bool Next(IEnumerator<SyntaxToken> tokens, TextSpan skip, out SyntaxToken token)
+	/// <summary>Pulls the next token.</summary>
+	private static bool Next(IEnumerator<SyntaxToken> tokens, out SyntaxToken token)
 	{
-		while (tokens.MoveNext())
+		if (tokens.MoveNext())
 		{
-			if (skip.Contains(tokens.Current.SpanStart))
-				continue;
-
 			token = tokens.Current;
 			return true;
 		}
@@ -408,12 +398,10 @@ internal static class TokenStreamComparer
 	/// </remarks>
 	private static bool SameModifierRun(
 		IEnumerator<SyntaxToken> original,
-		TextSpan originalSkip,
 		ReadOnlySpan<char> originalText,
 		ref SyntaxToken before,
 		ref bool carryOriginal,
 		IEnumerator<SyntaxToken> produced,
-		TextSpan producedSkip,
 		ReadOnlySpan<char> formattedText,
 		ref SyntaxToken after,
 		ref bool carryProduced,
@@ -425,7 +413,7 @@ internal static class TokenStreamComparer
 		while (IsModifier(before))
 		{
 			expected.Add(Text(originalText, before).ToString());
-			if (!Next(original, originalSkip, out before))
+			if (!Next(original, out before))
 				break;
 
 			carryOriginal = true;
@@ -434,7 +422,7 @@ internal static class TokenStreamComparer
 		while (IsModifier(after))
 		{
 			actual.Add(Text(formattedText, after).ToString());
-			if (!Next(produced, producedSkip, out after))
+			if (!Next(produced, out after))
 				break;
 
 			carryProduced = true;
@@ -495,23 +483,6 @@ internal static class TokenStreamComparer
 			.OfType<UsingDirectiveSyntax>()
 			.Select(directive => string.Join(' ', directive.DescendantTokens().Select(token => token.Text)))];
 
-	/// <summary>The span the using directives occupy, or an empty span at zero when there are none.</summary>
-	private static TextSpan DirectiveRegion(SyntaxNode root)
-	{
-		var start = int.MaxValue;
-		var end = 0;
-
-		foreach (var directive in root
-			.DescendantNodes(descendIntoChildren: node => node is CompilationUnitSyntax or BaseNamespaceDeclarationSyntax)
-			.OfType<UsingDirectiveSyntax>())
-		{
-			start = Math.Min(start, directive.SpanStart);
-			end = Math.Max(end, directive.Span.End);
-		}
-
-		return start == int.MaxValue ? TextSpan.FromBounds(0, 0) : TextSpan.FromBounds(start, end);
-	}
-
 	private static ReadOnlySpan<char> Text(ReadOnlySpan<char> source, SyntaxToken token)
 	{
 		var span = token.Span;
@@ -522,7 +493,12 @@ internal static class TokenStreamComparer
 	/// Walks the syntax tree in source order using an explicit stack over
 	/// <c>ChildNodesAndTokens().Reverse()</c>.
 	/// </summary>
-	private static IEnumerator<SyntaxToken> TokenWalker(SyntaxNode root)
+	/// <param name="root">The tree.</param>
+	/// <param name="skipDirectives">
+	/// Leave out the using directives of the compilation unit and of its namespaces, which
+	/// <see cref="SameDirectives"/> has already compared as a set.
+	/// </param>
+	private static IEnumerator<SyntaxToken> TokenWalker(SyntaxNode root, bool skipDirectives)
 	{
 		var stack = new Stack<SyntaxNodeOrToken>();
 		stack.Push(root);
@@ -535,7 +511,11 @@ internal static class TokenStreamComparer
 			}
 			else
 			{
-				foreach (var child in item.AsNode()!.ChildNodesAndTokens().Reverse())
+				var node = item.AsNode()!;
+				if (skipDirectives && node is UsingDirectiveSyntax { Parent: CompilationUnitSyntax or BaseNamespaceDeclarationSyntax })
+					continue;
+
+				foreach (var child in node.ChildNodesAndTokens().Reverse())
 					stack.Push(child);
 			}
 		}

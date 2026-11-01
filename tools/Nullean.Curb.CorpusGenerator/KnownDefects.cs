@@ -18,11 +18,6 @@ namespace Nullean.Curb.CorpusGenerator;
 /// <list type="number">
 /// <item><c>curb check</c>: a trailing <c>//</c> comment after the <c>{</c> of an empty block; collapsing the block
 /// puts the <c>}</c> inside the comment, "formatted output no longer parses" (4).</item>
-/// <item><c>curb check</c>: comments among using directives that move into a block namespace, "formatting lost
-/// content while reordering" (2).</item>
-/// <item><c>curb check</c>: two snippets' own <c>csharp_using_directive_placement = inside_namespace</c> on top of the
-/// corpus's <c>file_header_template</c> and file-scoped namespaces, refused with no layout change at all (2). Those
-/// snippets keep the corpus settings (<see cref="SettingsConflicts"/>).</item>
 /// <item>Idempotency: a block body converted to an expression body under
 /// <c>csharp_style_expression_bodied_methods = true</c> comes out as <c>=&gt;</c> with the expression on the next line,
 /// and a second pass joins it (210, nearly all <c>{ return x switch { ... }; }</c>). The corpus configuration leaves
@@ -42,13 +37,6 @@ namespace Nullean.Curb.CorpusGenerator;
 /// </remarks>
 public static class KnownDefects
 {
-	/// <summary>Test cases whose own settings, combined with the corpus's, Curb refuses (item 3).</summary>
-	public static readonly IReadOnlySet<string> SettingsConflicts = new HashSet<string>(StringComparer.Ordinal)
-	{
-		"UsingPlacementAndHeaderTests.Directives_move_inside_a_block_namespace",
-		"UsingPlacementAndHeaderTests.The_header_lands_above_directives_that_moved_inside",
-	};
-
 	/// <summary>
 	/// Syntax Curb prints verbatim today (<c>curb check --coverage</c>), by design rather than by defect: an unhandled
 	/// node keeps its source text. Untidy spacing inside one would measure that coverage gap rather than a formatting
@@ -87,13 +75,11 @@ public static class KnownDefects
 		return false;
 	}
 
-	/// <summary>Whether a generated trailing comment may end the line between two tokens (item 5).</summary>
+	/// <summary>Whether a generated trailing comment may end the line between two tokens (item 3).</summary>
 	public static bool AllowsTrailingComment(SyntaxToken previous, SyntaxToken token) =>
 		previous.IsKind(SyntaxKind.OpenBraceToken) && !token.IsKind(SyntaxKind.CloseBraceToken);
 
-	/// <summary>Whether the gap between two tokens may only have its indentation and blank lines changed (items 1 and 2).</summary>
+	/// <summary>Whether the gap between two tokens may only have its indentation and blank lines changed (item 1).</summary>
 	public static bool Avoid(SyntaxToken previous, SyntaxToken token) =>
-		InUsing(previous) || InUsing(token) || previous.IsKind(SyntaxKind.OpenBraceToken) && token.IsKind(SyntaxKind.CloseBraceToken);
-
-	private static bool InUsing(SyntaxToken token) => token.Parent?.AncestorsAndSelf().Any(n => n is UsingDirectiveSyntax) == true;
+		previous.IsKind(SyntaxKind.OpenBraceToken) && token.IsKind(SyntaxKind.CloseBraceToken);
 }

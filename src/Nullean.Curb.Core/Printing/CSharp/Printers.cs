@@ -54,12 +54,31 @@ internal static partial class Printers
 
 		foreach (var member in node.Members)
 		{
+			var regionStart = 0;
+			if (moveInside && member is BaseNamespaceDeclarationSyntax)
+			{
+				// The file's banner (a licence header, say) belongs to the file, not to whichever
+				// directive comes first, so it stays at the top while the directives move. It ends in
+				// a blank line by definition, which is the gap to the namespace.
+				var first = node.Usings[0];
+				var banner = UsingOrganiser.BannerTriviaCount(first);
+				regionStart = first.FullSpan.Start;
+				if (banner > 0)
+				{
+					if (previousEnd >= 0)
+						arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
+					TokenPrinter.PrintLeadingTrivia(first.GetFirstToken(includeZeroWidth: true), context, end: banner);
+					regionStart = UsingOrganiser.BannerEnd(first);
+					previousEnd = -1;
+				}
+			}
+
 			Separate(context, ref previousEnd, member);
 
 			if (moveInside && member is BaseNamespaceDeclarationSyntax)
 			{
 				context.UsingsToPlaceInside = node.Usings;
-				context.Reordered(TextSpan.FromBounds(node.Usings[0].FullSpan.Start, InsertionPoint(member)));
+				context.Reordered(TextSpan.FromBounds(regionStart, InsertionPoint(member)));
 
 				// The token stream genuinely reorders, so the comparer lifts the directives out of the
 				// linear walk and checks them as a set — the same handling sorting them already needs.
@@ -215,30 +234,39 @@ internal static partial class Printers
 	/// <param name="usings">The directives, in source order.</param>
 	/// <param name="context">Per-file printing state.</param>
 	/// <param name="previousEnd">Where the previous item ended, for blank-line separation.</param>
+	/// <param name="moved">
+	/// The compilation unit's directives, printed inside the namespace. Their banner has already been
+	/// printed at the top of the file (<see cref="CompilationUnit"/>), and the compilation unit has
+	/// already declared the whole move as one permuted region, so neither is done again here.
+	/// </param>
 	private static void PrintUsings(
 		SyntaxNode container,
 		SyntaxList<UsingDirectiveSyntax> usings,
 		PrintContext context,
-		ref int previousEnd)
+		ref int previousEnd,
+		bool moved = false)
 	{
 		var ordered = UsingOrganiser.Order(container, usings, context.Options);
+		var firstInSource = usings.Count > 0 ? usings[0] : null;
 
 		if (ordered is null)
 		{
 			foreach (var directive in usings)
 			{
 				Separate(context, ref previousEnd, directive);
-				Node.Print(directive, context);
+				if (moved && directive == firstInSource)
+					UsingDirective(directive, context, UsingOrganiser.BannerTriviaCount(directive));
+				else
+					Node.Print(directive, context);
 			}
 
 			return;
 		}
 
 		var arena = context.Arena;
-		var firstInSource = usings[0];
-		var bannerCount = UsingOrganiser.BannerTriviaCount(firstInSource);
+		var bannerCount = UsingOrganiser.BannerTriviaCount(firstInSource!);
 
-		if (bannerCount > 0)
+		if (bannerCount > 0 && !moved)
 		{
 			if (previousEnd >= 0)
 				arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
@@ -246,7 +274,7 @@ internal static partial class Printers
 			// Through the ordinary trivia walk rather than verbatim, so it comes out exactly as it does
 			// on the next run, when the block is already in order and nothing splits the trivia: a
 			// verbatim copy kept trailing whitespace on a header line that the next run then removed.
-			TokenPrinter.PrintLeadingTrivia(firstInSource.GetFirstToken(includeZeroWidth: true), context, end: bannerCount);
+			TokenPrinter.PrintLeadingTrivia(firstInSource!.GetFirstToken(includeZeroWidth: true), context, end: bannerCount);
 			previousEnd = UsingOrganiser.BannerEnd(firstInSource);
 		}
 
@@ -272,10 +300,13 @@ internal static partial class Printers
 
 		previousEnd = usings[^1].Span.End;
 
+		if (moved)
+			return;
+
 		// To the end of the last directive's *full* span, so a trailing comment is inside the region
 		// the verifier treats as permuted. Ending at Span.End leaves `using X; // note` half in and
 		// half out, and the comment then fails a comparison it was never meant to be part of.
-		context.Reordered(TextSpan.FromBounds(firstInSource.FullSpan.Start, usings[^1].FullSpan.End));
+		context.Reordered(TextSpan.FromBounds(firstInSource!.FullSpan.Start, usings[^1].FullSpan.End));
 		context.UsingsReordered = true;
 	}
 
@@ -371,7 +402,13 @@ internal static partial class Printers
 
 		var moved = context.TakeUsingsToPlaceInside();
 		if (moved.Count > 0)
-			PrintUsings(node, moved, context, ref previousEnd);
+		{
+			PrintUsings(node, moved, context, ref previousEnd, moved: true);
+
+			// The namespace's own directives keep the gap they had under the declaration; see
+			// PrintNamespaceBody.
+			previousEnd = node.SemicolonToken.Span.End;
+		}
 
 		// Usings may sit inside a file-scoped namespace, and this printer used to walk only the
 		// members — so every such file was refused by the content verifier rather than formatted. None
@@ -2595,10 +2632,17 @@ internal static partial class Printers
 	/// (<see cref="UsingOrganiser.BannerEnd"/>), so a header rewrite here would either be printed
 	/// twice or fight that logic for the same characters.
 	/// </summary>
+	/// <remarks>
+	/// Not when the directives move inside the namespace. Their banner is then printed where it is by
+	/// <see cref="CompilationUnit"/>, through the same trivia walk that honours a header rewrite, and
+	/// the next run finds no directives at the top to defer to: leaving the header alone on this run
+	/// meant the next one rewrote it.
+	/// </remarks>
 	private static bool UsingOrganiserOwnsLeadingTrivia(CompilationUnitSyntax node, SyntaxToken first, PrintContext context) =>
 		node.Usings.Count > 0
 		&& first == node.Usings[0].GetFirstToken(includeZeroWidth: true)
-		&& UsingOrganiser.IsEligible(node, node.Usings, context.Options);
+		&& UsingOrganiser.IsEligible(node, node.Usings, context.Options)
+		&& !MovesUsingsInside(node, context);
 
 	/// <summary>What scanning the compilation unit's leading trivia from its very start found.</summary>
 	/// <param name="ConsumedCount">
@@ -2700,18 +2744,31 @@ internal static partial class Printers
 	/// know which one a directive belonged to, and putting it in the wrong one changes what the names
 	/// inside that namespace resolve to — a refusal rather than a guess, as with the file-scoped
 	/// conversion.
+	/// <para>
+	/// Nor where the namespace has directives of its own and they are to be sorted. The two lists are
+	/// sorted apart on this run and as one on the next, so the output would not be a fixed point.
+	/// </para>
 	/// </remarks>
 	private static bool MovesUsingsInside(CompilationUnitSyntax node, PrintContext context) =>
 		context.Options.UsingPlacement == UsingPlacement.InsideNamespace
 		&& node.Usings.Count > 0
 		&& node.AttributeLists.Count == 0
-		&& node.Members is [BaseNamespaceDeclarationSyntax];
+		&& node.Members is [BaseNamespaceDeclarationSyntax only]
+		&& (only.Usings.Count == 0 || context.Options.SortUsings == UsingOrder.AsWritten);
 
-	/// <summary>Where the directives land: just past the brace or semicolon that opens the namespace.</summary>
+	/// <summary>
+	/// Where the directives land: just past the brace or semicolon that opens the namespace, and past a
+	/// comment on the same line, which stays beside the brace or ahead of the directives.
+	/// </summary>
+	/// <remarks>
+	/// The end of the permuted region the content check is told about, so it has to reach past that
+	/// comment. Stopping at the token left the comment outside the region on the source side and
+	/// inside it on the output side, and the file was refused.
+	/// </remarks>
 	private static int InsertionPoint(SyntaxNode member) => member switch
 	{
-		NamespaceDeclarationSyntax block => block.OpenBraceToken.Span.End,
-		FileScopedNamespaceDeclarationSyntax scoped => scoped.SemicolonToken.Span.End,
+		NamespaceDeclarationSyntax block => block.OpenBraceToken.FullSpan.End,
+		FileScopedNamespaceDeclarationSyntax scoped => scoped.SemicolonToken.FullSpan.End,
 		_ => member.SpanStart,
 	};
 
