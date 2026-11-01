@@ -142,9 +142,18 @@ internal static class ContentVerifier
 				var span = reordered[nextReordered++];
 				var length = CountContent(source[span.Start..span.End]);
 
-				if (length > 0
-					&& !VerifyPermutation(source, output, ref sourceIndex, ref outputIndex, length, out failure))
-					return false;
+				// Usings moved into a namespace that is also being made file-scoped land after its
+				// semicolon, so the brace that became that semicolon sits inside the permuted region.
+				// It is the same substitution the walk below allows, taken here instead, and the closing
+				// brace is owed just the same.
+				if (length > 0)
+				{
+					var braceAvailable = namespaceUnwrapped && !namespaceBraceOwed;
+					if (!VerifyPermutation(source, output, ref sourceIndex, ref outputIndex, length, braceAvailable, out var braceTaken, out failure))
+						return false;
+
+					namespaceBraceOwed |= braceTaken;
+				}
 
 				continue;
 			}
@@ -363,16 +372,30 @@ internal static class ContentVerifier
 	/// and comparing is exact rather than approximate: a dropped comment, a duplicated directive or
 	/// a mangled name all change the multiset.
 	/// </remarks>
+	/// <param name="source">The original text.</param>
+	/// <param name="output">What was printed.</param>
+	/// <param name="sourceIndex">Where the region starts in the source; advanced past it.</param>
+	/// <param name="outputIndex">Where the region starts in the output; advanced past it.</param>
+	/// <param name="count">How many content characters the region holds.</param>
+	/// <param name="braceAvailable">
+	/// The namespace conversion's one <c>{</c>-to-<c>;</c> substitution has not been used yet, so the
+	/// region may carry it: one <c>{</c> fewer in the output and one <c>;</c> more, and nothing else.
+	/// </param>
+	/// <param name="braceTaken">Set when the region used that substitution.</param>
+	/// <param name="failure">Set when the region does not verify.</param>
 	private static bool VerifyPermutation(
 		ReadOnlySpan<char> source,
 		ReadOnlySpan<char> output,
 		ref int sourceIndex,
 		ref int outputIndex,
 		int count,
+		bool braceAvailable,
+		out bool braceTaken,
 		out string? failure)
 	{
 		var expected = new char[count];
 		var actual = new char[count];
+		braceTaken = false;
 
 		if (!Take(source, ref sourceIndex, expected) || !Take(output, ref outputIndex, actual))
 		{
@@ -385,8 +408,20 @@ internal static class ContentVerifier
 
 		if (!expected.AsSpan().SequenceEqual(actual))
 		{
-			failure = "reordering changed content, not just order";
-			return false;
+			// The one substitution the conversion makes, applied to the source side and compared again.
+			var brace = braceAvailable ? Array.IndexOf(expected, '{') : -1;
+			if (brace >= 0)
+			{
+				expected[brace] = ';';
+				Array.Sort(expected);
+				braceTaken = expected.AsSpan().SequenceEqual(actual);
+			}
+
+			if (!braceTaken)
+			{
+				failure = "reordering changed content, not just order";
+				return false;
+			}
 		}
 
 		failure = null;

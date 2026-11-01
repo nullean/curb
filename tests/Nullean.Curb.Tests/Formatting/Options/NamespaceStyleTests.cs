@@ -263,4 +263,108 @@ public class NamespaceStyleTests : FormattingTest
 		// trailing note
 		""",
 		editorConfig: FileScoped);
+
+	[Test]
+	public Task A_comment_above_the_closing_brace_loses_its_trailing_whitespace() => Formats(
+		// It ends the file once the brace goes, and the next run trims it there. A regular string, so
+		// the trailing whitespace is visible.
+		"namespace Alpha\n{\n    public class C\n    {\n    }\n\n    // trailing note  \n}\n",
+		"""
+		namespace Alpha;
+
+		public class C
+		{
+		}
+
+		// trailing note
+		""",
+		editorConfig: FileScoped);
+
+	[Test]
+	public Task A_comment_after_the_opening_brace_is_not_lost_with_it() => Formats(
+		// The brace becomes the semicolon; the comment beside it goes on the line under the declaration,
+		// which is where Roslyn's own fixer puts it (issue #182). The fixer leaves no blank line between
+		// the two; Curb keeps the one it always writes under a file-scoped declaration, which dotnet
+		// format whitespace leaves alone.
+		"""
+		namespace Alpha
+		{ // about this namespace
+		    public class C
+		    {
+		    }
+		}
+		""",
+		"""
+		namespace Alpha;
+
+		// about this namespace
+		public class C
+		{
+		}
+		""",
+		editorConfig: FileScoped);
+
+	[Test]
+	public Task A_blank_line_under_the_brace_comment_stays() => Formats(
+		"""
+		namespace Alpha
+		{ // about this namespace
+
+		    public class C
+		    {
+		    }
+		}
+		""",
+		"""
+		namespace Alpha;
+
+		// about this namespace
+
+		public class C
+		{
+		}
+		""",
+		editorConfig: FileScoped);
+
+	[Test]
+	public Task Two_comments_after_the_brace_take_a_line_each() => Formats(
+		// One line each, which is how the next run prints them once they lead the first member.
+		"""
+		namespace Alpha
+		{ /* first */ // second
+		    using System;
+
+		    public class C
+		    {
+		    }
+		}
+		""",
+		"""
+		namespace Alpha;
+
+		/* first */
+		// second
+		using System;
+
+		public class C
+		{
+		}
+		""",
+		editorConfig: FileScoped);
+
+	[Test]
+	public Task A_comment_above_the_brace_stops_it() => Unchanged(
+		// It would have to cross the semicolon that replaces the brace, so the block stays a block.
+		// dotnet format style converts it, leaving the comment under the semicolon. Before this the
+		// conversion lost the comment and the whole file was refused.
+		"""
+		namespace Alpha
+		// about this namespace
+		{
+		    public class C
+		    {
+		    }
+		}
+		""",
+		editorConfig: FileScoped);
 }

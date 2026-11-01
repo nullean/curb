@@ -1,5 +1,4 @@
 using System.Buffers;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
 using Nullean.Curb.Documents;
@@ -160,10 +159,10 @@ internal sealed class PrintContext(DocArena arena, SourceText text, string sourc
 	/// The compilation unit's using directives, when they are to be printed inside the namespace.
 	/// </summary>
 	/// <remarks>Set by the compilation unit just before it prints the namespace, and taken by it.</remarks>
-	public SyntaxList<UsingDirectiveSyntax> UsingsToPlaceInside { get; set; }
+	public UsingRange UsingsToPlaceInside { get; set; }
 
 	/// <summary>Takes the held directives, leaving none behind.</summary>
-	public SyntaxList<UsingDirectiveSyntax> TakeUsingsToPlaceInside()
+	public UsingRange TakeUsingsToPlaceInside()
 	{
 		var held = UsingsToPlaceInside;
 		UsingsToPlaceInside = default;

@@ -16,23 +16,12 @@ namespace Nullean.Curb.CorpusGenerator;
 /// damaged a file.
 /// </para>
 /// <list type="number">
-/// <item><c>curb check</c>: extra whitespace inside a using directive, <c>using System.Text ;</c> or
-/// <c>using  System;</c>, makes sorting the directives refuse, "reordering usings altered one" (66).</item>
-/// <item><c>curb check</c>: a comment as the first thing inside a block namespace is lost by file-scoped conversion,
-/// "formatting changed content" (5).</item>
 /// <item><c>curb check</c>: a trailing <c>//</c> comment after the <c>{</c> of an empty block; collapsing the block
 /// puts the <c>}</c> inside the comment, "formatted output no longer parses" (4).</item>
-/// <item><c>curb check</c>: comments among using directives that move into a block namespace, "formatting lost
-/// content while reordering" (2).</item>
-/// <item><c>curb check</c>: two snippets' own <c>csharp_using_directive_placement = inside_namespace</c> on top of the
-/// corpus's <c>file_header_template</c> and file-scoped namespaces, refused with no layout change at all (2). Those
-/// snippets keep the corpus settings (<see cref="SettingsConflicts"/>).</item>
 /// <item>Idempotency: a block body converted to an expression body under
 /// <c>csharp_style_expression_bodied_methods = true</c> comes out as <c>=&gt;</c> with the expression on the next line,
 /// and a second pass joins it (210, nearly all <c>{ return x switch { ... }; }</c>). The corpus configuration leaves
 /// that one key out.</item>
-/// <item>Idempotency: trailing whitespace on a file header line, or on the blank line after it, survives the first pass
-/// and goes on the second (18). None is written into a file's leading trivia.</item>
 /// <item>Idempotency: a trailing <c>//</c> comment on a line a width decision covers (a method header, an expression
 /// body, an accessor list, a switch arm) is counted by the first pass, which breaks the construct, and not by the
 /// second, which joins it back (1; 2 each at seeds 2 and 3). <c>curb check</c>: a trailing comment after a <c>}</c>
@@ -48,16 +37,6 @@ namespace Nullean.Curb.CorpusGenerator;
 /// </remarks>
 public static class KnownDefects
 {
-	/// <summary>Test cases whose own settings, combined with the corpus's, Curb refuses (item 5).</summary>
-	public static readonly IReadOnlySet<string> SettingsConflicts = new HashSet<string>(StringComparer.Ordinal)
-	{
-		"UsingPlacementAndHeaderTests.Directives_move_inside_a_block_namespace",
-		"UsingPlacementAndHeaderTests.The_header_lands_above_directives_that_moved_inside",
-	};
-
-	/// <summary>The profile for a file's leading trivia: no trailing whitespace (item 7).</summary>
-	public static LayoutProfile InHeader(LayoutProfile p) => p with { TrailingWhitespace = 0 };
-
 	/// <summary>
 	/// Syntax Curb prints verbatim today (<c>curb check --coverage</c>), by design rather than by defect: an unhandled
 	/// node keeps its source text. Untidy spacing inside one would measure that coverage gap rather than a formatting
@@ -96,15 +75,11 @@ public static class KnownDefects
 		return false;
 	}
 
-	/// <summary>Whether a generated trailing comment may end the line between two tokens (item 8).</summary>
+	/// <summary>Whether a generated trailing comment may end the line between two tokens (item 3).</summary>
 	public static bool AllowsTrailingComment(SyntaxToken previous, SyntaxToken token) =>
 		previous.IsKind(SyntaxKind.OpenBraceToken) && !token.IsKind(SyntaxKind.CloseBraceToken);
 
-	/// <summary>Whether the gap between two tokens may only have its indentation and blank lines changed (items 1 to 4).</summary>
+	/// <summary>Whether the gap between two tokens may only have its indentation and blank lines changed (item 1).</summary>
 	public static bool Avoid(SyntaxToken previous, SyntaxToken token) =>
-		InUsing(previous) || InUsing(token) || previous.IsKind(SyntaxKind.OpenBraceToken) && previous.Parent is NamespaceDeclarationSyntax || previous.IsKind(
-			SyntaxKind.OpenBraceToken
-		) && token.IsKind(SyntaxKind.CloseBraceToken);
-
-	private static bool InUsing(SyntaxToken token) => token.Parent?.AncestorsAndSelf().Any(n => n is UsingDirectiveSyntax) == true;
+		previous.IsKind(SyntaxKind.OpenBraceToken) && token.IsKind(SyntaxKind.CloseBraceToken);
 }

@@ -275,6 +275,12 @@ internal static partial class Printers
 		if (node.Parent is not CompilationUnitSyntax unit || unit.Members.Count != 1)
 			return false;
 
+		// A comment or directive on its own line above the opening brace would have to cross the
+		// semicolon that replaces the brace. The conversion used to drop it, and the content check
+		// refused the file; rare enough to leave the block as it is instead.
+		if (TokenPrinter.HasLeadingContent(node.OpenBraceToken))
+			return false;
+
 		foreach (var member in node.Members)
 		{
 			if (member is BaseNamespaceDeclarationSyntax)
@@ -312,7 +318,38 @@ internal static partial class Printers
 		// under the brace, and a file that had one came out with two.
 		var previousEnd = -1;
 
+		// The compilation unit's directives, when csharp_using_directive_placement asked for them to be
+		// inside the namespace. Leaving them untaken dropped them from the output, and the content
+		// check refused every such file (issues #184 and #185).
+		var moved = context.TakeUsingsToPlaceInside();
+		if (moved.Count > 0)
+		{
+			PrintUsings(node, moved, context, ref previousEnd, moved: true);
+
+			// The namespace's own directives keep the gap they had under the brace; see PrintNamespaceBody.
+			previousEnd = node.OpenBraceToken.Span.End;
+		}
+
+		// A comment after the opening brace, which the output no longer has (issue #182). It follows
+		// the moved directives, because the brace closes the region the content check compares as a
+		// permutation and the comment comes after it; with nothing moved it is simply the first thing
+		// under the declaration. It then reads as the leading comment of whatever comes next, as it
+		// does on the next run: no blank line is forced under it, and one the author left is kept.
+		var braceComments = TokenPrinter.HasAnyContent(node.OpenBraceToken);
+		if (moved.Count > 0 && braceComments)
+			AfterUsingList(context, ref previousEnd, hadUsings: true);
+
+		if (braceComments && TokenPrinter.PrintTrailingCommentsOnOwnLine(node.OpenBraceToken, context))
+		{
+			SyntaxNode? next = node.Usings.Count > 0 ? node.Usings[0] : node.Members.Count > 0 ? node.Members[0] : null;
+			if (next is not null && !NextStartsWithDirective(next))
+				context.BlankLines(context.DeclarationSeparation(node.OpenBraceToken.Span.End, EffectiveStart(next)));
+			previousEnd = -1;
+		}
+
 		PrintUsings(node, node.Usings, context, ref previousEnd);
+		AfterUsingList(context, ref previousEnd, moved.Count > 0 && !braceComments,
+			node.Members.Count > 0 && NextStartsWithDirective(node.Members[0]));
 
 		foreach (var member in node.Members)
 		{
@@ -333,6 +370,12 @@ internal static partial class Printers
 			}
 
 			TokenPrinter.PrintLeadingTrivia(node.CloseBraceToken, context, trailingBreak: false);
+
+			// The line the comment ends, which the brace would otherwise have ended. Left open, the
+			// comment kept its trailing whitespace, and the next run, reading it as the file's last
+			// trivia, removed it.
+			if (node.SemicolonToken.RawKind == 0)
+				arena.HardLine();
 		}
 
 		TokenPrinter.PrintIfPresent(node.SemicolonToken, context);
@@ -363,7 +406,14 @@ internal static partial class Printers
 			// them to be in here. They print ahead of any this namespace already had.
 			var moved = context.TakeUsingsToPlaceInside();
 			if (moved.Count > 0)
-				PrintUsings(node, moved, context, ref previousEnd);
+			{
+				PrintUsings(node, moved, context, ref previousEnd, moved: true);
+
+				// The namespace's own directives keep the gap they had under the brace, which is what
+				// dotnet format leaves. Measured from where the moved ones ended, it was the distance
+				// from the top of the file instead.
+				previousEnd = node.OpenBraceToken.Span.End;
+			}
 
 			PrintUsings(node, node.Usings, context, ref previousEnd);
 			var hadUsings = moved.Count > 0 || node.Usings.Count > 0;

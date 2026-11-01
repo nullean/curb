@@ -11,6 +11,7 @@ public class UsingPlacementAndHeaderTests : FormattingTest
 {
 	private const string Inside = "csharp_using_directive_placement = inside_namespace";
 	private const string Header = "file_header_template = Licensed to the Foo Foundation.\\nSee LICENSE.";
+	private const string FileScoped = "csharp_style_namespace_declarations = file_scoped";
 
 	// ---- using placement ---------------------------------------------------------------------------
 
@@ -129,6 +130,396 @@ public class UsingPlacementAndHeaderTests : FormattingTest
 		}
 		""",
 		editorConfig: Inside);
+
+	[Test]
+	public Task Comments_among_the_directives_travel_with_them() => Formats(
+		"""
+		using System;
+		// text helpers
+		using System.Text; // trailing
+
+		namespace N
+		{
+		    public class C
+		    {
+		    }
+		}
+		""",
+		"""
+		namespace N
+		{
+		    using System;
+		    // text helpers
+		    using System.Text; // trailing
+
+		    public class C
+		    {
+		    }
+		}
+		""",
+		editorConfig: Inside);
+
+	[Test]
+	public Task A_banner_stays_at_the_top_of_the_file() => Formats(
+		// A licence header belongs to the file, not to the first directive, so it stays where it is
+		// while the directives move; dotnet format style does the same. "Banner" is what the using
+		// sort means by it: everything above the last blank line before the first directive.
+		"""
+		// Copyright Foo
+
+		using System;
+		// text helpers
+		using System.Text;
+
+		namespace N
+		{
+		    public class C
+		    {
+		    }
+		}
+		""",
+		"""
+		// Copyright Foo
+
+		namespace N
+		{
+		    using System;
+		    // text helpers
+		    using System.Text;
+
+		    public class C
+		    {
+		    }
+		}
+		""",
+		editorConfig: Inside);
+
+	[Test]
+	public Task A_comment_beside_the_brace_stays_beside_it() => Formats(
+		// The comment is outside the region the move permutes, and the content check was told the region
+		// ended at the brace itself, so the file was refused.
+		"""
+		using System;
+
+		namespace N
+		{ // about this namespace
+		    public class C
+		    {
+		    }
+		}
+		""",
+		"""
+		namespace N
+		{ // about this namespace
+		    using System;
+
+		    public class C
+		    {
+		    }
+		}
+		""",
+		editorConfig: Inside);
+
+	[Test]
+	public Task Directives_of_its_own_keep_their_gap_under_the_brace() => Formats(
+		// Moved ones go first. The namespace's own keep whatever the author had between them and the
+		// brace, here none, which is what dotnet format style writes.
+		"""
+		using System.Text;
+		using System;
+
+		namespace N
+		{
+		    using System.IO;
+
+		    public class C
+		    {
+		    }
+		}
+		""",
+		"""
+		namespace N
+		{
+		    using System.Text;
+		    using System;
+		    using System.IO;
+
+		    public class C
+		    {
+		    }
+		}
+		""",
+		editorConfig: Inside);
+
+	[Test]
+	public Task Directives_of_its_own_stop_the_move_when_they_are_sorted() => Formats(
+		// Moved in, the two lists would be sorted apart on this run and as one on the next. The move is
+		// declined, and the outer list is still sorted where it is. dotnet format style moves them and
+		// sorts all three; this leaves a file it would still change, but never a wrong one.
+		"""
+		using System.Text;
+		using System;
+
+		namespace N
+		{
+		    using System.IO;
+
+		    public class C
+		    {
+		    }
+		}
+		""",
+		"""
+		using System;
+		using System.Text;
+
+		namespace N
+		{
+		    using System.IO;
+
+		    public class C
+		    {
+		    }
+		}
+		""",
+		editorConfig: Inside + "\ndotnet_sort_system_directives_first = true");
+
+	// ---- with csharp_style_namespace_declarations = file_scoped --------------------------------------
+
+	[Test]
+	public Task Directives_move_into_a_block_namespace_made_file_scoped() => Formats(
+		// Both rules at once: the block becomes file-scoped and the directives land under its
+		// declaration. The conversion never took the directives it was handed, so they were dropped
+		// and the file refused (issue #184). Checked against dotnet format style.
+		"""
+		using System;
+		using System.Text;
+
+		namespace N
+		{
+		    public class C
+		    {
+		    }
+		}
+		""",
+		"""
+		namespace N;
+
+		using System;
+		using System.Text;
+
+		public class C
+		{
+		}
+		""",
+		editorConfig: Inside + "\n" + FileScoped);
+
+	[Test]
+	public Task Comments_travel_with_directives_into_a_namespace_made_file_scoped() => Formats(
+		// dotnet format style puts the brace's comment straight under the declaration, ahead of the
+		// moved directives. Curb puts it after them: the content check compares the moved directives
+		// and the brace they land behind as one permuted region, and the comment follows the brace.
+		// Both are fixed points of dotnet format whitespace.
+		"""
+		using System;
+		// text helpers
+		using System.Text; // trailing
+
+		namespace N
+		{ // about this namespace
+		    using System.IO;
+
+		    public class C
+		    {
+		    }
+		}
+		""",
+		"""
+		namespace N;
+
+		using System;
+		// text helpers
+		using System.Text; // trailing
+
+		// about this namespace
+		using System.IO;
+
+		public class C
+		{
+		}
+		""",
+		editorConfig: Inside + "\n" + FileScoped);
+
+	// ---- global usings stay where they are --------------------------------------------------------------
+
+	[Test]
+	public Task A_global_using_stays_at_the_top_while_the_rest_move() => Formats(
+		// A global using inside a namespace, or after one, does not compile (CS8914, CS8915). They stay,
+		// and the directives after them move, which is what dotnet format style writes.
+		"""
+		global using System.Linq;
+		using System;
+
+		namespace N
+		{
+		    class C { }
+		}
+		""",
+		"""
+		global using System.Linq;
+
+		namespace N
+		{
+		    using System;
+
+		    class C { }
+		}
+		""",
+		editorConfig: Inside);
+
+	[Test]
+	public Task A_global_using_stays_at_the_top_of_a_namespace_made_file_scoped() => Formats(
+		"""
+		global using System.Linq;
+		using System;
+
+		namespace N
+		{
+		    class C { }
+		}
+		""",
+		"""
+		global using System.Linq;
+
+		namespace N;
+
+		using System;
+
+		class C { }
+		""",
+		editorConfig: Inside + "\n" + FileScoped);
+
+	[Test]
+	public Task Global_aliases_and_static_usings_stay_too() => Formats(
+		"""
+		global using static System.Math;
+		global using L = System.Collections.Generic.List<int>;
+		using System.Text;
+		using System;
+
+		namespace N
+		{
+		    class C { }
+		}
+		""",
+		"""
+		global using static System.Math;
+		global using L = System.Collections.Generic.List<int>;
+
+		namespace N;
+
+		using System.Text;
+		using System;
+
+		class C { }
+		""",
+		editorConfig: Inside + "\n" + FileScoped);
+
+	[Test]
+	public Task Global_usings_sort_where_they_are_and_the_rest_sort_inside() => Formats(
+		"""
+		global using System.Text;
+		global using System.Collections;
+		using Zebra;
+		using System;
+
+		namespace N
+		{
+		    class C { }
+		}
+		""",
+		"""
+		global using System.Collections;
+		global using System.Text;
+
+		namespace N
+		{
+		    using System;
+		    using Zebra;
+
+		    class C { }
+		}
+		""",
+		editorConfig: Inside + "\ndotnet_sort_system_directives_first = true");
+
+	[Test]
+	public Task Only_global_usings_have_nothing_to_move() => Unchanged(
+		"""
+		global using System;
+		global using System.Linq;
+
+		namespace N
+		{
+		    class C { }
+		}
+		""",
+		editorConfig: Inside);
+
+	[Test]
+	public Task The_header_lands_above_global_usings_that_stayed() => Formats(
+		"""
+		global using System.Linq;
+		using System;
+
+		namespace N
+		{
+		    class C { }
+		}
+		""",
+		"""
+		// Licensed to the Foo Foundation.
+		// See LICENSE.
+
+		global using System.Linq;
+
+		namespace N;
+
+		using System;
+
+		class C { }
+		""",
+		editorConfig: Header + "\n" + Inside + "\n" + FileScoped);
+
+	[Test]
+	public Task A_banner_stays_with_the_global_usings() => Formats(
+		// The banner is the first directive's, and that directive stays, so the banner never moves; a
+		// mismatched header above a sorted global block is the sort's to keep, as it is without the move.
+		"""
+		// Copyright someone else, all rights reserved.
+
+		global using System.Text;
+		global using System.Collections;
+		using System;
+
+		namespace N
+		{
+		    class C { }
+		}
+		""",
+		"""
+		// Copyright someone else, all rights reserved.
+
+		global using System.Collections;
+		global using System.Text;
+
+		namespace N
+		{
+		    using System;
+
+		    class C { }
+		}
+		""",
+		editorConfig: Header + "\n" + Inside + "\ndotnet_sort_system_directives_first = true");
 
 	// ---- file header -------------------------------------------------------------------------------
 
@@ -472,4 +863,97 @@ public class UsingPlacementAndHeaderTests : FormattingTest
 		}
 		""",
 		editorConfig: Header + "\n" + Inside);
+
+	[Test]
+	public Task The_header_lands_above_directives_moved_into_a_namespace_made_file_scoped() => Formats(
+		// All three rules at once, as the generated corpus configures them (issue #185).
+		"""
+		using System;
+
+		namespace N
+		{
+		    public class C
+		    {
+		    }
+		}
+		""",
+		"""
+		// Licensed to the Foo Foundation.
+		// See LICENSE.
+
+		namespace N;
+
+		using System;
+
+		public class C
+		{
+		}
+		""",
+		editorConfig: Header + "\n" + Inside + "\n" + FileScoped);
+
+	[Test]
+	public Task A_matching_header_stays_above_directives_that_moved_inside() => Formats(
+		// The header is the first directive's leading trivia. It used to move inside with it, and the
+		// next run then found no header and added another.
+		"""
+		// Licensed to the Foo Foundation.
+		// See LICENSE.
+
+		using System;
+
+		namespace N
+		{
+		    public class C
+		    {
+		    }
+		}
+		""",
+		"""
+		// Licensed to the Foo Foundation.
+		// See LICENSE.
+
+		namespace N
+		{
+		    using System;
+
+		    public class C
+		    {
+		    }
+		}
+		""",
+		editorConfig: Header + "\n" + Inside);
+
+	[Test]
+	public Task A_mismatched_header_is_corrected_even_when_the_directives_would_sort() => Formats(
+		// With sorting on, a mismatched header at the top of a using block is left to the sort's banner
+		// (A_mismatched_header_is_left_alone_when_usings_will_be_sorted). Once the block moves inside,
+		// the next run has nothing at the top to leave it to and corrects it, so this run must too.
+		"""
+		// Copyright someone else, all rights reserved.
+
+		using System.Text;
+		using System;
+
+		namespace N
+		{
+		    public class C
+		    {
+		    }
+		}
+		""",
+		"""
+		// Licensed to the Foo Foundation.
+		// See LICENSE.
+
+		namespace N
+		{
+		    using System;
+		    using System.Text;
+
+		    public class C
+		    {
+		    }
+		}
+		""",
+		editorConfig: Header + "\n" + Inside + "\ndotnet_sort_system_directives_first = true");
 }

@@ -169,7 +169,7 @@ public static class Permuter
 			}
 			else
 			{
-				AppendCommentedGap(output, gap, level, i == 0 ? KnownDefects.InHeader(p) : p, r);
+				AppendCommentedGap(output, gap, level, p, r);
 			}
 
 			output.Append(token.Text);

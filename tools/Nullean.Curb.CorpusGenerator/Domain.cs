@@ -286,6 +286,34 @@ internal static class Domain
 			""");
 	}
 
+	/// <summary>
+	/// Global usings of every form beside ordinary ones and a namespace, the one file of the solution with them.
+	/// </summary>
+	/// <remarks>
+	/// A global using must come before everything else in the file, and moving one into the namespace once
+	/// wrote code that does not compile; snippets cover <c>csharp_using_directive_placement</c> itself, this keeps
+	/// the shape in the built solution. Corpus.Core only, which targets net10.0.
+	/// </remarks>
+	public const string GlobalUsings = """
+		global using System.Collections.Concurrent;
+		global using System.Globalization;
+		global using static System.StringComparison;
+		global using CorpusClock = Corpus.Abstractions.IClock;
+		using System;
+
+		namespace Corpus.Core;
+
+		/// <summary>Uses each of the project's global usings, so none of them is dead weight.</summary>
+		internal static class GlobalUsingsInUse
+		{
+			public static bool SameName(string left, string right) => string.Equals(left, right, OrdinalIgnoreCase);
+
+			public static string Stamp(CorpusClock clock) => clock.UtcNow.ToString("O", CultureInfo.InvariantCulture);
+
+			public static ConcurrentDictionary<string, int> Counts() => new ConcurrentDictionary<string, int>(StringComparer.Ordinal);
+		}
+		""";
+
 	/// <summary>The folder <see cref="ModernFiles"/> live in, relative to the project.</summary>
 	public const string ModernFolder = "Modern";
 }

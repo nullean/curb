@@ -294,6 +294,88 @@ public class UsingOrderTests : FormattingTest
 		""",
 		editorConfig: "dotnet_sort_system_directives_first = true");
 
+	// ---- global usings -----------------------------------------------------------------------------
+
+	[Test]
+	public Task Global_usings_sort_ahead_of_the_rest() => Formats(
+		// Not a preference: a global using after one that is not global does not compile (CS8915). The
+		// rank used to put `using System;` above `global using static ...`. Checked against dotnet format.
+		"""
+		global using System.Collections.Concurrent;
+		global using static System.StringComparison;
+		global using Clock = System.IO.Stream;
+		using Zebra;
+		using System;
+
+		public class C { }
+		""",
+		"""
+		global using System.Collections.Concurrent;
+		global using static System.StringComparison;
+		global using Clock = System.IO.Stream;
+		using System;
+		using Zebra;
+
+		public class C { }
+		""",
+		editorConfig: "dotnet_sort_system_directives_first = true");
+
+	// ---- whitespace inside a directive ---------------------------------------------------------------
+
+	[Test]
+	public Task Spaces_inside_a_directive_do_not_stop_it_sorting() => Formats(
+		// The spaces go, as they would anywhere, and the directives still sort. The verifier compared
+		// the directives written with the ones read as text, so `using Zebra.Things ;` was no longer
+		// among them and every such file was refused (issue #181). Checked against dotnet format style.
+		"""
+		using Zebra.Things ;
+		using  System.Linq;
+		using System . Text;
+
+		public class C { }
+		""",
+		"""
+		using System.Linq;
+		using System.Text;
+		using Zebra.Things;
+
+		public class C { }
+		""",
+		editorConfig: "dotnet_sort_system_directives_first = true");
+
+	[Test]
+	public Task A_banner_loses_its_trailing_whitespace_while_the_block_sorts() => Formats(
+		// The banner is split off the first directive and printed ahead of the sorted block. It used to
+		// be copied verbatim, trailing whitespace and all, and the next run, with the block already in
+		// order and nothing split, removed it: not idempotent (issue #187). It now goes through the
+		// same trivia walk either way. Regular strings, so the trailing whitespace is visible.
+		"// Licensed to the Foo Foundation.  \n// See LICENSE.\t\n  \nusing System.Text;\nusing System;\n\npublic class C { }\n",
+		"""
+		// Licensed to the Foo Foundation.
+		// See LICENSE.
+
+		using System;
+		using System.Text;
+
+		public class C { }
+		""",
+		editorConfig: "dotnet_sort_system_directives_first = true");
+
+	[Test]
+	public Task A_header_banner_loses_its_trailing_whitespace_while_the_block_sorts() => Formats(
+		// The same with the header the corpus configures, which matches and so is left to the sort.
+		"// Licensed to the Foo Foundation.  \n// See LICENSE.\t\n  \nusing System.Text;\nusing System;\n\npublic class C { }\n",
+		"""
+		// Licensed to the Foo Foundation.
+		// See LICENSE.
+
+		using System;
+		using System.Text;
+
+		public class C { }
+		""",
+		editorConfig: "file_header_template = Licensed to the Foo Foundation.\\nSee LICENSE.\ndotnet_sort_system_directives_first = true");
+
 	// ---- block namespaces -------------------------------------------------------------------------
 
 	[Test]
