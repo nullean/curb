@@ -401,6 +401,33 @@ jobs:
   # neutralising the corpus's own `dotnet_diagnostic.IDE0005.severity = none`, because an .editorconfig
   # entry for a specific rule outranks a .globalconfig one whatever global_level says. The generated corpus
   # keeps all three traps on purpose, so the forcing stays exercised.
+  # Every Razor expectation the suite asserts, formatted with Microsoft's Razor formatter, the engine
+  # `dotnet format` is getting for Razor (dotnet/sdk#56563). As verifyexpectations does for C#: an expectation it
+  # changes has to be named in build/conformance-divergences.json with a reason, and an entry that no longer
+  # reproduces fails too. 27 are documented today, mostly markup Curb does not format yet (#88).
+  #
+  # Not a job the release waits for. The engine is a prerelease package on Microsoft's public dnceng feed
+  # (tools/Nullean.Curb.RazorOracle/nuget.config); if that feed drops the pinned version this job fails loudly,
+  # and a release should not be held hostage to it. Once `dotnet format whitespace` formats Razor, this calls it.
+  razor-oracle:
+    runs-on: ubuntu-latest
+    name: Razor expectations against the Razor engine
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      # The dump runs the whole test suite, and with CI=true its F# tests fail rather than skip without Fantomas.
+      - name: Restore the Fantomas the F# tests run against
+        run: dotnet tool restore --tool-manifest tests/Nullean.Curb.Tests/Cli/FSharp/Fixture/dotnet-tools.json
+
+      - name: Razor expectations survive the Razor engine
+        run: ./build.sh verifyrazorexpectations -s true
+
   cleanup-conformance:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest

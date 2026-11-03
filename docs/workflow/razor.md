@@ -181,6 +181,18 @@ refusal is reported again on the next run.
   outside them identical to the source, and each block holding exactly the formatted text. If any check
   fails, the whole file is reported as failed and left as it was.
 
+## Checked against Microsoft's Razor formatter
+
+`dotnet format` is gaining Razor support ([dotnet/sdk#56563](https://github.com/dotnet/sdk/pull/56563)), through
+the formatting engine Visual Studio and VS Code use, minus their HTML step. Until it ships, CI runs that engine
+directly over every Razor expectation in {{product}}'s test suite, the way it runs `dotnet format` over the C# ones
+(`./build.sh verifyrazorexpectations`). An expectation the engine would change has to be listed, with a reason,
+in `build/conformance-divergences.json`. Today most of them are markup, which {{product}} doesn't format yet, and
+indented `@code` lines, which the engine moves to column zero.
+
+One difference is the engine's: it indents by `tab_width` and ignores `indent_size`, so with `indent_size = 2` and
+the default `tab_width` of 4 it indents a block by four where {{product}}, as for C#, indents by two.
+
 ## Measured
 
 Each repository was formatted with the key forced on, then formatted a second time. A separate script with

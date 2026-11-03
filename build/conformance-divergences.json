@@ -111,6 +111,195 @@
       "staysFixedPoint": false,
       "reason": "Same not-fully-root-caused divergence as the dotnet-format-whitespace entry above (indent_style = tab combined with a width narrow enough to force wrapping), now confirmed to reproduce under a real `dotnet build -p:EnforceCodeStyleInBuild=true` as well as the `dotnet format whitespace` CLI.",
       "exampleCase": "CoreOptionTests.Tab_width_counts_toward_the_line_length"
+    },
+    {
+      "key": "razor:refused",
+      "tool": "razor-dotnet-format",
+      "staysFixedPoint": false,
+      "reason": "Curb formats only the C# in a block, and leaves a block it cannot read as C# exactly as written: one holding Razor (a template, <text>, @:, a Razor comment, markup), one whose closing brace shares its line, one that never closes. The Razor engine parses Razor, so it formats them, and the markup around them. Matching it means parsing Razor, which Curb does not (#88).",
+      "exampleCase": "RazorFormattingTests.Nothing_after_an_unclosed_code_block_is_formatted"
+    },
+    {
+      "key": "razor:refused",
+      "tool": "razor-dotnet-format",
+      "staysFixedPoint": false,
+      "reason": "Curb formats only the C# in a block, and leaves a block it cannot read as C# exactly as written: one holding Razor (a template, <text>, @:, a Razor comment, markup), one whose closing brace shares its line, one that never closes. The Razor engine parses Razor, so it formats them, and the markup around them. Matching it means parsing Razor, which Curb does not (#88).",
+      "exampleCase": "RazorFormattingTests.An_unclosed_block_is_refused"
+    },
+    {
+      "key": "razor:refused",
+      "tool": "razor-dotnet-format",
+      "staysFixedPoint": false,
+      "reason": "Curb formats only the C# in a block, and leaves a block it cannot read as C# exactly as written: one holding Razor (a template, <text>, @:, a Razor comment, markup), one whose closing brace shares its line, one that never closes. The Razor engine parses Razor, so it formats them, and the markup around them. Matching it means parsing Razor, which Curb does not (#88).",
+      "exampleCase": "RazorFormattingTests.A_closing_brace_after_code_on_its_line_is_refused"
+    },
+    {
+      "key": "razor:refused",
+      "tool": "razor-dotnet-format",
+      "staysFixedPoint": false,
+      "reason": "Curb formats only the C# in a block, and leaves a block it cannot read as C# exactly as written: one holding Razor (a template, <text>, @:, a Razor comment, markup), one whose closing brace shares its line, one that never closes. The Razor engine parses Razor, so it formats them, and the markup around them. Matching it means parsing Razor, which Curb does not (#88).",
+      "exampleCase": "RazorFormattingTests.A_closing_brace_that_shares_its_line_is_refused"
+    },
+    {
+      "key": "razor:refused",
+      "tool": "razor-dotnet-format",
+      "staysFixedPoint": false,
+      "reason": "Curb formats only the C# in a block, and leaves a block it cannot read as C# exactly as written: one holding Razor (a template, <text>, @:, a Razor comment, markup), one whose closing brace shares its line, one that never closes. The Razor engine parses Razor, so it formats them, and the markup around them. Matching it means parsing Razor, which Curb does not (#88).",
+      "exampleCase": "RazorFormattingTests.A_text_tag_in_a_block_is_refused"
+    },
+    {
+      "key": "razor:refused",
+      "tool": "razor-dotnet-format",
+      "staysFixedPoint": false,
+      "reason": "Curb formats only the C# in a block, and leaves a block it cannot read as C# exactly as written: one holding Razor (a template, <text>, @:, a Razor comment, markup), one whose closing brace shares its line, one that never closes. The Razor engine parses Razor, so it formats them, and the markup around them. Matching it means parsing Razor, which Curb does not (#88).",
+      "exampleCase": "RazorFormattingTests.A_line_transition_in_a_block_is_refused"
+    },
+    {
+      "key": "razor:refused",
+      "tool": "razor-dotnet-format",
+      "staysFixedPoint": false,
+      "reason": "Curb formats only the C# in a block, and leaves a block it cannot read as C# exactly as written: one holding Razor (a template, <text>, @:, a Razor comment, markup), one whose closing brace shares its line, one that never closes. The Razor engine parses Razor, so it formats them, and the markup around them. Matching it means parsing Razor, which Curb does not (#88).",
+      "exampleCase": "RazorFormattingTests.One_refused_block_leaves_the_other_formatted"
+    },
+    {
+      "key": "razor:refused",
+      "tool": "razor-dotnet-format",
+      "staysFixedPoint": false,
+      "reason": "Curb formats only the C# in a block, and leaves a block it cannot read as C# exactly as written: one holding Razor (a template, <text>, @:, a Razor comment, markup), one whose closing brace shares its line, one that never closes. The Razor engine parses Razor, so it formats them, and the markup around them. Matching it means parsing Razor, which Curb does not (#88).",
+      "exampleCase": "RazorFormattingTests.A_razor_comment_in_a_block_is_refused"
+    },
+    {
+      "key": "razor:refused",
+      "tool": "razor-dotnet-format",
+      "staysFixedPoint": false,
+      "reason": "Curb formats only the C# in a block, and leaves a block it cannot read as C# exactly as written: one holding Razor (a template, <text>, @:, a Razor comment, markup), one whose closing brace shares its line, one that never closes. The Razor engine parses Razor, so it formats them, and the markup around them. Matching it means parsing Razor, which Curb does not (#88).",
+      "exampleCase": "RazorFormattingTests.Statements_are_not_members_and_are_refused"
+    },
+    {
+      "key": "razor:refused",
+      "tool": "razor-dotnet-format",
+      "staysFixedPoint": false,
+      "reason": "Curb formats only the C# in a block, and leaves a block it cannot read as C# exactly as written: one holding Razor (a template, <text>, @:, a Razor comment, markup), one whose closing brace shares its line, one that never closes. The Razor engine parses Razor, so it formats them, and the markup around them. Matching it means parsing Razor, which Curb does not (#88).",
+      "exampleCase": "RazorFormattingTests.A_template_in_a_block_is_refused"
+    },
+    {
+      "key": "razor:refused",
+      "tool": "razor-dotnet-format",
+      "staysFixedPoint": false,
+      "reason": "Curb formats only the C# in a block, and leaves a block it cannot read as C# exactly as written: one holding Razor (a template, <text>, @:, a Razor comment, markup), one whose closing brace shares its line, one that never closes. The Razor engine parses Razor, so it formats them, and the markup around them. Matching it means parsing Razor, which Curb does not (#88).",
+      "exampleCase": "RazorFormattingTests.A_block_shaped_line_inside_a_code_block_with_a_comment_on_its_brace_line_is_left_alone"
+    },
+    {
+      "key": "razor:refused",
+      "tool": "razor-dotnet-format",
+      "staysFixedPoint": false,
+      "reason": "Curb formats only the C# in a block, and leaves a block it cannot read as C# exactly as written: one holding Razor (a template, <text>, @:, a Razor comment, markup), one whose closing brace shares its line, one that never closes. The Razor engine parses Razor, so it formats them, and the markup around them. Matching it means parsing Razor, which Curb does not (#88).",
+      "exampleCase": "RazorFormattingTests.A_statement_block_holding_markup_is_left_as_written"
+    },
+    {
+      "key": "razor:markup",
+      "tool": "razor-dotnet-format",
+      "staysFixedPoint": false,
+      "reason": "The Razor engine also formats markup, directives and expressions: it re-indents element nesting, puts an @if body's brace and markup on lines of their own, normalises the spacing in @using and in an implicit expression's call, and opens a one-line @{ } out. Curb leaves everything outside a block as written until markup formatting lands (#88).",
+      "exampleCase": "RazorFormattingTests.A_code_directive_inside_an_html_comment_is_not_a_block"
+    },
+    {
+      "key": "razor:column",
+      "tool": "razor-dotnet-format",
+      "staysFixedPoint": false,
+      "reason": "Curb keeps an indented @code or @functions line where it is and indents the block's content from that line's own column. The Razor engine moves a top-level directive block to column zero, content with it. Moving the directive's line is markup, which Curb does not format yet (#88).",
+      "exampleCase": "RazorFormattingTests.An_indented_block_keeps_the_lines_of_a_multi_line_string_as_written"
+    },
+    {
+      "key": "razor:column",
+      "tool": "razor-dotnet-format",
+      "staysFixedPoint": false,
+      "reason": "Curb keeps an indented @code or @functions line where it is and indents the block's content from that line's own column. The Razor engine moves a top-level directive block to column zero, content with it. Moving the directive's line is markup, which Curb does not format yet (#88).",
+      "exampleCase": "RazorFormattingTests.A_width_is_measured_from_the_blocks_column"
+    },
+    {
+      "key": "razor:column",
+      "tool": "razor-dotnet-format",
+      "staysFixedPoint": false,
+      "reason": "Curb keeps an indented @code or @functions line where it is and indents the block's content from that line's own column. The Razor engine moves a top-level directive block to column zero, content with it. Moving the directive's line is markup, which Curb does not format yet (#88).",
+      "exampleCase": "RazorFormattingTests.Tabs_follow_indent_style"
+    },
+    {
+      "key": "razor:column",
+      "tool": "razor-dotnet-format",
+      "staysFixedPoint": false,
+      "reason": "Curb keeps an indented @code or @functions line where it is and indents the block's content from that line's own column. The Razor engine moves a top-level directive block to column zero, content with it. Moving the directive's line is markup, which Curb does not format yet (#88).",
+      "exampleCase": "RazorFormattingTests.A_tab_indented_block_keeps_its_tab_and_adds_spaces_when_indent_style_is_space"
+    },
+    {
+      "key": "razor:column",
+      "tool": "razor-dotnet-format",
+      "staysFixedPoint": false,
+      "reason": "Curb keeps an indented @code or @functions line where it is and indents the block's content from that line's own column. The Razor engine moves a top-level directive block to column zero, content with it. Moving the directive's line is markup, which Curb does not format yet (#88).",
+      "exampleCase": "RazorFormattingTests.A_space_indented_block_keeps_its_spaces_and_adds_a_tab_when_indent_style_is_tab"
+    },
+    {
+      "key": "razor:column",
+      "tool": "razor-dotnet-format",
+      "staysFixedPoint": false,
+      "reason": "Curb keeps an indented @code or @functions line where it is and indents the block's content from that line's own column. The Razor engine moves a top-level directive block to column zero, content with it. Moving the directive's line is markup, which Curb does not format yet (#88).",
+      "exampleCase": "RazorFormattingTests.An_indented_block_keeps_an_inactive_branch_as_written"
+    },
+    {
+      "key": "razor:column",
+      "tool": "razor-dotnet-format",
+      "staysFixedPoint": false,
+      "reason": "Curb keeps an indented @code or @functions line where it is and indents the block's content from that line's own column. The Razor engine moves a top-level directive block to column zero, content with it. Moving the directive's line is markup, which Curb does not format yet (#88).",
+      "exampleCase": "RazorFormattingTests.An_indented_block_keeps_a_block_comment_stable"
+    },
+    {
+      "key": "razor:column",
+      "tool": "razor-dotnet-format",
+      "staysFixedPoint": false,
+      "reason": "Curb keeps an indented @code or @functions line where it is and indents the block's content from that line's own column. The Razor engine moves a top-level directive block to column zero, content with it. Moving the directive's line is markup, which Curb does not format yet (#88).",
+      "exampleCase": "RazorFormattingTests.An_indented_block_is_indented_to_its_own_column"
+    },
+    {
+      "key": "razor:markup",
+      "tool": "razor-dotnet-format",
+      "staysFixedPoint": false,
+      "reason": "The Razor engine also formats markup, directives and expressions: it re-indents element nesting, puts an @if body's brace and markup on lines of their own, normalises the spacing in @using and in an implicit expression's call, and opens a one-line @{ } out. Curb leaves everything outside a block as written until markup formatting lands (#88).",
+      "exampleCase": "RazorFormattingTests.A_file_without_blocks_is_unchanged"
+    },
+    {
+      "key": "razor:markup",
+      "tool": "razor-dotnet-format",
+      "staysFixedPoint": false,
+      "reason": "The Razor engine also formats markup, directives and expressions: it re-indents element nesting, puts an @if body's brace and markup on lines of their own, normalises the spacing in @using and in an implicit expression's call, and opens a one-line @{ } out. Curb leaves everything outside a block as written until markup formatting lands (#88).",
+      "exampleCase": "RazorFormattingTests.Functions_in_a_cshtml_view_is_formatted"
+    },
+    {
+      "key": "razor:markup",
+      "tool": "razor-dotnet-format",
+      "staysFixedPoint": false,
+      "reason": "The Razor engine also formats markup, directives and expressions: it re-indents element nesting, puts an @if body's brace and markup on lines of their own, normalises the spacing in @using and in an implicit expression's call, and opens a one-line @{ } out. Curb leaves everything outside a block as written until markup formatting lands (#88).",
+      "exampleCase": "RazorFormattingTests.A_statement_block_on_one_line_is_not_a_block"
+    },
+    {
+      "key": "razor:markup",
+      "tool": "razor-dotnet-format",
+      "staysFixedPoint": false,
+      "reason": "The Razor engine also formats markup, directives and expressions: it re-indents element nesting, puts an @if body's brace and markup on lines of their own, normalises the spacing in @using and in an implicit expression's call, and opens a one-line @{ } out. Curb leaves everything outside a block as written until markup formatting lands (#88).",
+      "exampleCase": "RazorFormattingTests.A_blazor_component_has_its_code_block_formatted_and_its_markup_left_alone"
+    },
+    {
+      "key": "razor:indent",
+      "tool": "razor-dotnet-format",
+      "staysFixedPoint": false,
+      "reason": "The Razor engine indents by tab_width and ignores indent_size (it takes its indent from the C# options' TabSize), where dotnet format and Curb indent C# by indent_size. With indent_size = 2 and the default tab_width of 4 the engine indents a block by four.",
+      "exampleCase": "RazorFormattingTests.Csharp_options_come_from_the_razor_files_settings"
+    },
+    {
+      "key": "razor:region",
+      "tool": "razor-dotnet-format",
+      "staysFixedPoint": false,
+      "reason": "The Razor engine adds a blank line after an #endregion that ends a @code block, before its closing brace. Curb keeps a block's last line where the formatter left it, as it does in a .cs file.",
+      "exampleCase": "RazorFormattingTests.Preprocessor_directives_inside_a_block_are_kept"
     }
   ]
 }
