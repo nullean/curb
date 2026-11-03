@@ -11,12 +11,11 @@ On source that was never formatted, {{product}} indents a few kinds of continuat
 `dotnet format`:
 - multi-dimensional array initializers;
 - `select new { }` in a query;
-- tuple patterns in switch arms;
 - members of a `with` initializer;
 - the `:` of a conditional whose `?` branch is a multi-line lambda.
 
 The CI corpus, which is written to be untidy, finds these in 34 of its 1,868 files at its default width,
-and in 137 with no width, where its initializers are kept as written. That is the gap between its conformance
+and in 105 with no width, where its initializers are kept as written. That is the gap between its conformance
 floors and 100%. elastic/docs-builder, whose authors had already formatted it, shows none.
 
 ## Braces after an expression body's arrow

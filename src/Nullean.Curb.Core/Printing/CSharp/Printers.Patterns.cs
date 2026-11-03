@@ -157,6 +157,34 @@ internal static partial class Printers
 		return before.RawKind != 0 && !context.AuthorBroke(before.Span.End, pattern.SpanStart);
 	}
 
+	/// <summary>Breaks ahead of a positional subpattern the author put on a line of its own.</summary>
+	/// <remarks>
+	/// The line keeps the offset the author gave it, as any pattern continuation does, unless it starts
+	/// with a property pattern's <c>{</c>. dotnet format places that brace one level in from the line the
+	/// positional pattern starts on, wherever it was, as it places a brace anywhere (issue #206).
+	/// </remarks>
+	private static void SubpatternLine(SubpatternSyntax subpattern, SyntaxToken openParen, int anchor, PrintContext context)
+	{
+		var first = subpattern.GetFirstToken();
+		if (first.Parent is not PropertyPatternClauseSyntax)
+		{
+			ContinuationLine(first, anchor, context);
+			return;
+		}
+
+		// The anchor names a line by the source position its first text came from.
+		var text = context.Text;
+		var line = text.Lines.GetLineFromPosition(openParen.SpanStart);
+		var lineStart = line.Start;
+		while (lineStart < openParen.SpanStart && char.IsWhiteSpace(text[lineStart]))
+			lineStart++;
+
+		var register = context.EnterContinuation();
+		context.Arena.SourceLineAnchor(register, lineStart);
+		context.Arena.AlignedLine(register, context.Options.IndentSize);
+		context.ExitContinuation();
+	}
+
 	public static void DeclarationPattern(DeclarationPatternSyntax node, PrintContext context)
 	{
 		Node.Print(node.Type, context);
@@ -184,7 +212,7 @@ internal static partial class Printers
 			using (arena.Indent())
 			{
 				if (subpatterns.Count > 0 && positionalBroken && context.AuthorBroke(positional.OpenParenToken.Span.End, subpatterns[0].SpanStart))
-					ContinuationLine(subpatterns[0].GetFirstToken(), anchor, context);
+					SubpatternLine(subpatterns[0], positional.OpenParenToken, anchor, context);
 
 				for (var i = 0; i < subpatterns.Count; i++)
 				{
@@ -193,7 +221,7 @@ internal static partial class Printers
 						continue;
 					TokenPrinter.Print(subpatterns.GetSeparator(i), context);
 					if (positionalBroken && context.AuthorBroke(subpatterns[i].Span.End, subpatterns[i + 1].SpanStart))
-						ContinuationLine(subpatterns[i + 1].GetFirstToken(), anchor, context);
+						SubpatternLine(subpatterns[i + 1], positional.OpenParenToken, anchor, context);
 					else
 						arena.Synthetic(SyntheticText.Space);
 				}

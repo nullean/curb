@@ -738,6 +738,78 @@ public class PatternTests : FormattingTest
 
 	// ---- preservation: a pattern's continuation lines keep the author's offset ----------------------
 
+	// Issue #206: the exception. A subpattern line that starts with a property pattern's brace goes one
+	// level in from the line the positional pattern starts on, wherever the author put it; any other
+	// subpattern line keeps their offset.
+	[Test]
+	public Task A_subpattern_line_starting_with_a_brace_goes_a_level_in_from_the_patterns_line() => Formats(
+		"""
+		public class C
+		{
+		    public static decimal M(Order order, Customer customer) => (order, customer) switch
+		    {
+		        (
+		          { Lines.Count: 0 }, _) => 0m,
+		        (
+		                    { Total: >= 100m }, not null) => 1m,
+		        (
+		          1, _) => 2m,
+		        (_,
+		          { Total: 5 }) => 4m,
+		        _ => order.Total,
+		    };
+
+		    public bool N(object o) => o is (
+		          { Total: 0 }, _);
+
+		    public void P(object o)
+		    {
+		        if (o is (
+		              { Total: 0 }, _))
+		            Run();
+		        switch (o)
+		        {
+		            case (
+		                  { Total: 0 }, _):
+		                break;
+		        }
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public static decimal M(Order order, Customer customer) => (order, customer) switch
+		    {
+		        (
+		            { Lines.Count: 0 }, _) => 0m,
+		        (
+		            { Total: >= 100m }, not null) => 1m,
+		        (
+		          1, _) => 2m,
+		        (_,
+		            { Total: 5 }) => 4m,
+		        _ => order.Total,
+		    };
+
+		    public bool N(object o) => o is (
+		        { Total: 0 }, _);
+
+		    public void P(object o)
+		    {
+		        if (o is (
+		            { Total: 0 }, _))
+		            Run();
+		        switch (o)
+		        {
+		            case (
+		                { Total: 0 }, _):
+		                break;
+		        }
+		    }
+		}
+		""");
+
 	// Issue #111: each continuation line used to break to the statement's own column, or one level in.
 	[Test]
 	public Task Pattern_continuation_lines_keep_the_authors_indent() => Unchanged(
