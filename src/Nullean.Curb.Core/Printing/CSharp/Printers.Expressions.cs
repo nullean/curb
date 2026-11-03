@@ -654,6 +654,19 @@ internal static partial class Printers
 		// argument list took on this run, which is available in both. Only one of them may answer: where
 		// the source already says the owner broke, the group below places the brace, and a second break
 		// here left a blank line above it (issue #195).
+		// A brace on a line of its own sits at the indent of the line the creation starts on, and so does
+		// what it holds: below `select new Customer` in a query that is the `select` line (issue #213).
+		var braceBelowOwner = leadingLine
+			&& elementBrace < 0
+			&& BraceOnOwnLine(BraceStyle.ObjectCollectionArrayInitializers, context)
+			&& (ownerBrokeAlone
+				|| (!(exactly && ownerSpansLines)
+					&& (openItOut
+						|| ownerSpansLines
+						|| (asWritten && context.AuthorBroke(node.SpanStart, node.Parent!.SpanStart)))));
+		var ownerLine = braceBelowOwner ? OwnerLineAnchor(node.Parent!.GetFirstToken(), context) : -1;
+		var ownerScope = ownerLine >= 0 ? arena.AlignedIndent(ownerLine, 0) : default;
+
 		if (ownerBrokeAlone)
 			BeforeOpenBrace(BraceStyle.ObjectCollectionArrayInitializers, context);
 		else if (leadingLine && !oneMemberPerLine && elementBrace < 0 && !ownerSpansLines)
@@ -794,6 +807,9 @@ internal static partial class Printers
 			TokenPrinter.PrintWithoutLeadingTrivia(node.CloseBraceToken, context);
 		}
 
+		ownerScope.Dispose();
+		if (ownerLine >= 0)
+			context.ExitContinuation();
 		if (anchor >= 0)
 			context.ExitContinuation();
 
@@ -1360,6 +1376,13 @@ internal static partial class Printers
 
 		TokenPrinter.Print(node.NewKeyword, context);
 
+		// A brace on a line of its own sits at the indent of the line `new` is on, and so does what it
+		// holds: below `select new` in a query that is the `select` line (issue #213).
+		var braceBelowNew = BraceOnOwnLine(BraceStyle.AnonymousTypes, context)
+			&& (braceLineOnly || openItOut || (asWritten && context.AuthorBroke(node.NewKeyword.Span.End, node.OpenBraceToken.SpanStart)));
+		var newLine = braceBelowNew ? OwnerLineAnchor(node.NewKeyword, context) : -1;
+		var newScope = newLine >= 0 ? arena.AlignedIndent(newLine, 0) : default;
+
 		// Outside the group, for the same reason as an initializer's: the break the author made is not
 		// one of the members'.
 		if (braceLineOnly)
@@ -1411,6 +1434,10 @@ internal static partial class Printers
 
 			TokenPrinter.Print(node.CloseBraceToken, context);
 		}
+
+		newScope.Dispose();
+		if (newLine >= 0)
+			context.ExitContinuation();
 
 		void Separator(int from, int to)
 		{

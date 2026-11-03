@@ -258,6 +258,8 @@ internal sealed class DocPrinter<TLanguage>
 						_anchors[doc.A] = OutputColumn();
 					else if (doc.B < 0)
 						_anchors[doc.A] = IndentOfLineStartingAt(Doc.SourceLinePosition(doc.B));
+					else if (doc.B > Doc.AnchorAtLineShift)
+						_anchors[doc.A] = IndentOfLineContaining(Doc.ContainingLinePosition(doc.B));
 					else if (_lineOpen)
 						_anchors[doc.A] = LineShift(anchoredAtLineStart: false);
 					else
@@ -697,6 +699,22 @@ internal sealed class DocPrinter<TLanguage>
 				return _lineIndents[i];
 			if (_lineStarts[i] < position)
 				break;
+		}
+
+		return Doc.AnchorUnset;
+	}
+
+	/// <summary>
+	/// The indent of the line already written that holds the source text at <paramref name="position"/>,
+	/// or <see cref="Doc.AnchorUnset"/> when no line written so far starts with source text before it.
+	/// </summary>
+	/// <remarks>The last line that starts at or before the position, since lines come out in source order.</remarks>
+	private int IndentOfLineContaining(int position)
+	{
+		for (var i = _lineCount - 1; i >= 0; i--)
+		{
+			if (_lineStarts[i] <= position)
+				return _lineIndents[i];
 		}
 
 		return Doc.AnchorUnset;

@@ -404,6 +404,79 @@ public class InitializerTests : FormattingTest
 		}
 		""");
 
+	// Issue #213: a creation's brace on a line of its own goes to the indent of the line its `new` (or
+	// `with` receiver) is on, and what it holds follows it. In a query that is the `select` line; on the
+	// statement's own line it is the statement's indent, as before.
+	[Test]
+	public Task A_brace_on_its_own_line_sits_at_the_indent_of_the_line_new_is_on() => Formats(
+		"""
+		class C
+		{
+		    void M(int[] xs, Customer customer)
+		    {
+		        var h = from x in xs
+		                select new
+		            { x, y = 1 };
+		        var k = from x in xs
+		                select new Customer
+		            { Name = "a" };
+		        var i = xs.Select(x => new
+		              { x });
+		        var l = xs
+		            .SelectMany(x => xs, (x, y) => new
+		             { x, y })
+		            .ToList();
+		        var m = customer with
+		          { Name = "a" };
+		        var n = from x in xs
+		                select new
+		                {
+		                    x,
+		                    y = 1,
+		                };
+		        var o = new { customer.Id, Nested = new
+		            { Flag = true } };
+		    }
+		}
+		""",
+		"""
+		class C
+		{
+		    void M(int[] xs, Customer customer)
+		    {
+		        var h = from x in xs
+		                select new
+		                { x, y = 1 };
+		        var k = from x in xs
+		                select new Customer
+		                { Name = "a" };
+		        var i = xs.Select(x => new
+		        { x });
+		        var l = xs
+		            .SelectMany(x => xs, (x, y) => new
+		            { x, y })
+		            .ToList();
+		        var m = customer with
+		        { Name = "a" };
+		        var n = from x in xs
+		                select new
+		                {
+		                    x,
+		                    y = 1,
+		                };
+		        var o = new
+		        {
+		            customer.Id,
+		            Nested = new
+		            { Flag = true }
+		        };
+		    }
+		}
+		""",
+		// The members of `o` open out, which puts `Nested = new` on a line of its own: the brace follows
+		// that line, not the one the source had it on.
+		editorConfig: "csharp_new_line_before_members_in_anonymous_types = true");
+
 	// ---- tuples -------------------------------------------------------------------------------
 
 	[Test]
