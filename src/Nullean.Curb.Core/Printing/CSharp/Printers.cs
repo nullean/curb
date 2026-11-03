@@ -1579,6 +1579,26 @@ internal static partial class Printers
 			context.Arena.HardLine();
 	}
 
+	/// <summary>
+	/// Claims a register holding the indent of the line <paramref name="owner"/> starts on, for the brace of
+	/// an expression that does not start its line and for what that brace holds. The caller owes
+	/// <see cref="PrintContext.ExitContinuation"/>.
+	/// </summary>
+	/// <remarks>
+	/// dotnet format places such a brace from the line holding <c>new</c> or the <c>with</c> receiver,
+	/// wherever the author put it: `select new` / `{ … }` in a query lines the brace up with the
+	/// <c>select</c> (issue #213). Where the owner is on the statement's own line that is the statement's
+	/// indent, as before.
+	/// </remarks>
+	internal static int OwnerLineAnchor(SyntaxToken owner, PrintContext context)
+	{
+		// The line it was printed on, not the one it had in the source: an enclosing initializer Curb
+		// opened out moved `Nested = new` to a line of its own.
+		var register = context.EnterContinuation();
+		context.Arena.ContainingLineAnchor(register, owner.SpanStart);
+		return register;
+	}
+
 	/// <summary>True when <c>csharp_new_line_before_open_brace</c> puts this construct's brace on a line of its own.</summary>
 	internal static bool BraceOnOwnLine(BraceStyle construct, PrintContext context) =>
 		context.Options.NewLineBeforeOpenBrace.HasFlag(construct);

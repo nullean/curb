@@ -202,6 +202,20 @@ internal readonly struct Doc
 	public static int SourceLinePosition(int mode) => -1 - mode;
 
 	/// <summary>
+	/// <c>B</c> on a <see cref="DocKind.Anchor"/> for <see cref="DocArena.ContainingLineAnchor"/>: capture the
+	/// indent of the output line, already written, that holds the source text at <paramref name="position"/>,
+	/// wherever on the line it is. Encoded from 2 up, past the two fixed modes.
+	/// </summary>
+	/// <remarks>
+	/// The line is the last one written that starts with source text at or before the position. Unlike
+	/// <see cref="AnchorAtSourceLine"/>, it follows the text to whichever line the printer put it on.
+	/// </remarks>
+	public static int AnchorAtContainingLine(int position) => 2 + position;
+
+	/// <summary>The source position an <see cref="AnchorAtContainingLine"/> mode names.</summary>
+	public static int ContainingLinePosition(int mode) => mode - 2;
+
+	/// <summary>
 	/// A register a line-shift anchor declined to fill. An aligned line reading it breaks to the
 	/// enclosing indent instead.
 	/// </summary>
