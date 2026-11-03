@@ -10,7 +10,7 @@ description: Install Curb, format a folder, and configure it with the .editorcon
 As a global tool:
 
 ```sh
-dotnet tool install -g Nullean.Curb
+dotnet tool install -g curb-cli
 ```
 
 Ships as a native-AOT binary for `linux-x64`, `linux-arm64`, `win-x64`, `win-arm64` and `osx-arm64`,

@@ -8,7 +8,7 @@ description: Install Curb as a global dotnet tool, an MSBuild package, or a nati
 ## Global tool
 
 ```sh
-dotnet tool install -g Nullean.Curb
+dotnet tool install -g curb-cli
 ```
 
 Installs the `curb` command globally. Requires the .NET 10 SDK. After this, `curb format ./src` and `curb check ./src` work from any directory.
@@ -28,7 +28,7 @@ The tool ships as a native-AOT binary per platform — about 11 MB, about 10 ms 
 To update:
 
 ```sh
-dotnet tool update -g Nullean.Curb
+dotnet tool update -g curb-cli
 ```
 
 ## MSBuild package

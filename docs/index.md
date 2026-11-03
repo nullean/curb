@@ -16,7 +16,7 @@ Visual Studio and Rider out of the box.
 **Your choices, not ours.**
 
 ```sh
-dotnet tool install -g Nullean.Curb
+dotnet tool install -g curb-cli
 curb format ./src
 ```
 
