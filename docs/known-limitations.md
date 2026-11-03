@@ -9,12 +9,11 @@ description: Current limitations in Curb's formatting output and what to expect 
 
 On source that was never formatted, {{product}} indents a few kinds of continuation line differently from
 `dotnet format`:
-- multi-dimensional array initializers;
 - `select new { }` in a query;
 - members of a `with` initializer.
 
 The CI corpus, which is written to be untidy, finds these in 21 of its 1,868 files at its default width,
-and in 104 with no width, where its initializers are kept as written. That is the gap between its conformance
+and in 65 with no width, where its initializers are kept as written. That is the gap between its conformance
 floors and 100%. elastic/docs-builder, whose authors had already formatted it, shows none.
 
 ## Braces after an expression body's arrow

@@ -860,6 +860,54 @@ public class CollectionBreakTests : FormattingTest
 		"public class C\n{\n\tpublic void M()\n\t{\n\t\tvar lookup = new Dictionary<string, int>\n\t\t{\n\t\t\t{ \"a\", 1 },\n\t\t};\n\t}\n}",
 		editorConfig: "indent_style = tab");
 
+	// Issue #199: dotnet format keeps each line of a dictionary where it is but writes its indent in the
+	// configured style. Written with spaces under tabs, the brace was joined onto `new` and the entries
+	// kept their spaces.
+	[Test]
+	public Task Under_tabs_a_dictionary_written_with_spaces_keeps_its_columns_in_tabs() => Formats(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        var d = new Dictionary<int, int>
+		        {
+		            { 1, 2 },
+		              { 3, 4 },
+		        };
+		        var grid = new int[,] { { 1, 2 },
+		                                { 3, 4 } };
+		    }
+		}
+		""",
+		"public class C\n{\n\tpublic void M()\n\t{\n\t\tvar d = new Dictionary<int, int>\n\t\t{\n\t\t\t{ 1, 2 },\n\t\t\t  { 3, 4 },\n\t\t};\n\t\tvar grid = new int[,] { { 1, 2 },\n\t\t\t\t\t\t\t\t{ 3, 4 } };\n\t}\n}",
+		editorConfig: "indent_style = tab");
+
+	[Test]
+	public Task Under_tabs_a_dictionary_line_after_a_comment_or_inside_a_string_is_left_as_written() => Formats(
+		// The two lines dotnet format does not restyle: one whose trivia holds a comment, and a string's
+		// own content.
+		"public class C\n{\n    public void M()\n    {\n        var d = new Dictionary<string, string>\n        {\n            { \"a\", \"b\" }, // one\n            { \"c\", @\"x\n        y\" },\n            { \"e\", \"f\" },\n            // own line\n            { \"g\", \"h\" },\n        };\n    }\n}",
+		"public class C\n{\n\tpublic void M()\n\t{\n\t\tvar d = new Dictionary<string, string>\n\t\t{\n\t\t\t{ \"a\", \"b\" }, // one\n            { \"c\", @\"x\n        y\" },\n\t\t\t{ \"e\", \"f\" },\n            // own line\n            { \"g\", \"h\" },\n\t\t};\n\t}\n}",
+		editorConfig: "indent_style = tab");
+
+	[Test]
+	public Task Under_spaces_a_dictionary_written_with_tabs_keeps_its_columns_in_spaces() => Formats(
+		"public class C\n{\n    public void M()\n    {\n        var d = new Dictionary<int, int>\n\t\t{\n\t\t\t{ 1, 2 },\n\t\t\t  { 3, 4 },\n\t\t};\n    }\n}",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        var d = new Dictionary<int, int>
+		        {
+		            { 1, 2 },
+		              { 3, 4 },
+		        };
+		    }
+		}
+		""");
+
 	/// <summary>
 	/// An initializer whose brace the author put on a line of its own, with every member on that line, stays as
 	/// written. See <see href="https://github.com/nullean/curb/issues/136">issue #136</see>.
