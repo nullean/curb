@@ -1542,6 +1542,39 @@ let rec private verifyExpectations (arguments:ParseResults<Arguments>) =
     gateOnNonFixedPoints "dotnet format whitespace" dump divergences
         (notFixedPoint |> Array.map (fun r -> r.Directory, r.TestCase))
 
+/// The Razor counterpart of `verifyExpectations`: every Razor expectation the test suite asserts is formatted
+/// with Microsoft's Razor formatter (Microsoft.CodeAnalysis.Razor.DotNetFormat, the engine `dotnet format` is
+/// getting for Razor in dotnet/sdk#56563), and one it changes has to be a documented divergence.
+///
+/// The engine runs in tools/Nullean.Curb.RazorOracle, its own process with its own package sources: it needs a
+/// prerelease Roslyn, published only to Microsoft's public dnceng feed, which nothing that ships may reference.
+/// Once `dotnet format whitespace` formats Razor itself, this should call it instead, as verifyExpectations does.
+and private verifyRazorExpectations (_: ParseResults<Arguments>) =
+    let dump = Path.Combine(Paths.Output.FullName, "razor-expectations")
+    if Directory.Exists dump then Directory.Delete(dump, true)
+    Directory.CreateDirectory dump |> ignore
+
+    Environment.SetEnvironmentVariable("CURB_RAZOR_EXPECTATION_DUMP", dump)
+    exec "dotnet" ["run"; "--project"; "tests/Nullean.Curb.Tests"; "-c"; "Release"] |> ignore
+    Environment.SetEnvironmentVariable("CURB_RAZOR_EXPECTATION_DUMP", null)
+
+    let cases = Directory.GetDirectories dump
+    printfn "checking %d Razor expectations against Microsoft's Razor formatter" cases.Length
+    if cases.Length = 0 then failwith "no Razor expectations were written — is the dump still wired into the harness?"
+
+    exec "dotnet" ["run"; "--project"; "tools/Nullean.Curb.RazorOracle"; "-c"; "Release"; "--"; dump] |> ignore
+
+    let testCaseOf (d: string) = (File.ReadAllText(Path.Combine(d, "TestCase.txt"))).Trim()
+    let notFixedPoint =
+        cases
+        |> Array.filter (fun d ->
+            File.ReadAllText(Path.Combine(d, "Expected.razor")) <> File.ReadAllText(Path.Combine(d, "Reference.razor")))
+        |> Array.map (fun d -> d, testCaseOf d)
+
+    printfn ""
+    printfn "%d of %d Razor expectations are a fixed point of the Razor engine" (cases.Length - notFixedPoint.Length) cases.Length
+    gateOnNonFixedPoints "the Razor engine" dump (loadDivergences "razor-dotnet-format") notFixedPoint
+
 /// Shared by `verifyExpectations` and `verifyCleanupExpectations`: prints every case that is not a fixed
 /// point of `toolLabel`, gates on each one being named in the divergence registry, and gates on the
 /// registry holding no stale entry that no longer reproduces (which would silently exempt whatever case
@@ -2699,6 +2732,7 @@ let Setup (parsed:ParseResults<Arguments>) (subCommand:Arguments) =
     cmd VerifyCleanupExpectations.Name (Some [Build.Name]) None <| fun _ -> verifyCleanupExpectations parsed
     cmd VerifyExpectationsJb.Name (Some [Build.Name]) None <| fun _ -> verifyExpectationsJb parsed
     cmd VerifyExpectationsIde0055.Name (Some [Build.Name]) None <| fun _ -> verifyExpectationsIde0055 parsed
+    cmd VerifyRazorExpectations.Name (Some [Build.Name]) None <| fun _ -> verifyRazorExpectations parsed
 
     step PristineCheck.Name pristineCheck
     step GeneratePackages.Name generatePackages

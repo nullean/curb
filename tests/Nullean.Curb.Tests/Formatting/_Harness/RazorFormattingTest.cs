@@ -1,5 +1,7 @@
 using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
+using System.Runtime.CompilerServices;
 using System.IO.Abstractions.TestingHelpers;
 using JetBrains.Annotations;
 using Nullean.Curb.EditorConfig;
@@ -34,9 +36,13 @@ public abstract class RazorFormattingTest
 		[LanguageInjection("razor")] string source,
 		[LanguageInjection("razor")] string expected,
 		[StringSyntax("ini")] string? editorConfig = null,
-		int declined = 0)
+		int declined = 0,
+		[CallerMemberName] string? caller = null,
+		[CallerFilePath] string? callerFile = null)
 	{
 		var options = Options(editorConfig);
+		RazorExpectationDump.Record(expected, editorConfig,
+			$"{(callerFile is null ? "?" : Path.GetFileNameWithoutExtension(callerFile))}.{caller ?? "?"}");
 		var actual = FormatOrFail(source, options, "source", declined);
 
 		if (!string.Equals(actual, expected, StringComparison.Ordinal))
@@ -58,8 +64,10 @@ public abstract class RazorFormattingTest
 	protected static Task Unchanged(
 		[LanguageInjection("razor")] string source,
 		[StringSyntax("ini")] string? editorConfig = null,
-		int declined = 0) =>
-		Formats(source, source, editorConfig, declined);
+		int declined = 0,
+		[CallerMemberName] string? caller = null,
+		[CallerFilePath] string? callerFile = null) =>
+		Formats(source, source, editorConfig, declined, caller, callerFile);
 
 	/// <summary>
 	/// Asserts that every block in <paramref name="source"/> is declined and the file comes back exactly
@@ -69,14 +77,16 @@ public abstract class RazorFormattingTest
 		[LanguageInjection("razor")] string source,
 		string reason,
 		int declined = 1,
-		[StringSyntax("ini")] string? editorConfig = null)
+		[StringSyntax("ini")] string? editorConfig = null,
+		[CallerMemberName] string? caller = null,
+		[CallerFilePath] string? callerFile = null)
 	{
 		using var formatter = new RazorFormatter();
 		var result = formatter.Format(source, Options(editorConfig));
 		if (result.Message is null || !result.Message.Contains(reason, StringComparison.Ordinal))
 			throw new FormattingAssertionException($"expected a refusal saying '{reason}', got: {result.Message ?? "(no message)"}");
 
-		return Unchanged(source, editorConfig, declined);
+		return Unchanged(source, editorConfig, declined, caller, callerFile);
 	}
 
 	internal static FormatOptions Options(string? editorConfig) =>
@@ -116,5 +126,28 @@ public abstract class RazorFormattingTest
 			throw new FormattingAssertionException($"formatting the {what} reported Changed = {result.Changed}, which its text contradicts");
 
 		return result.Text!;
+	}
+}
+
+/// <summary>
+/// Writes each Razor expectation out for <c>./build.sh verifyrazorexpectations</c>, which formats it with
+/// Microsoft's Razor engine. Nothing is written unless <c>CURB_RAZOR_EXPECTATION_DUMP</c> names a directory.
+/// </summary>
+internal static class RazorExpectationDump
+{
+	private static readonly string? Root = Environment.GetEnvironmentVariable("CURB_RAZOR_EXPECTATION_DUMP");
+	private static int Next;
+
+	public static void Record(string expected, string? editorConfig, string testCase)
+	{
+		if (string.IsNullOrEmpty(Root))
+			return;
+
+		// A directory each, as for the C# dump: the cases do not share a configuration.
+		var directory = Path.Combine(Root, Interlocked.Increment(ref Next).ToString("D5", CultureInfo.InvariantCulture));
+		Directory.CreateDirectory(directory);
+		File.WriteAllText(Path.Combine(directory, ".editorconfig"), $"root = true\n[*.{{cs,razor,cshtml}}]\n{editorConfig}\n");
+		File.WriteAllText(Path.Combine(directory, "Expected.razor"), expected);
+		File.WriteAllText(Path.Combine(directory, "TestCase.txt"), testCase);
 	}
 }

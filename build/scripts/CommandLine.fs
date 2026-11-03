@@ -40,6 +40,7 @@ type Arguments =
     | [<CliPrefix(CliPrefix.None);SubCommand>] VerifyCleanupExpectations
     | [<CliPrefix(CliPrefix.None);SubCommand>] VerifyExpectationsJb
     | [<CliPrefix(CliPrefix.None);SubCommand>] VerifyExpectationsIde0055
+    | [<CliPrefix(CliPrefix.None);SubCommand>] VerifyRazorExpectations
 
     | [<Inherit>] TrailingCommas
     | [<Inherit>] Reflow
@@ -92,6 +93,7 @@ with
             | VerifyCleanupExpectations -> "prove every cleanup-rule case in the test suite is a fixed point of dotnet format style"
             | VerifyExpectationsJb -> "measures how many expectations in the test suite are a fixed point of jb cleanupcode; reported only, not gated (jb's own processing is not deterministic at this batch size yet)"
             | VerifyExpectationsIde0055 -> "prove every expectation in the test suite reports no IDE0055 under a real, analyzer-driven dotnet build — a fixed point of dotnet format whitespace is not the same claim"
+            | VerifyRazorExpectations -> "prove every Razor expectation in the test suite is a fixed point of Microsoft's Razor formatter, the engine dotnet format is getting for Razor, or a documented divergence"
             | TrailingCommas -> "measure conformance with ReSharper's trailing-comma keys on"
             | Reflow -> "keep the corpus's own max_line_length instead of forcing it off"
             | Deterministic -> "force csharp_keep_existing_linebreaks = false; implies --reflow. Redundant now that a width selects it"
