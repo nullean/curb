@@ -702,4 +702,267 @@ public class InitializerTests : FormattingTest
 		    }
 		}
 		""");
+
+	// ---- an initializer after an expression body's arrow (issue #197) -------------------------------
+
+	[Test]
+	public Task Issue_197_an_initializer_below_a_hugging_paren_is_a_level_in() => Formats(
+		// The arrow's line is a level deeper than the member, and dotnet format places the braces from it.
+		"""
+		public class C
+		{
+		    public static C For(
+		        string id) => new()
+		    {
+		        Id = id,
+		        Child = new Inner
+		        {
+		            Name = id,
+		        },
+		    };
+		}
+		""",
+		"""
+		public class C
+		{
+		    public static C For(
+		        string id) => new()
+		        {
+		            Id = id,
+		            Child = new Inner
+		            {
+		                Name = id,
+		            },
+		        };
+		}
+		""");
+
+	[Test]
+	public Task Issue_197_an_initializer_below_a_paren_on_its_own_line_stays_at_the_member() => Unchanged(
+		"""
+		public class C
+		{
+		    public static C For(
+		        string id
+		    ) => new()
+		    {
+		        Id = id,
+		    };
+
+		    public static C Other(string id) => new()
+		    {
+		        Id = id,
+		    };
+
+		    public C Property => new()
+		    {
+		        Id = "",
+		    };
+		}
+		""");
+
+	[Test]
+	public Task Issue_197_every_owner_with_a_parameter_list_follows_the_arrow_line() => Unchanged(
+		"""
+		public class C
+		{
+		    public C(
+		        string id) => Id = new()
+		        {
+		            Id = id,
+		        };
+
+		    public static C operator +(
+		        C a, C b) => new()
+		        {
+		            Id = "",
+		        };
+
+		    public static implicit operator C(
+		        string id) => new()
+		        {
+		            Id = id,
+		        };
+
+		    public void Host()
+		    {
+		        C Local(
+		            string id) => new()
+		            {
+		                Id = id,
+		            };
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Issue_197_other_bodies_with_braces_of_their_own_follow_the_arrow_line() => Unchanged(
+		"""
+		public class C
+		{
+		    public C With(
+		        string id) => this with
+		        {
+		            Id = id,
+		        };
+
+		    public object Anonymous(
+		        string id) => new
+		        {
+		            Id = id,
+		        };
+
+		    public bool Pattern(
+		        string id) => id is C
+		        {
+		            Id: "a",
+		        };
+
+		    public async Task<C> Awaited(
+		        string id) => await new C
+		        {
+		            Id = id,
+		        };
+
+		    public C Chained(
+		        string id) => new C
+		        {
+		            Id = id,
+		        }.Clone();
+
+		    public C Wrapped(
+		        string id) => Wrap(new C
+		        {
+		            Id = id,
+		        });
+
+		    public C Conditional(
+		        string id) => id is null ? null : new C
+		        {
+		            Id = id,
+		        };
+
+		    public C Thrown(
+		        string id) => throw new C
+		        {
+		            Id = id,
+		        };
+		}
+		""");
+
+	[Test]
+	public Task Issue_197_collection_and_array_initializers_stay_where_the_author_put_them() => Unchanged(
+		// dotnet format moves an object initializer with the arrow's line and leaves these two alone.
+		"""
+		public class C
+		{
+		    public static List<int> Items(
+		        string id) => new()
+		    {
+		        1,
+		    };
+
+		    public static int[] Numbers(
+		        string id) => new[]
+		    {
+		        1,
+		    };
+		}
+		""");
+
+	[Test]
+	public Task Issue_197_a_body_ending_in_an_initializer_stays_at_a_one_line_member() => Unchanged(
+		// The other half of the same disagreement: Curb hung these a level in and dotnet format took them back.
+		"""
+		public class C
+		{
+		    public C Fallback(string id) => id ?? new()
+		    {
+		        Id = id,
+		    };
+
+		    public C Cast(string id) => (C)new()
+		    {
+		        Id = id,
+		    };
+
+		    public C Thrown(string id) => throw new C
+		    {
+		        Id = id,
+		    };
+		}
+		""");
+
+	[Test]
+	public Task Issue_197_a_forced_hug_indents_only_a_list_that_broke() => Formats(
+		// The empty list and the property print no group of their own, so they must not read an earlier member's.
+		"""
+		public class C
+		{
+		    public static C For(
+		        string id
+		    ) => new()
+		    {
+		        Id = id,
+		    };
+
+		    public static C Empty() => new()
+		    {
+		        Id = "",
+		    };
+
+		    public C Property => new()
+		    {
+		        Id = "",
+		    };
+		}
+		""",
+		"""
+		public class C
+		{
+		    public static C For(
+		        string id) => new()
+		        {
+		            Id = id,
+		        };
+
+		    public static C Empty() => new()
+		    {
+		        Id = "",
+		    };
+
+		    public C Property => new()
+		    {
+		        Id = "",
+		    };
+		}
+		""",
+		editorConfig: "csharp_wrap_before_declaration_rpar = false");
+
+	[Test]
+	public Task Issue_197_a_converted_body_settles_where_the_next_run_puts_it() => Formats(
+		"""
+		public class C
+		{
+		    public static C For(
+		        string id)
+		    {
+		        return new()
+		        {
+		            Id = id,
+		        };
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public static C For(
+		        string id) => new()
+		        {
+		            Id = id,
+		        };
+		}
+		""",
+		editorConfig: "csharp_style_expression_bodied_methods = true");
 }

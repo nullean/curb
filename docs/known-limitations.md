@@ -19,6 +19,13 @@ The CI corpus, which is written to be untidy, finds these in 34 of its 1,868 fil
 and in 137 with no width, where its initializers are kept as written. That is the gap between its conformance
 floors and 100%. elastic/docs-builder, whose authors had already formatted it, shows none.
 
+## Braces after an expression body's arrow
+
+{{product}} and `dotnet format` still undo each other's indent on two rare shapes of `=> … { }`:
+
+- An initializer on the left of an operator, such as `=> new T { … } ?? other`.
+- A constructor with `: base(…)` and a wrapped parameter list under `csharp_wrap_before_declaration_rpar = false`.
+
 ## An expression body can move on a second pass at a width
 
 With a width set, an expression body Curb moved below its `=>` on the first pass can be joined back
