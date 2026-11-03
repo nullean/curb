@@ -3582,6 +3582,7 @@ internal static partial class Printers
 							or ArrayCreationExpressionSyntax
 							or ImplicitArrayCreationExpressionSyntax
 						&& options.NewLineBeforeMembersInObjectInitializers
+						&& initializer.IsKind(SyntaxKind.ObjectInitializerExpression)
 						&& BraceOnOwnLine(BraceStyle.ObjectCollectionArrayInitializers, context)
 						&& SpansLines(initializer, context):
 					return true;

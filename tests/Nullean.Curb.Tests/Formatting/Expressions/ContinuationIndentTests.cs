@@ -1008,8 +1008,8 @@ public class ContinuationIndentTests : FormattingTest
 		{
 		    void M()
 		    {
-		        Assert(() => Create(new[] { Parse(a),
-		                                    Parse(b) },
+		        Assert(() => Create(new Options { A = Parse(a),
+		                                          B = Parse(b) },
 		                            options: x));
 		    }
 		}
@@ -1019,16 +1019,15 @@ public class ContinuationIndentTests : FormattingTest
 		{
 		    void M()
 		    {
-		        Assert(() => Create(new[]
+		        Assert(() => Create(new Options
 		        {
-		            Parse(a),
-		            Parse(b)
+		            A = Parse(a),
+		            B = Parse(b)
 		        },
 		                            options: x));
 		    }
 		}
-		""",
-		editorConfig: "csharp_new_line_before_members_in_object_initializers = true");
+		""");
 
 	// Issue #16: a `//` comment between `name:` and the value holds the value on a line of its own, and
 	// that line, not a line a level into the value, is the argument's first continuation. Read as the

@@ -300,20 +300,22 @@ public readonly record struct FormatOptions
 	public bool SpaceAfterSemicolonInForStatement { get; init; } = true;
 
 	/// <summary>
-	/// Put every member of an object, collection or array initializer on its own line.
-	/// <c>csharp_new_line_before_members_in_object_initializers</c>.
+	/// Put every member of an object initializer on its own line once it spans lines.
+	/// <c>csharp_new_line_before_members_in_object_initializers</c>, default true.
 	/// </summary>
 	/// <remarks>
-	/// See <see cref="NewLineBetweenQueryExpressionClauses"/> for why this defaults to false rather
-	/// than to Roslyn's documented true.
+	/// Roslyn's default, and what dotnet format does with the key unset: it spreads the members of an
+	/// object initializer the author already opened out, `new Dictionary { [1] = 2, [3] = 4 }` included,
+	/// and leaves a one-line initializer, and every collection or array initializer, as written. Curb
+	/// defaulted this to false, so with no key set its output was not a fixed point there (issue #215).
 	/// </remarks>
-	public bool NewLineBeforeMembersInObjectInitializers { get; init; }
+	public bool NewLineBeforeMembersInObjectInitializers { get; init; } = true;
 
 	/// <summary>
-	/// Put every member of an anonymous type on its own line.
-	/// <c>csharp_new_line_before_members_in_anonymous_types</c>.
+	/// Put every member of an anonymous type on its own line once it spans lines.
+	/// <c>csharp_new_line_before_members_in_anonymous_types</c>, default true, as Roslyn's is.
 	/// </summary>
-	public bool NewLineBeforeMembersInAnonymousTypes { get; init; }
+	public bool NewLineBeforeMembersInAnonymousTypes { get; init; } = true;
 
 	/// <summary>
 	/// Put every clause of a query expression on its own line.
@@ -321,19 +323,15 @@ public readonly record struct FormatOptions
 	/// </summary>
 	/// <remarks>
 	/// <para>
-	/// These three options are documented with a default of true, and Curb defaults all three to
-	/// false anyway. The reason is evidence rather than preference: <c>dotnet format whitespace</c>
-	/// never acts on any of them. Setting all three to true and handing it
-	/// <c>new Point{X=1,Y=2}</c>, <c>new{First=1}</c> and a one-line query — so that it has to
-	/// rewrite the whitespace regardless — it normalises the spacing and inserts no line break at
-	/// all. Roslyn applies these only where its formatter is already placing a newline, which the
-	/// whitespace formatter never is.
+	/// Documented with a default of true, and Curb defaults it to false anyway. Handed a one-line
+	/// query with the key set, <c>dotnet format whitespace</c> normalises its spacing and inserts no
+	/// line break, so there is no behaviour to match, and defaulting to true would break every
+	/// one-line query in a repository the first time Curb ran.
 	/// </para>
 	/// <para>
-	/// So there is no observable behaviour to match, and the choice falls to Curb. Defaulting to
-	/// true would explode every one-line initializer in a repository the first time Curb ran, on
-	/// the strength of an option no other tool honours. Defaulting to false keeps Curb a fixed
-	/// point of dotnet format and leaves the expanded layout one line of config away.
+	/// The two initializer keys beside it were false for the same reason, until it turned out that
+	/// dotnet format does act on them once an initializer spans lines (issue #215); they now default to
+	/// true, as Roslyn's do.
 	/// </para>
 	/// </remarks>
 	public bool NewLineBetweenQueryExpressionClauses { get; init; }

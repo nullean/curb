@@ -553,7 +553,11 @@ internal static partial class Printers
 		var arena = context.Arena;
 
 		var spansLines = SpansLines(node, context);
-		var oneMemberPerLine = context.Options.NewLineBeforeMembersInObjectInitializers;
+		// The key reaches object initializers only, `new Dictionary { [1] = 2 }` included: dotnet format
+		// leaves a collection or array initializer's elements where the author put them however it is set
+		// (issue #215).
+		var oneMemberPerLine = context.Options.NewLineBeforeMembersInObjectInitializers
+			&& node.IsKind(SyntaxKind.ObjectInitializerExpression);
 
 		// Reproduce the author's own breaks rather than imposing one member per line: an initializer
 		// written across lines with two members sharing one keeps them sharing it.
@@ -669,7 +673,7 @@ internal static partial class Printers
 
 		if (ownerBrokeAlone)
 			BeforeOpenBrace(BraceStyle.ObjectCollectionArrayInitializers, context);
-		else if (leadingLine && !oneMemberPerLine && elementBrace < 0 && !ownerSpansLines)
+		else if (leadingLine && !openItOut && elementBrace < 0 && !ownerSpansLines)
 			BeforeOpenBraceWhenOwnerBroke(BraceStyle.ObjectCollectionArrayInitializers, ownerGroup, context);
 
 		// Named and published so an enclosing construct can aim at it — see PrintContext.OwnBlockGroup.
