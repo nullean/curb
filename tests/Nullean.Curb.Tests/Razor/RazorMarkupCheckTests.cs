@@ -56,7 +56,7 @@ public class RazorMarkupCheckTests
 	public async Task A_block_appearing_or_vanishing_fails()
 	{
 		Check(Output + "@code {\nint y;\n}\n", out var failure).Should().BeFalse();
-		failure.Should().Contain("3 @code/@functions block(s) where the source had 2");
+		failure.Should().Contain("3 code block(s) where the source had 2");
 		Check(Output.Replace("@code {\nRenderFragment", "@kode {\nRenderFragment", StringComparison.Ordinal), out _).Should().BeFalse();
 		await Task.CompletedTask;
 	}
@@ -83,7 +83,7 @@ public class RazorUnwrapTests
 	[Arguments("class __CurbRazor__\n{\n}", "")]
 	public async Task The_members_between_the_wrapper_braces_are_found(string formatted, string members)
 	{
-		RazorFormatter.TryUnwrap(formatted, out var start, out var end).Should().BeTrue();
+		RazorFormatter.TryUnwrap(formatted, RazorFormatter.WrapperName, out var start, out var end).Should().BeTrue();
 		formatted[start..end].Should().Be(members);
 		await Task.CompletedTask;
 	}
@@ -95,7 +95,7 @@ public class RazorUnwrapTests
 	[Arguments("class __CurbRazor__\n{\n    int x;\n} // trailing\n")]
 	public async Task A_wrapper_whose_braces_share_a_line_is_not_unwrapped(string formatted)
 	{
-		RazorFormatter.TryUnwrap(formatted, out _, out _).Should().BeFalse();
+		RazorFormatter.TryUnwrap(formatted, RazorFormatter.WrapperName, out _, out _).Should().BeFalse();
 		await Task.CompletedTask;
 	}
 }

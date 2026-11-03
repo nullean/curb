@@ -1,14 +1,14 @@
 ---
 navigation_title: Razor code blocks (experimental)
-description: An experimental, opt-in mode that formats the C# inside @code and @functions blocks of .razor and .cshtml files and leaves every other byte of the file as it is.
+description: An experimental, opt-in mode that formats the C# inside @code, @functions and @{ } blocks of .razor and .cshtml files and leaves every other byte of the file as it is.
 ---
 
 # Razor code blocks (experimental)
 
-{{product}} can format the C# in the `@code` and `@functions` blocks of your `.razor` components and
+{{product}} can format the C# in the `@code`, `@functions` and `@{ }` blocks of your `.razor` components and
 `.cshtml` views with the same rules and the same `.editorconfig` keys as your `.cs` files. Nothing else in
-the file changes: markup, directives, `@{ }` blocks and expressions stay exactly as you wrote them. It's
-experimental and off by default.
+the file changes: markup, directives and expressions stay exactly as you wrote them. It's experimental and
+off by default.
 
 ## Turning it on
 
@@ -98,10 +98,31 @@ becomes
 Only the lines between the `{` line and the `}` line are replaced. The `{` line, the `}` line and every
 byte outside them are copied from the source.
 
+A `@{` alone on its line opens a block of statements, formatted the way a method's body would be, one
+level in from the `@{` line:
+
+```html
+@{
+  ViewData["Title"]="Home";
+      var items=Model.Items.Where(i=>i.Visible).ToList();
+}
+```
+
+becomes
+
+```html
+@{
+    ViewData["Title"] = "Home";
+    var items = Model.Items.Where(i => i.Visible).ToList();
+}
+```
+
+A `@{ }` on one line, such as `@{ Layout = null; }`, isn't a block, and is left as written.
+
 ## What it never touches
 
 - Markup, attributes, `@page`, `@using`, `@inject` and every other directive.
-- `@{ }` blocks, `@if`, `@foreach`, `@switch` and the other code constructs inside markup.
+- `@if`, `@foreach`, `@switch` and the other code constructs inside markup.
 - Implicit and explicit expressions, such as `@count` and `@(a + b)`.
 - `@code` inside a Razor comment (`@* *@`) or an HTML comment (`<!-- -->`), and `@@code`, which is text.
 - A block on one line, such as `@code { int x; }`.
@@ -139,6 +160,7 @@ Components/Pages/Grid.razor: line 41: @code block left as written, it does not p
 | Reason | Why |
 |---|---|
 | it does not parse as C# class members | The block holds Razor rather than C#: a template (`@<p>…</p>`), `<text>`, `@:`, a Razor comment, or markup in a method body. {{product}} doesn't parse Razor. |
+| it does not parse as C# statements | The same, for a `@{ }` block: markup such as `<p>@x</p>` among its statements. |
 | its closing brace is not alone on its line | Something shares the line with the `}` that closes the block, such as `} <p>…` or a stray `};`. |
 | no closing brace | The C# lexer never finds the `}` that closes the block. |
 | it nests too deeply | The same limit as a `.cs` file. |
@@ -174,13 +196,18 @@ its own block finder masked every block's inner lines and compared the rest of e
 Every change in those runs was whitespace. Every refusal was a block holding Razor markup (a template, or
 markup in a method body), except two copies of a sample with a stray `};` after its last member.
 
+Those runs predate `@{ }` blocks. With them, the same check over the same blazor-samples, eShop and
+docs-builder checkouts changed 7 docs-builder views where it had changed 4, and nothing more elsewhere: those
+repositories have few multi-line `@{ }` blocks, and most are already formatted. Every change was inside a
+block, no file failed, and a second pass changed nothing.
+
 With the key absent, a repository's Razor files cost almost nothing: about 3 ms on dotnet/blazor-samples'
 3,080 components, the price of looking for the key in each folder's `.editorconfig` files.
 
 ## Limitations
 
 - Experimental. The output may change between releases.
-- Only `@code` and `@functions` blocks. There are no plans to format markup.
+- Only `@code`, `@functions` and `@{ }` blocks. Markup isn't formatted yet; see [#88](https://github.com/nullean/curb/issues/88).
 - `print-config` and `doc-tree` work on `.cs` files only.
 - The C# lexer reads the markup inside an `@if` or `@foreach` body as C#, so a brace in that markup's text
   (`<p>{</p>`) is counted. The body's end is then not found, and nothing after it in the file is formatted.

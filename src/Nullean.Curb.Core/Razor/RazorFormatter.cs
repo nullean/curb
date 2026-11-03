@@ -34,7 +34,7 @@ public sealed class RazorFormatter : IDisposable
 	public const string EnableKey = "curb_razor_format_code_blocks";
 
 	/// <summary>The name of the class a block is wrapped in. Never written anywhere.</summary>
-	private const string WrapperName = "__CurbRazor__";
+	internal const string WrapperName = "__CurbRazor__";
 
 	private readonly CSharpFormatter _csharp = new();
 	private readonly List<RazorBlock> _blocks = [];
@@ -123,6 +123,7 @@ public sealed class RazorFormatter : IDisposable
 		RazorBlockRefusal.CloseBraceNotAlone => "its closing brace is not alone on its line",
 		RazorBlockRefusal.Unclosed => "no closing brace",
 		RazorBlockRefusal.DoesNotParse => "it does not parse as C# class members",
+		RazorBlockRefusal.StatementsDoNotParse => "it does not parse as C# statements",
 		RazorBlockRefusal.TooDeep => "it nests too deeply",
 		RazorBlockRefusal.WrapperReshaped => "formatting moved the braces around it",
 		_ => "not refused",
@@ -167,8 +168,13 @@ public sealed class RazorFormatter : IDisposable
 				: Math.Max(1, options.MaxLineLength - indentColumns),
 		};
 
+		// Members go in a class; statements in a block of their own, a top-level statement, so they come
+		// out a level in as a method's would.
+		var statements = block.Kind == RazorBlockKind.Statements;
 		_wrapped.Clear();
-		_wrapped.Append("class ").Append(WrapperName).Append(newLine).Append('{').Append(newLine);
+		if (!statements)
+			_wrapped.Append("class ").Append(WrapperName).Append(newLine);
+		_wrapped.Append('{').Append(newLine);
 		_wrapped.Append(inner);
 		_wrapped.Append('}').Append(newLine);
 		var wrapped = _wrapped.ToString();
@@ -177,7 +183,7 @@ public sealed class RazorFormatter : IDisposable
 		switch (result.Status)
 		{
 			case FormatStatus.SyntaxError:
-				refusal = RazorBlockRefusal.DoesNotParse;
+				refusal = statements ? RazorBlockRefusal.StatementsDoNotParse : RazorBlockRefusal.DoesNotParse;
 				detail = result.Message;
 				return result;
 
@@ -190,7 +196,7 @@ public sealed class RazorFormatter : IDisposable
 		}
 
 		var formatted = result.Text!;
-		if (!TryUnwrap(formatted, out var start, out var end))
+		if (!TryUnwrap(formatted, statements ? null : WrapperName, out var start, out var end))
 		{
 			refusal = RazorBlockRefusal.WrapperReshaped;
 			return result;
@@ -211,11 +217,17 @@ public sealed class RazorFormatter : IDisposable
 	/// closing brace but line breaks, so the first <c>{</c> after the name and the last <c>}</c> are the
 	/// wrapper's. False when the formatter put anything else on either brace's line.
 	/// </remarks>
-	internal static bool TryUnwrap(string formatted, out int start, out int end)
+	internal static bool TryUnwrap(string formatted, string? wrapperName, out int start, out int end)
 	{
 		start = end = 0;
-		var name = formatted.IndexOf(WrapperName, StringComparison.Ordinal);
-		var open = name < 0 ? -1 : formatted.IndexOf('{', name + WrapperName.Length);
+		int open;
+		if (wrapperName is null)
+			open = formatted.StartsWith('{') ? 0 : -1;
+		else
+		{
+			var name = formatted.IndexOf(wrapperName, StringComparison.Ordinal);
+			open = name < 0 ? -1 : formatted.IndexOf('{', name + wrapperName.Length);
+		}
 		var close = formatted.LastIndexOf('}');
 		if (open < 0 || close <= open)
 			return false;
@@ -364,7 +376,7 @@ public sealed class RazorFormatter : IDisposable
 		RazorBlockScanner.Scan(output, rescan, component);
 		if (rescan.Count != blocks.Count)
 		{
-			failure = $"the formatted file has {rescan.Count} @code/@functions block(s) where the source had {blocks.Count}";
+			failure = $"the formatted file has {rescan.Count} code block(s) where the source had {blocks.Count}";
 			return false;
 		}
 
@@ -374,7 +386,7 @@ public sealed class RazorFormatter : IDisposable
 		{
 			var before = blocks[i];
 			var after = rescan[i];
-			if (before.Refusal != after.Refusal || before.IsFunctions != after.IsFunctions)
+			if (before.Refusal != after.Refusal || before.Kind != after.Kind)
 			{
 				failure = $"line {RazorBlockScanner.LineOf(source, before.Directive)}: the {before.Name} block scans differently once formatted";
 				return false;
@@ -396,7 +408,7 @@ public sealed class RazorFormatter : IDisposable
 
 		if (!source.AsSpan(inSource).SequenceEqual(output.AsSpan(inOutput)))
 		{
-			failure = "markup after the last @code/@functions block changed";
+			failure = "markup after the last code block changed";
 			return false;
 		}
 

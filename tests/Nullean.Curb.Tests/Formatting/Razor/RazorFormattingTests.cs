@@ -1,11 +1,69 @@
 namespace Nullean.Curb.Tests.Formatting.Razor;
 
 /// <summary>
-/// The C# inside <c>@code</c> and <c>@functions</c> blocks, formatted as class members; every other byte
-/// of the file left exactly as written.
+/// The C# inside <c>@code</c> and <c>@functions</c> blocks, formatted as class members, and inside
+/// <c>@{ }</c> blocks, formatted as statements; every other byte of the file left exactly as written.
 /// </summary>
 public class RazorFormattingTests : RazorFormattingTest
 {
+	// ---- @{ } blocks (issue #88) ----------------------------------------------------------------
+
+	[Test]
+	public Task A_statement_block_is_formatted_a_level_in_from_its_line() =>
+		Formats(
+			"""
+			@{
+			  ViewData["Title"]="Home";
+			      var items=Model.Items.Where(i=>i.Visible).ToList();
+			  string Label(int n){return n==1?"item":"items";}
+			}
+			<div>
+			    @{
+			    var count=items.Count;
+			    }
+			    <p>@count @Label(count)</p>
+			</div>
+			""",
+			"""
+			@{
+			    ViewData["Title"] = "Home";
+			    var items = Model.Items.Where(i => i.Visible).ToList();
+			    string Label(int n) { return n == 1 ? "item" : "items"; }
+			}
+			<div>
+			    @{
+			        var count = items.Count;
+			    }
+			    <p>@count @Label(count)</p>
+			</div>
+			""");
+
+	[Test]
+	public Task A_statement_block_follows_indent_style() =>
+		Formats(
+			"@{\nvar x=1;\nif (x>0) {\nx++;\n}\n}\n<p>@x</p>\n",
+			"@{\n\tvar x = 1;\n\tif (x > 0)\n\t{\n\t\tx++;\n\t}\n}\n<p>@x</p>\n",
+			"indent_style = tab");
+
+	[Test]
+	public Task A_statement_block_holding_markup_is_left_as_written() =>
+		Rejects(
+			"""
+			@{
+			    var   x = 1;
+			    <p>@x</p>
+			}
+			""",
+			"it does not parse as C# statements");
+
+	[Test]
+	public Task A_statement_block_on_one_line_is_not_a_block() =>
+		Unchanged(
+			"""
+			@{ ViewData["Title"]   =   "Home"; }
+			<p>x</p>
+			""");
+
 	[Test]
 	public Task A_blazor_component_has_its_code_block_formatted_and_its_markup_left_alone() =>
 		Formats(
@@ -63,7 +121,7 @@ public class RazorFormattingTests : RazorFormattingTest
 			"""
 			@model IndexModel
 			@{
-			    ViewData["Title"]   =   "Home";
+			    ViewData["Title"] = "Home";
 			}
 			<div>@Greeting( "x" )</div>
 			@functions {
@@ -500,7 +558,7 @@ public class RazorFormattingTests : RazorFormattingTest
 
 	[Test]
 	public Task Nothing_after_an_unclosed_code_block_is_formatted() =>
-		Unchanged(
+		Rejects(
 			"""
 			@{
 			    var s = 1;
@@ -508,7 +566,8 @@ public class RazorFormattingTests : RazorFormattingTest
 			@code {
 			int y=1;
 			}
-			""");
+			""",
+			"no closing brace");
 
 	[Test]
 	public Task A_closing_brace_that_shares_its_line_is_refused() =>
@@ -660,7 +719,7 @@ public class RazorFormattingTests : RazorFormattingTest
 			@page "/"
 			<p>   x   </p>
 			@{
-			    var   y = 1;
+			    var y = 1;
 			}
 			@if (y > 0) {
 			<p>y</p>

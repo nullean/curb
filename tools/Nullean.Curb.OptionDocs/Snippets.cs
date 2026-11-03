@@ -1591,7 +1591,7 @@ public static class Snippets
             "Experimental. It has to be set in a section whose glob names Razor files, and `[*]`, `[**]` and `[*.*]` do not " +
             "count, so a catch-all section cannot turn it on by accident:\n\n```ini\n[*.{razor,cshtml}]\n" +
             "curb_razor_format_code_blocks = true\n```\n\nWithout it, Curb never reads a `.razor` or `.cshtml` file. With it, " +
-            "only the C# inside `@code` and `@functions` blocks changes: markup, `@{ }` blocks and expressions are never " +
+            "only the C# inside `@code`, `@functions` and `@{ }` blocks changes: markup and expressions are never " +
             "touched, and a block that holds Razor markup is left as written. See [Razor](../../../workflow/razor.md).",
     };
 
