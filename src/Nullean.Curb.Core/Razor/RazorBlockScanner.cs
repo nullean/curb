@@ -19,6 +19,9 @@ public enum RazorBlockRefusal : byte
 	/// <summary>The inner text does not parse as the members of a class: Razor markup, usually.</summary>
 	DoesNotParse,
 
+	/// <summary>A <c>@{ }</c> block's inner text does not parse as C# statements: Razor markup, usually.</summary>
+	StatementsDoNotParse,
+
 	/// <summary>The C# nests deeper than Curb follows.</summary>
 	TooDeep,
 
@@ -26,7 +29,20 @@ public enum RazorBlockRefusal : byte
 	WrapperReshaped,
 }
 
-/// <summary>One <c>@code { … }</c> or <c>@functions { … }</c> block in a Razor file.</summary>
+/// <summary>What a <see cref="RazorBlock"/> holds.</summary>
+public enum RazorBlockKind : byte
+{
+	/// <summary><c>@code { … }</c>: the members of the component's class.</summary>
+	Code,
+
+	/// <summary><c>@functions { … }</c>: the members of the component's or view's class.</summary>
+	Functions,
+
+	/// <summary><c>@{ … }</c>: statements.</summary>
+	Statements,
+}
+
+/// <summary>One <c>@code { … }</c>, <c>@functions { … }</c> or <c>@{ … }</c> block in a Razor file.</summary>
 /// <remarks>
 /// Only the bytes from <see cref="InnerStart"/> to <see cref="InnerEnd"/> are ever replaced: whole lines
 /// between the line that opens the block and the line that closes it. Everything else in the file is
@@ -34,7 +50,7 @@ public enum RazorBlockRefusal : byte
 /// </remarks>
 /// <param name="LineStart">Where the directive's line starts.</param>
 /// <param name="Directive">Where the <c>@</c> of the directive is.</param>
-/// <param name="IsFunctions">True for <c>@functions</c>, false for <c>@code</c>.</param>
+/// <param name="Kind">Which of the three it is.</param>
 /// <param name="OpenBrace">Where the block's <c>{</c> is.</param>
 /// <param name="InnerStart">Just past the line break that ends the <c>{</c> line.</param>
 /// <param name="InnerEnd">The start of the line holding the closing <c>}</c>; -1 when there is none.</param>
@@ -43,25 +59,33 @@ public enum RazorBlockRefusal : byte
 public readonly record struct RazorBlock(
 	int LineStart,
 	int Directive,
-	bool IsFunctions,
+	RazorBlockKind Kind,
 	int OpenBrace,
 	int InnerStart,
 	int InnerEnd,
 	int CloseBrace,
 	RazorBlockRefusal Refusal)
 {
+	/// <summary>True for <c>@functions</c>.</summary>
+	public bool IsFunctions => Kind == RazorBlockKind.Functions;
+
 	/// <summary>The directive's name, for messages.</summary>
-	public string Name => IsFunctions ? "@functions" : "@code";
+	public string Name => Kind switch
+	{
+		RazorBlockKind.Functions => "@functions",
+		RazorBlockKind.Statements => "@{ }",
+		_ => "@code",
+	};
 }
 
 /// <summary>
-/// Finds the <c>@code</c> and <c>@functions</c> blocks in a <c>.razor</c> or <c>.cshtml</c> file without
-/// parsing Razor.
+/// Finds the <c>@code</c>, <c>@functions</c> and <c>@{ }</c> blocks in a <c>.razor</c> or <c>.cshtml</c> file
+/// without parsing Razor.
 /// </summary>
 /// <remarks>
 /// <para>
 /// A candidate is a line whose first non-whitespace text is <c>@code</c> or <c>@functions</c>, then
-/// optional spaces or tabs, then <c>{</c> and the end of the line. The <c>{</c> may also stand alone on
+/// optional spaces or tabs, then <c>{</c> and the end of the line; or <c>@{</c> and the end of the line. The <c>{</c> may also stand alone on
 /// the next line. Lines inside a Razor comment (<c>@* *@</c>) or an HTML comment (<c>&lt;!-- --&gt;</c>)
 /// are never candidates, and <c>@@code</c> is an escaped <c>@</c>, not a directive. <c>@code</c> is a
 /// directive in a component (<c>.razor</c>) only; in a view (<c>.cshtml</c>) it is an expression followed
@@ -363,23 +387,28 @@ public static class RazorBlockScanner
 
 		var text = source.AsSpan();
 		var rest = text[first..];
-		bool isFunctions;
+		RazorBlockKind kind;
 		int afterName;
 		if (component && rest.StartsWith("@code"))
 		{
-			isFunctions = false;
+			kind = RazorBlockKind.Code;
 			afterName = first + 5;
 		}
 		else if (rest.StartsWith("@functions"))
 		{
-			isFunctions = true;
+			kind = RazorBlockKind.Functions;
 			afterName = first + 10;
+		}
+		else if (rest.StartsWith("@{"))
+		{
+			kind = RazorBlockKind.Statements;
+			afterName = first + 1;
 		}
 		else
 			return false;
 
 		// `{` on the same line, or alone on the next one. Anything else after the name, an identifier
-		// character in particular (`@codeBehind`), is not this directive.
+		// character in particular (`@codeBehind`), is not this directive. A `@{` has its brace already.
 		var brace = SkipBlanks(text, afterName);
 		if (brace >= text.Length)
 			return false;
@@ -401,7 +430,7 @@ public static class RazorBlockScanner
 		if (close < 0)
 		{
 			// Nothing after a block that never closes can be told apart from its body.
-			block = new RazorBlock(lineStart, first, isFunctions, brace, innerStart, -1, -1, RazorBlockRefusal.Unclosed);
+			block = new RazorBlock(lineStart, first, kind, brace, innerStart, -1, -1, RazorBlockRefusal.Unclosed);
 			resume = -1;
 			return true;
 		}
@@ -420,7 +449,7 @@ public static class RazorBlockScanner
 			alone = false;
 
 		block = new RazorBlock(
-			lineStart, first, isFunctions, brace, innerStart, closeLineStart, close,
+			lineStart, first, kind, brace, innerStart, closeLineStart, close,
 			alone ? RazorBlockRefusal.None : RazorBlockRefusal.CloseBraceNotAlone);
 		resume = close + 1;
 		return true;

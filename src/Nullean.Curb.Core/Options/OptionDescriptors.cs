@@ -226,6 +226,6 @@ public sealed record OptionDescriptor(
 		new("xml_attribute_indent", OptionGroup.XmlLayout, ["single_indent", "double_indent", "align_by_first_attribute"], "(not set)", "Where an attribute on a line of its own starts. Unset keeps its offset from its element as written.", "xml_attributes"),
 
 		// ---- Razor (1, experimental) ----------------------------------------------------------
-		new("curb_razor_format_code_blocks", OptionGroup.Razor, ["true", "false"], "false", "Experimental. Format the C# in @code and @functions blocks of .razor and .cshtml files, and nothing else in them. Read only from a section that names those files.", "razor_component"),
+		new("curb_razor_format_code_blocks", OptionGroup.Razor, ["true", "false"], "false", "Experimental. Format the C# in @code, @functions and @{ } blocks of .razor and .cshtml files, and nothing else in them. Read only from a section that names those files.", "razor_component"),
 	];
 }

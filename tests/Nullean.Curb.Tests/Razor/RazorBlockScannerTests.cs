@@ -171,7 +171,9 @@ public class RazorBlockScannerTests
 	[Arguments("@functions\n{ string s = @\"\n@code {\n    int    x;\n}\n\";\n}\n")]
 	public async Task A_block_shaped_line_inside_csharp_is_never_a_block(string source)
 	{
-		Scan(source).Where(block => block.Refusal == RazorBlockRefusal.None).Should().BeEmpty();
+		// The `@{ }` around the line is a block of its own; the `@code` line inside it is not one.
+		Scan(source).Where(block => block.Refusal == RazorBlockRefusal.None)
+			.Should().OnlyContain(block => block.Kind == RazorBlockKind.Statements && block.Directive == 0);
 		await Task.CompletedTask;
 	}
 
@@ -181,8 +183,9 @@ public class RazorBlockScannerTests
 		const string source = "@{\n    var s = \"}\";\n}\n@if (x) { <p>@y</p> }\n<p>@Model.Items[0].Name, mail a@b.com</p>\n@code {\nint x;\n}\n";
 		var blocks = Scan(source);
 
-		blocks.Should().ContainSingle();
-		Inner(source, blocks[0]).Should().Be("int x;\n");
+		blocks.Should().HaveCount(2);
+		blocks[0].Kind.Should().Be(RazorBlockKind.Statements);
+		Inner(source, blocks[1]).Should().Be("int x;\n");
 		await Task.CompletedTask;
 	}
 
@@ -193,7 +196,8 @@ public class RazorBlockScannerTests
 	[Arguments("@if (x) {\n<p>{</p>\n}\n@code {\nint x;\n}\n")]
 	public async Task After_code_whose_end_cannot_be_found_nothing_is_a_block(string source)
 	{
-		Scan(source).Should().BeEmpty();
+		// An unclosed `@{` is a block of its own, refused; nothing after it is one.
+		Scan(source).Should().OnlyContain(block => block.Refusal == RazorBlockRefusal.Unclosed);
 		await Task.CompletedTask;
 	}
 

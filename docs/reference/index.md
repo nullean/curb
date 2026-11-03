@@ -176,5 +176,5 @@ How Curb lays XML out. It keeps the author's layout: it re-indents the lines tha
 
 Experimental and off by default. Curb can format the C# inside `@code` and `@functions` blocks of `.razor` and `.cshtml` files and leave every other byte of the file as it is. Turn it on with `curb_razor_format_code_blocks = true` in a section that names those files, such as `[*.{razor,cshtml}]`; `[*]` does not count. The C# style comes from the same keys as a `.cs` file's, so a `[*.{cs,razor,cshtml}]` section gives both the same style. See [Razor](../workflow/razor.md).
 
-- [curb_razor_format_code_blocks](razor/code-blocks/curb_razor_format_code_blocks.md) — Experimental. Format the C# in @code and @functions blocks of .razor and .cshtml files, and nothing else in them. Read only from a section that names those files.
+- [curb_razor_format_code_blocks](razor/code-blocks/curb_razor_format_code_blocks.md) — Experimental. Format the C# in @code, @functions and @{ } blocks of .razor and .cshtml files, and nothing else in them. Read only from a section that names those files.
 
