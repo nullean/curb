@@ -41,10 +41,11 @@ public class MemberSeparatorTests : FormattingTest
 		""");
 
 	[Test]
-	public Task An_initializer_can_be_asked_for_one_member_per_line() => Formats(
+	public Task An_opened_out_initializer_puts_each_member_on_its_own_line_by_default() => Formats(
 		// One member per line *when the initializer is opened out*. It is not a reason to open one:
-		// measured with the key set, dotnet format leaves `new Point { X = 1, Y = 2 }` exactly where
-		// it is and only spreads the members of an initializer the author had already opened.
+		// dotnet format leaves `new Point { X = 1, Y = 2 }` exactly where it is and only spreads the
+		// members of an initializer the author had already opened. On by default, as Roslyn's key is
+		// (issue #215).
 		"""
 		public class C
 		{
@@ -71,8 +72,65 @@ public class MemberSeparatorTests : FormattingTest
 		        };
 		    }
 		}
+		""");
+
+	[Test]
+	public Task An_initializer_below_a_creation_whose_arguments_broke_keeps_its_brace_line() => Unchanged(
+		// With the key on and a width set, the brace a broken argument list leaves on a line of its own was
+		// joined onto the `)`, and dotnet format put it back. Only an initializer Curb opens out places its
+		// own brace.
+		"""
+		public class C
+		{
+		    private static readonly HttpClient Client = new(new SocketsHttpHandler
+		    {
+		        AutomaticDecompression = DecompressionMethods.All,
+		        PooledConnectionLifetime = TimeSpan.FromMinutes(5)
+		    })
+		    { Timeout = FetchTimeout };
+		}
 		""",
-		editorConfig: "csharp_new_line_before_members_in_object_initializers = true");
+		editorConfig: "max_line_length = 140");
+
+	[Test]
+	public Task An_initializer_can_keep_the_members_the_author_joined() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        var opened = new Point
+		        {
+		            X = 1, Y = 2,
+		            Z = 3
+		        };
+		    }
+		}
+		""",
+		editorConfig: "csharp_new_line_before_members_in_object_initializers = false\ncsharp_new_line_before_members_in_anonymous_types = false");
+
+	[Test]
+	public Task A_collection_or_array_initializer_keeps_the_elements_the_author_joined() => Unchanged(
+		// The key reaches object initializers only: dotnet format leaves a collection's or an array's
+		// elements where the author put them, however it is set (issue #215).
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        var l = new List<int>
+		        {
+		            1, 2,
+		            3
+		        };
+		        var a = new[]
+		        {
+		            1, 2,
+		            3
+		        };
+		    }
+		}
+		""");
 
 	[Test]
 	public Task A_collection_initializer_follows_the_same_option() => Formats(
@@ -134,10 +192,9 @@ public class MemberSeparatorTests : FormattingTest
 		""");
 
 	[Test]
-	public Task The_object_initializer_key_reaches_anonymous_types_too() => Formats(
-		// Roslyn's behaviour rather than its documentation, and the one expectation in this suite that
-		// dotnet format moved: with only csharp_new_line_before_members_in_object_initializers set, it
-		// still spreads an opened-out anonymous type. Curb had the two keys independent.
+	public Task The_anonymous_type_key_opens_an_anonymous_type_out_on_its_own() => Formats(
+		// Either key spreads an opened-out anonymous type: Roslyn's behaviour rather than its
+		// documentation. With the object initializer key off, the anonymous type key still does.
 		"""
 		public class C
 		{
@@ -161,8 +218,7 @@ public class MemberSeparatorTests : FormattingTest
 		    {
 		        var o = new Point
 		        {
-		            X = 1,
-		            Y = 2
+		            X = 1, Y = 2
 		        };
 		        var a = new
 		        {
@@ -172,7 +228,7 @@ public class MemberSeparatorTests : FormattingTest
 		    }
 		}
 		""",
-		editorConfig: "csharp_new_line_before_members_in_object_initializers = true");
+		editorConfig: "csharp_new_line_before_members_in_object_initializers = false");
 
 	// ---- anonymous types --------------------------------------------------------------------------
 
@@ -189,7 +245,7 @@ public class MemberSeparatorTests : FormattingTest
 		""");
 
 	[Test]
-	public Task An_anonymous_type_can_be_asked_for_one_member_per_line() => Formats(
+	public Task An_opened_out_anonymous_type_puts_each_member_on_its_own_line_by_default() => Formats(
 		// Again: one per line once it is opened out, and no reason to open it.
 		"""
 		public class C
@@ -217,8 +273,7 @@ public class MemberSeparatorTests : FormattingTest
 		        };
 		    }
 		}
-		""",
-		editorConfig: "csharp_new_line_before_members_in_anonymous_types = true");
+		""");
 
 	// ---- query expressions ------------------------------------------------------------------------
 

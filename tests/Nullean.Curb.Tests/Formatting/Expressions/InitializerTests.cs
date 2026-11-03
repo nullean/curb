@@ -406,7 +406,8 @@ public class InitializerTests : FormattingTest
 
 	// Issue #213: a creation's brace on a line of its own goes to the indent of the line its `new` (or
 	// `with` receiver) is on, and what it holds follows it. In a query that is the `select` line; on the
-	// statement's own line it is the statement's indent, as before.
+	// statement's own line it is the statement's indent, as before. The members of `o` open out, which puts
+	// `Nested = new` on a line of its own: the brace follows that line, not the one the source had it on.
 	[Test]
 	public Task A_brace_on_its_own_line_sits_at_the_indent_of_the_line_new_is_on() => Formats(
 		"""
@@ -472,10 +473,7 @@ public class InitializerTests : FormattingTest
 		        };
 		    }
 		}
-		""",
-		// The members of `o` open out, which puts `Nested = new` on a line of its own: the brace follows
-		// that line, not the one the source had it on.
-		editorConfig: "csharp_new_line_before_members_in_anonymous_types = true");
+		""");
 
 	// ---- tuples -------------------------------------------------------------------------------
 

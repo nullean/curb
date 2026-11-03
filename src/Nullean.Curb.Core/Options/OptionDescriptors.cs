@@ -93,8 +93,8 @@ public sealed record OptionDescriptor(
 		new("csharp_new_line_before_else", OptionGroup.NewLines, ["true", "false"], "true", "Put else on its own line rather than joining it to the preceding brace.", "if_else"),
 		new("csharp_new_line_before_catch", OptionGroup.NewLines, ["true", "false"], "true", "Put catch on its own line.", "try_catch"),
 		new("csharp_new_line_before_finally", OptionGroup.NewLines, ["true", "false"], "true", "Put finally on its own line.", "try_catch"),
-		new("csharp_new_line_before_members_in_object_initializers", OptionGroup.NewLines, ["true", "false"], "false", "Put each member of an object initializer on its own line.", "object_init"),
-		new("csharp_new_line_before_members_in_anonymous_types", OptionGroup.NewLines, ["true", "false"], "false", "Put each member of an anonymous type on its own line.", "anonymous_type"),
+		new("csharp_new_line_before_members_in_object_initializers", OptionGroup.NewLines, ["true", "false"], "true", "Put each member of an object initializer on its own line.", "object_init"),
+		new("csharp_new_line_before_members_in_anonymous_types", OptionGroup.NewLines, ["true", "false"], "true", "Put each member of an anonymous type on its own line.", "anonymous_type"),
 		new("csharp_new_line_between_query_expression_clauses", OptionGroup.NewLines, ["true", "false"], "false", "Put each clause of a query expression on its own line.", "query"),
 
 		// ---- Indentation (6) ----------------------------------------------------------------
