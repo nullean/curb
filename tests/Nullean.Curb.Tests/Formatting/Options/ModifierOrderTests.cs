@@ -88,6 +88,27 @@ public class ModifierOrderTests : FormattingTest
 		editorConfig: Preferred);
 
 	[Test]
+	public Task Reordered_modifiers_keep_the_break_before_the_rest_of_the_declaration() => Formats(
+		// The break between the two keywords cannot follow them through the sort, but the one before the
+		// type still ends the modifiers, wherever they land (issue #201).
+		"""
+		public class C
+		{
+		    static
+		        public
+		        int M() => 0;
+		}
+		""",
+		"""
+		public class C
+		{
+		    public static
+		        int M() => 0;
+		}
+		""",
+		editorConfig: Preferred);
+
+	[Test]
 	public Task Async_sorts_last_because_the_configuration_puts_it_last() => Formats(
 		"""
 		public class C
