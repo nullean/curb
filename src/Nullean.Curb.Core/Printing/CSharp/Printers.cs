@@ -856,20 +856,46 @@ internal static partial class Printers
 			_ => null,
 		};
 
+	/// <summary>A declaration's <c>&lt;T, U&gt;</c>.</summary>
+	/// <remarks>A line the author broke stays broken, one level in, as in <see cref="Printers.BracketedParameterList"/>.</remarks>
 	public static void TypeParameterList(TypeParameterListSyntax node, PrintContext context)
 	{
 		TokenPrinter.Print(node.LessThanToken, context);
 
-		for (var i = 0; i < node.Parameters.Count; i++)
+		using (context.Arena.Indent())
 		{
-			Node.Print(node.Parameters[i], context);
-			if (i >= node.Parameters.SeparatorCount)
-				continue;
-			TokenPrinter.Print(node.Parameters.GetSeparator(i), context);
-			context.Arena.Synthetic(SyntheticText.Space);
+			BreakAsWritten(node.LessThanToken, node.Parameters.FirstOrDefault(), context);
+			for (var i = 0; i < node.Parameters.Count; i++)
+			{
+				Node.Print(node.Parameters[i], context);
+				if (i >= node.Parameters.SeparatorCount)
+					continue;
+				var separator = node.Parameters.GetSeparator(i);
+				TokenPrinter.Print(separator, context);
+				if (!BreakAsWritten(separator, node.Parameters[i + 1], context))
+					context.Arena.Synthetic(SyntheticText.Space);
+			}
 		}
 
+		BreakAsWritten(node.Parameters.LastOrDefault(), node.GreaterThanToken, context);
 		TokenPrinter.Print(node.GreaterThanToken, context);
+	}
+
+	/// <summary>
+	/// Breaks the line where the author broke it between <paramref name="before"/> and
+	/// <paramref name="after"/>, and says whether it did.
+	/// </summary>
+	/// <remarks>
+	/// For lists with no width-driven layout of their own. Under deterministic layout the author's
+	/// breaks are not read, so this never breaks and the list stays on one line as before.
+	/// </remarks>
+	private static bool BreakAsWritten(SyntaxNodeOrToken before, SyntaxNodeOrToken after, PrintContext context)
+	{
+		if (before.RawKind == 0 || after.RawKind == 0 || !context.AuthorBroke(before.Span.End, after.SpanStart))
+			return false;
+
+		context.Arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
+		return true;
 	}
 
 	public static void TypeParameter(TypeParameterSyntax node, PrintContext context)
@@ -2260,8 +2286,25 @@ internal static partial class Printers
 			// A modifier followed by a comment has already been parted from the next one by the
 			// trivia; adding the usual space as well doubled it.
 			if (!EndsInWhitespace(modifier))
-				context.Arena.Synthetic(SyntheticText.Space);
+				AfterModifier(modifier, context);
 		}
+	}
+
+	/// <summary>The space after a modifier, or the line break the author put there.</summary>
+	/// <remarks>
+	/// <c>public static</c> then the type on the next line stays that way, one level in, as dotnet format
+	/// leaves it; joining it lengthened a line the author had wrapped on purpose (issue #201). Read from
+	/// the modifier's own trailing trivia, which holds the line ending when there is one.
+	/// </remarks>
+	private static void AfterModifier(SyntaxToken modifier, PrintContext context)
+	{
+		if (context.AuthorBroke(modifier.Span.End, modifier.FullSpan.End))
+		{
+			using (context.Arena.Indent())
+				context.Arena.HardLine();
+		}
+		else
+			context.Arena.Synthetic(SyntheticText.Space);
 	}
 
 	/// <summary>True when a token's trailing trivia already supplies the space after it.</summary>
@@ -2370,9 +2413,20 @@ internal static partial class Printers
 		{
 			if (indices[i] != i)
 				moved = true;
+		}
 
-			TokenPrinter.PrintWithoutLeadingTrivia(modifiers[indices[i]], context);
-			context.Arena.Synthetic(SyntheticText.Space);
+		// Where the order stands, each break the author made stays with the modifier it followed. Where it
+		// moved, only the break before the rest of the declaration is kept, after whichever comes last.
+		for (var i = 0; i < indices.Length; i++)
+		{
+			var modifier = modifiers[indices[i]];
+			TokenPrinter.PrintWithoutLeadingTrivia(modifier, context);
+			if (!moved)
+				AfterModifier(modifier, context);
+			else if (i == indices.Length - 1)
+				AfterModifier(modifiers[^1], context);
+			else
+				context.Arena.Synthetic(SyntheticText.Space);
 		}
 
 		// Only when the sort actually moved something. Declaring a delta that did not happen is not

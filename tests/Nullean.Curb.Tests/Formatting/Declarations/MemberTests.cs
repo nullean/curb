@@ -386,6 +386,96 @@ public class MemberTests : FormattingTest
 		}
 		""");
 
+	// Issue #201: dotnet format leaves each of these lines where the author broke them, and with no width
+	// there is no reason to join them.
+	[Test]
+	public Task A_declaration_the_author_wrapped_stays_wrapped() => Unchanged(
+		"""
+		public class T
+		{
+		    public int this[
+		        int i] => i;
+
+		    public int this[int i,
+		        int j]
+		    {
+		        get => i;
+		    }
+
+		    public static T D1<
+		        U>() => null;
+
+		    public static T D3<U,
+		        V>() => null;
+
+		    public static
+		        T D2(string id) => null;
+
+		    public
+		        static
+		        int D4() => 0;
+		}
+		""");
+
+	[Test]
+	public Task A_wrapped_declaration_line_moves_to_one_level_in() => Formats(
+		"""
+		public class T
+		{
+		    public int this[
+		  int i,
+		            int j] => i;
+
+		    public static T D1<
+		  U>() => null;
+
+		    public static
+		 T D2(string id) => null;
+		}
+		""",
+		"""
+		public class T
+		{
+		    public int this[
+		        int i,
+		        int j] => i;
+
+		    public static T D1<
+		        U>() => null;
+
+		    public static
+		        T D2(string id) => null;
+		}
+		""");
+
+	[Test]
+	public Task A_width_still_joins_a_wrapped_declaration_line() => Formats(
+		"""
+		public class T
+		{
+		    public int this[
+		        int i,
+		        int j] => i;
+
+		    public static T D1<
+		        U>() => null;
+
+		    public static
+		        T D2(string id) => null;
+		}
+		""",
+		"""
+		public class T
+		{
+		    public int this[int i, int j] => i;
+
+		    public static T D1<U>() => null;
+
+		    public static T D2(string id) => null;
+		}
+		""",
+		editorConfig: "max_line_length = 120");
+
 	[Test]
 	public Task Operator() => Unchanged(
 		"""

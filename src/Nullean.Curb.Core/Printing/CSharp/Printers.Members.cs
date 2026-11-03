@@ -205,23 +205,37 @@ internal static partial class Printers
 		TokenPrinter.PrintIfPresent(node.SemicolonToken, context);
 	}
 
+	/// <summary>An indexer's <c>[int i, int j]</c>.</summary>
+	/// <remarks>
+	/// A line the author broke stays broken, one level in, as a method's parameters do: dotnet format
+	/// leaves it, and joining it lengthened a line they had wrapped on purpose (issue #201).
+	/// </remarks>
 	public static void BracketedParameterList(BracketedParameterListSyntax node, PrintContext context)
 	{
+		var arena = context.Arena;
 		Spacing.BeforeOpenBracket(context);
 		TokenPrinter.Print(node.OpenBracketToken, context);
-		Spacing.InsideBrackets(context);
 
-		for (var i = 0; i < node.Parameters.Count; i++)
+		using (arena.Indent())
 		{
-			Node.Print(node.Parameters[i], context);
-			if (i >= node.Parameters.SeparatorCount)
-				continue;
-			Spacing.BeforeComma(context);
-			TokenPrinter.Print(node.Parameters.GetSeparator(i), context);
-			Spacing.AfterComma(context);
+			if (!BreakAsWritten(node.OpenBracketToken, node.Parameters.FirstOrDefault(), context))
+				Spacing.InsideBrackets(context);
+
+			for (var i = 0; i < node.Parameters.Count; i++)
+			{
+				Node.Print(node.Parameters[i], context);
+				if (i >= node.Parameters.SeparatorCount)
+					continue;
+				Spacing.BeforeComma(context);
+				var separator = node.Parameters.GetSeparator(i);
+				TokenPrinter.Print(separator, context);
+				if (!BreakAsWritten(separator, node.Parameters[i + 1], context))
+					Spacing.AfterComma(context);
+			}
 		}
 
-		Spacing.InsideBrackets(context);
+		if (!BreakAsWritten(node.Parameters.LastOrDefault(), node.CloseBracketToken, context))
+			Spacing.InsideBrackets(context);
 		TokenPrinter.Print(node.CloseBracketToken, context);
 	}
 
