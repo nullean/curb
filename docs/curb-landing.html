@@ -331,6 +331,7 @@
   }
   .pass-tag.amber { color: var(--amber); background: rgba(255,176,61,0.09); border: 1px solid var(--amber-dim); }
   .pass-tag.purple { color: var(--purple-hi); background: rgba(169,107,255,0.09); border: 1px solid var(--purple-dim); }
+  .pass-tag.muted { color: var(--muted); background: rgba(152,161,174,0.07); border: 1px solid var(--bg3); }
   .pass h3 { font-family: var(--display); font-size: 1.25rem; font-weight: 700; margin-bottom: 0.5rem; letter-spacing: -0.02em; }
   .pass p { font-size: 0.84rem; color: var(--muted); margin-bottom: 1.1rem; }
   .pass ul { list-style: none; font-size: 0.8rem; }
@@ -528,7 +529,7 @@
       </a>
       <a class="card" href="reference/">
         <div class="card-kicker">your choices, not ours</div>
-        <div class="card-title">97 keys.<br/>All from .editorconfig.</div>
+        <div class="card-title">116 C# keys.<br/>All from .editorconfig.</div>
         <p class="card-body">
           All 39 IDE0055 keys, the 8 core EditorConfig keys, plus ReSharper's wrapping and blank-line
           keys — read from the <strong>.editorconfig</strong> you already have. Curb invents nothing.
@@ -688,7 +689,7 @@
           <li>Braces, expression bodies, file-scoped namespaces</li>
           <li>Modifier order, using directives, file headers</li>
         </ul>
-        <a class="pass-link" href="reference/">97 options →</a>
+        <a class="pass-link" href="reference/">116 C# options →</a>
       </div>
       <div class="pass">
         <span class="pass-tag purple">pass 2 · on demand</span>
@@ -707,12 +708,66 @@
     </div>
 
     <p class="stats-note" style="margin-top:2.5rem">
-      Pass 1's output is measured as a fixed point of <code>dotnet format whitespace</code> in CI, on
-      every push: 100% with reflow off, 100% with reflow on, 99.9% with
-      <code>csharp_keep_existing_linebreaks = true</code>. Pass 2 is held to the same discipline against
-      <code>dotnet format style</code>. Both read the same <strong>.editorconfig</strong> in your repo.
+      Pass 1's output is gated in CI, on every push, as a fixed point of <code>dotnet format whitespace</code>,
+      on a generated corpus written to be as untidy as real code gets. On a repository that is already formatted,
+      such as elastic/docs-builder, it changes nothing <code>dotnet format</code> would put back. Pass 2 is
+      held to the same discipline against <code>dotnet format style</code>. Both read the same
+      <strong>.editorconfig</strong> in your repo.
       <a href="design-principles/conformance/">How it's measured →</a>
     </p>
+  </div>
+</section>
+
+<hr class="divider"/>
+
+<!-- ══════════════  BEYOND C#  ══════════════ -->
+<section class="section reveal" id="languages">
+  <div class="inner">
+    <p class="section-label">// beyond C#</p>
+    <h2 class="section-title">The rest of the repo.<br/>Same command.</h2>
+    <p class="section-sub">
+      <code>curb format</code> and <code>curb check</code> also cover the files around your C#, from the same
+      <strong>.editorconfig</strong>, the same cache and the same exit code.
+    </p>
+
+    <div class="grid-3">
+      <div class="pass">
+        <span class="pass-tag amber">on by default</span>
+        <h3>Project and solution files</h3>
+        <p><code>.csproj</code>, <code>.fsproj</code>, <code>.props</code>, <code>.targets</code>, <code>.slnx</code>
+        and <code>nuget.config</code>, re-indented by Curb's own lossless XML printer. Your line breaks stay, and
+        text, comments and attribute values are never touched.</p>
+        <ul>
+          <li>Opt out with <code>curb_xml_format = false</code></li>
+          <li>CLI and pre-commit only: the build never rewrites a project file</li>
+        </ul>
+        <a class="pass-link" href="workflow/xml/">project and solution files →</a>
+      </div>
+      <div class="pass">
+        <span class="pass-tag purple">opt in</span>
+        <h3>F# through Fantomas</h3>
+        <p>Declare Fantomas in your tool manifest and Curb hands it your <code>.fs</code>, <code>.fsi</code> and
+        <code>.fsx</code> files, through the version you pinned, with Curb's cache, write and exit code around it.</p>
+        <ul>
+          <li>Nothing changes until a manifest declares Fantomas</li>
+          <li>Written only if Fantomas leaves its own result unchanged</li>
+          <li>Also runs in <code>dotnet build</code> for F# projects</li>
+        </ul>
+        <a class="pass-link" href="workflow/fsharp/">F# through Fantomas →</a>
+      </div>
+      <div class="pass">
+        <span class="pass-tag muted">experimental</span>
+        <h3>Razor code blocks</h3>
+        <p>The C# inside <code>@code</code> and <code>@functions</code> blocks of <code>.razor</code> and
+        <code>.cshtml</code> files, formatted with your C# options. Markup, directives and expressions stay
+        exactly as written.</p>
+        <ul>
+          <li>Opt in with <code>curb_razor_format_code_blocks = true</code> in a <code>[*.razor]</code> section</li>
+          <li>CLI and pre-commit only: the build never formats Razor</li>
+        </ul>
+        <a class="pass-link" href="workflow/razor/">Razor code blocks →</a>
+      </div>
+    </div>
   </div>
 </section>
 

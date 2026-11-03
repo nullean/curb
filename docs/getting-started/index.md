@@ -10,7 +10,7 @@ description: Install Curb, format a folder, and configure it with the .editorcon
 As a global tool:
 
 ```sh
-dotnet tool install -g Nullean.Curb
+dotnet tool install -g curb-cli
 ```
 
 Ships as a native-AOT binary for `linux-x64`, `linux-arm64`, `win-x64`, `win-arm64` and `osx-arm64`,
@@ -29,8 +29,12 @@ curb check ./src      # exit non-zero if anything would change
 Out of the box {{product}} uses Roslyn's defaults, which are the same defaults Visual Studio and Rider
 use. On a repository that is already IDE0055-clean, `curb format` should change nothing.
 
-{{product}} also formats project and solution files ([Project and solution files](../workflow/xml.md)),
-and F# when your tool manifest declares Fantomas ([F# through Fantomas](../workflow/fsharp.md)).
+{{product}} also formats project and solution files, on by default ([Project and solution
+files](../workflow/xml.md)). It formats F# when your tool manifest declares Fantomas, through the version
+the manifest pins; it never installs Fantomas, and skips F# files without it ([F# through
+Fantomas](../workflow/fsharp.md)). And, experimentally, it formats the C# in Razor `@code` and `@functions`
+blocks when an `.editorconfig` section for Razor files opts in, leaving the markup alone ([Razor code
+blocks](../workflow/razor.md)).
 
 ## Turn on reflow
 
@@ -55,7 +59,8 @@ csharp_style_namespace_declarations = file_scoped
 ```
 
 All 39 IDE0055 formatting options are supported, plus the 8 core EditorConfig keys, plus a set of
-syntax-level code style and wrapping options — around 90 keys in total.
+syntax-level code style and wrapping options — 116 C# keys in total, and a handful more for project
+files and Razor.
 
 Unrecognised or not-yet-implemented keys are **reported, not silently ignored**, with a "did you mean"
 suggestion for likely typos. Semantic code style keys are passed over deliberately, because they belong
