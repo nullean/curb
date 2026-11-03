@@ -9,9 +9,10 @@ description: curb rewrites your source before the compiler reads it. How it work
 <PackageReference Include="curb" Version="*" PrivateAssets="all" />
 ```
 
-That is the whole setup. From then on `dotnet build` formats the project's source before compiling it.
-It formats the C# the project compiles and nothing else: project and solution files are only formatted
-by `curb format` and `curb check` (see [project and solution files](xml.md)).
+That is the whole setup. From then on `dotnet build` formats the project's source before compiling it:
+the C# a C# project compiles, and the F# an F# project compiles when its tool manifest declares Fantomas
+(see [F#](fsharp.md)). Project and solution files and Razor files are only formatted by `curb format` and
+`curb check` (see [project and solution files](xml.md) and [Razor code blocks](razor.md)).
 
 The package is build-only — `netstandard2.0`, no library, `DevelopmentDependency`, nothing added to your
 output. Put it in `Directory.Build.props` to apply it across a solution.

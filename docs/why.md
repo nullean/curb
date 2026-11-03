@@ -51,7 +51,11 @@ are the ones that needed a compilation to decide — worth fixing, not noise.
 | Syntax-level code style (braces, expression bodies, file-scoped namespaces) | ❌ | ✅ | ✅ |
 | Semantic code style (`var`, unused usings, naming) | ❌ | ✅ | ❌ *by design* |
 
-The last row is the scope boundary. {{product}} never loads a compilation, and that is what keeps it
+Beyond C#, the same commands format project and solution files, F# through the Fantomas your tool
+manifest pins, and, experimentally, the C# in Razor `@code` blocks. See
+[Project and solution files](workflow/xml.md), [F#](workflow/fsharp.md) and [Razor](workflow/razor.md).
+
+The last row of the table is the scope boundary. {{product}} never loads a compilation, and that is what keeps it
 fast enough to run inside every build.
 
 ## Read more

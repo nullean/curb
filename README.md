@@ -87,6 +87,19 @@ cover your `.fs`, `.fsi` and `.fsx` files too, through that exact version, with 
 and safety check on top: a result is written only if Fantomas leaves it unchanged when it is sent back.
 Without the manifest entry nothing changes. See [F# through Fantomas](https://curb.nullean.net/workflow/fsharp/).
 
+### Razor code blocks (experimental)
+
+Opt in from a section that names Razor files, and `curb format` and `curb check` format the C# in the
+`@code` and `@functions` blocks of `.razor` and `.cshtml` files with your C# options:
+
+```ini
+[*.{razor,cshtml}]
+curb_razor_format_code_blocks = true
+```
+
+Markup, directives, `@{ }` blocks and expressions stay exactly as written, and the MSBuild package never
+formats Razor files. See [Razor code blocks](https://curb.nullean.net/workflow/razor/).
+
 ## Building from source
 
 Requires the .NET 10 SDK.
