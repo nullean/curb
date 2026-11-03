@@ -360,6 +360,50 @@ public class InitializerTests : FormattingTest
 		}
 		""");
 
+	// Issue #214: dotnet format opens a `with` initializer that spans lines out one member per line even
+	// with csharp_new_line_before_members_in_object_initializers off: the key reaches object initializers
+	// only. One on a single line stays there.
+	[Test]
+	public Task A_with_initializer_that_spans_lines_puts_each_member_on_its_own_line() => Formats(
+		"""
+		public class C
+		{
+		    public void M(Customer customer)
+		    {
+		        var a = customer with
+		        {
+		            Name = customer.Name
+		                .ToUpperInvariant(), Email = "x"
+		        };
+		        var b = customer with
+		        {
+		            Name = "a", Email = "x"
+		        };
+		        var c = customer with { Name = "a", Email = "x" };
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M(Customer customer)
+		    {
+		        var a = customer with
+		        {
+		            Name = customer.Name
+		                .ToUpperInvariant(),
+		            Email = "x"
+		        };
+		        var b = customer with
+		        {
+		            Name = "a",
+		            Email = "x"
+		        };
+		        var c = customer with { Name = "a", Email = "x" };
+		    }
+		}
+		""");
+
 	// ---- tuples -------------------------------------------------------------------------------
 
 	[Test]
