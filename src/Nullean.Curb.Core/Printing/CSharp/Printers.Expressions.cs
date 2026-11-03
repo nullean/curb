@@ -557,7 +557,12 @@ internal static partial class Printers
 
 		// Reproduce the author's own breaks rather than imposing one member per line: an initializer
 		// written across lines with two members sharing one keeps them sharing it.
-		var asWritten = !oneMemberPerLine && spansLines;
+		//
+		// A `with` expression's members go one per line whatever the key says: it reaches object
+		// initializers only, and dotnet format opens a `with` that spans lines out regardless (issue #214).
+		// Only its members: where its brace goes is the key's, as before.
+		var membersOnePerLine = oneMemberPerLine || node.IsKind(SyntaxKind.WithInitializerExpression);
+		var asWritten = !membersOnePerLine && spansLines;
 
 		// The option says one member per line *when the initializer is opened out*, not that it must
 		// be opened out. Measured: with csharp_new_line_before_members_in_object_initializers = true
@@ -565,7 +570,7 @@ internal static partial class Printers
 		// `new Thing { X = 1 }` and `new { P = 1 }` every one of them on its line. Curb exploded all
 		// four, which on roslyn — where both keys are set — was the single largest source of churn,
 		// and produced things like a `new[]` at one indent with its brace at another.
-		var openItOut = oneMemberPerLine && spansLines;
+		var openItOut = membersOnePerLine && spansLines;
 
 		// An array or collection initializer the author broke keeps exactly their breaks, as a
 		// collection expression does. dotnet format leaves both as written, where it opens out an
