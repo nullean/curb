@@ -583,22 +583,25 @@ internal static partial class Printers
 			// That includes the brace's own line: `new Dictionary<string, int>` / `{` keeps the brace where
 			// the author put it, column and all, as dotnet format does. The space alone joined it onto the
 			// `new` line whatever the source had (issue #137). Not past a comment, which places the line
-			// itself, nor from an indent dotnet format would rewrite into the configured style.
+			// itself.
+			//
+			// dotnet format keeps each line's column but writes its indent in the configured style, so
+			// under tabs a dictionary written with spaces had its brace joined and its entries left in
+			// spaces (issue #199). Every line now keeps its column in that style instead.
 			var open = node.OpenBraceToken;
 			var lineStart = context.Text.Lines.GetLineFromPosition(open.SpanStart).Start;
 			if (leadingLine
 				&& !TokenPrinter.HasLeadingContent(open)
 				&& !EndsWithLineComment(open.GetPreviousToken())
-				&& context.AuthorBroke(open.GetPreviousToken().Span.End, open.SpanStart)
-				&& IndentInStyle(lineStart, open.SpanStart, context))
+				&& context.AuthorBroke(open.GetPreviousToken().Span.End, open.SpanStart))
 			{
 				arena.LiteralLine();
-				arena.SourceText(lineStart, open.SpanStart - lineStart);
+				IndentAsWritten(lineStart, open.SpanStart, context);
 			}
 			else if (leadingLine)
 				arena.Synthetic(SyntheticText.Space);
 
-			PrintVerbatim(node, context);
+			PrintVerbatimInStyle(node, context);
 			return;
 		}
 
@@ -922,6 +925,99 @@ internal static partial class Printers
 		}
 
 		return !context.Options.UseTabs || spaces < Math.Max(1, context.Options.TabWidth);
+	}
+
+	/// <summary>
+	/// Writes a line's indent, the source between <paramref name="start"/> and <paramref name="end"/>, at
+	/// the column it reaches but in the configured style.
+	/// </summary>
+	/// <remarks>Only a line dotnet format leaves where it is comes here, so the rewrite is rare and allocates.</remarks>
+	private static void IndentAsWritten(int start, int end, PrintContext context)
+	{
+		if (IndentInStyle(start, end, context))
+		{
+			if (end > start)
+				context.Arena.SourceText(start, end - start);
+			return;
+		}
+
+		var tabWidth = Math.Max(1, context.Options.TabWidth);
+		var column = 0;
+		for (var i = start; i < end; i++)
+			column += context.Text[i] == '\t' ? tabWidth - (column % tabWidth) : 1;
+
+		var tabs = context.Options.UseTabs ? column / tabWidth : 0;
+		context.Arena.ExternalText(new string('\t', tabs) + new string(' ', column - (tabs * tabWidth)));
+	}
+
+	/// <summary>
+	/// <see cref="PrintVerbatim"/> for a construct dotnet format leaves line for line, whose indents it
+	/// still writes in the configured style.
+	/// </summary>
+	/// <remarks>
+	/// Two kinds of line it leaves exactly as written: one that starts inside a token, which is a string's
+	/// content, and one whose trivia holds a comment, which dotnet format does not re-lay here.
+	/// </remarks>
+	private static void PrintVerbatimInStyle(SyntaxNode node, PrintContext context)
+	{
+		var first = node.GetFirstToken();
+		var last = node.GetLastToken();
+		TokenPrinter.PrintLeadingTrivia(first, context);
+
+		var text = context.Text;
+		var span = node.Span;
+		var lineStart = span.Start;
+		for (var i = span.Start; i < span.End; i++)
+		{
+			if (text[i] != '\n')
+				continue;
+
+			var lineEnd = i > lineStart && text[i - 1] == '\r' ? i - 1 : i;
+			if (lineEnd > lineStart)
+				context.Arena.SourceText(lineStart, lineEnd - lineStart);
+			context.Arena.LiteralLine();
+
+			lineStart = i + 1;
+			var content = lineStart;
+			while (content < span.End && text[content] is ' ' or '\t')
+				content++;
+
+			if (content < span.End && text[content] is not ('\r' or '\n') && KeepsItsIndent(node, content))
+				continue;
+
+			IndentAsWritten(lineStart, content, context);
+			lineStart = content;
+		}
+
+		if (span.End > lineStart)
+			context.Arena.SourceText(lineStart, span.End - lineStart);
+
+		if (last.RawKind != 0)
+		{
+			TokenPrinter.PrintTrailingTrivia(last, context);
+			context.PreviousToken = last;
+		}
+	}
+
+	/// <summary>True for a line, starting at <paramref name="position"/>, whose indent dotnet format leaves alone.</summary>
+	private static bool KeepsItsIndent(SyntaxNode node, int position)
+	{
+		var token = node.FindToken(position);
+		if (position > token.SpanStart && position < token.Span.End)
+			return true;
+
+		return HasComment(token.LeadingTrivia) || HasComment(token.GetPreviousToken().TrailingTrivia);
+	}
+
+	private static bool HasComment(SyntaxTriviaList trivia)
+	{
+		foreach (var item in trivia)
+		{
+			if (item.IsKind(SyntaxKind.SingleLineCommentTrivia) || item.IsKind(SyntaxKind.MultiLineCommentTrivia))
+				return true;
+		}
+
+		return false;
 	}
 
 	/// <summary>True for an initializer whose elements are brace-wrapped, as a dictionary's are.</summary>
