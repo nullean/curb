@@ -300,6 +300,11 @@ internal static partial class Printers
 			return;
 		}
 
+		// The same `:` after an opened-out block lambda as above: dotnet format moves it to the indent of
+		// the enclosing statement's line whatever the layout, so it does not take the group's break under
+		// the `?` (issue #205). The block breaks the group anyway, so the `?` still starts a line.
+		var colonFollowsBlock = OpensOutBlock(node.WhenTrue, context);
+
 		using (arena.Group())
 		using (arena.Indent())
 		{
@@ -314,10 +319,22 @@ internal static partial class Printers
 			if (spaced)
 				arena.Synthetic(SyntheticText.Space);
 			Node.Print(node.WhenTrue, context);
-			if (spaced)
-				arena.Line();
-			else
-				arena.SoftLine();
+			if (!colonFollowsBlock)
+			{
+				if (spaced)
+					arena.Line();
+				else
+					arena.SoftLine();
+				TokenPrinter.Print(node.ColonToken, context);
+				if (spaced)
+					arena.Synthetic(SyntheticText.Space);
+				Node.Print(node.WhenFalse, context);
+			}
+		}
+
+		if (colonFollowsBlock)
+		{
+			ColonAfterBlockLine(node, context);
 			TokenPrinter.Print(node.ColonToken, context);
 			if (spaced)
 				arena.Synthetic(SyntheticText.Space);
@@ -359,7 +376,7 @@ internal static partial class Printers
 	/// </remarks>
 	private static void ColonAfterBlockLine(ConditionalExpressionSyntax node, PrintContext context)
 	{
-		var start = IndentationContextStart(node);
+		var start = IndentationContextStart(node, context);
 		if (start < 0)
 		{
 			context.Arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
@@ -376,10 +393,19 @@ internal static partial class Printers
 	/// Where the nearest construct that dotnet format indents its own lines from starts: a statement,
 	/// a lambda, a switch expression arm, an initializer or collection element, or a member.
 	/// </summary>
-	private static int IndentationContextStart(SyntaxNode node)
+	/// <remarks>
+	/// Not a statement this run prints as an expression body: that goes on to the member, where the next
+	/// run finds it (see <see cref="PrintContext.ConvertedStatement"/>).
+	/// </remarks>
+	private static int IndentationContextStart(SyntaxNode node, PrintContext context)
 	{
 		for (var current = node.Parent; current is not null; current = current.Parent)
 		{
+			// Nor the block around it, whose braces the conversion drops.
+			if (context.ConvertedStatement is { } converted
+				&& (ReferenceEquals(current, converted) || ReferenceEquals(current, converted.Parent)))
+				continue;
+
 			switch (current)
 			{
 				case StatementSyntax or AnonymousFunctionExpressionSyntax or SwitchExpressionArmSyntax

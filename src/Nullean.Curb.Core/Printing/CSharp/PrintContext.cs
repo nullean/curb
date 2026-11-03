@@ -1,5 +1,6 @@
 using System.Buffers;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Text;
 using Nullean.Curb.Documents;
 
@@ -128,6 +129,14 @@ internal sealed class PrintContext(DocArena arena, SourceText text, string sourc
 	/// still gets its own indent. A broken ternary at the top of the condition reads it the same way.
 	/// </remarks>
 	public SyntaxNode? IndentedCondition { get; set; }
+
+	/// <summary>The statement of a block body being printed as an expression body, while it is.</summary>
+	/// <remarks>
+	/// It no longer starts a line of its own: what it holds now hangs off the member's arrow, so a
+	/// construct that measures from the enclosing statement's line measures from the member's instead,
+	/// as it will on the next run, which reads the expression body back.
+	/// </remarks>
+	public StatementSyntax? ConvertedStatement { get; set; }
 
 	/// <summary>Source spans a rewrite legitimately dropped, or null when nothing was dropped.</summary>
 	/// <remarks>
