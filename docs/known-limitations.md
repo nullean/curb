@@ -13,11 +13,10 @@ On source that was never formatted, {{product}} indents a few kinds of continuat
 - `select new { }` in a query;
 - tuple patterns in switch arms;
 - members of a `with` initializer;
-- the `:` of a conditional whose `?` branch is a multi-line lambda;
-- a `//` comment directly above a goto label, under `csharp_indent_labels = one_less_than_current`.
+- the `:` of a conditional whose `?` branch is a multi-line lambda.
 
-The CI corpus, which is written to be untidy, finds these in 44 of its 1,868 files at its default width,
-and in 143 with no width, where its initializers are kept as written. That is the gap between its conformance
+The CI corpus, which is written to be untidy, finds these in 34 of its 1,868 files at its default width,
+and in 137 with no width, where its initializers are kept as written. That is the gap between its conformance
 floors and 100%. elastic/docs-builder, whose authors had already formatted it, shows none.
 
 ## An expression body can move on a second pass at a width
