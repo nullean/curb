@@ -417,26 +417,26 @@ internal static partial class Printers
 
 		if (node.Initializer is not null)
 		{
-			// ` : base(...)` — the colon needs air on both sides, unless it has been given a line.
+			// ` : base(...)` — the colon needs air on both sides, unless it has been given a line: by the
+			// option, or by the author when the option is unset (issue #196).
+			var colon = node.Initializer.ColonToken;
+			var sameLine = context.Options.PlaceConstructorInitializerOnSameLine;
 			using (arena.Indent())
 			{
-				if (context.Options.PlaceConstructorInitializerOnSameLine)
-					arena.Synthetic(SyntheticText.Space);
+				if (sameLine != true && context.AuthorBroke(node.ParameterList.Span.End, colon.SpanStart))
+				{
+					using (AuthorClauseLine(colon, context))
+						PrintConstructorInitializer(node.Initializer, context);
+					context.ExitContinuation();
+				}
 				else
-					arena.HardLine();
-				TokenPrinter.Print(node.Initializer.ColonToken, context);
-				arena.Synthetic(SyntheticText.Space);
-				TokenPrinter.Print(node.Initializer.ThisOrBaseKeyword, context);
-				Spacing.BeforeCallParens(context);
-
-				// Named, because when there is an initializer it is *its* closing parenthesis the body
-				// follows, not the parameter list's. Wrapping it here rather than reading whichever
-				// argument list happened to be printed last, which a nested call would win.
-				var initializerGroup = context.Arena.NextGroupId();
-				using (context.Arena.Group(initializerGroup))
-					Node.Print(node.Initializer.ArgumentList, context);
-
-				context.ParameterListGroup = initializerGroup;
+				{
+					if (sameLine == false)
+						arena.HardLine();
+					else
+						arena.Synthetic(SyntheticText.Space);
+					PrintConstructorInitializer(node.Initializer, context);
+				}
 			}
 		}
 
@@ -454,6 +454,23 @@ internal static partial class Printers
 		}
 
 		TokenPrinter.PrintIfPresent(node.SemicolonToken, context);
+	}
+
+	private static void PrintConstructorInitializer(ConstructorInitializerSyntax initializer, PrintContext context)
+	{
+		TokenPrinter.Print(initializer.ColonToken, context);
+		context.Arena.Synthetic(SyntheticText.Space);
+		TokenPrinter.Print(initializer.ThisOrBaseKeyword, context);
+		Spacing.BeforeCallParens(context);
+
+		// Named, because when there is an initializer it is *its* closing parenthesis the body
+		// follows, not the parameter list's. Wrapping it here rather than reading whichever
+		// argument list happened to be printed last, which a nested call would win.
+		var initializerGroup = context.Arena.NextGroupId();
+		using (context.Arena.Group(initializerGroup))
+			Node.Print(initializer.ArgumentList, context);
+
+		context.ParameterListGroup = initializerGroup;
 	}
 
 	/// <summary>

@@ -475,22 +475,18 @@ internal static partial class Printers
 			return;
 		}
 
-		// A `{ }` body the author kept on one line only stays there while the header is still one
-		// line. Once a clause has been given a line of its own the brace follows it, which is what
-		// dotnet format writes and what two corpus files caught. Safe to ask here because the clause
-		// options force their break unconditionally — this is reading the options, not the layout.
-		var oneLine = KeepsOneLine(node.OpenBraceToken, node.CloseBraceToken, context)
-			&& !HeaderWasBroken(node.BaseList, node.ConstraintClauses.Count, context);
+		// A `{ }` body the author kept on one line only stays on the header's while the header is still
+		// one line. Once a clause has a line of its own the brace moves below it and stays one line there,
+		// which is what dotnet format writes and what two corpus files caught. Safe to ask here because a
+		// clause's break is forced by its option or reproduced from the author's, never decided by this run.
+		var oneLine = KeepsOneLine(node.OpenBraceToken, node.CloseBraceToken, context);
+		if (!oneLine || HeaderWasBroken(node.BaseList, node.ConstraintClauses, context))
+			BeforeOpenBrace(BraceStyle.Types, context);
+		else
+			arena.Synthetic(SyntheticText.Space);
 
 		using (arena.ForceFlatIf(oneLine))
-		{
-			if (oneLine)
-				arena.Synthetic(SyntheticText.Space);
-			else
-				BeforeOpenBrace(BraceStyle.Types, context);
-
 			PrintTypeBody(node, context);
-		}
 	}
 
 	private static void PrintTypeBody(TypeDeclarationSyntax node, PrintContext context)
@@ -595,7 +591,7 @@ internal static partial class Printers
 		if (node.Body is not null)
 		{
 			if (!TryPrintExpressionBody(node.Body, context.Options.ExpressionBodiedMethods, context))
-				PrintBody(node.Body, BraceStyle.Methods, context, context.ParameterListGroup);
+				PrintBody(node.Body, BraceStyle.Methods, context, context.ParameterListGroup, HeaderWasBroken(null, node.ConstraintClauses, context));
 			return;
 		}
 
@@ -1969,21 +1965,27 @@ internal static partial class Printers
 	/// Only where csharp_new_line_before_open_brace gives the brace a line at all: without one, dotnet
 	/// format writes `int a) { }` after a wrapped list too.
 	/// </param>
+	/// <param name="belowClause">A <c>where</c> clause has a line of its own above this body.</param>
 	internal static void PrintBody(
 		SyntaxNode body,
 		BraceStyle construct,
 		PrintContext context,
-		ushort ownerGroup = 0)
+		ushort ownerGroup = 0,
+		bool belowClause = false)
 	{
 		// A one-line body the author put on the line below its header stays there, as dotnet format leaves
 		// `void P()` then `{ }`; it was joined onto the signature (issue #146). The brace option still has
 		// the last word: without a line of its own for this brace, dotnet format joins it, after a wrapped
 		// parameter list too, and BeforeOpenBrace does the same.
+		//
+		// A `where` clause on its own line sends a one-line body below it however it was written, the same
+		// as a type's, whether it stayed one line or csharp_empty_block_style collapsed it.
 		var keepsOneLine = KeepsOneLine(body, context);
-		if (keepsOneLine
-			&& !JoinsEmptyBracesToHeader(body, context)
-			&& body is BlockSyntax block
-			&& context.AuthorBroke(block.OpenBraceToken.GetPreviousToken().Span.End, block.OpenBraceToken.SpanStart))
+		if ((belowClause && (keepsOneLine || JoinsEmptyBracesToHeader(body, context)))
+			|| (keepsOneLine
+				&& !JoinsEmptyBracesToHeader(body, context)
+				&& body is BlockSyntax block
+				&& context.AuthorBroke(block.OpenBraceToken.GetPreviousToken().Span.End, block.OpenBraceToken.SpanStart)))
 		{
 			BeforeOpenBrace(construct, context);
 			using (context.Arena.ForceFlat())
@@ -2910,18 +2912,61 @@ internal static partial class Printers
 	/// event answer to the property setting, the same grouping dotnet format uses for their braces.
 	/// </remarks>
 	/// <summary>
-	/// True when a clause option has put a line into a declaration's header, so nothing after it can
+	/// True when a clause has a line of its own in a declaration's header, so nothing after it can
 	/// still be on the declaration's own line.
 	/// </summary>
-	private static bool HeaderWasBroken(BaseListSyntax? baseList, int constraintCount, PrintContext context) =>
-		(context.Options.WrapBeforeExtendsColon && baseList is not null)
-		|| (context.Options.WrapBeforeFirstTypeParameterConstraint && constraintCount > 0);
+	/// <remarks>
+	/// Reads the same answers the clauses print from, none of which this run's output changes: an option,
+	/// or a break Curb reproduces.
+	/// </remarks>
+	private static bool HeaderWasBroken(
+		BaseListSyntax? baseList,
+		SyntaxList<TypeParameterConstraintClauseSyntax> constraints,
+		PrintContext context)
+	{
+		if (baseList is not null && ClauseOnOwnLine(baseList.ColonToken, context.Options.WrapBeforeExtendsColon, context))
+			return true;
+
+		foreach (var constraint in constraints)
+		{
+			if (ClauseOnOwnLine(constraint.WhereKeyword, context.Options.WrapBeforeFirstTypeParameterConstraint, context))
+				return true;
+		}
+
+		return false;
+	}
+
+	/// <summary>
+	/// Whether a header clause starting at <paramref name="first"/> gets a line of its own: what its
+	/// <paramref name="option"/> says when it is set, otherwise where the author put it.
+	/// </summary>
+	private static bool ClauseOnOwnLine(SyntaxToken first, bool? option, PrintContext context) =>
+		option ?? context.AuthorBroke(first.GetPreviousToken().Span.End, first.SpanStart);
+
+	/// <summary>
+	/// Breaks ahead of a header clause the author put on its own line, as far in from the line above as
+	/// they put it, and returns the scope its own lines print in. The caller owes
+	/// <see cref="PrintContext.ExitContinuation"/> once that scope closes.
+	/// </summary>
+	/// <remarks>
+	/// <c>dotnet format</c> leaves that line at whatever indent it has and moves it only as far as the
+	/// line above moves, the same as a value below <c>=</c>; see <see cref="ValueBelowOperator"/>.
+	/// </remarks>
+	private static DocScope AuthorClauseLine(SyntaxToken first, PrintContext context)
+	{
+		var anchor = context.EnterContinuation();
+		context.Arena.LineShiftAnchor(anchor);
+		var offset = ContinuationLine(first, anchor, context);
+		return context.Arena.AlignedIndent(anchor, offset);
+	}
 
 	/// <summary>Prints a <c>where</c> clause, on the signature line or a line of its own.</summary>
 	/// <remarks>
 	/// <para>
 	/// The break is unconditional when the option is on, so it never has to ask whether the
-	/// declaration wrapped — a question whose answer this run's own output would change.
+	/// declaration wrapped — a question whose answer this run's own output would change. Unset, the
+	/// author's own break stands: <c>dotnet format</c> leaves it, and joining it lengthened a line they
+	/// had wrapped on purpose (issue #196).
 	/// </para>
 	/// <para>
 	/// The indent scope covers the clause and not just the line before it. Anything the clause brings
@@ -2932,34 +2977,45 @@ internal static partial class Printers
 	/// </remarks>
 	private static void PrintConstraintClause(TypeParameterConstraintClauseSyntax constraint, PrintContext context)
 	{
-		if (!context.Options.WrapBeforeFirstTypeParameterConstraint)
+		var option = context.Options.WrapBeforeFirstTypeParameterConstraint;
+		if (!ClauseOnOwnLine(constraint.WhereKeyword, option, context))
 		{
 			context.Arena.Synthetic(SyntheticText.Space);
 			Node.Print(constraint, context);
 			return;
 		}
 
-		using (context.Arena.Indent())
-		{
-			context.Arena.HardLine();
-			Node.Print(constraint, context);
-		}
+		PrintClauseOnOwnLine(constraint, constraint.WhereKeyword, context);
 	}
 
 	/// <summary>Prints a base list, on the declaration line or a line of its own, colon first.</summary>
 	private static void PrintBaseList(BaseListSyntax baseList, PrintContext context)
 	{
-		if (!context.Options.WrapBeforeExtendsColon)
+		if (!ClauseOnOwnLine(baseList.ColonToken, context.Options.WrapBeforeExtendsColon, context))
 		{
 			Spacing.BeforeInheritanceColon(context);
 			Node.Print(baseList, context);
 			return;
 		}
 
+		PrintClauseOnOwnLine(baseList, baseList.ColonToken, context);
+	}
+
+	/// <summary>Prints a clause on a line below the header: where the author put it, or one level in.</summary>
+	private static void PrintClauseOnOwnLine(SyntaxNode clause, SyntaxToken first, PrintContext context)
+	{
 		using (context.Arena.Indent())
 		{
+			if (context.AuthorBroke(first.GetPreviousToken().Span.End, first.SpanStart))
+			{
+				using (AuthorClauseLine(first, context))
+					Node.Print(clause, context);
+				context.ExitContinuation();
+				return;
+			}
+
 			context.Arena.HardLine();
-			Node.Print(baseList, context);
+			Node.Print(clause, context);
 		}
 	}
 

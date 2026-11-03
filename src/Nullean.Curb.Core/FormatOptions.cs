@@ -895,43 +895,45 @@ public readonly record struct FormatOptions
 
 	/// <summary>
 	/// <c>csharp_wrap_before_first_type_parameter_constraint</c>: put a <c>where</c> clause on its own
-	/// line, indented under the declaration it constrains.
+	/// line, indented under the declaration it constrains. Null leaves each clause where the author put
+	/// it under preservation, and on the signature line under deterministic layout.
 	/// </summary>
 	/// <remarks>
 	/// <para>
-	/// Off by default, which keeps the clause on the signature line. On, it is Rider's own default
-	/// rendering, and one of the few places a real repository's layout differs from Curb's by a whole
-	/// line rather than by a column.
+	/// <c>true</c> is Rider's own default rendering, and one of the few places a real repository's layout
+	/// differs from Curb's by a whole line rather than by a column.
 	/// </para>
 	/// <para>
-	/// A forced placement, not a width-driven one: the break is always there or never, so nothing here
-	/// reads the source and there is no layout for a second run to read back differently. Where a
-	/// declaration carries several <c>where</c> clauses they each take their own line, since a break
-	/// before the first and none before the rest is a rendering nobody asks for.
+	/// Set, it is a forced placement rather than a width-driven one: the break is always there or never,
+	/// so there is no layout for a second run to read back differently. Where a declaration carries
+	/// several <c>where</c> clauses they each take their own line, since a break before the first and
+	/// none before the rest is a rendering nobody asks for.
 	/// </para>
 	/// </remarks>
-	public bool WrapBeforeFirstTypeParameterConstraint { get; init; }
+	public bool? WrapBeforeFirstTypeParameterConstraint { get; init; }
 
 	/// <summary>
-	/// <c>csharp_wrap_before_extends_colon</c>: put a base list on its own line, colon first.
+	/// <c>csharp_wrap_before_extends_colon</c>: put a base list on its own line, colon first. Null leaves
+	/// it where the author put it under preservation, and on the declaration's line under deterministic
+	/// layout.
 	/// </summary>
 	/// <remarks>
-	/// Off by default, keeping <c>class C : B</c> on one line. Forced rather than width-driven, for
-	/// the same reason as <see cref="WrapBeforeFirstTypeParameterConstraint"/>.
+	/// Set, it is forced rather than width-driven, for the same reason as
+	/// <see cref="WrapBeforeFirstTypeParameterConstraint"/>.
 	/// </remarks>
-	public bool WrapBeforeExtendsColon { get; init; }
+	public bool? WrapBeforeExtendsColon { get; init; }
 
 	/// <summary>
 	/// <c>csharp_place_constructor_initializer_on_same_line</c>: keep <c>: base(…)</c> on the
-	/// constructor's own line.
+	/// constructor's own line. Null leaves it where the author put it under preservation, and on the
+	/// constructor's line under deterministic layout.
 	/// </summary>
 	/// <remarks>
-	/// On by default, which is what Curb has always written. Off gives the initializer a line of its
-	/// own, indented under the signature — the same forced placement as
-	/// <see cref="WrapBeforeExtendsColon"/>, and free ground on the same measurement: dotnet format
-	/// neither joins an initializer the author broke nor breaks one they joined.
+	/// <c>false</c> gives the initializer a line of its own, indented under the signature — the same
+	/// forced placement as <see cref="WrapBeforeExtendsColon"/>, and free ground on the same measurement:
+	/// dotnet format neither joins an initializer the author broke nor breaks one they joined.
 	/// </remarks>
-	public bool PlaceConstructorInitializerOnSameLine { get; init; } = true;
+	public bool? PlaceConstructorInitializerOnSameLine { get; init; }
 
 	/// <summary>
 	/// <c>csharp_wrap_before_arrow_with_expressions</c>: when an expression body wraps, put the

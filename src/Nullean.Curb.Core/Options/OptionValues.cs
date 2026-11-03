@@ -70,9 +70,9 @@ public static class OptionValues
 			false => "false",
 			null => "false   # a plain identifier receiver keeps its first call; anything else stands alone",
 		},
-		"csharp_wrap_before_first_type_parameter_constraint" => Bool(options.WrapBeforeFirstTypeParameterConstraint),
-		"csharp_wrap_before_extends_colon" => Bool(options.WrapBeforeExtendsColon),
-		"csharp_place_constructor_initializer_on_same_line" => Bool(options.PlaceConstructorInitializerOnSameLine),
+		"csharp_wrap_before_first_type_parameter_constraint" => Clause(options.WrapBeforeFirstTypeParameterConstraint, "false"),
+		"csharp_wrap_before_extends_colon" => Clause(options.WrapBeforeExtendsColon, "false"),
+		"csharp_place_constructor_initializer_on_same_line" => Clause(options.PlaceConstructorInitializerOnSameLine, "true"),
 		"csharp_wrap_before_arrow_with_expressions" => Bool(options.WrapBeforeArrowWithExpressions),
 		"csharp_wrap_after_dot_in_method_calls" => Bool(options.WrapAfterDotInMethodCalls),
 		"csharp_wrap_chained_method_calls" => options.WrapChainedMethodCalls is null
@@ -254,6 +254,9 @@ public static class OptionValues
 
 	private static string Count(int? value) =>
 		value?.ToString(CultureInfo.InvariantCulture) ?? "   # no limit; width alone breaks a list";
+
+	private static string Clause(bool? value, string unset) =>
+		value is null ? unset + "   # unless the author broke it; a width joins that too" : Bool(value.Value);
 
 	private static string Rpar(bool? value) => value switch
 	{
