@@ -286,6 +286,104 @@ public class BracketAndLambdaBlockTests : FormattingTest
 		"public class C\n{\n\tpublic void M(bool enabled)\n\t{\n\t\tRegister(\n\t\t\tenabled ? () =>\n\t\t\t{\n\t\t\t\tRun();\n\t\t\t}\n\t\t: null);\n\t}\n}",
 		editorConfig: "indent_style = tab");
 
+	// Issue #205: with a width the ternary breaks before `?` and `:`, but a `:` after a block lambda
+	// still goes to the statement's line, where dotnet format puts it in every layout.
+	[Test]
+	public Task Under_a_width_a_colon_after_a_block_lambda_goes_to_the_statement() => Formats(
+		"""
+		public class C
+		{
+		    public void M(bool enabled)
+		    {
+		        Register(
+		            enabled ? () =>
+		            {
+		                Run();
+		            } : null);
+		        Action a = enabled ? () =>
+		        {
+		            Run();
+		        } : null;
+		        var s = value switch
+		        {
+		            1 => enabled ? () =>
+		            {
+		                Run();
+		            } : null,
+		            _ => null,
+		        };
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M(bool enabled)
+		    {
+		        Register(
+		            enabled
+		                ? () =>
+		                {
+		                    Run();
+		                }
+		        : null
+		        );
+		        Action a = enabled
+		            ? () =>
+		            {
+		                Run();
+		            }
+		        : null;
+		        var s = value switch
+		        {
+		            1 =>
+		                enabled
+		                    ? () =>
+		                    {
+		                        Run();
+		                    }
+		            : null,
+		            _ => null,
+		        };
+		    }
+		}
+		""",
+		editorConfig: "max_line_length = 120");
+
+	[Test]
+	public Task A_colon_after_a_block_lambda_in_a_body_converted_to_an_arrow_goes_to_the_member() => Formats(
+		// The statement it measured from becomes the member's expression body, so on the next run the
+		// member's line is the one it finds. Measuring from the statement on the converting run moved the
+		// `:` on the second.
+		"""
+		public class C
+		{
+		    public void M(bool enabled)
+		    {
+		        Register(
+		            enabled ? () =>
+		            {
+		                Run();
+		            } : null);
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M(bool enabled) =>
+		        Register(
+		            enabled
+		                ? () =>
+		                {
+		                    Run();
+		                }
+		    : null
+		        );
+		}
+		""",
+		editorConfig: "max_line_length = 120\ncsharp_style_expression_bodied_methods = true");
+
 	// Issue #135: a lambda block keeps the offset the author gave it from the line the lambda
 	// starts on.
 

@@ -1805,6 +1805,8 @@ internal static partial class Printers
 		};
 
 		context.Arena.Synthetic(SyntheticText.Space);
+		var outerConverted = context.ConvertedStatement;
+		context.ConvertedStatement = statement;
 		ArrowAndBody(
 			body.Parent,
 			default,
@@ -1813,6 +1815,7 @@ internal static partial class Printers
 			SynthesisedArrowBreaksBefore(body.OpenBraceToken.GetPreviousToken(), context),
 			context.AuthorJoined(keywordEnd, carried.SpanStart),
 			context);
+		context.ConvertedStatement = outerConverted;
 		TokenPrinter.Print(SemicolonOf(statement), context);
 
 		// In source order: the verifier walks these with a single cursor.
