@@ -186,9 +186,9 @@ Measured with both keys forced on, formatted twice:
 
 | Repository | Razor files | Changed | Markup left as written | Failed | Second pass |
 |---|---|---|---|---|---|
-| dotnet/blazor-samples | 3,091 | 439 | 9 | 0 | no change |
+| dotnet/blazor-samples | 3,091 | 441 | 9 | 0 | no change |
 | dotnet/aspnetcore (`src/Components`, `src/ProjectTemplates`) | 887 | 207 | 12 | 0 | no change |
-| dotnet/eShop | 58 | 9 | 0 | 0 | no change |
+| dotnet/eShop | 58 | 11 | 0 | 0 | no change |
 | elastic/docs-builder (`.cshtml` views) | 242 | 54 | 9 | 0 | no change |
 
 On 245 components from eShop and blazor-samples, formatted by Microsoft's formatter as well, Curb's markup
