@@ -1,14 +1,14 @@
 ---
-navigation_title: Razor code blocks (experimental)
-description: An experimental, opt-in mode that formats the C# inside @code, @functions and @{ } blocks of .razor and .cshtml files and leaves every other byte of the file as it is.
+navigation_title: Razor (experimental)
+description: An experimental, opt-in mode that formats the C# inside @code, @functions and @{ } blocks of .razor and .cshtml files and, with a second key, re-indents their markup.
 ---
 
-# Razor code blocks (experimental)
+# Razor (experimental)
 
 {{product}} can format the C# in the `@code`, `@functions` and `@{ }` blocks of your `.razor` components and
 `.cshtml` views with the same rules and the same `.editorconfig` keys as your `.cs` files. Nothing else in
-the file changes: markup, directives and expressions stay exactly as you wrote them. It's experimental and
-off by default.
+the file changes: markup, directives and expressions stay exactly as you wrote them, unless a second key
+[re-indents the markup](#markup-experimental). It's experimental and off by default.
 
 ## Turning it on
 
