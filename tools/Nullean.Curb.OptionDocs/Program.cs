@@ -487,7 +487,7 @@ internal static class Program
         // The markup keys are shown at indent_size = 2, where engine quirks indent by tab_width (4) instead.
         var markup = descriptor.Key switch
         {
-            RazorFormatter.MarkupKey => RazorMarkup.Indent,
+            RazorFormatter.MarkupKey or RazorFormatter.AttributeIndentKey => RazorMarkup.Indent,
             RazorFormatter.EngineQuirksKey => RazorMarkup.EngineQuirks,
             _ => RazorMarkup.Off,
         };
@@ -499,9 +499,15 @@ internal static class Program
         foreach (var value in descriptor.Values)
         {
             var after = snippet;
-            if (value == "true")
+            if (descriptor.Key == RazorFormatter.AttributeIndentKey || value == "true")
             {
-                var result = razor.Format(snippet, options, markup: markup);
+                var attributes = value switch
+                {
+                    "indent_by_one" => RazorAttributeIndent.IndentByOne,
+                    "indent_by_two" => RazorAttributeIndent.IndentByTwo,
+                    _ => RazorAttributeIndent.AlignWithFirst,
+                };
+                var result = razor.Format(snippet, options, markup: markup, attributes: attributes);
                 if (!result.Success || result.Declined > 0)
                     throw new InvalidOperationException($"the {descriptor.Key} = {value} example does not format: {result.Message}");
                 after = result.Text!;

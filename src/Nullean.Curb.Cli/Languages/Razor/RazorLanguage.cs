@@ -42,7 +42,7 @@ internal sealed class RazorLanguage : IInProcessLanguage
 
 		var explicitProperties = editorConfig.ExplicitFor(configuration.FileName);
 		return IsEnabled(explicitProperties)
-			? new RazorOptions(EditorConfigOptionsBinder.Bind(configuration), MarkupFrom(explicitProperties))
+			? new RazorOptions(EditorConfigOptionsBinder.Bind(configuration), MarkupFrom(explicitProperties), AttributesFrom(configuration.Properties))
 			: RazorOptions.Declined;
 	}
 
@@ -56,6 +56,16 @@ internal sealed class RazorLanguage : IInProcessLanguage
 			return RazorMarkup.Off;
 		return IsTrue(explicitProperties, RazorFormatter.EngineQuirksKey) ? RazorMarkup.EngineQuirks : RazorMarkup.Indent;
 	}
+
+	/// <summary>
+	/// <c>razor_attribute_indent_style</c>, read from any section, as Microsoft's Razor formatter reads it: it changes
+	/// nothing until markup is turned on.
+	/// </summary>
+	internal static RazorAttributeIndent AttributesFrom(IReadOnlyDictionary<string, string> properties) =>
+		!properties.TryGetValue(RazorFormatter.AttributeIndentKey, out var value) ? RazorAttributeIndent.AlignWithFirst
+		: value.Equals("indent_by_one", StringComparison.OrdinalIgnoreCase) ? RazorAttributeIndent.IndentByOne
+		: value.Equals("indent_by_two", StringComparison.OrdinalIgnoreCase) ? RazorAttributeIndent.IndentByTwo
+		: RazorAttributeIndent.AlignWithFirst;
 
 	private static bool IsTrue(IReadOnlyDictionary<string, string> properties, string key) =>
 		properties.TryGetValue(key, out var value) && value.Equals("true", StringComparison.OrdinalIgnoreCase);
@@ -88,10 +98,13 @@ internal sealed class RazorOptions : LanguageOptions
 
 	public readonly RazorMarkup Markup;
 
-	public RazorOptions(FormatOptions options, RazorMarkup markup, bool claimed = true)
+	public readonly RazorAttributeIndent Attributes;
+
+	public RazorOptions(FormatOptions options, RazorMarkup markup, RazorAttributeIndent attributes = RazorAttributeIndent.AlignWithFirst, bool claimed = true)
 	{
 		Value = options;
 		Markup = markup;
+		Attributes = attributes;
 		Claimed = claimed;
 
 		// The byte-order mark is outside every block, so it stays as the file has it whatever `charset`
@@ -122,7 +135,8 @@ internal sealed class RazorWorker(RazorFormatter formatter) : ILanguageWorker
 		formatter.Format(
 			source, ((RazorOptions)options).Value, produceText, verifyRoundTrip,
 			component: !fileName.EndsWith(".cshtml", StringComparison.OrdinalIgnoreCase),
-			markup: ((RazorOptions)options).Markup);
+			markup: ((RazorOptions)options).Markup,
+			attributes: ((RazorOptions)options).Attributes);
 
 	/// <summary>Zero, since the run's round-trip line counts <c>.cs</c> files only.</summary>
 	public int RoundTripsChecked => 0;

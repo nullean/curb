@@ -130,6 +130,18 @@ public class RazorRunTests
 	}
 
 	[Test]
+	public async Task The_attribute_indent_style_is_read_from_any_section_as_microsofts_formatter_reads_it()
+	{
+		var fs = Repo(OptIn + "curb_razor_format_markup = true\n\n[*]\nrazor_attribute_indent_style = indent_by_one\n");
+		fs.AddFile($"{Root}/A.razor", new MockFileData("<div>\n<button class=\"btn\"\ntype=\"button\">x</button>\n</div>\n"));
+
+		FormattingRun.Execute(fs, Root, write: true);
+
+		fs.File.ReadAllText($"{Root}/A.razor").Should().Be("<div>\n    <button class=\"btn\"\n        type=\"button\">x</button>\n</div>\n");
+		await Task.CompletedTask;
+	}
+
+	[Test]
 	public async Task A_code_block_in_a_view_is_markup_and_left_alone()
 	{
 		var fs = Repo(OptIn);

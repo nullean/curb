@@ -253,6 +253,207 @@ public class RazorMarkupTests : RazorFormattingTest
 			"markup left as written, <div> is never closed",
 			markup: RazorMarkup.Indent);
 
+	private const string Attributes =
+		"""
+		<div>
+		<button class="btn" type="button"
+		@onclick="Go"
+		  disabled="@off">
+		Go
+		</button>
+		<input type="text"
+		value="@x" />
+		<MyComponent
+		A="1"
+		B="2" />
+		<span>x</span><a href="y"
+		title="z">y</a>
+		<p
+		>text</p>
+		</div>
+		""";
+
+	[Test]
+	public Task Continued_attributes_align_with_the_first_one() =>
+		Formats(
+			Attributes,
+			"""
+			<div>
+			    <button class="btn" type="button"
+			            @onclick="Go"
+			            disabled="@off">
+			        Go
+			    </button>
+			    <input type="text"
+			           value="@x" />
+			    <MyComponent
+			        A="1"
+			        B="2" />
+			    <span>x</span><a href="y"
+			                     title="z">y</a>
+			    <p
+			    >text</p>
+			</div>
+			""",
+			markup: RazorMarkup.Indent);
+
+	[Test]
+	public Task Engine_quirks_align_attributes_with_a_tag_that_has_none_on_its_line() =>
+		Formats(
+			Attributes,
+			"""
+			<div>
+			    <button class="btn" type="button"
+			            @onclick="Go"
+			            disabled="@off">
+			        Go
+			    </button>
+			    <input type="text"
+			           value="@x" />
+			    <MyComponent
+			    A="1"
+			    B="2" />
+			    <span>x</span><a href="y"
+			                     title="z">y</a>
+			    <p
+			    >text</p>
+			</div>
+			""",
+			markup: RazorMarkup.EngineQuirks);
+
+	[Test]
+	public Task Indent_by_one_puts_continued_attributes_a_level_in_from_the_tags_line() =>
+		Formats(
+			Attributes,
+			"""
+			<div>
+			    <button class="btn" type="button"
+			        @onclick="Go"
+			        disabled="@off">
+			        Go
+			    </button>
+			    <input type="text"
+			        value="@x" />
+			    <MyComponent
+			        A="1"
+			        B="2" />
+			    <span>x</span><a href="y"
+			        title="z">y</a>
+			    <p
+			    >text</p>
+			</div>
+			""",
+			editorConfig: "razor_attribute_indent_style = indent_by_one",
+			markup: RazorMarkup.Indent);
+
+	[Test]
+	public Task Indent_by_two_puts_continued_attributes_two_levels_in() =>
+		Formats(
+			Attributes,
+			"""
+			<div>
+			    <button class="btn" type="button"
+			            @onclick="Go"
+			            disabled="@off">
+			        Go
+			    </button>
+			    <input type="text"
+			            value="@x" />
+			    <MyComponent
+			            A="1"
+			            B="2" />
+			    <span>x</span><a href="y"
+			            title="z">y</a>
+			    <p
+			    >text</p>
+			</div>
+			""",
+			editorConfig: "razor_attribute_indent_style = indent_by_two",
+			markup: RazorMarkup.Indent);
+
+	[Test]
+	public Task Csharp_in_a_value_moves_with_its_tag_and_text_in_a_value_is_kept() =>
+		Formats(
+			"""
+			<div>
+			<button @onclick="@(() => Show("a",
+			             "b"))"
+			   class="x">y</button>
+			<p title="a
+			   b c"
+			   id="q">z</p>
+			<input @bind="x" @bind:event="oninput"
+			       @bind:after="Done"
+			       />
+			</div>
+			""",
+			"""
+			<div>
+			    <button @onclick="@(() => Show("a",
+			                 "b"))"
+			            class="x">y</button>
+			    <p title="a
+			   b c"
+			       id="q">z</p>
+			    <input @bind="x" @bind:event="oninput"
+			           @bind:after="Done"
+			    />
+			</div>
+			""",
+			markup: RazorMarkup.Indent);
+
+	[Test]
+	public Task An_explicit_expression_in_any_attributes_value_moves_with_its_tag() =>
+		Formats(
+			"""
+			<div>
+			<p class="@(Busy
+			              ? "busy" : "idle")">x</p>
+			</div>
+			""",
+			"""
+			<div>
+			    <p class="@(Busy
+			                  ? "busy" : "idle")">x</p>
+			</div>
+			""",
+			markup: RazorMarkup.Indent);
+
+	[Test]
+	public Task Csharp_in_a_directive_attributes_value_moves_with_its_tag() =>
+		Formats(
+			"""
+			<div>
+			<button @onclick="() => Show(1,
+			                  2)"
+			   class="x">y</button>
+			</div>
+			""",
+			"""
+			<div>
+			    <button @onclick="() => Show(1,
+			                      2)"
+			            class="x">y</button>
+			</div>
+			""",
+			markup: RazorMarkup.Indent);
+
+	[Test]
+	public Task A_tab_indented_tag_is_measured_by_tab_width_when_its_csharp_moves() =>
+		Formats(
+			"<div>\n\t\t<button @onclick=\"@(() => Show(1,\n\t\t\t\t2))\">y</button>\n</div>\n",
+			"<div>\n    <button @onclick=\"@(() => Show(1,\n            2))\">y</button>\n</div>\n",
+			editorConfig: "tab_width = 4",
+			markup: RazorMarkup.Indent);
+
+	[Test]
+	public Task Aligned_attributes_use_tabs_then_spaces() =>
+		Formats(
+			"<div>\n<button class=\"btn\" type=\"button\"\n@onclick=\"Go\">\nGo\n</button>\n<input @bind=\"x\"\n@bind:after=\"Done\" />\n</div>\n",
+			"<div>\n\t<button class=\"btn\" type=\"button\"\n\t\t\t@onclick=\"Go\">\n\t\tGo\n\t</button>\n\t<input @bind=\"x\"\n\t\t   @bind:after=\"Done\" />\n</div>\n",
+			editorConfig: "indent_style = tab\ntab_width = 4",
+			markup: RazorMarkup.Indent);
+
 	[Test]
 	public Task Without_the_key_markup_is_left_as_written() =>
 		Unchanged(

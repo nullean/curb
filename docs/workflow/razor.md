@@ -169,10 +169,21 @@ becomes
 - **Two exceptions, as the IDE formats them:** `<html>` doesn't indent its `<head>` and `<body>`, and an element
   opened mid-line (`Some text <a href="…">link`) is inline, so the line continuing it stays with its parent.
 - **A `@code`, `@functions` or `@{ }` line moves with its nesting,** and its C# is then formatted from where it is.
+- **Attributes on the lines after a start tag's** go by `razor_attribute_indent_style`, the key Microsoft's
+  formatter reads: aligned with the tag's first attribute (`align_with_first`, the default), or one or two levels
+  in from the tag's line (`indent_by_one`, `indent_by_two`). With no attribute on the tag's line, `align_with_first`
+  puts them a level in. A `>` or `/>` on its own line goes where the tag's line does, and C# continuing an attribute's
+  value (`@onclick="@(() => …`) moves as far as the tag's line did.
+
+  ```html
+  <button class="btn" type="button"
+          @onclick="Save"
+          disabled="@busy">
+  ```
 - **Only leading whitespace changes.** Text, attributes and expressions are untouched, and so are these lines:
   - the content of `<script>`, `<style>`, `<pre>` and `<textarea>`;
   - the inside of a comment;
-  - the lines a tag's attributes continue on;
+  - text continuing a quoted attribute value, whose whitespace is part of the value;
   - a C# statement continued on a second line.
 
   Curb checks every line is the same once its indentation is removed before it writes anything.
@@ -180,7 +191,8 @@ becomes
   element, an element that's never closed, or a `@switch`, which isn't followed yet.
 
 Markup is indented by `indent_size`, as C# is. Microsoft's formatter indents by `tab_width` and ignores
-`indent_size`. To match it exactly, add `curb_razor_markup_engine_quirks = true` and Curb uses `tab_width` too.
+`indent_size`, and aligns attributes with a tag that has none on its own line. To match it exactly, add
+`curb_razor_markup_engine_quirks = true` and Curb does both too.
 
 Measured with both keys forced on, formatted twice:
 
@@ -192,8 +204,10 @@ Measured with both keys forced on, formatted twice:
 | elastic/docs-builder (`.cshtml` views) | 242 | 54 | 9 | 0 | no change |
 
 On 245 components from eShop and blazor-samples, formatted by Microsoft's formatter as well, Curb's markup
-matched it on all but the shapes this mode leaves alone (continued attribute lines) and the C# differences
-listed under [Checked against Microsoft's Razor formatter](#checked-against-microsofts-razor-formatter).
+matched it on 229. The other 16 differ in the C# listed under
+[Checked against Microsoft's Razor formatter](#checked-against-microsofts-razor-formatter), in `@code{` and
+trailing whitespace, which Curb leaves alone, and in one file where Microsoft's formatter miscounts the nesting
+after a Razor comment.
 
 ## What it never touches
 
@@ -295,12 +309,13 @@ With the key absent, a repository's Razor files cost almost nothing: about 3 ms 
 ## Limitations
 
 - Experimental. The output may change between releases.
-- Markup is only re-indented, and only under `curb_razor_format_markup`. Continued attribute lines aren't aligned
-  yet, and a `@switch` leaves the file's markup as written; see [#88](https://github.com/nullean/curb/issues/88).
+- Markup is only re-indented, and only under `curb_razor_format_markup`. A `@switch` leaves the file's markup as
+  written; see [#88](https://github.com/nullean/curb/issues/88).
 - `print-config` and `doc-tree` work on `.cs` files only.
 - The C# lexer reads the markup inside an `@if` or `@foreach` body as C#, so a brace in that markup's text
   (`<p>{</p>`) is counted. The body's end is then not found, and nothing after it in the file is formatted.
 
 See the option reference for [the code-blocks key](../reference/razor/code-blocks/curb_razor_format_code_blocks.md),
-[the markup key](../reference/razor/code-blocks/curb_razor_format_markup.md) and
+[the markup key](../reference/razor/code-blocks/curb_razor_format_markup.md),
+[attribute indentation](../reference/razor/code-blocks/razor_attribute_indent_style.md) and
 [engine quirks](../reference/razor/code-blocks/curb_razor_markup_engine_quirks.md).

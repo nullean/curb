@@ -235,6 +235,7 @@ public static class OptionCatalog
 		"curb_razor_format_code_blocks",
 		"curb_razor_format_markup",
 		"curb_razor_markup_engine_quirks",
+		"razor_attribute_indent_style",
 	}.ToFrozenSet(StringComparer.Ordinal);
 
 	/// <summary>
