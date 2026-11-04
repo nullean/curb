@@ -1565,6 +1565,21 @@ public static class Snippets
     /// <summary>Razor fixtures for the Razor key's examples.</summary>
     public static IReadOnlyDictionary<string, string> Razor { get; } = new Dictionary<string, string>
     {
+        ["razor_markup"] = """
+            <div class="card">
+            <h3>@Title</h3>
+            @if (Items.Count > 0)
+            {
+            <ul>
+            @foreach (var item in Items)
+            {
+            <li>@item</li>
+            }
+            </ul>
+            }
+            </div>
+
+            """,
         ["razor_component"] = """
             @page "/counter"
 
@@ -1593,6 +1608,17 @@ public static class Snippets
             "curb_razor_format_code_blocks = true\n```\n\nWithout it, Curb never reads a `.razor` or `.cshtml` file. With it, " +
             "only the C# inside `@code`, `@functions` and `@{ }` blocks changes: markup and expressions are never " +
             "touched, and a block that holds Razor markup is left as written. See [Razor](../../../workflow/razor.md).",
+        ["curb_razor_format_markup"] =
+            "Experimental, and only on top of `curb_razor_format_code_blocks`, from a section whose glob names Razor files:\n\n" +
+            "```ini\n[*.{razor,cshtml}]\ncurb_razor_format_code_blocks = true\ncurb_razor_format_markup = true\n```\n\n" +
+            "Each markup line goes one indent in per element and code block it sits in, as Microsoft's Razor formatter " +
+            "puts it. Only a line's leading whitespace changes; the content of `<script>`, `<style>`, `<pre>` and " +
+            "`<textarea>`, comments and continued attribute lines stay as written, and a file whose tags do not balance " +
+            "is left alone. See [Razor](../../../workflow/razor.md).",
+        ["curb_razor_markup_engine_quirks"] =
+            "Microsoft's Razor formatter indents by `tab_width` and ignores `indent_size`. Curb indents markup by " +
+            "`indent_size`, as it does C#; this key makes it use `tab_width` instead, for a repository that wants its " +
+            "Razor files to stay exactly as the IDE formats them. The examples here are at `indent_size = 2`.",
     };
 
     /// <summary>A paragraph for an XML key's page, where the values alone do not say enough.</summary>

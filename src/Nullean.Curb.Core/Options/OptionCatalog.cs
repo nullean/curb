@@ -233,6 +233,8 @@ public static class OptionCatalog
 	public static readonly FrozenSet<string> RazorKeys = new[]
 	{
 		"curb_razor_format_code_blocks",
+		"curb_razor_format_markup",
+		"curb_razor_markup_engine_quirks",
 	}.ToFrozenSet(StringComparer.Ordinal);
 
 	/// <summary>

@@ -189,7 +189,7 @@ public static class RazorBlockScanner
 	/// The position just past the C# that the transition at <paramref name="at"/> starts, <c>at + 1</c> when
 	/// it starts none, or -1 when its end cannot be found.
 	/// </summary>
-	private static int SkipCode(string source, int at, bool component)
+	internal static int SkipCode(string source, int at, bool component)
 	{
 		var text = source.AsSpan();
 		var start = at + 1;
@@ -265,7 +265,7 @@ public static class RazorBlockScanner
 	}
 
 	/// <summary>Just past the token that closes the one at <paramref name="open"/>, or -1.</summary>
-	private static int PastMatch(string source, int open, SyntaxKind openKind, SyntaxKind closeKind)
+	internal static int PastMatch(string source, int open, SyntaxKind openKind, SyntaxKind closeKind)
 	{
 		var close = FindClose(source, open, openKind, closeKind);
 		return close < 0 ? -1 : close + 1;
