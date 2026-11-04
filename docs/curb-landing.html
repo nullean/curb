@@ -757,15 +757,16 @@
       </div>
       <div class="pass">
         <span class="pass-tag muted">experimental</span>
-        <h3>Razor code blocks</h3>
-        <p>The C# inside <code>@code</code> and <code>@functions</code> blocks of <code>.razor</code> and
-        <code>.cshtml</code> files, formatted with your C# options. Markup, directives and expressions stay
-        exactly as written.</p>
+        <h3>Razor</h3>
+        <p>The C# inside <code>@code</code>, <code>@functions</code> and <code>@{ }</code> blocks of
+        <code>.razor</code> and <code>.cshtml</code> files, formatted with your C# options, and the markup
+        re-indented by its nesting. Directives and expressions stay exactly as written.</p>
         <ul>
           <li>Opt in with <code>curb_razor_format_code_blocks = true</code> in a <code>[*.razor]</code> section</li>
+          <li>Add <code>curb_razor_format_markup = true</code> to re-indent markup</li>
           <li>CLI and pre-commit only: the build never formats Razor</li>
         </ul>
-        <a class="pass-link" href="workflow/razor/">Razor code blocks →</a>
+        <a class="pass-link" href="workflow/razor/">Razor →</a>
       </div>
     </div>
   </div>

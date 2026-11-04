@@ -71,7 +71,7 @@ specific projects.
 
 In CI, use `curb check` rather than `curb format`. It exits non-zero if any file would change, and
 changes nothing. It checks everything `curb format` would format: C#, project and solution files, F# when a
-tool manifest declares Fantomas (run `dotnet tool restore` first), and Razor code blocks where they are
+tool manifest declares Fantomas (run `dotnet tool restore` first), and Razor files where they are
 opted in.
 
 ```sh

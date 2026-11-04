@@ -46,10 +46,10 @@ in your IDE and nothing moves; `EnforceCodeStyleInBuild` stays green.
 The same commands cover the files around your C#. Project and solution files (`.csproj`, `.props`,
 `.targets`, `.slnx`, `nuget.config`) are formatted by default; turn it off with `curb_xml_format = false`.
 F# is formatted through [Fantomas](https://fsprojects.github.io/fantomas/), the version your tool
-manifest pins, once a manifest declares it; {{product}} never installs Fantomas. The C# in Razor `@code`
-and `@functions` blocks is formatted too, experimentally, when a `[*.razor]` section opts in; markup is
-never touched. → [Project and solution files](workflow/xml.md) · [F# through Fantomas](workflow/fsharp.md) ·
-[Razor code blocks](workflow/razor.md)
+manifest pins, once a manifest declares it; {{product}} never installs Fantomas. The C# in Razor `@code`,
+`@functions` and `@{ }` blocks is formatted too, experimentally, when a `[*.razor]` section opts in, and a
+second key re-indents the markup. → [Project and solution files](workflow/xml.md) ·
+[F# through Fantomas](workflow/fsharp.md) · [Razor](workflow/razor.md)
 
 ## Built for a codebase agents also edit
 
