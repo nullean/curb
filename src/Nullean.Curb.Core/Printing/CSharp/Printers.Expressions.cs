@@ -1681,14 +1681,20 @@ internal static partial class Printers
 	{
 		TokenPrinter.Print(node.LessThanToken, context);
 
+		// `Dictionary<,>` names an open generic: its arguments are omitted, so there is nothing for the commas'
+		// spacing options to separate, and dotnet format leaves them together whatever those options say
+		// (issue #218).
+		var omitted = node.Arguments.Count > 0 && node.Arguments[0] is OmittedTypeArgumentSyntax;
 		for (var i = 0; i < node.Arguments.Count; i++)
 		{
 			Node.Print(node.Arguments[i], context);
 			if (i >= node.Arguments.SeparatorCount)
 				continue;
-			Spacing.BeforeComma(context);
+			if (!omitted)
+				Spacing.BeforeComma(context);
 			TokenPrinter.Print(node.Arguments.GetSeparator(i), context);
-			Spacing.AfterComma(context);
+			if (!omitted)
+				Spacing.AfterComma(context);
 		}
 
 		TokenPrinter.Print(node.GreaterThanToken, context);

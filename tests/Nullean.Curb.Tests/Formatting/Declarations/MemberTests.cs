@@ -476,6 +476,25 @@ public class MemberTests : FormattingTest
 		""",
 		editorConfig: "max_line_length = 120");
 
+	// Issue #219: a C# 14 extension block's receiver has no name when the block holds static members only,
+	// and nothing follows its type for a space to separate.
+	[Test]
+	public Task An_extension_block_with_an_unnamed_receiver_keeps_its_parenthesis() => Unchanged(
+		"""
+		public static class Boxes
+		{
+		    extension<T>(Box<T>)
+		    {
+		        public static Box<T> Empty() => new();
+		    }
+
+		    extension<T>(Box<T> box)
+		    {
+		        public bool IsEmpty => box.Count == 0;
+		    }
+		}
+		""");
+
 	[Test]
 	public Task Operator() => Unchanged(
 		"""

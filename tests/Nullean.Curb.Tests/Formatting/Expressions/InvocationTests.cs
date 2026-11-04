@@ -282,6 +282,30 @@ public class InvocationTests : FormattingTest
 		}
 		""");
 
+	// Issue #218: an open generic's omitted arguments have nothing between their commas to space, and dotnet
+	// format leaves them together whatever the comma spacing options say.
+	[Test]
+	public Task An_open_generic_keeps_its_commas_together() => Unchanged(
+		"""
+		public class C
+		{
+		    public static readonly System.Type Two = typeof(System.Collections.Generic.Dictionary<,>);
+		    public static readonly System.Type Three = typeof(System.Func<,,>);
+		    public static readonly System.Type One = typeof(System.Collections.Generic.List<>);
+		}
+		""");
+
+	[Test]
+	public Task An_open_generic_keeps_its_commas_together_with_comma_spacing_on() => Unchanged(
+		"""
+		public class C
+		{
+		    public static readonly System.Type Two = typeof(System.Collections.Generic.Dictionary<,>);
+		    public static readonly System.Collections.Generic.Dictionary<int , string> Closed;
+		}
+		""",
+		editorConfig: "csharp_space_before_comma = true\ncsharp_space_after_comma = true");
+
 	[Test]
 	public Task Argument_list_breaks_one_per_line_when_it_does_not_fit() => Formats(
 		"""
