@@ -39,6 +39,12 @@ public sealed class RazorFormatter : IDisposable
 	/// <summary>With <see cref="MarkupKey"/>, indents markup by <c>tab_width</c>, as Microsoft's Razor formatter does.</summary>
 	public const string EngineQuirksKey = "curb_razor_markup_engine_quirks";
 
+	/// <summary>
+	/// Where an attribute that starts a line inside a start tag goes, under <see cref="MarkupKey"/>. The key
+	/// Microsoft's Razor formatter reads, with its values.
+	/// </summary>
+	public const string AttributeIndentKey = "razor_attribute_indent_style";
+
 	/// <summary>The name of the class a block is wrapped in. Never written anywhere.</summary>
 	internal const string WrapperName = "__CurbRazor__";
 
@@ -63,13 +69,15 @@ public sealed class RazorFormatter : IDisposable
 	/// left as written and why.
 	/// </returns>
 	/// <param name="markup">Whether markup is re-indented as well, and by which unit; see <see cref="RazorMarkup"/>.</param>
+	/// <param name="attributes">With <paramref name="markup"/>, where an attribute that starts a line inside a start tag goes.</param>
 	public FormatResult Format(
 		string source,
 		in FormatOptions options,
 		bool produceText = true,
 		bool verifyRoundTrip = true,
 		bool component = true,
-		RazorMarkup markup = RazorMarkup.Off)
+		RazorMarkup markup = RazorMarkup.Off,
+		RazorAttributeIndent attributes = RazorAttributeIndent.AlignWithFirst)
 	{
 		if (markup == RazorMarkup.Off)
 			return FormatBlocks(source, options, produceText, verifyRoundTrip, component);
@@ -77,7 +85,8 @@ public sealed class RazorFormatter : IDisposable
 		// Markup first: an indented @code line moves with its nesting, and its block's C# is then formatted
 		// against the line where it now is.
 		var unit = markup == RazorMarkup.EngineQuirks ? options.TabWidth : options.IndentSize;
-		var indented = RazorMarkupIndenter.TryIndent(source, component, unit, options.UseTabs, options.TabWidth, out var refusal);
+		var indented = RazorMarkupIndenter.TryIndent(
+			source, component, unit, options.UseTabs, options.TabWidth, out var refusal, attributes, markup == RazorMarkup.EngineQuirks);
 		if (indented is null)
 		{
 			var asWritten = FormatBlocks(source, options, produceText, verifyRoundTrip, component);
@@ -463,6 +472,19 @@ public sealed class RazorFormatter : IDisposable
 
 	/// <summary>Returns the pooled buffers this formatter holds.</summary>
 	public void Dispose() => _csharp.Dispose();
+}
+
+/// <summary>Where an attribute that starts a line inside a start tag goes; <c>razor_attribute_indent_style</c>.</summary>
+public enum RazorAttributeIndent : byte
+{
+	/// <summary>The column of the first attribute on the tag's line, or a level in when it has none.</summary>
+	AlignWithFirst,
+
+	/// <summary>One level in from the tag's line.</summary>
+	IndentByOne,
+
+	/// <summary>Two levels in from the tag's line.</summary>
+	IndentByTwo,
 }
 
 /// <summary>Whether <see cref="RazorFormatter"/> re-indents markup, and by which unit.</summary>

@@ -228,6 +228,7 @@ public sealed record OptionDescriptor(
 		// ---- Razor (1, experimental) ----------------------------------------------------------
 		new("curb_razor_format_code_blocks", OptionGroup.Razor, ["true", "false"], "false", "Experimental. Format the C# in @code, @functions and @{ } blocks of .razor and .cshtml files, and nothing else in them. Read only from a section that names those files.", "razor_component"),
 		new("curb_razor_format_markup", OptionGroup.Razor, ["true", "false"], "false", "Experimental. With curb_razor_format_code_blocks, also re-indent markup by its nesting, as Microsoft's Razor formatter does. Only indentation changes. Read only from a section that names Razor files.", "razor_markup"),
-		new("curb_razor_markup_engine_quirks", OptionGroup.Razor, ["true", "false"], "false", "Experimental. With curb_razor_format_markup, indent markup by tab_width rather than indent_size, as Microsoft's Razor formatter does.", "razor_markup"),
+		new("razor_attribute_indent_style", OptionGroup.Razor, ["align_with_first", "indent_by_one", "indent_by_two"], "align_with_first", "With curb_razor_format_markup, where an attribute that starts a line inside a start tag goes. Microsoft's Razor formatter reads the same key.", "razor_attributes"),
+		new("curb_razor_markup_engine_quirks", OptionGroup.Razor, ["true", "false"], "false", "Experimental. With curb_razor_format_markup, indent markup by tab_width rather than indent_size, and align attributes with a tag that has none on its line, as Microsoft's Razor formatter does.", "razor_markup"),
 	];
 }

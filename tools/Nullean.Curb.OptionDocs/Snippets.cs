@@ -1565,6 +1565,19 @@ public static class Snippets
     /// <summary>Razor fixtures for the Razor key's examples.</summary>
     public static IReadOnlyDictionary<string, string> Razor { get; } = new Dictionary<string, string>
     {
+        ["razor_attributes"] = """
+            <div>
+            <button class="btn btn-primary" type="button"
+            @onclick="Save"
+            disabled="@busy">
+            Save
+            </button>
+            <InputText
+            @bind-Value="name"
+            placeholder="Name" />
+            </div>
+
+            """,
         ["razor_markup"] = """
             <div class="card">
             <h3>@Title</h3>
@@ -1615,10 +1628,20 @@ public static class Snippets
             "puts it. Only a line's leading whitespace changes; the content of `<script>`, `<style>`, `<pre>` and " +
             "`<textarea>`, comments and continued attribute lines stay as written, and a file whose tags do not balance " +
             "is left alone. See [Razor](../../../workflow/razor.md).",
+        ["razor_attribute_indent_style"] =
+            "Microsoft's Razor formatter reads the same key with the same values, so one setting serves both. It " +
+            "only applies with `curb_razor_format_markup`. A line inside a start tag that begins with its `>` or `/>` " +
+            "goes where the tag's line does, C# continuing an attribute's value moves as far as the tag's line moved, " +
+            "and text continuing a quoted value is kept as written, since its whitespace is part of the value. " +
+            "With nothing after the tag's name on its line, `align_with_first` puts attributes a level in; " +
+            "Microsoft's formatter, and `curb_razor_markup_engine_quirks`, align them with the tag instead. The " +
+            "examples here are at `indent_size = 2`.",
         ["curb_razor_markup_engine_quirks"] =
             "Microsoft's Razor formatter indents by `tab_width` and ignores `indent_size`. Curb indents markup by " +
             "`indent_size`, as it does C#; this key makes it use `tab_width` instead, for a repository that wants its " +
-            "Razor files to stay exactly as the IDE formats them. The examples here are at `indent_size = 2`.",
+            "Razor files to stay exactly as the IDE formats them. It also follows the IDE where a start tag has no " +
+            "attribute on its own line: under `razor_attribute_indent_style = align_with_first` the attributes on the " +
+            "lines after it align with the tag, rather than going a level in. The examples here are at `indent_size = 2`.",
     };
 
     /// <summary>A paragraph for an XML key's page, where the values alone do not say enough.</summary>

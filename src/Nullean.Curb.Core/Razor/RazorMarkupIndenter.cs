@@ -61,6 +61,22 @@ public static class RazorMarkupIndenter
 	/// </remarks>
 	private readonly record struct Frame(FrameKind Kind, string? Name, bool Indents = true);
 
+	/// <summary>What a line inside a start tag that spans lines begins with.</summary>
+	private enum TagLine : byte
+	{
+		/// <summary>An attribute, placed by <c>razor_attribute_indent_style</c>.</summary>
+		Attribute,
+
+		/// <summary>The tag's <c>&gt;</c> or <c>/&gt;</c>, which goes where the tag's line does.</summary>
+		Closer,
+
+		/// <summary>C# continuing an attribute's value, moved as far as the tag's line moved.</summary>
+		CSharpValue,
+
+		/// <summary>Text continuing a quoted value: its whitespace is part of the value, so it is kept.</summary>
+		TextValue,
+	}
+
 	/// <summary>
 	/// The source with each markup line's indentation replaced, or null and a reason when the file's structure
 	/// cannot be followed.
@@ -70,10 +86,17 @@ public static class RazorMarkupIndenter
 	/// <param name="indentColumns">Columns per nesting level.</param>
 	/// <param name="useTabs">Write indentation with tabs, then spaces.</param>
 	/// <param name="tabWidth">Columns a tab advances.</param>
+	/// <param name="attributes">Where an attribute that starts a line inside a start tag goes.</param>
+	/// <param name="engineQuirks">
+	/// Place attributes as Microsoft's Razor formatter does where it differs: with nothing after the tag's name on its
+	/// line, they align with the tag rather than going a level in.
+	/// </param>
 	/// <param name="refusal">Why the file is left as written.</param>
-	public static string? TryIndent(string source, bool component, int indentColumns, bool useTabs, int tabWidth, out string? refusal)
+	public static string? TryIndent(
+		string source, bool component, int indentColumns, bool useTabs, int tabWidth, out string? refusal,
+		RazorAttributeIndent attributes = RazorAttributeIndent.AlignWithFirst, bool engineQuirks = false)
 	{
-		var scanner = new Scanner(source, component);
+		var scanner = new Scanner(source, component, tabWidth);
 		var lines = Lines(source);
 		var builder = new StringBuilder(source.Length + 64);
 
@@ -87,21 +110,31 @@ public static class RazorMarkupIndenter
 			while (lineEnd > content && source[lineEnd - 1] is '\n' or '\r')
 				lineEnd--;
 
-			var depth = scanner.DepthForLine(start, content, lineEnd);
-			if (scanner.Refusal is not null)
+			var sourceColumn = Column(source, start, content, 0, tabWidth);
+			if (!scanner.InTag(content, sourceColumn, indentColumns, attributes, engineQuirks, out var column))
 			{
-				refusal = scanner.Refusal;
-				return null;
+				var depth = scanner.DepthForLine(start, content, lineEnd);
+				if (scanner.Refusal is not null)
+				{
+					refusal = scanner.Refusal;
+					return null;
+				}
+
+				column = depth < 0 ? -1 : depth * indentColumns;
 			}
 
-			if (depth < 0 || content == lineEnd)
+			if (column < 0 || content == lineEnd)
+			{
 				builder.Append(source, start, end - start);
+				column = sourceColumn;
+			}
 			else
 			{
-				AppendIndent(builder, depth * indentColumns, useTabs, tabWidth);
+				AppendIndent(builder, column, useTabs, tabWidth);
 				builder.Append(source, content, end - content);
 			}
 
+			scanner.BeginLine(content, column);
 			scanner.ScanLine(content, lineEnd);
 			if (scanner.Refusal is not null)
 			{
@@ -139,6 +172,15 @@ public static class RazorMarkupIndenter
 		builder.Append('\t', tabs).Append(' ', columns - (tabs * Math.Max(1, tabWidth)));
 	}
 
+	/// <summary>The column <paramref name="to"/> is at, reading from <paramref name="from"/> at <paramref name="column"/>.</summary>
+	private static int Column(string source, int from, int to, int column, int tabWidth)
+	{
+		var width = Math.Max(1, tabWidth);
+		for (var i = from; i < to; i++)
+			column = source[i] == '\t' ? column + width - (column % width) : column + 1;
+		return column;
+	}
+
 	/// <summary>Each line's start and end, its line break included.</summary>
 	private static List<(int Start, int End)> Lines(string source)
 	{
@@ -158,9 +200,23 @@ public static class RazorMarkupIndenter
 		return lines;
 	}
 
-	private sealed class Scanner(string source, bool component)
+	private sealed class Scanner(string source, bool component, int tabWidth)
 	{
 		private readonly List<Frame> _stack = [];
+
+		// The lines inside the last start tag that spanned lines, by where their content starts.
+		private readonly Dictionary<int, TagLine> _tagLines = [];
+
+		// The line being read: where its content starts, and the column it was written at.
+		private int _lineContent;
+		private int _lineColumn;
+
+		// The last start tag that spanned lines: the column its line was written at and read from, and the columns
+		// its tag and its first attribute were written at (-1 for no attribute on that line).
+		private int _tagLineColumn;
+		private int _tagLineSourceColumn;
+		private int _tagColumn;
+		private int _firstAttributeColumn;
 
 		// Everything before this position has been read. A line starting before it lies inside something read
 		// past its start (a tag's attributes, a comment, a C# block), and keeps its indentation.
@@ -184,6 +240,42 @@ public static class RazorMarkupIndenter
 		private int _codeBlockEnd = -1;
 
 		public string? Refusal { get; private set; }
+
+		/// <summary>Says where the line being read starts and the column it was written at.</summary>
+		public void BeginLine(int content, int column)
+		{
+			_lineContent = content;
+			_lineColumn = column;
+		}
+
+		/// <summary>
+		/// Whether the line whose content starts at <paramref name="content"/> lies inside a start tag that spans
+		/// lines, and if so the column to write it at, or -1 to keep it as written.
+		/// </summary>
+		public bool InTag(int content, int sourceColumn, int indentColumns, RazorAttributeIndent attributes, bool engineQuirks, out int column)
+		{
+			if (!_tagLines.TryGetValue(content, out var kind))
+			{
+				column = -1;
+				return false;
+			}
+
+			column = kind switch
+			{
+				TagLine.Closer => _tagLineColumn,
+				TagLine.CSharpValue => Math.Max(0, sourceColumn + _tagLineColumn - _tagLineSourceColumn),
+				TagLine.TextValue => -1,
+				_ => attributes switch
+				{
+					RazorAttributeIndent.IndentByOne => _tagLineColumn + indentColumns,
+					RazorAttributeIndent.IndentByTwo => _tagLineColumn + (2 * indentColumns),
+					_ when _firstAttributeColumn >= 0 => _firstAttributeColumn,
+					_ when engineQuirks => _tagColumn,
+					_ => _tagLineColumn + indentColumns,
+				},
+			};
+			return true;
+		}
 
 		/// <summary>The nesting depth to indent the line at, or -1 to keep it as written.</summary>
 		public int DepthForLine(int start, int content, int lineEnd)
@@ -476,6 +568,9 @@ public static class RazorMarkupIndenter
 				return end;
 			}
 
+			if (source.AsSpan(i, end - i).IndexOfAny('\n', '\r') >= 0)
+				ReadTagLines(i, nameEnd, end);
+
 			var selfClosing = source[end - 2] == '/';
 			if (!selfClosing && !VoidElements.Contains(name))
 			{
@@ -485,6 +580,112 @@ public static class RazorMarkupIndenter
 			}
 
 			return end;
+		}
+
+		/// <summary>
+		/// Records what each line inside the start tag at <paramref name="tag"/> begins with, and where the tag and
+		/// its first attribute were written.
+		/// </summary>
+		private void ReadTagLines(int tag, int nameEnd, int end)
+		{
+			_tagLines.Clear();
+			_tagLineColumn = _lineColumn;
+			_tagLineSourceColumn = Column(source, LineStart(_lineContent), _lineContent, 0, tabWidth);
+			_tagColumn = Column(source, _lineContent, tag, _lineColumn, tabWidth);
+			_firstAttributeColumn = -1;
+
+			var onTagLine = true;
+			var i = nameEnd;
+			while (i < end)
+			{
+				var c = source[i];
+				if (c is '\n' or '\r')
+				{
+					i = SkipWhitespace(i + 1);
+					if (i < end && source[i] is not ('\n' or '\r'))
+						_tagLines[i] = source[i] == '>' || (source[i] == '/' && i + 1 < end && source[i + 1] == '>') ? TagLine.Closer : TagLine.Attribute;
+					onTagLine = false;
+					continue;
+				}
+
+				if (c is ' ' or '\t' or '>' || (c == '/' && i + 1 < end && source[i + 1] == '>'))
+				{
+					i++;
+					continue;
+				}
+
+				if (onTagLine && _firstAttributeColumn < 0)
+					_firstAttributeColumn = Column(source, _lineContent, i, _lineColumn, tabWidth);
+
+				i = ReadAttribute(i, end);
+			}
+		}
+
+		/// <summary>Reads past the attribute at <paramref name="i"/>, recording the lines its value continues on.</summary>
+		private int ReadAttribute(int i, int end)
+		{
+			if (source[i] == '@' && i + 1 < end && source[i + 1] is '(' or '{')
+				return MarkValueLines(i, Matching(i + 1), TagLine.CSharpValue);
+
+			var csharp = source[i] == '@';
+			while (i < end && source[i] is not (' ' or '\t' or '\n' or '\r' or '=' or '>') && !(source[i] == '/' && i + 1 < end && source[i + 1] == '>'))
+				i++;
+
+			var equals = SkipWhitespace(i);
+			if (equals >= end || source[equals] != '=')
+				return i;
+
+			var value = SkipWhitespace(equals + 1);
+			if (value >= end || source[value] is not ('"' or '\''))
+			{
+				while (value < end && source[value] is not (' ' or '\t' or '\n' or '\r' or '>'))
+					value++;
+				return value;
+			}
+
+			var quote = source[value];
+			var inside = value + 1;
+			var close = inside;
+			if (source.AsSpan(inside).StartsWith("@("))
+			{
+				csharp = true;
+				close = Matching(inside + 1);
+			}
+
+			close = close < 0 ? -1 : source.IndexOf(quote, close);
+			if (close < 0 || close >= end)
+				return end;
+
+			return MarkValueLines(inside, close, csharp ? TagLine.CSharpValue : TagLine.TextValue) + 1;
+		}
+
+		/// <summary>Records each line that starts between <paramref name="from"/> and <paramref name="to"/> as <paramref name="kind"/>.</summary>
+		private int MarkValueLines(int from, int to, TagLine kind)
+		{
+			if (to < 0)
+				return source.Length;
+
+			for (var i = from; i < to; i++)
+			{
+				if (source[i] == '\n' || (source[i] == '\r' && (i + 1 >= source.Length || source[i + 1] != '\n')))
+					_tagLines[SkipWhitespace(i + 1)] = kind;
+			}
+
+			return to;
+		}
+
+		/// <summary>Just past the bracket that closes the one at <paramref name="open"/>, or -1.</summary>
+		private int Matching(int open) =>
+			RazorBlockScanner.PastMatch(
+				source, open,
+				source[open] == '(' ? SyntaxKind.OpenParenToken : SyntaxKind.OpenBraceToken,
+				source[open] == '(' ? SyntaxKind.CloseParenToken : SyntaxKind.CloseBraceToken);
+
+		private int LineStart(int i)
+		{
+			while (i > 0 && source[i - 1] is not ('\n' or '\r'))
+				i--;
+			return i;
 		}
 
 		/// <summary>Just past the <c>&gt;</c> that ends a tag whose name ends at <paramref name="i"/>, or -1.</summary>

@@ -321,6 +321,27 @@
       "staysFixedPoint": false,
       "reason": "Curb formats only the C# in a block, and leaves a block it cannot read as C# exactly as written: one holding Razor (a template, <text>, @:, a Razor comment, markup), one whose closing brace shares its line, one that never closes. The Razor engine parses Razor, so it formats them, and the markup around them. Matching it means parsing Razor, which Curb does not (#88).",
       "exampleCase": "RazorMarkupTests.An_element_left_open_leaves_the_markup_as_written"
+    },
+    {
+      "key": "razor:attribute-no-first",
+      "tool": "razor-dotnet-format",
+      "staysFixedPoint": false,
+      "reason": "Under razor_attribute_indent_style = align_with_first, a start tag with no attribute on its own line has nothing to align with. Microsoft's formatter then puts the attributes at the tag's column; Curb puts them a level in, as indent_by_one would. curb_razor_markup_engine_quirks = true matches the engine.",
+      "exampleCase": "RazorMarkupTests.Continued_attributes_align_with_the_first_one"
+    },
+    {
+      "key": "razor:attribute-text-value",
+      "tool": "razor-dotnet-format",
+      "staysFixedPoint": false,
+      "reason": "A line continuing a quoted text attribute value (class=\"a\\n   b c\") is part of the value, so Curb keeps its whitespace. Microsoft's formatter re-indents it to the tag's line, which changes the attribute's value.",
+      "exampleCase": "RazorMarkupTests.Csharp_in_a_value_moves_with_its_tag_and_text_in_a_value_is_kept"
+    },
+    {
+      "key": "razor:attribute-csharp-value",
+      "tool": "razor-dotnet-format",
+      "staysFixedPoint": false,
+      "reason": "A line continuing the C# value of a directive attribute (@onclick=\"() => Show(1,\\n 2)\") moves as far as its tag's line did, as it does inside @(…). Microsoft's formatter puts it at the tag line's indent unless the value is an @(…) expression, breaking the lambda's alignment.",
+      "exampleCase": "RazorMarkupTests.Csharp_in_a_directive_attributes_value_moves_with_its_tag"
     }
   ]
 }

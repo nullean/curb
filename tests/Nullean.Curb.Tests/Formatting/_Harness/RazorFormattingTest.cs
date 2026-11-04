@@ -44,12 +44,13 @@ public abstract class RazorFormattingTest
 		var options = Options(editorConfig);
 		RazorExpectationDump.Record(expected, editorConfig,
 			$"{(callerFile is null ? "?" : Path.GetFileNameWithoutExtension(callerFile))}.{caller ?? "?"}");
-		var actual = FormatOrFail(source, options, "source", declined, markup);
+		var attributes = Attributes(editorConfig);
+		var actual = FormatOrFail(source, options, "source", declined, markup, attributes);
 
 		if (!string.Equals(actual, expected, StringComparison.Ordinal))
 			throw new FormattingAssertionException(FormattingDiff.Describe(expected, actual, source, editorConfig));
 
-		var second = FormatOrFail(expected, options, "expected output", declined, markup);
+		var second = FormatOrFail(expected, options, "expected output", declined, markup, attributes);
 		if (!string.Equals(second, expected, StringComparison.Ordinal))
 		{
 			throw new FormattingAssertionException(
@@ -92,6 +93,14 @@ public abstract class RazorFormattingTest
 		return Unchanged(source, editorConfig, declined, markup, caller, callerFile);
 	}
 
+	/// <summary><c>razor_attribute_indent_style</c> from the case's <c>.editorconfig</c>, read as the CLI reads it.</summary>
+	internal static RazorAttributeIndent Attributes(string? editorConfig) =>
+		Nullean.Curb.Cli.Languages.Razor.RazorLanguage.AttributesFrom(
+			(editorConfig ?? "").Split('\n')
+				.Select(static line => line.Split('=', 2))
+				.Where(static pair => pair.Length == 2)
+				.ToDictionary(static pair => pair[0].Trim(), static pair => pair[1].Trim(), StringComparer.Ordinal));
+
 	internal static FormatOptions Options(string? editorConfig) =>
 		Cache.GetOrAdd(editorConfig ?? "", static text =>
 		{
@@ -109,10 +118,11 @@ public abstract class RazorFormattingTest
 			return options;
 		});
 
-	private static string FormatOrFail(string source, in FormatOptions options, string what, int declined, RazorMarkup markup)
+	private static string FormatOrFail(
+		string source, in FormatOptions options, string what, int declined, RazorMarkup markup, RazorAttributeIndent attributes)
 	{
 		using var formatter = new RazorFormatter();
-		var result = formatter.Format(source, options, verifyRoundTrip: true, markup: markup);
+		var result = formatter.Format(source, options, verifyRoundTrip: true, markup: markup, attributes: attributes);
 		if (result.Status != FormatStatus.Formatted)
 			throw new FormattingAssertionException($"formatting the {what} failed with {result.Status}: {result.Message}");
 
