@@ -119,10 +119,86 @@ becomes
 
 A `@{ }` on one line, such as `@{ Layout = null; }`, isn't a block, and is left as written.
 
+## Markup (experimental)
+
+A second key re-indents the markup as well, by its nesting, the way Microsoft's Razor formatter does. It only
+counts on top of `curb_razor_format_code_blocks`, from the same kind of section:
+
+```ini
+[*.{razor,cshtml}]
+curb_razor_format_code_blocks = true
+curb_razor_format_markup = true
+```
+
+```html
+<div class="card">
+<h3>@Title</h3>
+@if (Items.Count > 0)
+{
+<ul>
+@foreach (var item in Items)
+{
+<li>@item</li>
+}
+</ul>
+}
+</div>
+```
+
+becomes
+
+```html
+<div class="card">
+    <h3>@Title</h3>
+    @if (Items.Count > 0)
+    {
+        <ul>
+            @foreach (var item in Items)
+            {
+                <li>@item</li>
+            }
+        </ul>
+    }
+</div>
+```
+
+- **One level per element and code block a line sits in.** Components nest like elements. Void elements
+  (`<br>`, `<img>`, `<input>`, …) and self-closing tags don't. The body of an `@if`, `@foreach`, `@for`,
+  `@while`, `@using`, `@lock`, `@try`, `@do` or `@section`, and a C# brace inside one, go a level in. A line that
+  starts with the tag or brace closing what it's in sits with what it closes.
+- **Two exceptions, as the IDE formats them:** `<html>` doesn't indent its `<head>` and `<body>`, and an element
+  opened mid-line (`Some text <a href="…">link`) is inline, so the line continuing it stays with its parent.
+- **A `@code`, `@functions` or `@{ }` line moves with its nesting,** and its C# is then formatted from where it is.
+- **Only leading whitespace changes.** Text, attributes and expressions are untouched, and so are these lines:
+  - the content of `<script>`, `<style>`, `<pre>` and `<textarea>`;
+  - the inside of a comment;
+  - the lines a tag's attributes continue on;
+  - a C# statement continued on a second line.
+
+  Curb checks every line is the same once its indentation is removed before it writes anything.
+- **A file it can't follow is left as written,** with the reason: a closing tag that doesn't close the open
+  element, an element that's never closed, or a `@switch`, which isn't followed yet.
+
+Markup is indented by `indent_size`, as C# is. Microsoft's formatter indents by `tab_width` and ignores
+`indent_size`. To match it exactly, add `curb_razor_markup_engine_quirks = true` and Curb uses `tab_width` too.
+
+Measured with both keys forced on, formatted twice:
+
+| Repository | Razor files | Changed | Markup left as written | Failed | Second pass |
+|---|---|---|---|---|---|
+| dotnet/blazor-samples | 3,091 | 439 | 9 | 0 | no change |
+| dotnet/aspnetcore (`src/Components`, `src/ProjectTemplates`) | 887 | 207 | 12 | 0 | no change |
+| dotnet/eShop | 58 | 9 | 0 | 0 | no change |
+| elastic/docs-builder (`.cshtml` views) | 242 | 54 | 9 | 0 | no change |
+
+On 245 components from eShop and blazor-samples, formatted by Microsoft's formatter as well, Curb's markup
+matched it on all but the shapes this mode leaves alone (continued attribute lines) and the C# differences
+listed under [Checked against Microsoft's Razor formatter](#checked-against-microsofts-razor-formatter).
+
 ## What it never touches
 
-- Markup, attributes, `@page`, `@using`, `@inject` and every other directive.
-- `@if`, `@foreach`, `@switch` and the other code constructs inside markup.
+- Attributes, `@page`, `@using`, `@inject` and every other directive. Markup, unless `curb_razor_format_markup` is set.
+- With markup off, `@if`, `@foreach`, `@switch` and the other code constructs inside markup.
 - Implicit and explicit expressions, such as `@count` and `@(a + b)`.
 - `@code` inside a Razor comment (`@* *@`) or an HTML comment (`<!-- -->`), and `@@code`, which is text.
 - A block on one line, such as `@code { int x; }`.
@@ -219,9 +295,12 @@ With the key absent, a repository's Razor files cost almost nothing: about 3 ms 
 ## Limitations
 
 - Experimental. The output may change between releases.
-- Only `@code`, `@functions` and `@{ }` blocks. Markup isn't formatted yet; see [#88](https://github.com/nullean/curb/issues/88).
+- Markup is only re-indented, and only under `curb_razor_format_markup`. Continued attribute lines aren't aligned
+  yet, and a `@switch` leaves the file's markup as written; see [#88](https://github.com/nullean/curb/issues/88).
 - `print-config` and `doc-tree` work on `.cs` files only.
 - The C# lexer reads the markup inside an `@if` or `@foreach` body as C#, so a brace in that markup's text
   (`<p>{</p>`) is counted. The body's end is then not found, and nothing after it in the file is formatted.
 
-See the [option reference](../reference/razor/code-blocks/curb_razor_format_code_blocks.md) for the key.
+See the option reference for [the code-blocks key](../reference/razor/code-blocks/curb_razor_format_code_blocks.md),
+[the markup key](../reference/razor/code-blocks/curb_razor_format_markup.md) and
+[engine quirks](../reference/razor/code-blocks/curb_razor_markup_engine_quirks.md).

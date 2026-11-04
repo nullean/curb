@@ -35,10 +35,30 @@ internal sealed class RazorLanguage : IInProcessLanguage
 	/// that is the answer for every Razor file in a repository that has not opted in, so declining them
 	/// costs a dictionary lookup rather than a second walk over the sections.
 	/// </remarks>
-	public LanguageOptions BindOptions(FileConfiguration configuration, CurbEditorConfig editorConfig) =>
-		configuration.Properties.ContainsKey(RazorFormatter.EnableKey) && IsEnabled(editorConfig.ExplicitFor(configuration.FileName))
-			? new RazorOptions(EditorConfigOptionsBinder.Bind(configuration))
+	public LanguageOptions BindOptions(FileConfiguration configuration, CurbEditorConfig editorConfig)
+	{
+		if (!configuration.Properties.ContainsKey(RazorFormatter.EnableKey))
+			return RazorOptions.Declined;
+
+		var explicitProperties = editorConfig.ExplicitFor(configuration.FileName);
+		return IsEnabled(explicitProperties)
+			? new RazorOptions(EditorConfigOptionsBinder.Bind(configuration), MarkupFrom(explicitProperties))
 			: RazorOptions.Declined;
+	}
+
+	/// <summary>
+	/// Markup re-indentation, read the same way as the key that turns Razor on: only from a section that names
+	/// Razor files, and only on top of it.
+	/// </summary>
+	internal static RazorMarkup MarkupFrom(IReadOnlyDictionary<string, string> explicitProperties)
+	{
+		if (!IsTrue(explicitProperties, RazorFormatter.MarkupKey))
+			return RazorMarkup.Off;
+		return IsTrue(explicitProperties, RazorFormatter.EngineQuirksKey) ? RazorMarkup.EngineQuirks : RazorMarkup.Indent;
+	}
+
+	private static bool IsTrue(IReadOnlyDictionary<string, string> properties, string key) =>
+		properties.TryGetValue(key, out var value) && value.Equals("true", StringComparison.OrdinalIgnoreCase);
 
 	/// <summary>A repository whose <c>.editorconfig</c> files never mention the key has not opted in.</summary>
 	public bool DeclinesUnresolved(string path, CurbEditorConfig editorConfig) =>
@@ -49,8 +69,7 @@ internal sealed class RazorLanguage : IInProcessLanguage
 
 	/// <summary>Whether <paramref name="explicitProperties"/> turns Razor formatting on.</summary>
 	internal static bool IsEnabled(IReadOnlyDictionary<string, string> explicitProperties) =>
-		explicitProperties.TryGetValue(RazorFormatter.EnableKey, out var value)
-		&& value.Equals("true", StringComparison.OrdinalIgnoreCase);
+		IsTrue(explicitProperties, RazorFormatter.EnableKey);
 
 	public bool SkipSource(string source) => false;
 
@@ -63,13 +82,16 @@ internal sealed class RazorLanguage : IInProcessLanguage
 internal sealed class RazorOptions : LanguageOptions
 {
 	/// <summary>For every file that did not opt in. Nothing reads it but <see cref="Claimed"/>.</summary>
-	public static RazorOptions Declined { get; } = new(new FormatOptions(), claimed: false);
+	public static RazorOptions Declined { get; } = new(new FormatOptions(), RazorMarkup.Off, claimed: false);
 
 	public readonly FormatOptions Value;
 
-	public RazorOptions(FormatOptions options, bool claimed = true)
+	public readonly RazorMarkup Markup;
+
+	public RazorOptions(FormatOptions options, RazorMarkup markup, bool claimed = true)
 	{
 		Value = options;
+		Markup = markup;
 		Claimed = claimed;
 
 		// The byte-order mark is outside every block, so it stays as the file has it whatever `charset`
@@ -99,7 +121,8 @@ internal sealed class RazorWorker(RazorFormatter formatter) : ILanguageWorker
 		bool verifyRoundTrip) =>
 		formatter.Format(
 			source, ((RazorOptions)options).Value, produceText, verifyRoundTrip,
-			component: !fileName.EndsWith(".cshtml", StringComparison.OrdinalIgnoreCase));
+			component: !fileName.EndsWith(".cshtml", StringComparison.OrdinalIgnoreCase),
+			markup: ((RazorOptions)options).Markup);
 
 	/// <summary>Zero, since the run's round-trip line counts <c>.cs</c> files only.</summary>
 	public int RoundTripsChecked => 0;

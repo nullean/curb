@@ -37,18 +37,19 @@ public abstract class RazorFormattingTest
 		[LanguageInjection("razor")] string expected,
 		[StringSyntax("ini")] string? editorConfig = null,
 		int declined = 0,
+		RazorMarkup markup = RazorMarkup.Off,
 		[CallerMemberName] string? caller = null,
 		[CallerFilePath] string? callerFile = null)
 	{
 		var options = Options(editorConfig);
 		RazorExpectationDump.Record(expected, editorConfig,
 			$"{(callerFile is null ? "?" : Path.GetFileNameWithoutExtension(callerFile))}.{caller ?? "?"}");
-		var actual = FormatOrFail(source, options, "source", declined);
+		var actual = FormatOrFail(source, options, "source", declined, markup);
 
 		if (!string.Equals(actual, expected, StringComparison.Ordinal))
 			throw new FormattingAssertionException(FormattingDiff.Describe(expected, actual, source, editorConfig));
 
-		var second = FormatOrFail(expected, options, "expected output", declined);
+		var second = FormatOrFail(expected, options, "expected output", declined, markup);
 		if (!string.Equals(second, expected, StringComparison.Ordinal))
 		{
 			throw new FormattingAssertionException(
@@ -65,9 +66,10 @@ public abstract class RazorFormattingTest
 		[LanguageInjection("razor")] string source,
 		[StringSyntax("ini")] string? editorConfig = null,
 		int declined = 0,
+		RazorMarkup markup = RazorMarkup.Off,
 		[CallerMemberName] string? caller = null,
 		[CallerFilePath] string? callerFile = null) =>
-		Formats(source, source, editorConfig, declined, caller, callerFile);
+		Formats(source, source, editorConfig, declined, markup, caller, callerFile);
 
 	/// <summary>
 	/// Asserts that every block in <paramref name="source"/> is declined and the file comes back exactly
@@ -78,15 +80,16 @@ public abstract class RazorFormattingTest
 		string reason,
 		int declined = 1,
 		[StringSyntax("ini")] string? editorConfig = null,
+		RazorMarkup markup = RazorMarkup.Off,
 		[CallerMemberName] string? caller = null,
 		[CallerFilePath] string? callerFile = null)
 	{
 		using var formatter = new RazorFormatter();
-		var result = formatter.Format(source, Options(editorConfig));
+		var result = formatter.Format(source, Options(editorConfig), markup: markup);
 		if (result.Message is null || !result.Message.Contains(reason, StringComparison.Ordinal))
 			throw new FormattingAssertionException($"expected a refusal saying '{reason}', got: {result.Message ?? "(no message)"}");
 
-		return Unchanged(source, editorConfig, declined, caller, callerFile);
+		return Unchanged(source, editorConfig, declined, markup, caller, callerFile);
 	}
 
 	internal static FormatOptions Options(string? editorConfig) =>
@@ -106,10 +109,10 @@ public abstract class RazorFormattingTest
 			return options;
 		});
 
-	private static string FormatOrFail(string source, in FormatOptions options, string what, int declined)
+	private static string FormatOrFail(string source, in FormatOptions options, string what, int declined, RazorMarkup markup)
 	{
 		using var formatter = new RazorFormatter();
-		var result = formatter.Format(source, options, verifyRoundTrip: true);
+		var result = formatter.Format(source, options, verifyRoundTrip: true, markup: markup);
 		if (result.Status != FormatStatus.Formatted)
 			throw new FormattingAssertionException($"formatting the {what} failed with {result.Status}: {result.Message}");
 

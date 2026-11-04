@@ -33,6 +33,12 @@ public sealed class RazorFormatter : IDisposable
 	/// <summary>The <c>.editorconfig</c> key that turns this on.</summary>
 	public const string EnableKey = "curb_razor_format_code_blocks";
 
+	/// <summary>The <c>.editorconfig</c> key that re-indents markup as well. Experimental.</summary>
+	public const string MarkupKey = "curb_razor_format_markup";
+
+	/// <summary>With <see cref="MarkupKey"/>, indents markup by <c>tab_width</c>, as Microsoft's Razor formatter does.</summary>
+	public const string EngineQuirksKey = "curb_razor_markup_engine_quirks";
+
 	/// <summary>The name of the class a block is wrapped in. Never written anywhere.</summary>
 	internal const string WrapperName = "__CurbRazor__";
 
@@ -56,7 +62,47 @@ public sealed class RazorFormatter : IDisposable
 	/// <see cref="FormatResult.Declined"/> and <see cref="FormatResult.Message"/> saying which blocks were
 	/// left as written and why.
 	/// </returns>
-	public FormatResult Format(string source, in FormatOptions options, bool produceText = true, bool verifyRoundTrip = true, bool component = true)
+	/// <param name="markup">Whether markup is re-indented as well, and by which unit; see <see cref="RazorMarkup"/>.</param>
+	public FormatResult Format(
+		string source,
+		in FormatOptions options,
+		bool produceText = true,
+		bool verifyRoundTrip = true,
+		bool component = true,
+		RazorMarkup markup = RazorMarkup.Off)
+	{
+		if (markup == RazorMarkup.Off)
+			return FormatBlocks(source, options, produceText, verifyRoundTrip, component);
+
+		// Markup first: an indented @code line moves with its nesting, and its block's C# is then formatted
+		// against the line where it now is.
+		var unit = markup == RazorMarkup.EngineQuirks ? options.TabWidth : options.IndentSize;
+		var indented = RazorMarkupIndenter.TryIndent(source, component, unit, options.UseTabs, options.TabWidth, out var refusal);
+		if (indented is null)
+		{
+			var asWritten = FormatBlocks(source, options, produceText, verifyRoundTrip, component);
+			if (asWritten.Status != FormatStatus.Formatted)
+				return asWritten;
+			var note = "markup left as written, " + refusal;
+			return asWritten with
+			{
+				Message = asWritten.Message is null ? note : note + "; " + asWritten.Message,
+				Declined = asWritten.Declined + 1,
+			};
+		}
+
+		if (!RazorMarkupIndenter.OnlyIndentationChanged(source, indented))
+			return new FormatResult(FormatStatus.VerificationFailed, false, null, 1, "re-indenting the markup changed more than indentation");
+
+		var result = FormatBlocks(indented, options, produceText: true, verifyRoundTrip, component);
+		if (result.Status != FormatStatus.Formatted)
+			return result;
+
+		var changed = !string.Equals(result.Text, source, StringComparison.Ordinal);
+		return result with { Changed = changed, Text = produceText ? result.Text : null };
+	}
+
+	private FormatResult FormatBlocks(string source, in FormatOptions options, bool produceText, bool verifyRoundTrip, bool component)
 	{
 		_blocks.Clear();
 		RazorBlockScanner.Scan(source, _blocks, component);
@@ -417,4 +463,20 @@ public sealed class RazorFormatter : IDisposable
 
 	/// <summary>Returns the pooled buffers this formatter holds.</summary>
 	public void Dispose() => _csharp.Dispose();
+}
+
+/// <summary>Whether <see cref="RazorFormatter"/> re-indents markup, and by which unit.</summary>
+public enum RazorMarkup : byte
+{
+	/// <summary>Markup is left exactly as written.</summary>
+	Off,
+
+	/// <summary>Markup is re-indented by its nesting, one <c>indent_size</c> per level, as C# is.</summary>
+	Indent,
+
+	/// <summary>
+	/// As <see cref="Indent"/>, but one <c>tab_width</c> per level, the unit Microsoft's Razor formatter uses
+	/// whatever <c>indent_size</c> says.
+	/// </summary>
+	EngineQuirks,
 }

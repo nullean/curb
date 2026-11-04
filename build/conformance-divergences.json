@@ -300,6 +300,27 @@
       "staysFixedPoint": false,
       "reason": "The Razor engine adds a blank line after an #endregion that ends a @code block, before its closing brace. Curb keeps a block's last line where the formatter left it, as it does in a .cs file.",
       "exampleCase": "RazorFormattingTests.Preprocessor_directives_inside_a_block_are_kept"
+    },
+    {
+      "key": "razor:markup",
+      "tool": "razor-dotnet-format",
+      "staysFixedPoint": false,
+      "reason": "The Razor engine also formats markup, directives and expressions: it re-indents element nesting, puts an @if body's brace and markup on lines of their own, normalises the spacing in @using and in an implicit expression's call, and opens a one-line @{ } out. Curb leaves everything outside a block as written until markup formatting lands (#88).",
+      "exampleCase": "RazorMarkupTests.Without_the_key_markup_is_left_as_written"
+    },
+    {
+      "key": "razor:indent",
+      "tool": "razor-dotnet-format",
+      "staysFixedPoint": false,
+      "reason": "The Razor engine indents by tab_width and ignores indent_size (it takes its indent from the C# options' TabSize), where dotnet format and Curb indent C# by indent_size. With indent_size = 2 and the default tab_width of 4 the engine indents a block by four.",
+      "exampleCase": "RazorMarkupTests.By_default_markup_indents_by_indent_size"
+    },
+    {
+      "key": "razor:refused",
+      "tool": "razor-dotnet-format",
+      "staysFixedPoint": false,
+      "reason": "Curb formats only the C# in a block, and leaves a block it cannot read as C# exactly as written: one holding Razor (a template, <text>, @:, a Razor comment, markup), one whose closing brace shares its line, one that never closes. The Razor engine parses Razor, so it formats them, and the markup around them. Matching it means parsing Razor, which Curb does not (#88).",
+      "exampleCase": "RazorMarkupTests.An_element_left_open_leaves_the_markup_as_written"
     }
   ]
 }

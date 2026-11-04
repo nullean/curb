@@ -94,6 +94,42 @@ public class RazorRunTests
 	}
 
 	[Test]
+	public async Task The_markup_key_re_indents_markup_on_top_of_the_code_blocks_key()
+	{
+		var fs = Repo(OptIn + "curb_razor_format_markup = true\n");
+		fs.AddFile($"{Root}/A.razor", new MockFileData("<div>\n<p>x</p>\n</div>\n"));
+
+		FormattingRun.Execute(fs, Root, write: true).Changed.Should().Be(1);
+
+		fs.File.ReadAllText($"{Root}/A.razor").Should().Be("<div>\n    <p>x</p>\n</div>\n");
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task The_markup_key_alone_does_not_turn_razor_on()
+	{
+		var fs = Repo("root = true\n\n[*.razor]\ncurb_razor_format_markup = true\n");
+		fs.AddFile($"{Root}/A.razor", new MockFileData("<div>\n<p>x</p>\n</div>\n"));
+
+		FormattingRun.Execute(fs, Root, write: true).Files.Should().Be(1, "only the C# file");
+
+		fs.File.ReadAllText($"{Root}/A.razor").Should().Be("<div>\n<p>x</p>\n</div>\n");
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task Engine_quirks_indent_markup_by_tab_width()
+	{
+		var fs = Repo(OptIn + "indent_size = 2\ntab_width = 4\ncurb_razor_format_markup = true\ncurb_razor_markup_engine_quirks = true\n");
+		fs.AddFile($"{Root}/A.razor", new MockFileData("<div>\n<p>x</p>\n</div>\n"));
+
+		FormattingRun.Execute(fs, Root, write: true);
+
+		fs.File.ReadAllText($"{Root}/A.razor").Should().Be("<div>\n    <p>x</p>\n</div>\n");
+		await Task.CompletedTask;
+	}
+
+	[Test]
 	public async Task A_code_block_in_a_view_is_markup_and_left_alone()
 	{
 		var fs = Repo(OptIn);

@@ -484,13 +484,24 @@ internal static class Program
             sb.AppendLine();
         }
 
+        // The markup keys are shown at indent_size = 2, where engine quirks indent by tab_width (4) instead.
+        var markup = descriptor.Key switch
+        {
+            RazorFormatter.MarkupKey => RazorMarkup.Indent,
+            RazorFormatter.EngineQuirksKey => RazorMarkup.EngineQuirks,
+            _ => RazorMarkup.Off,
+        };
+        var options = markup == RazorMarkup.Off
+            ? new FormatOptions { EndOfLine = EndOfLine.Lf }
+            : new FormatOptions { EndOfLine = EndOfLine.Lf, IndentSize = 2 };
+
         using var razor = new RazorFormatter();
         foreach (var value in descriptor.Values)
         {
             var after = snippet;
             if (value == "true")
             {
-                var result = razor.Format(snippet, new FormatOptions { EndOfLine = EndOfLine.Lf });
+                var result = razor.Format(snippet, options, markup: markup);
                 if (!result.Success || result.Declined > 0)
                     throw new InvalidOperationException($"the {descriptor.Key} = {value} example does not format: {result.Message}");
                 after = result.Text!;
