@@ -22,6 +22,53 @@ Column target for reflow. off disables reflow entirely and selects preservation 
 
 No known case where Curb's output is not a fixed point of `dotnet format` — see [conformance](../../design-principles/conformance.md).
 
+### `max_line_length = 80`
+
+```ini
+max_line_length = 80
+```
+
+::::{tab-set}
+
+:::{tab-item} Before
+```csharp
+using System.Text;
+
+namespace N;
+
+public class Widget
+{
+    public string Build()
+    {
+        return new StringBuilder().Append("Hello").Append(", ").Append("World").Append("!").ToString();
+    }
+}
+```
+:::
+
+:::{tab-item} After
+```csharp
+using System.Text;
+
+namespace N;
+
+public class Widget
+{
+    public string Build()
+    {
+        return new StringBuilder()
+            .Append("Hello")
+            .Append(", ")
+            .Append("World")
+            .Append("!")
+            .ToString();
+    }
+}
+```
+:::
+
+::::
+
 ### `max_line_length = off`
 
 ```ini

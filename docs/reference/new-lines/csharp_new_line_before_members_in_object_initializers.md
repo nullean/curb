@@ -14,7 +14,7 @@ Put each member of an object initializer on its own line.
 | Value | Notes |
 |---|---|
 | `true` |  |
-| `false` |  |
+| `false` | Leaves the members where they were written. It doesn't join them onto one line, and neither does `dotnet format`. |
 
 **Default:** `true`
 
@@ -38,7 +38,11 @@ public class Point { public int X; public int Y; public int Z; }
 
 public class Widget
 {
-    public Point Make() => new Point { X = 1, Y = 2, Z = 3 };
+    public Point Make() => new Point
+    {
+        X = 1, Y = 2,
+        Z = 3,
+    };
 }
 ```
 :::
@@ -51,7 +55,12 @@ public class Point { public int X; public int Y; public int Z; }
 
 public class Widget
 {
-    public Point Make() => new Point { X = 1, Y = 2, Z = 3 };
+    public Point Make() => new Point
+    {
+        X = 1,
+        Y = 2,
+        Z = 3,
+    };
 }
 ```
 :::
@@ -74,7 +83,11 @@ public class Point { public int X; public int Y; public int Z; }
 
 public class Widget
 {
-    public Point Make() => new Point { X = 1, Y = 2, Z = 3 };
+    public Point Make() => new Point
+    {
+        X = 1, Y = 2,
+        Z = 3,
+    };
 }
 ```
 :::
@@ -87,7 +100,11 @@ public class Point { public int X; public int Y; public int Z; }
 
 public class Widget
 {
-    public Point Make() => new Point { X = 1, Y = 2, Z = 3 };
+    public Point Make() => new Point
+    {
+        X = 1, Y = 2,
+        Z = 3,
+    };
 }
 ```
 :::

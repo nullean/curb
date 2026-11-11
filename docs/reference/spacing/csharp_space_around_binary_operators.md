@@ -115,7 +115,7 @@ public class Widget
 {
     public bool Check(int a, int b, int c)
     {
-        return a > 0 && b > 0 && c > 0 && a + b > c;
+        return a>0&&b>0&&c>0&&a+b>c;
     }
 }
 ```

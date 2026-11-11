@@ -26,6 +26,7 @@ No known case where Curb's output is not a fixed point of `dotnet format` — se
 ### `csharp_wrap_parameters_style = chop_always`
 
 ```ini
+max_line_length = 80
 csharp_wrap_parameters_style = chop_always
 ```
 
@@ -37,7 +38,18 @@ namespace N;
 
 public class Widget
 {
-    public void Register(string name, int value, bool active, string tag)
+    public void Move(int x, int y)
+    {
+        Console.WriteLine(x);
+    }
+
+    public void Register(
+        string name,
+        int value,
+        bool active,
+        string tag,
+        string owner
+    )
     {
         Console.WriteLine(name);
     }
@@ -51,11 +63,20 @@ namespace N;
 
 public class Widget
 {
+    public void Move(
+        int x,
+        int y
+    )
+    {
+        Console.WriteLine(x);
+    }
+
     public void Register(
         string name,
         int value,
         bool active,
-        string tag
+        string tag,
+        string owner
     )
     {
         Console.WriteLine(name);
@@ -69,6 +90,7 @@ public class Widget
 ### `csharp_wrap_parameters_style = chop_if_long`
 
 ```ini
+max_line_length = 80
 csharp_wrap_parameters_style = chop_if_long
 ```
 
@@ -80,7 +102,12 @@ namespace N;
 
 public class Widget
 {
-    public void Register(string name, int value, bool active, string tag)
+    public void Move(int x, int y)
+    {
+        Console.WriteLine(x);
+    }
+
+    public void Register(string name, int value, bool active, string tag, string owner)
     {
         Console.WriteLine(name);
     }
@@ -94,11 +121,17 @@ namespace N;
 
 public class Widget
 {
+    public void Move(int x, int y)
+    {
+        Console.WriteLine(x);
+    }
+
     public void Register(
         string name,
         int value,
         bool active,
-        string tag
+        string tag,
+        string owner
     )
     {
         Console.WriteLine(name);
@@ -112,6 +145,7 @@ public class Widget
 ### `csharp_wrap_parameters_style = wrap_if_long`
 
 ```ini
+max_line_length = 80
 csharp_wrap_parameters_style = wrap_if_long
 ```
 
@@ -123,7 +157,18 @@ namespace N;
 
 public class Widget
 {
-    public void Register(string name, int value, bool active, string tag)
+    public void Move(int x, int y)
+    {
+        Console.WriteLine(x);
+    }
+
+    public void Register(
+        string name,
+        int value,
+        bool active,
+        string tag,
+        string owner
+    )
     {
         Console.WriteLine(name);
     }
@@ -137,9 +182,13 @@ namespace N;
 
 public class Widget
 {
+    public void Move(int x, int y)
+    {
+        Console.WriteLine(x);
+    }
+
     public void Register(
-        string name, int value,
-        bool active, string tag
+        string name, int value, bool active, string tag, string owner
     )
     {
         Console.WriteLine(name);

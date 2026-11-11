@@ -26,6 +26,7 @@ No known case where Curb's output is not a fixed point of `dotnet format` — se
 ### `csharp_wrap_chained_binary_expressions = chop_always`
 
 ```ini
+max_line_length = 80
 csharp_wrap_chained_binary_expressions = chop_always
 ```
 
@@ -37,9 +38,15 @@ namespace N;
 
 public class Widget
 {
+    public bool Small(int a, int b)
+    {
+        return a > 0 && b > 0;
+    }
+
     public bool Check(int a, int b, int c)
     {
-        return a > 0 && b > 0 && c > 0 && a + b > c && a + c > b && b + c > a;
+        return a > 0 && b > 0 && c > 0 && a + b > c && a + c > b && b + c >
+            a && a != b;
     }
 }
 ```
@@ -51,11 +58,15 @@ namespace N;
 
 public class Widget
 {
-    public bool Check(
-        int a,
-        int b,
-        int c
-    )
+    public bool Small(int a, int b)
+    {
+        return a
+            > 0
+            && b
+                > 0;
+    }
+
+    public bool Check(int a, int b, int c)
     {
         return a
             > 0
@@ -71,7 +82,9 @@ public class Widget
                 > b
             && b
                 + c
-                > a;
+                > a
+            && a
+                != b;
     }
 }
 ```
@@ -82,6 +95,7 @@ public class Widget
 ### `csharp_wrap_chained_binary_expressions = chop_if_long`
 
 ```ini
+max_line_length = 80
 csharp_wrap_chained_binary_expressions = chop_if_long
 ```
 
@@ -93,9 +107,15 @@ namespace N;
 
 public class Widget
 {
+    public bool Small(int a, int b)
+    {
+        return a > 0 && b > 0;
+    }
+
     public bool Check(int a, int b, int c)
     {
-        return a > 0 && b > 0 && c > 0 && a + b > c && a + c > b && b + c > a;
+        return a > 0 && b > 0 && c > 0 && a + b > c && a + c > b && b + c >
+            a && a != b;
     }
 }
 ```
@@ -107,18 +127,20 @@ namespace N;
 
 public class Widget
 {
-    public bool Check(
-        int a,
-        int b,
-        int c
-    )
+    public bool Small(int a, int b)
+    {
+        return a > 0 && b > 0;
+    }
+
+    public bool Check(int a, int b, int c)
     {
         return a > 0
             && b > 0
             && c > 0
             && a + b > c
             && a + c > b
-            && b + c > a;
+            && b + c > a
+            && a != b;
     }
 }
 ```
@@ -129,6 +151,7 @@ public class Widget
 ### `csharp_wrap_chained_binary_expressions = wrap_if_long`
 
 ```ini
+max_line_length = 80
 csharp_wrap_chained_binary_expressions = wrap_if_long
 ```
 
@@ -140,9 +163,15 @@ namespace N;
 
 public class Widget
 {
+    public bool Small(int a, int b)
+    {
+        return a > 0 && b > 0;
+    }
+
     public bool Check(int a, int b, int c)
     {
-        return a > 0 && b > 0 && c > 0 && a + b > c && a + c > b && b + c > a;
+        return a > 0 && b > 0 && c > 0 && a + b > c && a + c > b && b + c >
+            a && a != b;
     }
 }
 ```
@@ -154,15 +183,15 @@ namespace N;
 
 public class Widget
 {
-    public bool Check(
-        int a,
-        int b,
-        int c
-    )
+    public bool Small(int a, int b)
     {
-        return a > 0 && b > 0 && c > 0
-            && a + b > c && a + c > b
-            && b + c > a;
+        return a > 0 && b > 0;
+    }
+
+    public bool Check(int a, int b, int c)
+    {
+        return a > 0 && b > 0 && c > 0 && a + b > c && a + c > b && b + c > a
+            && a != b;
     }
 }
 ```

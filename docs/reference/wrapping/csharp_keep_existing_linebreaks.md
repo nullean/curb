@@ -25,6 +25,7 @@ No known case where Curb's output is not a fixed point of `dotnet format` — se
 ### `csharp_keep_existing_linebreaks = true`
 
 ```ini
+max_line_length = 80
 csharp_keep_existing_linebreaks = true
 ```
 
@@ -38,9 +39,14 @@ namespace N;
 
 public class Widget
 {
-    public string Build()
+    public string Build(string name)
     {
-        return new StringBuilder().Append("Hello").Append(", ").Append("World").Append("!").ToString();
+        var greeting = new StringBuilder()
+            .Append("Hello, ")
+            .Append(name);
+        return string.Join(", ",
+            greeting,
+            "!");
     }
 }
 ```
@@ -54,9 +60,14 @@ namespace N;
 
 public class Widget
 {
-    public string Build()
+    public string Build(string name)
     {
-        return new StringBuilder().Append("Hello").Append(", ").Append("World").Append("!").ToString();
+        var greeting = new StringBuilder()
+            .Append("Hello, ")
+            .Append(name);
+        return string.Join(", ",
+            greeting,
+            "!");
     }
 }
 ```
@@ -67,6 +78,7 @@ public class Widget
 ### `csharp_keep_existing_linebreaks = false`
 
 ```ini
+max_line_length = 80
 csharp_keep_existing_linebreaks = false
 ```
 
@@ -80,9 +92,14 @@ namespace N;
 
 public class Widget
 {
-    public string Build()
+    public string Build(string name)
     {
-        return new StringBuilder().Append("Hello").Append(", ").Append("World").Append("!").ToString();
+        var greeting = new StringBuilder()
+            .Append("Hello, ")
+            .Append(name);
+        return string.Join(", ",
+            greeting,
+            "!");
     }
 }
 ```
@@ -96,9 +113,10 @@ namespace N;
 
 public class Widget
 {
-    public string Build()
+    public string Build(string name)
     {
-        return new StringBuilder().Append("Hello").Append(", ").Append("World").Append("!").ToString();
+        var greeting = new StringBuilder().Append("Hello, ").Append(name);
+        return string.Join(", ", greeting, "!");
     }
 }
 ```

@@ -36,9 +36,17 @@ namespace N;
 
 public class Widget
 {
-    public void Register(string name, int value, bool active, string tag)
+    public void Move(
+        int x,
+        int y)
     {
-        Console.WriteLine(name);
+    }
+
+    public void Resize(
+        int width,
+        int height
+    )
+    {
     }
 }
 ```
@@ -50,9 +58,18 @@ namespace N;
 
 public class Widget
 {
-    public void Register(string name, int value, bool active, string tag)
+    public void Move(
+        int x,
+        int y
+    )
     {
-        Console.WriteLine(name);
+    }
+
+    public void Resize(
+        int width,
+        int height
+    )
+    {
     }
 }
 ```
@@ -74,9 +91,17 @@ namespace N;
 
 public class Widget
 {
-    public void Register(string name, int value, bool active, string tag)
+    public void Move(
+        int x,
+        int y)
     {
-        Console.WriteLine(name);
+    }
+
+    public void Resize(
+        int width,
+        int height
+    )
+    {
     }
 }
 ```
@@ -88,9 +113,16 @@ namespace N;
 
 public class Widget
 {
-    public void Register(string name, int value, bool active, string tag)
+    public void Move(
+        int x,
+        int y)
     {
-        Console.WriteLine(name);
+    }
+
+    public void Resize(
+        int width,
+        int height)
+    {
     }
 }
 ```

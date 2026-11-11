@@ -442,13 +442,15 @@ public static class Snippets
 
             """,
 
+        // The keys need a width, and with one an empty `{ }` body breaks onto its own line, so the method
+        // has an expression body to stay single-line.
         ["attributed_method"] = """
             namespace N;
 
             public class Widget
             {
                 [Obsolete]
-                public void OldWay() { }
+                public void OldWay() => Console.WriteLine("old");
 
                 [Obsolete("use NewWay")]
                 public string OldName { get; set; } = "";
@@ -945,6 +947,7 @@ public static class Snippets
 
             """,
 
+        // Both keys act only on an initializer the author already opened out, so the snippet opens it.
         ["csharp_new_line_before_members_in_object_initializers"] = """
             namespace N;
 
@@ -952,7 +955,11 @@ public static class Snippets
 
             public class Widget
             {
-                public Point Make() => new Point { X = 1, Y = 2, Z = 3 };
+                public Point Make() => new Point
+                {
+                    X = 1, Y = 2,
+                    Z = 3,
+                };
             }
 
             """,
@@ -964,7 +971,11 @@ public static class Snippets
             {
                 public object Describe()
                 {
-                    return new { Name = "curb", Version = 1, Active = true };
+                    return new
+                    {
+                        Name = "curb", Version = 1,
+                        Active = true,
+                    };
                 }
             }
 
@@ -1467,11 +1478,14 @@ public static class Snippets
             """,
 
         ["csharp_blank_lines_around_namespace"] = """
-            using System;
-
-            namespace N;
-
-            public class Widget { }
+            namespace A
+            {
+                public class Widget { }
+            }
+            namespace B
+            {
+                public class Gadget { }
+            }
 
             """,
 
@@ -1535,17 +1549,307 @@ public static class Snippets
 
             """,
 
+        // Both values leave an expanded enum alone; false is the one that expands a one-line enum.
         ["csharp_place_simple_enum_on_single_line"] = """
             namespace N;
 
-            public enum Status
+            public enum Status { Active, Inactive, Pending }
+
+            """,
+
+        // Each key moves the ) of a list the author broke: one method or call per position.
+        ["csharp_wrap_before_declaration_rpar"] = """
+            namespace N;
+
+            public class Widget
             {
-                Active,
-                Inactive,
-                Pending,
+                public void Move(
+                    int x,
+                    int y)
+                {
+                }
+
+                public void Resize(
+                    int width,
+                    int height
+                )
+                {
+                }
             }
 
             """,
+
+        ["csharp_wrap_before_invocation_rpar"] = """
+            namespace N;
+
+            public class Widget
+            {
+                public void Run()
+                {
+                    Move(
+                        1,
+                        2);
+                    Resize(
+                        640,
+                        480
+                    );
+                }
+
+                private void Move(int x, int y) { }
+
+                private void Resize(int width, int height) { }
+            }
+
+            """,
+
+        ["csharp_keep_existing_linebreaks"] = """
+            using System.Text;
+
+            namespace N;
+
+            public class Widget
+            {
+                public string Build(string name)
+                {
+                    var greeting = new StringBuilder()
+                        .Append("Hello, ")
+                        .Append(name);
+                    return string.Join(", ",
+                        greeting,
+                        "!");
+                }
+            }
+
+            """,
+
+        ["csharp_wrap_before_arrow_with_expressions"] = """
+            namespace N;
+
+            public class Widget
+            {
+                public int Value { get; set; }
+
+                public string Describe() => $"Widget {Value} of {Value * 2}, built by the widget factory";
+            }
+
+            """,
+
+        ["csharp_wrap_before_binary_opsign"] = """
+            namespace N;
+
+            public class Widget
+            {
+                public bool IsValid(string name, int count)
+                {
+                    return name.Length > 0 && count > 0 && count < 100 && name != "none" && name != "all";
+                }
+            }
+
+            """,
+
+        ["csharp_place_field_attribute_on_same_line"] = """
+            using System;
+
+            namespace N;
+
+            public class Widget
+            {
+                [NonSerialized]
+                private int _cache;
+
+                [field: NonSerialized]
+                public event EventHandler? Changed;
+            }
+
+            """,
+
+        ["csharp_place_event_attribute_on_same_line"] = """
+            using System;
+
+            namespace N;
+
+            public class Widget
+            {
+                [NonSerialized]
+                private int _cache;
+
+                [field: NonSerialized]
+                public event EventHandler? Changed;
+            }
+
+            """,
+
+        // Each of these four has one list that fits in the companion width and one that doesn't, so
+        // chop_always (breaks both), chop_if_long (breaks the long one) and wrap_if_long (packs the long
+        // one) all differ.
+        ["csharp_wrap_arguments_style"] = """
+            namespace N;
+
+            public class Widget
+            {
+                public void Run()
+                {
+                    Register("curb", 42, true, "formatter");
+                    Register("a widget with a much longer name", 4200, false, "a formatter tag");
+                }
+
+                private void Register(string name, int value, bool active, string tag)
+                {
+                    Console.WriteLine(name);
+                }
+            }
+
+            """,
+
+        ["csharp_wrap_parameters_style"] = """
+            namespace N;
+
+            public class Widget
+            {
+                public void Move(int x, int y)
+                {
+                    Console.WriteLine(x);
+                }
+
+                public void Register(string name, int value, bool active, string tag, string owner)
+                {
+                    Console.WriteLine(name);
+                }
+            }
+
+            """,
+
+        ["csharp_wrap_chained_binary_expressions"] = """
+            namespace N;
+
+            public class Widget
+            {
+                public bool Small(int a, int b)
+                {
+                    return a > 0 && b > 0;
+                }
+
+                public bool Check(int a, int b, int c)
+                {
+                    return a > 0 && b > 0 && c > 0 && a + b > c && a + c > b && b + c > a && a != b;
+                }
+            }
+
+            """,
+
+        ["csharp_wrap_object_and_collection_initializer_style"] = """
+            namespace N;
+
+            public class Widget
+            {
+                public object Make()
+                {
+                    var small = new Point { X = 1, Y = 2 };
+                    return new Point { X = 1000, Y = 2000, Z = 3000, Label = "a point with a long label" };
+                }
+            }
+
+            """,
+
+        // Formatted when IDE0055 applies, left as written when it doesn't: an untidy snippet shows both.
+        ["dotnet_diagnostic.ide0055.severity"] = """
+            namespace N;
+
+            public class Widget
+            {
+                public int Value { get; set; }
+
+                public int Double( )
+                {
+                    return Value*2;
+                }
+            }
+
+            """,
+
+        ["generated_code"] = """
+            namespace N;
+
+            public class Widget
+            {
+                public int Value { get; set; }
+
+                public int Double( )
+                {
+                    return Value*2;
+                }
+            }
+
+            """,
+    };
+
+    /// <summary>
+    /// Settings a key's examples need before the key can act, keyed by the key. They are printed in
+    /// every example's <c>.editorconfig</c> block, and apply to Before as well as After, so the only
+    /// difference between the two is the key itself.
+    /// </summary>
+    /// <remarks>
+    /// Most are a width: these keys act only when a line is being broken, or only in deterministic
+    /// layout, which the CLI refuses without one.
+    /// </remarks>
+    public static IReadOnlyDictionary<string, string[]> Companions { get; } = new Dictionary<string, string[]>
+    {
+        ["csharp_keep_existing_linebreaks"] = ["max_line_length = 80"],
+        ["csharp_wrap_chained_method_calls"] = ["max_line_length = 80"],
+        ["csharp_wrap_after_dot_in_method_calls"] = ["max_line_length = 80"],
+        ["csharp_wrap_before_first_method_call"] = ["max_line_length = 80"],
+        ["csharp_wrap_before_arrow_with_expressions"] = ["max_line_length = 80"],
+        ["csharp_wrap_before_binary_opsign"] = ["max_line_length = 80", "csharp_wrap_chained_binary_expressions = chop_if_long"],
+        ["csharp_wrap_chained_binary_expressions"] = ["max_line_length = 80"],
+        ["csharp_wrap_parameters_style"] = ["max_line_length = 80"],
+        ["csharp_wrap_arguments_style"] = ["max_line_length = 80"],
+        ["csharp_wrap_object_and_collection_initializer_style"] = ["max_line_length = 80"],
+        ["csharp_place_method_attribute_on_same_line"] = ["max_line_length = 80"],
+        ["csharp_place_field_attribute_on_same_line"] = ["max_line_length = 80"],
+        ["csharp_place_property_attribute_on_same_line"] = ["max_line_length = 80"],
+        ["csharp_place_event_attribute_on_same_line"] = ["max_line_length = 80"],
+        // Either value of this key turns sorting on, so the example sorts on both sides to show the separation alone.
+        ["dotnet_separate_import_directive_groups"] = ["dotnet_sort_system_directives_first = true"],
+    };
+
+    /// <summary>
+    /// Keys whose examples all start from the snippet as written rather than from the default's output.
+    /// </summary>
+    /// <remarks>
+    /// <c>csharp_keep_existing_linebreaks</c> has no default of its own: it follows <c>max_line_length</c>,
+    /// so with the width its examples need, the default's output has already joined the lines <c>true</c>
+    /// would keep, and both examples would show that joined output twice.
+    /// </remarks>
+    public static IReadOnlySet<string> StartFromInput { get; } = new HashSet<string>
+    {
+        "csharp_keep_existing_linebreaks",
+    };
+
+    /// <summary>
+    /// What a key does, for a key whose effect a code block can't show. The page carries this in place
+    /// of Before and After blocks that would be identical.
+    /// </summary>
+    public static IReadOnlyDictionary<string, string> Unshown { get; } = new Dictionary<string, string>
+    {
+        ["charset"] =
+            "`utf-8` writes the file without a byte-order mark and `utf-8-bom` writes it with one. Curb reads and " +
+            "writes UTF-8 either way, so a code block can't show the difference. With the key unset, each file keeps " +
+            "the mark it arrived with. The other EditorConfig values (`latin1`, `utf-16be`, `utf-16le`) are reported " +
+            "as unrecognised, since re-encoding a file is not a formatting change.",
+        ["end_of_line"] =
+            "`lf` and `crlf` write every line ending in the file that way. `auto` writes the platform's own " +
+            "(`Environment.NewLine`), and is what Curb does with the key unset. A code block can't show the difference. " +
+            "With the key unset, `dotnet format` keeps a file's own line endings, so the two disagree on a CRLF file " +
+            "on macOS or Linux ([#261](https://github.com/nullean/curb/issues/261)).",
+        ["insert_final_newline"] =
+            "`true` ends the file with a newline, adding one if it's missing. `false` removes the newline after the " +
+            "last line. A code block can't show the difference. With the key unset Curb behaves as `true`, while " +
+            "`dotnet format` leaves the end of the file as it is " +
+            "([#262](https://github.com/nullean/curb/issues/262)).",
+        ["csharp_style_expression_bodied_indexers"] =
+            "Curb accepts this key but doesn't convert indexers yet, so it has no example " +
+            "([#260](https://github.com/nullean/curb/issues/260)). A get-only property converts under " +
+            "`csharp_style_expression_bodied_properties`.",
     };
 
     /// <summary>
@@ -1558,6 +1862,25 @@ public static class Snippets
             "Accepted, but moves no brace on its own: an event's braces follow `properties`, as in `dotnet format`.",
         [("csharp_new_line_before_open_brace", "object_collection_array_initializers")] =
             "Moves an object initializer's brace. A collection or array initializer's brace stays where it was written, as in `dotnet format`.",
+        [("csharp_new_line_before_members_in_object_initializers", "false")] =
+            "Leaves the members where they were written. It doesn't join them onto one line, and neither does `dotnet format`.",
+        [("csharp_new_line_before_members_in_anonymous_types", "false")] =
+            "No effect yet unless `csharp_new_line_before_members_in_object_initializers = false` is set too " +
+            "([#259](https://github.com/nullean/curb/issues/259)). `dotnet format` reads this key alone.",
+        [("csharp_wrap_before_first_method_call", "true")] =
+            "What Curb does with the key unset: once a chain breaks, its receiver gets a line of its own.",
+        [("dotnet_sort_system_directives_first", "false")] =
+            "Sorts the usings alphabetically, `System` ones included. Leave the key unset to keep them as written.",
+        [("dotnet_separate_import_directive_groups", "false")] =
+            "Still sorts the usings, `System` first unless `dotnet_sort_system_directives_first` says otherwise. " +
+            "Leave the key unset to keep them as written.",
+        [("dotnet_separate_import_directive_groups", "true")] =
+            "Also sorts the usings, `System` first unless `dotnet_sort_system_directives_first` says otherwise.",
+        [("dotnet_diagnostic.ide0055.severity", "none")] = "Curb leaves the file as written. `dotnet format whitespace` still formats it.",
+        [("dotnet_diagnostic.ide0055.severity", "silent")] = "Formats the file, the same as `warning`.",
+        [("dotnet_diagnostic.ide0055.severity", "suggestion")] = "Formats the file, the same as `warning`.",
+        [("dotnet_diagnostic.ide0055.severity", "error")] = "Formats the file, the same as `warning`.",
+        [("generated_code", "true")] = "Curb leaves the file as written.",
     };
 
     public static IReadOnlyDictionary<string, string> DemoValues { get; } = new Dictionary<string, string>
@@ -1569,6 +1892,7 @@ public static class Snippets
         ["csharp_blank_lines_inside_type"] = "1",
         ["csharp_blank_lines_around_namespace"] = "1",
         ["csharp_blank_lines_after_using_list"] = "1",
+        ["max_line_length"] = "80",
         ["file_header_template"] = "Copyright (c) Example Corp.\\nLicensed under the MIT license.",
         ["xml_max_blank_lines_between_tags"] = "0",
     };

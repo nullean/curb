@@ -80,9 +80,9 @@ public class Widget
 {
     public void Run()
     {
-        int x = 1;
-        string name = "curb";
-        bool active = true;
+        int  x=1;
+        string  name="curb";
+        bool  active=true;
     }
 }
 ```

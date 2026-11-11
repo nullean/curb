@@ -13,11 +13,11 @@ Set this to none to opt a file out of formatting.
 
 | Value | Notes |
 |---|---|
-| `none` |  |
-| `silent` |  |
-| `suggestion` |  |
+| `none` | Curb leaves the file as written. `dotnet format whitespace` still formats it. |
+| `silent` | Formats the file, the same as `warning`. |
+| `suggestion` | Formats the file, the same as `warning`. |
 | `warning` |  |
-| `error` |  |
+| `error` | Formats the file, the same as `warning`. |
 
 **Default:** `warning`
 
@@ -41,9 +41,9 @@ public class Widget
 {
     public int Value { get; set; }
 
-    public int Double()
+    public int Double( )
     {
-        return Value * 2;
+        return Value*2;
     }
 }
 ```
@@ -57,9 +57,9 @@ public class Widget
 {
     public int Value { get; set; }
 
-    public int Double()
+    public int Double( )
     {
-        return Value * 2;
+        return Value*2;
     }
 }
 ```
@@ -167,9 +167,9 @@ public class Widget
 {
     public int Value { get; set; }
 
-    public int Double()
+    public int Double( )
     {
-        return Value * 2;
+        return Value*2;
     }
 }
 ```
