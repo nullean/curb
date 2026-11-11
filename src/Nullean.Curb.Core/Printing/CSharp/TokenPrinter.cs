@@ -186,6 +186,14 @@ internal static class TokenPrinter
 					// Captured before the flush, which zeroes it — the old check read it afterwards
 					// and so was always true.
 					var priorNewLines = pendingNewLines;
+
+					// Without trailing breaks the comment before this one has not ended its line, so the blank
+					// line between them came out as that line's ending and was lost: a closing brace dropped
+					// every blank line between the comments above it. Ending it here leaves the state a
+					// trailing break would have.
+					if (!trailingBreak && emittedAnything)
+						arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
+
 					bool blankLineBefore;
 					if (forcedGapPending is int pendingBeforeComment)
 					{

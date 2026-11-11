@@ -216,6 +216,46 @@ public class CommentTests : FormattingTest
 		}
 		""");
 
+	/// <summary>
+	/// A blank line between the comments above a closing brace stays, as dotnet format leaves it. Curb dropped
+	/// it above a block's, a type's and, once its comments moved in with the statements, a switch's brace.
+	/// See <see href="https://github.com/nullean/curb/issues/230">issue #230</see>.
+	/// </summary>
+	[Test]
+	public Task A_blank_line_between_comments_above_a_closing_brace_stays() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M(int x)
+		    {
+		        {
+		            Call();
+		            // one
+
+		            // two
+		        }
+		        {
+		            Call();
+		            /* one */
+
+		            /* two */
+		        }
+		        switch (x)
+		        {
+		            case 1:
+		                break;
+		                // one
+
+		                /* two */
+		        }
+		    }
+
+		    // one
+
+		    // two
+		}
+		""");
+
 	[Test]
 	public Task Comment_as_the_only_content_of_a_block() => Unchanged(
 		"""

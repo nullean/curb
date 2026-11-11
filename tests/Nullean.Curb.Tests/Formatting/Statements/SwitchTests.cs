@@ -449,4 +449,192 @@ public class SwitchTests : FormattingTest
 		}
 		""",
 		editorConfig: "max_line_length = 120");
+
+	/// <summary>
+	/// A comment after the last section's statements goes where those statements are, as dotnet format puts
+	/// it, whatever column the author wrote it at. Curb moved it out to the brace's column. See
+	/// <see href="https://github.com/nullean/curb/issues/230">issue #230</see>.
+	/// </summary>
+	[Test]
+	public Task A_comment_at_the_end_of_the_last_section_goes_with_its_statements() => Formats(
+		"""
+		public class C
+		{
+		    public int M(int x)
+		    {
+		        switch (x)
+		        {
+		            case 1:
+		                return 1;
+		            case 2:
+		                break;
+		            // trailing note in the last section
+		        }
+		        switch (x)
+		        {
+		            case 1:
+		                break;
+		// column zero
+
+		            // one
+		            /* two */
+		        }
+		        switch (x)
+		        {
+		            case 1:
+		            // label only
+		        }
+		        switch (x)
+		        {
+		            default:
+		                {
+		                    break;
+		                }
+		                    // after a block
+		        }
+		        switch (x)
+		        {
+		            case 1: break;
+		            // after a one-line section
+		        }
+		        switch (x)
+		        {
+		                // no section
+		        }
+
+		        return 0;
+		    }
+		}
+		""",
+		// Checked against dotnet format, which writes exactly this.
+		"""
+		public class C
+		{
+		    public int M(int x)
+		    {
+		        switch (x)
+		        {
+		            case 1:
+		                return 1;
+		            case 2:
+		                break;
+		                // trailing note in the last section
+		        }
+		        switch (x)
+		        {
+		            case 1:
+		                break;
+		                // column zero
+
+		                // one
+		                /* two */
+		        }
+		        switch (x)
+		        {
+		            case 1:
+		                // label only
+		        }
+		        switch (x)
+		        {
+		            default:
+		                {
+		                    break;
+		                }
+		                // after a block
+		        }
+		        switch (x)
+		        {
+		            case 1: break;
+		                // after a one-line section
+		        }
+		        switch (x)
+		        {
+		            // no section
+		        }
+
+		        return 0;
+		    }
+		}
+		""");
+
+	/// <summary>
+	/// The comment follows the indent options of the statements it goes with: a block's
+	/// <c>csharp_indent_case_contents_when_block</c>, anything else's <c>csharp_indent_case_contents</c>.
+	/// </summary>
+	[Test]
+	public Task A_comment_at_the_end_of_the_last_section_follows_the_case_contents_options() => WithAndWithout(
+		"""
+		public class C
+		{
+		    public int M(int x)
+		    {
+		        switch (x)
+		        {
+		            case 1:
+		            break;
+		        // after a statement
+		        }
+		        switch (x)
+		        {
+		            default:
+		            {
+		                break;
+		            }
+		        // after a block
+		        }
+
+		        return 0;
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public int M(int x)
+		    {
+		        switch (x)
+		        {
+		            case 1:
+		            break;
+		            // after a statement
+		        }
+		        switch (x)
+		        {
+		            default:
+		                {
+		                    break;
+		                }
+		                // after a block
+		        }
+
+		        return 0;
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public int M(int x)
+		    {
+		        switch (x)
+		        {
+		            case 1:
+		            break;
+		            // after a statement
+		        }
+		        switch (x)
+		        {
+		            default:
+		            {
+		                break;
+		            }
+		            // after a block
+		        }
+
+		        return 0;
+		    }
+		}
+		""",
+		opinionConfig: "csharp_indent_case_contents_when_block = false",
+		editorConfig: "csharp_indent_case_contents = false");
 }
