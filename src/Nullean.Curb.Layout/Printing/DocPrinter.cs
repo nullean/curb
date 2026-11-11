@@ -75,9 +75,17 @@ internal sealed class DocPrinter<TLanguage>
 	/// For each line written so far whose first text came from the source: where in the source that
 	/// text starts, and the line's indent in columns. Read back by a source-line anchor.
 	/// </summary>
+	/// <remarks>
+	/// A line whose first text was synthetic, such as the <c>=&gt;</c> of an expression body a conversion
+	/// wrote, is recorded at its first source text instead, with its indent complemented so that only
+	/// <see cref="IndentOfLineContaining"/> answers from it.
+	/// </remarks>
 	private int[] _lineStarts = new int[256];
 	private int[] _lineIndents = new int[256];
 	private int _lineCount;
+
+	/// <summary>The indent of the current line while it holds synthetic text and no source text yet, or -1.</summary>
+	private int _syntheticLineIndent = -1;
 
 	// --- round-trip risk tracking ------------------------------------------------------------
 	private int _lastSourceEnd;
@@ -138,6 +146,7 @@ internal sealed class DocPrinter<TLanguage>
 		_lineOpen = false;
 		_pendingAnchorCount = 0;
 		_lineCount = 0;
+		_syntheticLineIndent = -1;
 		RoundTripAtRisk = false;
 
 		_breaks.Run(arena);
@@ -209,6 +218,8 @@ internal sealed class DocPrinter<TLanguage>
 
 						if (!_lineOpen)
 							OpenLine(text, doc.A);
+						else if (_syntheticLineIndent >= 0)
+							RecordLine(doc.A, ~_syntheticLineIndent);
 						// Before the weld check, which reads the character this text lands after.
 						WritePendingSpace(text, scope.SuppressWidth);
 						TrackRoundTripRisk(doc, text);
@@ -662,6 +673,7 @@ internal sealed class DocPrinter<TLanguage>
 		_lineOpen = true;
 		_lineSource = sourceStart < 0 ? -1 : sourceStart + leading;
 		_lineOutputStart = _output.Length;
+		_syntheticLineIndent = sourceStart < 0 && leading == 0 ? _column : -1;
 
 		for (var i = 0; i < _pendingAnchorCount; i++)
 			_anchors[_pendingAnchors[i]] = LineShift(anchoredAtLineStart: true);
@@ -672,14 +684,21 @@ internal sealed class DocPrinter<TLanguage>
 		if (_lineSource < 0 || leading > 0)
 			return;
 
+		RecordLine(_lineSource, _column);
+	}
+
+	/// <summary>Records a line for the source-line anchors; see <see cref="_lineStarts"/>.</summary>
+	private void RecordLine(int sourceStart, int indent)
+	{
+		_syntheticLineIndent = -1;
 		if (_lineCount == _lineStarts.Length)
 		{
 			Array.Resize(ref _lineStarts, _lineCount * 2);
 			Array.Resize(ref _lineIndents, _lineCount * 2);
 		}
 
-		_lineStarts[_lineCount] = _lineSource;
-		_lineIndents[_lineCount] = _column;
+		_lineStarts[_lineCount] = sourceStart;
+		_lineIndents[_lineCount] = indent;
 		_lineCount++;
 	}
 
@@ -695,8 +714,9 @@ internal sealed class DocPrinter<TLanguage>
 	{
 		for (var i = _lineCount - 1; i >= 0; i--)
 		{
+			// A line that starts with synthetic text does not start with the text at the position.
 			if (_lineStarts[i] == position)
-				return _lineIndents[i];
+				return _lineIndents[i] >= 0 ? _lineIndents[i] : Doc.AnchorUnset;
 			if (_lineStarts[i] < position)
 				break;
 		}
@@ -714,7 +734,7 @@ internal sealed class DocPrinter<TLanguage>
 		for (var i = _lineCount - 1; i >= 0; i--)
 		{
 			if (_lineStarts[i] <= position)
-				return _lineIndents[i];
+				return _lineIndents[i] >= 0 ? _lineIndents[i] : ~_lineIndents[i];
 		}
 
 		return Doc.AnchorUnset;

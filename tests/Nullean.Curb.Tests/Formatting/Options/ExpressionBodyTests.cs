@@ -230,6 +230,51 @@ public class ExpressionBodyTests : FormattingTest
 		""",
 		editorConfig: "csharp_style_expression_bodied_methods = true");
 
+	// The braces of a switch or an initializer in the converted body sit at the indent of the arrow's
+	// line, where dotnet format puts them. That line starts with the arrow the conversion wrote, and the
+	// braces took the member's line instead, a level to the left (found by the corpus while fixing #229).
+	[Test]
+	public Task Braces_in_a_method_converted_after_a_trailing_comment_follow_the_arrow_line() => Formats(
+		"""
+		public class C
+		{
+		    void M() // note
+		    {
+		        AssertUsed(comp2, ordinal switch
+		        {
+		            1 => references,
+		            _ => expected,
+		        }, references);
+		    }
+
+		    void N() // note
+		    {
+		        AssertUsed(comp2, new X
+		        {
+		            A = 1,
+		        }, references);
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    void M() // note
+		        => AssertUsed(comp2, ordinal switch
+		        {
+		            1 => references,
+		            _ => expected,
+		        }, references);
+
+		    void N() // note
+		        => AssertUsed(comp2, new X
+		        {
+		            A = 1,
+		        }, references);
+		}
+		""",
+		editorConfig: "csharp_style_expression_bodied_methods = true");
+
 	[Test]
 	public Task Accessors_convert_without_the_property_collapsing() => Formats(
 		// Two accessors, so there is a setter to keep and the accessor list has to stay.
