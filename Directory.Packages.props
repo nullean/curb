@@ -68,9 +68,10 @@
     <!-- Build script dependencies -->
     <!-- under Central Package Management the F# SDK adds no implicit FSharp.Core; the build references it itself -->
     <PackageVersion Include="FSharp.Core" Version="11.0.101" />
-    <PackageVersion Include="Argu" Version="6.2.5" />
-    <PackageVersion Include="Bullseye" Version="6.1.0" />
-    <PackageVersion Include="Proc" Version="0.14.0" />
-    <PackageVersion Include="Fake.Tools.Git" Version="6.1.4" />
+    <!-- brings Nullean.Make, and Proc.Fs 0.17 with Proc -->
+    <PackageVersion Include="Nullean.Make.Fs" Version="0.25.0" />
+    <!-- above the 0.17 Make.Fs brings: 0.18.0 adds Cmd.quiet, which the gates that run commands in parallel
+         (verifycleanupexpectations, xmlsafety) need to collect a command's output without printing any of it -->
+    <PackageVersion Include="Proc.Fs" Version="0.18.0" />
   </ItemGroup>
 </Project>

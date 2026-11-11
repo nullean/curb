@@ -14,9 +14,7 @@ open System.Net.Http
 open System.Text
 open System.Threading
 open System.Threading.Tasks
-open ProcNet
-
-let private exec binary args = Proc.Exec(binary, List.toArray args) |> ignore
+open Proc.Fs
 
 /// The sub-path GitHub Pages serves this repo from. Empty when the site is hosted at the domain
 /// root (curb.nullean.net). Three files have to agree on it: this one,
@@ -146,18 +144,20 @@ let build () =
     checkPrefixesAgree ()
     let tool = ensureTool ()
 
-    let args =
-        if PathPrefix = "" then ["build"; "--path"; docsSource]
-        else ["build"; "--path"; docsSource; "--path-prefix"; PathPrefix]
-    // The design-system layout the theme targets is behind a feature flag, read from the environment only.
-    Environment.SetEnvironmentVariable("FEATURE_NAVIGATION_PREVIEW", "true")
-    exec tool args
+    let finish = Path.Combine("scripts", "docs-finish.sh")
+    shell {
+        // The design-system layout the theme targets is behind a feature flag, read from the environment only.
+        env "FEATURE_NAVIGATION_PREVIEW" "true"
+        if PathPrefix = "" then sh $"{tool} build --path {docsSource}"
+        else sh $"{tool} build --path {docsSource} --path-prefix {PathPrefix}"
 
-    if not (Directory.Exists htmlOutput) then
-        failwithf "docs-builder reported success but %s does not exist" htmlOutput
+        if not (Directory.Exists htmlOutput) then
+            failwithf "docs-builder reported success but %s does not exist" htmlOutput
 
-    // The landing page, robots.txt, fonts, theme and HTML patches: the same script the workflow runs.
-    exec "bash" [Path.Combine("scripts", "docs-finish.sh"); htmlOutput; PathPrefix]
+        // The landing page, robots.txt, fonts, theme and HTML patches: the same script the workflow runs.
+        if PathPrefix = "" then sh $"bash {finish} {htmlOutput}"
+        else sh $"bash {finish} {htmlOutput} {PathPrefix}"
+    }
 
 // ─────────────────────────────  serve  ─────────────────────────────
 
@@ -266,13 +266,11 @@ let serve (port: int) =
         |> List.exists (fun v -> not (String.IsNullOrEmpty(Environment.GetEnvironmentVariable v)))
     if not headless then
         try
-            let opener, args =
-                if OperatingSystem.IsMacOS() then "open", url
-                elif OperatingSystem.IsWindows() then "cmd", sprintf "/c start %s" url
-                else "xdg-open", url
-            Diagnostics.ProcessStartInfo(opener, Arguments = args, UseShellExecute = false)
-            |> Diagnostics.Process.Start
-            |> ignore
+            shell {
+                if OperatingSystem.IsMacOS() then sh $"open {url}"
+                elif OperatingSystem.IsWindows() then sh $"cmd /c start {url}"
+                else sh $"xdg-open {url}"
+            }
         with _ -> ()
 
     // Stopping the listener is what breaks GetContext out of its wait; a second cancel key press

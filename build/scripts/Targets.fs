@@ -1,34 +1,29 @@
 module Targets
 
-#nowarn "3391" // Nullable<int> implicit conversions from ProcNet's ExitCode
-
-open Argu
 open System
 open System.IO
 open System.Text.Json
-open Bullseye
-open CommandLine
-open Fake.Tools.Git
-open ProcNet
+open Proc.Fs
 
-let exec binary args =
-    // Proc 0.14+: Exec passes args directly to the OS (no shell expansion) and throws on failure.
-    Proc.Exec (binary, List.toArray args) |> ignore
+/// What `Proc.Start` gave the Argu build, as a Proc.Fs capture: the command's output is echoed as it arrives,
+/// and comes back as one string, standard error included, with the exit code rather than an exception for a
+/// non-zero one.
+let private captured (command: Cmd) =
+    { Cmd.result command with EchoStdout = true }
+    |> Cmd.mapCapture (fun r -> r.ExitCode.Value, r.ConsoleOut |> Seq.map (fun l -> l.Line) |> String.concat "\n")
 
-/// Like exec but returns the exit code rather than throwing on failure.
-let private execResult binary args =
-    let result = Proc.Start(binary, List.toArray args)
-    result.ExitCode
+/// Like captured, but the output comes back as lines.
+let private capturedLines (command: Cmd) =
+    { Cmd.result command with EchoStdout = true }
+    |> Cmd.mapCapture (fun r -> r.ExitCode.Value, r.ConsoleOut |> Seq.map (fun l -> l.Line) |> Seq.toArray)
 
-/// Like execResult, but nothing is echoed while the process runs: its output comes back with the exit code,
+/// Like captured, but nothing is echoed while the process runs: its output comes back with the exit code,
 /// for a caller running several at once to print in order rather than interleaved.
-let private execQuiet binary (args: string list) =
-    let quiet =
-        { new Std.IConsoleOutWriter with
-            member _.Write(_: exn) = ()
-            member _.Write(_: Std.ConsoleOut) = () }
-    let result = Proc.Start(StartArguments(binary, List.toArray args, ConsoleOutWriter = quiet), Threading.CancellationToken.None)
-    result.ExitCode, result.ConsoleOut |> Seq.map (fun l -> l.Line) |> String.concat "\n"
+let private quietly (command: Cmd) =
+    command
+    |> Cmd.quiet
+    |> Cmd.result
+    |> Cmd.mapCapture (fun r -> r.ExitCode.Value, r.ConsoleOut |> Seq.map (fun l -> l.Line) |> String.concat "\n")
 
 /// The native CLI a CI job already published, named by CURB_EXE, or None to build it here.
 ///
@@ -46,99 +41,48 @@ let private prebuiltCurb =
             Some full
     )
 
-/// The command line that runs the CLI with `args`: CURB_EXE's binary when it is set, otherwise
-/// `dotnet run` against the Release build.
-let private curbCommand (args: string list) =
+/// The command that runs the CLI with `args`: CURB_EXE's binary when it is set, otherwise `dotnet run`
+/// against the Release build.
+let private curb (args: string list) =
     match prebuiltCurb.Value with
-    | Some exe -> exe, args
-    | None -> "dotnet", ["run"; "--project"; "src/Nullean.Curb.Cli"; "-c"; "Release"; "--"] @ args
+    | Some exe -> sh $"{exe} {args}"
+    | None -> sh $"dotnet run --project src/Nullean.Curb.Cli -c Release -- {args}"
 
-let private execCurb (args: string list) =
-    let binary, arguments = curbCommand args
-    exec binary arguments
-
-/// Runs the CLI with `args`, echoing its output as it arrives the way Proc.Start does, and returns the exit
-/// code and the output lines.
+/// Runs the CLI with `args`, echoing its output as it arrives, and returns the exit code and the output lines.
 ///
-/// Not Proc.Start, which subscribes to a process's output after starting it: one that has already exited
-/// by then fails with ObjectDisposedException, and the native CLI answers `options --list-keys` in a few
-/// milliseconds. `dotnet run` never exited that fast, which is why this did not show before CURB_EXE.
-let private startCurb (args: string list) =
-    let binary, arguments = curbCommand args
-    let info = Diagnostics.ProcessStartInfo(binary)
-    for argument in arguments do info.ArgumentList.Add argument
-    info.RedirectStandardOutput <- true
-    info.RedirectStandardError <- true
-    let lines = Collections.Concurrent.ConcurrentQueue<string>()
-    use proc = new Diagnostics.Process(StartInfo = info)
-    let received (e: Diagnostics.DataReceivedEventArgs) =
-        if not (isNull e.Data) then
-            lines.Enqueue e.Data
-            Console.WriteLine e.Data
-    proc.OutputDataReceived.Add received
-    proc.ErrorDataReceived.Add received
-    proc.Start() |> ignore
-    proc.BeginOutputReadLine()
-    proc.BeginErrorReadLine()
-    proc.WaitForExit()
-    proc.ExitCode, lines.ToArray()
+/// Not the Argu build's Proc.Start, which subscribed to a process's output after starting it: one that had
+/// already exited by then failed with ObjectDisposedException, and the native CLI answers
+/// `options --list-keys` in a few milliseconds. Proc.Fs hands the handlers to the process as it starts it.
+let private startCurb (args: string list) = curb args |> capturedLines |> Cmd.get
 
 /// dotnet/sdk#53783: on a cold tool-resolver cache (every fresh CI runner, every fresh container),
 /// restoring 2+ RID-specific tool packages in one manifest can misattribute one package's
 /// DotnetToolSettings.xml to another, failing with "The command ... is not contained in the
 /// package ...". The cache is warm after the first attempt, so a bare retry always succeeds -
 /// see https://github.com/dotnet/sdk/issues/53783.
-let private restoreTools =
-    lazy(
-        try exec "dotnet" ["tool"; "restore"]
-        with _ -> exec "dotnet" ["tool"; "restore"]
-    )
+let private restoreTools = lazy(shell { sh $"dotnet tool restore" |> Cmd.retry 1 })
 
 let private currentVersion =
     lazy(
-        restoreTools.Value |> ignore
-        let r = Proc.Start("dotnet", "minver", "-p", "canary.0", "-m", "0.1")
-        let o = r.ConsoleOut |> Seq.find (fun l -> not(l.Line.StartsWith("MinVer:")))
-        o.Line
+        restoreTools.Value
+        shell {
+            // MinVer reports on standard error ("MinVer: ..."); the version is the line on standard out
+            let! lines = lines $"dotnet minver -p canary.0 -m 0.1"
+            return lines |> List.find (fun l -> not (l.StartsWith("MinVer:")))
+        }
     )
+
+let private currentSha = lazy(shell { return! text $"git rev-parse HEAD" })
 
 let private currentVersionInformational =
     lazy(
         match Paths.IncludeGitHashInInformational with
         | false -> currentVersion.Value
-        | true -> sprintf "%s+%s" currentVersion.Value (Information.getCurrentSHA1("."))
+        | true -> sprintf "%s+%s" currentVersion.Value currentSha.Value
     )
 
-/// Cleans Release only, which is the configuration everything downstream builds.
-///
-/// Not a preference: this script is itself a project in the solution, and it runs from its Debug
-/// output. A bare `dotnet clean` defaults to Debug and so deletes the assemblies of the process
-/// executing it — anything the runner had not yet loaded then fails to resolve. It surfaced as
-/// `perf` dying on a missing System.Reactive, which reads like a restore problem and is not one.
-let private clean (arguments:ParseResults<Arguments>) =
-    if (Paths.Output.Exists) then Paths.Output.Delete (true)
-    exec "dotnet" ["clean"; "-c"; "Release"] |> ignore
-
-let private build (arguments:ParseResults<Arguments>) = exec "dotnet" ["build"; "-c"; "Release"] |> ignore
-
-let private test (arguments:ParseResults<Arguments>) =
-    // TUnit runs on Microsoft.Testing.Platform; `dotnet run` avoids the deprecated VSTest path.
-    exec "dotnet" ["run"; "--project"; "tests/Nullean.Curb.Tests"; "-c"; "Release"] |> ignore
-
-let private benchmark (arguments:ParseResults<Arguments>) =
-    exec "dotnet" ["run"; "--project"; "tests/Nullean.Curb.Benchmarks"; "-c"; "Release"] |> ignore
-
-/// Builds docs/ the way the workflow does — including the landing page override, which is the whole
-/// reason `docs-builder serve` is not enough on its own — and serves the result.
-let private docs (arguments:ParseResults<Arguments>) =
-    Documentation.build ()
-    if arguments.Contains NoServe then
-        printfn "built; --no-serve given, not serving"
-    else
-        Documentation.serve (arguments.TryGetResult Port |> Option.defaultValue 8080)
-
-let private corpusFrom (arguments:ParseResults<Arguments>) (target:string) =
-    match arguments.TryGetResult Corpus with
+let private corpusFrom (target:string) =
+    match CommandLine.corpus.Value with
     | Some path ->
         let corpus = DirectoryInfo path
         if not corpus.Exists then failwithf "corpus not found: %s" corpus.FullName
@@ -159,15 +103,15 @@ let rec private copyTree (source: string) (target: string) =
 /// Shared by conformance and churn so the two cannot drift into measuring different configurations,
 /// which would make their numbers incomparable — and comparing them is the whole point of having
 /// both. Every switch here is additive on top of whatever the corpus already says.
-let private configureCorpus (arguments:ParseResults<Arguments>) (work:string) =
-    let deterministic = arguments.Contains Deterministic
-    let preserve = arguments.Contains Preserve
-    let trailingCommas = arguments.Contains TrailingCommas
+let private configureCorpus (work:string) =
+    let deterministic = CommandLine.deterministic.Value
+    let preserve = CommandLine.preserve.Value
+    let trailingCommas = CommandLine.trailingCommas.Value
     // Both mode switches imply keeping the corpus's own widths, because with the width off there is no
     // mode to choose: no width means preservation whatever either key says, so forcing it off would make
     // --deterministic a no-op the binder rejects and --preserve a no-op that changes nothing.
-    let keepWidths = arguments.Contains Reflow || deterministic || preserve
-    let width = arguments.TryGetResult Width
+    let keepWidths = CommandLine.reflow.Value || deterministic || preserve
+    let width = CommandLine.width.Value
 
     for config in Directory.GetFiles(work, ".editorconfig", SearchOption.AllDirectories) do
         let text = File.ReadAllText config
@@ -197,12 +141,12 @@ let private configureCorpus (arguments:ParseResults<Arguments>) (work:string) =
         File.WriteAllText(config, appended.ToString())
 
 /// A one-line description of the configuration measured, for the report line.
-let private modeLabel (arguments:ParseResults<Arguments>) =
-    [ if arguments.Contains Deterministic then "deterministic"
-      if arguments.Contains Preserve then "preserving"
-      if arguments.Contains TrailingCommas then "trailing commas"
-      if arguments.Contains Reflow && not (arguments.Contains Deterministic) then "reflow"
-      match arguments.TryGetResult Width with
+let private modeLabel () =
+    [ if CommandLine.deterministic.Value then "deterministic"
+      if CommandLine.preserve.Value then "preserving"
+      if CommandLine.trailingCommas.Value then "trailing commas"
+      if CommandLine.reflow.Value && not (CommandLine.deterministic.Value) then "reflow"
+      match CommandLine.width.Value with
       | Some columns -> sprintf "width %d" columns
       | None -> () ]
     |> function
@@ -212,8 +156,8 @@ let private modeLabel (arguments:ParseResults<Arguments>) =
 /// Measures how far Curb's output is from dotnet format's, which is the product claim made
 /// checkable. Reflow is forced off so that every difference is an option disagreement rather than a
 /// deliberate wrap: with max_line_length off, Curb should be a fixed point of dotnet format.
-let private conformance (arguments:ParseResults<Arguments>) =
-    let corpus = corpusFrom arguments "conformance"
+let conformance () =
+    let corpus = corpusFrom "conformance"
 
     let root = Path.Combine(Paths.Output.FullName, "conformance")
     if Directory.Exists root then Directory.Delete(root, true)
@@ -239,11 +183,11 @@ let private conformance (arguments:ParseResults<Arguments>) =
     //
     // Reflow is forced off by default so a difference is an option disagreement rather than a wrap
     // Curb chose; --reflow keeps the corpus's own widths, which is the configuration people run.
-    configureCorpus arguments work
+    configureCorpus work
 
-    execCurb ["format"; work] |> ignore
+    shell { curb ["format"; work] }
     copyTree work reference
-    exec "dotnet" ["format"; "whitespace"; reference; "--folder"] |> ignore
+    shell { sh $"dotnet format whitespace {reference} --folder" }
 
     let sourceFiles = Directory.GetFiles(work, "*.cs", SearchOption.AllDirectories)
     let differing =
@@ -256,7 +200,7 @@ let private conformance (arguments:ParseResults<Arguments>) =
     let agreeing = total - differing.Length
     let percentage = 100.0 * float agreeing / float total
     printfn ""
-    printfn "conformance with dotnet format%s: %d/%d files (%.2f%%)" (modeLabel arguments) agreeing total percentage
+    printfn "conformance with dotnet format%s: %d/%d files (%.2f%%)" (modeLabel ()) agreeing total percentage
     if differing.Length > 0 then
         printfn ""
         printfn "first differing files:"
@@ -266,7 +210,7 @@ let private conformance (arguments:ParseResults<Arguments>) =
 
     // A regression here means Curb drifted away from the reference implementation, which is the one
     // number the product claim rests on. Fail rather than merely report it.
-    match arguments.TryGetResult Minimum with
+    match CommandLine.minimum.Value with
     | Some floor when percentage < floor ->
         failwithf "conformance %.2f%% is below the required %.2f%%" percentage floor
     | _ -> ()
@@ -285,8 +229,8 @@ let private conformance (arguments:ParseResults<Arguments>) =
 /// Unlike conformance this compares against the *pristine* corpus, which is read and never written.
 /// Copying a reference into the tree about to be formatted is the trap the layout notes record: both
 /// sides get normalised and the diff comes out empty by construction.
-let private churn (arguments:ParseResults<Arguments>) =
-    let corpus = corpusFrom arguments "churn"
+let churn () =
+    let corpus = corpusFrom "churn"
 
     let root = Path.Combine(Paths.Output.FullName, "churn")
     if Directory.Exists root then Directory.Delete(root, true)
@@ -294,7 +238,7 @@ let private churn (arguments:ParseResults<Arguments>) =
 
     printfn "copying corpus from %s" corpus.FullName
     copyTree corpus.FullName work
-    configureCorpus arguments work
+    configureCorpus work
 
     let sourceFiles = Directory.GetFiles(work, "*.cs", SearchOption.AllDirectories)
     let before =
@@ -302,7 +246,7 @@ let private churn (arguments:ParseResults<Arguments>) =
         |> Array.map (fun file -> file, File.ReadAllText file)
         |> Map.ofArray
 
-    execCurb ["format"; work] |> ignore
+    shell { curb ["format"; work] }
 
     let lineCount (text:string) = text.Split('\n').Length
     let changed =
@@ -319,7 +263,7 @@ let private churn (arguments:ParseResults<Arguments>) =
 
     printfn ""
     printfn "churn%s: %d/%d files rewritten (%.2f%%), %+d lines"
-        (modeLabel arguments) changed.Length total percentage lineDelta
+        (modeLabel ()) changed.Length total percentage lineDelta
     if changed.Length > 0 then
         printfn ""
         printfn "largest line deltas:"
@@ -333,7 +277,7 @@ let private churn (arguments:ParseResults<Arguments>) =
     // A ceiling rather than a floor, which is the one difference from conformance: churn going *up*
     // is the regression. Reported unless a ceiling is asked for, because there is no agreed number to
     // hold deterministic mode to yet — publishing it is the point of this target's first few runs.
-    match arguments.TryGetResult Maximum with
+    match CommandLine.maximum.Value with
     | Some ceiling when percentage > ceiling ->
         failwithf "churn %.2f%% is above the permitted %.2f%%" percentage ceiling
     | _ -> ()
@@ -357,7 +301,7 @@ let private publishNativeCurb () =
             sprintf "%s-%s" os arch
 
         printfn "publishing native AOT for %s" rid
-        exec "dotnet" ["publish"; "src/Nullean.Curb.Cli"; "-c"; "Release"; "-r"; rid] |> ignore
+        shell { sh $"dotnet publish src/Nullean.Curb.Cli -c Release -r {rid}" }
 
         let name = if OperatingSystem.IsWindows() then "curb.exe" else "curb"
         let binary = Path.GetFullPath(Path.Combine(".artifacts", "publish", "Nullean.Curb.Cli", sprintf "release_%s" rid, name))
@@ -373,9 +317,9 @@ let private publishNativeCurb () =
 ///
 /// The gate is on allocations, not time. Allocations are deterministic; wall time on a hosted
 /// runner is not, and a flaky perf gate gets disabled, which is worse than no gate.
-let private perf (arguments:ParseResults<Arguments>) =
+let perf () =
     let corpus =
-        match arguments.TryGetResult Corpus with
+        match CommandLine.corpus.Value with
         | Some path -> DirectoryInfo path
         | None -> failwith "perf needs --corpus <path> pointing at a C# checkout"
     if not corpus.Exists then failwithf "corpus %s does not exist" corpus.FullName
@@ -386,9 +330,8 @@ let private perf (arguments:ParseResults<Arguments>) =
     let runs =
         [ for _ in 1 .. 5 ->
             let started = Diagnostics.Stopwatch.StartNew()
-            let result = Proc.Start(binary, "check", corpus.FullName)
+            let _, output = sh $"{binary} check {corpus.FullName}" |> captured |> Cmd.get
             started.Stop()
-            let output = result.ConsoleOut |> Seq.map (fun l -> l.Line) |> String.concat "\n"
             let ratio =
                 let matched = Text.RegularExpressions.Regex.Match(output, @"\(([0-9.]+)x source\)")
                 if matched.Success then Double.Parse(matched.Groups.[1].Value, Globalization.CultureInfo.InvariantCulture)
@@ -407,7 +350,7 @@ let private perf (arguments:ParseResults<Arguments>) =
     // to make a gate at 30x pass or fail on the same code depending on which run won the stopwatch.
     let ratio = runs |> List.map (fun (_, r, _) -> r) |> List.min
 
-    match arguments.TryGetResult MaxAllocationRatio with
+    match CommandLine.maxAllocationRatio.Value with
     | Some ceiling when ratio > ceiling ->
         failwithf "allocated %.1fx the source size, above the permitted %.1fx" ratio ceiling
     | _ -> printfn "allocated %.1fx the source size" ratio
@@ -421,7 +364,7 @@ let private perf (arguments:ParseResults<Arguments>) =
 ///
 /// A third build covers the cache, which is the other half of the incrementality story and the half
 /// nothing else would catch.
-let private msbuildSmoketest (arguments:ParseResults<Arguments>) =
+let msbuildSmoketest () =
     let binary = publishNativeCurb ()
 
     let sample = Path.Combine("examples", "curb-msbuild-smoketest")
@@ -434,10 +377,7 @@ let private msbuildSmoketest (arguments:ParseResults<Arguments>) =
         // older than the incremental stamp from a previous run — so the target would skip and the
         // assertion below would blame the formatter for the harness's mistake.
         File.SetLastWriteTimeUtc(source, DateTime.UtcNow)
-        let args = ["build"; sample; "-c"; "Debug"; "--nologo"] @ extra
-        let result = Proc.Start("dotnet", List.toArray args)
-        let output = result.ConsoleOut |> Seq.map (fun l -> l.Line) |> String.concat "\n"
-        result.ExitCode, output
+        sh $"dotnet build {sample} -c Debug --nologo {extra}" |> captured |> Cmd.get
 
     printfn "building the sample with Curb"
     let withCurbCode, withCurbOutput = build [sprintf "-p:Curb_Exe=%s" binary]
@@ -478,15 +418,14 @@ let private msbuildSmoketest (arguments:ParseResults<Arguments>) =
 ///
 /// Needs the Fantomas the sample's manifest pins. `dotnet tool restore` fetches it; where that is not
 /// possible (offline, no feed) the test says so and stops, except on CI, where it fails.
-let private fsharpSmoketest (_: ParseResults<Arguments>) =
+let fsharpSmoketest () =
     let sample = Path.Combine("examples", "curb-msbuild-smoketest-fsharp")
     let source = Path.Combine(sample, "Program.fs")
     let pristine = Path.Combine(sample, "Program.unformatted")
 
     let restored =
         let manifest = Path.Combine(sample, ".config", "dotnet-tools.json")
-        let result = Proc.Start("dotnet", [| "tool"; "restore"; "--tool-manifest"; manifest |])
-        result.ExitCode = 0
+        succeeds $"dotnet tool restore --tool-manifest {manifest}" |> Cmd.get
 
     if not restored then
         if Environment.GetEnvironmentVariable "CI" = "true" then
@@ -500,10 +439,7 @@ let private fsharpSmoketest (_: ParseResults<Arguments>) =
         if restore then
             File.Copy(pristine, source, true)
             File.SetLastWriteTimeUtc(source, DateTime.UtcNow)
-        let args = ["build"; sample; "-c"; "Debug"; "--nologo"; "-v:n"] @ extra
-        let result = Proc.Start("dotnet", List.toArray args)
-        let output = result.ConsoleOut |> Seq.map (fun l -> l.Line) |> String.concat "\n"
-        result.ExitCode, output
+        sh $"dotnet build {sample} -c Debug --nologo -v:n {extra}" |> captured |> Cmd.get
 
     let formatted =
         "module Program\n\nlet run (x: int) = if x > 0 then Stable.double x else 0\n\n[<EntryPoint>]\nlet main _ =\n    run 1 |> ignore\n    0\n"
@@ -547,7 +483,7 @@ let private fsharpSmoketest (_: ParseResults<Arguments>) =
 /// comparison (`--corpus-source docs-builder`). CI no longer uses it.
 let private cloneDocsBuilder (destination: string) =
     printfn "cloning elastic/docs-builder into %s" destination
-    exec "git" ["clone"; "--depth"; "1"; "https://github.com/elastic/docs-builder.git"; destination] |> ignore
+    shell { sh $"git clone --depth 1 https://github.com/elastic/docs-builder.git {destination}" }
 
 /// The share of a corpus's C# files Curb would change below which the generated input is too close to Curb's own
 /// output to measure anything. Every gate that compares Curb with dotnet format, or with itself, passes trivially on
@@ -562,24 +498,31 @@ let private minimumChangedShare = 0.5
 /// the generator do.
 ///
 /// Fails if Curb would leave most of the C# alone: a corpus that is already Curb's output proves nothing.
-let private generateCorpus (arguments:ParseResults<Arguments>) (destination: string) =
+let private generateCorpus (destination: string) =
     let dump = Path.Combine(Paths.Output.FullName, "corpus-expectations")
     if Directory.Exists dump then Directory.Delete(dump, true)
     Directory.CreateDirectory dump |> ignore
-    Environment.SetEnvironmentVariable("CURB_EXPECTATION_DUMP", dump)
-    exec "dotnet" ["run"; "--project"; "tests/Nullean.Curb.Tests"; "-c"; "Release"] |> ignore
-    Environment.SetEnvironmentVariable("CURB_EXPECTATION_DUMP", null)
+    shell {
+        use! _ = withEnv ["CURB_EXPECTATION_DUMP", dump]
+        sh $"dotnet run --project tests/Nullean.Curb.Tests -c Release"
+    }
 
-    let seed = arguments.TryGetResult Seed |> Option.defaultValue 1
-    let size = arguments.TryGetResult CorpusSize |> Option.defaultValue 10.0
-    exec "dotnet"
-        [ "run"; "--project"; "tools/Nullean.Curb.CorpusGenerator"; "-c"; "Release"; "--"
-          "--output"; destination
-          "--expectations"; dump
-          "--seed"; string seed
-          "--size-mb"; size.ToString(Globalization.CultureInfo.InvariantCulture)
-          "--global-json"; Path.Combine(Paths.Root.FullName, "global.json")
-          "--divergences"; Path.Combine(Paths.Root.FullName, "build", "conformance-divergences.json") ]
+    let seed = CommandLine.seed.Value |> Option.defaultValue 1
+    let size = CommandLine.corpusSize.Value |> Option.defaultValue 10.0
+    let sizeMb = size.ToString(Globalization.CultureInfo.InvariantCulture)
+    let globalJson = Path.Combine(Paths.Root.FullName, "global.json")
+    let divergences = Path.Combine(Paths.Root.FullName, "build", "conformance-divergences.json")
+    shell {
+        sh $"""
+            dotnet run --project tools/Nullean.Curb.CorpusGenerator -c Release --
+              --output {destination}
+              --expectations {dump}
+              --seed {string seed}
+              --size-mb {sizeMb}
+              --global-json {globalJson}
+              --divergences {divergences}
+        """
+    }
 
     let _, lines = startCurb ["check"; destination]
     let summary =
@@ -599,16 +542,16 @@ let private generateCorpus (arguments:ParseResults<Arguments>) (destination: str
 /// Where the corpus comes from, in one place: every CI job that needs it calls `./build.sh clonecorpus`, and
 /// cleanupconformance writes one through here when no --corpus is given. Generated unless `--corpus-source
 /// docs-builder` asks for the clone the gates used to run against.
-let private materialiseCorpus (arguments:ParseResults<Arguments>) (destination: string) =
-    match arguments.TryGetResult CorpusSource |> Option.defaultValue "generated" with
-    | "generated" -> generateCorpus arguments destination
+let private materialiseCorpus (destination: string) =
+    match CommandLine.corpusSource.Value |> Option.defaultValue "generated" with
+    | "generated" -> generateCorpus destination
     | "docs-builder" -> cloneDocsBuilder destination
     | other -> failwithf "--corpus-source must be generated or docs-builder, not %s" other
 
-let private cloneCorpusTarget (arguments:ParseResults<Arguments>) =
-    match arguments.TryGetResult Corpus with
+let cloneCorpusTarget () =
+    match CommandLine.corpus.Value with
     | Some destination when Directory.Exists destination -> failwithf "%s already exists; clonecorpus needs a fresh path" destination
-    | Some destination -> materialiseCorpus arguments destination
+    | Some destination -> materialiseCorpus destination
     | None -> failwith "clonecorpus needs --corpus <path> to write into"
 
 /// Cleans a corpus that really builds, then requires that it still builds and that dotnet format style has
@@ -620,19 +563,19 @@ let private cloneCorpusTarget (arguments:ParseResults<Arguments>) =
 ///
 /// Needs a corpus that builds with the SDK in global.json. The generated corpus is a solution written to build, with
 /// sites for every owned rule planted across it; it is generated into build/output if `--corpus` is not given.
-let private cleanupConformance (arguments:ParseResults<Arguments>) =
+let cleanupConformance () =
     let corpus =
-        match arguments.TryGetResult Corpus with
+        match CommandLine.corpus.Value with
         | Some c ->
             let d = DirectoryInfo(c)
             if not d.Exists then failwithf "corpus not found: %s" d.FullName
             d
         | None ->
-            let source = arguments.TryGetResult CorpusSource |> Option.defaultValue "generated"
+            let source = CommandLine.corpusSource.Value |> Option.defaultValue "generated"
             let cached = DirectoryInfo(Path.Combine(Paths.Output.FullName, "corpus", source))
             if not cached.Exists then
                 Directory.CreateDirectory(cached.Parent.FullName) |> ignore
-                materialiseCorpus arguments cached.FullName
+                materialiseCorpus cached.FullName
             cached
 
     let work = DirectoryInfo(Path.Combine(Paths.Output.FullName, "cleanup-conformance"))
@@ -750,25 +693,24 @@ let private cleanupConformance (arguments:ParseResults<Arguments>) =
 
     File.WriteAllText(targets, targetsXml)
 
+    let properties =
+        [ "-p:EnforceCodeStyleInBuild=true"
+          // Without this the analysers are loaded and never run. docs-builder sets
+          // RunAnalyzersDuringBuild=false unless CI=true, which is sensible for a local build and
+          // fatal for this gate: every rule reported nothing and the run looked clean. The "all ten
+          // must be reported" assertion below is what caught it.
+          "-p:RunAnalyzersDuringBuild=true"
+          "-p:GenerateDocumentationFile=true"
+          // GenerateDocumentationFile turns every undocumented public member into CS1591, and the
+          // corpus's own warning policy is not what is being measured.
+          "-p:TreatWarningsAsErrors=false"
+          // %3B, not `;` and not `,`: MSBuild reads both as separators between properties on the
+          // command line, so either spelling fails with MSB1006 before anything is compiled.
+          "-p:NoWarn=CS1591%3BCS1573%3BCS1574%3BCS1712%3BNU1902%3BNU1903" ]
+
     let build stage =
-        let result =
-            Proc.Start("dotnet",
-                [| "build"; work.FullName; "-tl:off"; "--nologo"
-                   "-p:EnforceCodeStyleInBuild=true"
-                   // Without this the analysers are loaded and never run. docs-builder sets
-                   // RunAnalyzersDuringBuild=false unless CI=true, which is sensible for a local build and
-                   // fatal for this gate: every rule reported nothing and the run looked clean. The "all ten
-                   // must be reported" assertion below is what caught it.
-                   "-p:RunAnalyzersDuringBuild=true"
-                   "-p:GenerateDocumentationFile=true"
-                   // GenerateDocumentationFile turns every undocumented public member into CS1591, and the
-                   // corpus's own warning policy is not what is being measured.
-                   "-p:TreatWarningsAsErrors=false"
-                   // %3B, not `;` and not `,`: MSBuild reads both as separators between properties on the
-                   // command line, so either spelling fails with MSB1006 before anything is compiled.
-                   "-p:NoWarn=CS1591%3BCS1573%3BCS1574%3BCS1712%3BNU1902%3BNU1903" |])
-        let output = result.ConsoleOut |> Seq.map (fun l -> l.Line) |> String.concat "\n"
-        if result.ExitCode <> 0 then
+        let exitCode, output = sh $"dotnet build {work.FullName} -tl:off --nologo {properties}" |> captured |> Cmd.get
+        if exitCode <> 0 then
             printfn "%s" output
             // There is no build of the untouched corpus to compare against, so say whether the seed is to blame.
             let inSeed = Text.RegularExpressions.Regex.IsMatch(output, @"CurbConformanceSeed\.cs\(\d+,\d+\): error")
@@ -912,20 +854,16 @@ let private cleanupConformance (arguments:ParseResults<Arguments>) =
     // And what the reference implementation makes of the result. Reported rather than gated, because it will
     // also want to fix the sites Curb declined — it has a compilation and can reason about symbol sets.
     printfn "asking dotnet format style what it would still do"
-    let verify =
-        Proc.Start("dotnet",
-            Array.concat [
-                [| "format"; "style"; work.FullName; "--verify-no-changes"; "--no-restore"
-                   "--severity"; "info"; "--diagnostics" |]
-                ownedIds
-            ])
+    let verifyCode, verifyOutput =
+        sh $"dotnet format style {work.FullName} --verify-no-changes --no-restore --severity info --diagnostics {ownedIds}"
+        |> capturedLines
+        |> Cmd.get
 
-    if verify.ExitCode = 0 then
+    if verifyCode = 0 then
         printfn "dotnet format style: nothing left at all"
     else
         let remaining =
-            verify.ConsoleOut
-            |> Seq.map (fun l -> l.Line)
+            verifyOutput
             |> Seq.filter (fun l -> ownedIds |> Array.exists (fun id -> l.Contains(id, StringComparison.Ordinal)))
             |> Seq.length
         printfn "dotnet format style: %d line(s) still to fix, which should be the declined ones" remaining
@@ -980,28 +918,26 @@ let private normalisePreprocessed (text: string) =
 
 /// Runs one `dotnet msbuild` and returns its stdout, or the reason it failed.
 let private runMsbuild (project: string) (arguments: string list) =
-    let info = Diagnostics.ProcessStartInfo("dotnet")
-    info.ArgumentList.Add "msbuild"
-    info.ArgumentList.Add project
-    info.ArgumentList.Add "-nologo"
-    for argument in arguments do info.ArgumentList.Add argument
-    info.RedirectStandardOutput <- true
-    info.RedirectStandardError <- true
-    info.WorkingDirectory <- Path.GetDirectoryName project
-    // Evaluation only: no restore, no build, and no node reuse leaking state between the two passes.
-    info.Environment["MSBUILDDISABLENODEREUSE"] <- "1"
-    info.Environment["DOTNET_CLI_TELEMETRY_OPTOUT"] <- "1"
-    use proc = Diagnostics.Process.Start info
-    let output = proc.StandardOutput.ReadToEndAsync()
-    let error = proc.StandardError.ReadToEndAsync()
-    proc.WaitForExit()
-    if proc.ExitCode = 0 then Ok output.Result
+    let exitCode, output, error =
+        shell {
+            use! _ = inDir (Path.GetDirectoryName project)
+            // Evaluation only: no restore, no build, and no node reuse leaking state between the two passes.
+            use! _ = withEnv [ "MSBUILDDISABLENODEREUSE", "1"; "DOTNET_CLI_TELEMETRY_OPTOUT", "1" ]
+            return!
+                sh $"dotnet msbuild {project} -nologo {arguments}"
+                |> Cmd.quiet
+                |> Cmd.result
+                |> Cmd.mapCapture (fun r ->
+                    let text error = r.ConsoleOut |> Seq.filter (fun l -> l.Error = error) |> Seq.map (fun l -> l.Line) |> String.concat "\n"
+                    r.ExitCode.Value, text false, text true)
+        }
+    if exitCode = 0 then Ok output
     else
         let reason =
-            (output.Result + "\n" + error.Result).Split('\n')
+            (output + "\n" + error).Split('\n')
             |> Array.map (fun l -> l.Trim())
             |> Array.tryFind (fun l -> l.Contains "error")
-            |> Option.defaultValue (sprintf "exit code %d" proc.ExitCode)
+            |> Option.defaultValue (sprintf "exit code %d" exitCode)
         Error reason
 
 /// Evaluates one project: MSBuild's JSON for the properties and items above, and the preprocessed
@@ -1034,8 +970,8 @@ let private evaluateProject (work: string) (project: string) =
 /// reported with its reason and skipped; one that evaluated before and does not after is a failure.
 /// It fails, too, when no project evaluates at all, when any XML file failed or was unparsable, and
 /// when a second run finds anything left to change.
-let private xmlSafety (arguments:ParseResults<Arguments>) =
-    let corpus = corpusFrom arguments "xmlsafety"
+let xmlSafety () =
+    let corpus = corpusFrom "xmlsafety"
     let work = Path.Combine(Paths.Output.FullName, "xmlsafety")
     if Directory.Exists work then Directory.Delete(work, true)
     printfn "copying corpus from %s" corpus.FullName
@@ -1110,9 +1046,9 @@ let private xmlSafety (arguments:ParseResults<Arguments>) =
 /// Nothing is written. The corpus is read and cleaned in memory, so this is safe to point at a checkout
 /// somebody is working in — which also means it does not need the corpus to build, and a repository whose
 /// SDK cannot be resolved here is still a usable corpus.
-let private cleanupSafety (arguments:ParseResults<Arguments>) =
+let cleanupSafety () =
     let corpus =
-        match arguments.TryGetResult Corpus with
+        match CommandLine.corpus.Value with
         | Some c -> DirectoryInfo(c)
         | None -> failwith "cleanupsafety needs --corpus <path> pointing at a C# checkout"
     if not corpus.Exists then failwithf "corpus not found: %s" corpus.FullName
@@ -1120,16 +1056,13 @@ let private cleanupSafety (arguments:ParseResults<Arguments>) =
     printfn "sweeping %s" corpus.FullName
     let summaryFile = Path.Combine(Path.GetTempPath(), "curb-cleanup-summary.txt")
     if File.Exists summaryFile then File.Delete summaryFile
-    Environment.SetEnvironmentVariable("CURB_CLEANUP_CORPUS", corpus.FullName)
-    Environment.SetEnvironmentVariable("CURB_CLEANUP_SUMMARY", summaryFile)
+    let exitCode, output =
+        shell {
+            use! _ = withEnv [ "CURB_CLEANUP_CORPUS", corpus.FullName; "CURB_CLEANUP_SUMMARY", summaryFile ]
+            return! sh $"dotnet run --project tests/Nullean.Curb.Tests -c Release -- --treenode-filter '/*/*/CleanupCorpusTests/*'" |> captured
+        }
 
-    let result =
-        Proc.Start("dotnet",
-            [| "run"; "--project"; "tests/Nullean.Curb.Tests"; "-c"; "Release"; "--"
-               "--treenode-filter"; "/*/*/CleanupCorpusTests/*" |])
-
-    let output = result.ConsoleOut |> Seq.map (fun l -> l.Line) |> String.concat "\n"
-    if result.ExitCode <> 0 then
+    if exitCode <> 0 then
         printfn "%s" output
         failwith "the corpus sweep found a wrong verdict that damaged a file"
 
@@ -1142,11 +1075,12 @@ let private cleanupSafety (arguments:ParseResults<Arguments>) =
 /// are switched off proves nothing. The other two exist because cleanup can be wrong in ways a
 /// formatter cannot: it could silence a rule instead of fixing it, and it could rewrite a repository
 /// that never asked for anything.
-let private cleanupSmoketest (arguments:ParseResults<Arguments>) =
+let cleanupSmoketest () =
     // Deliberately not CURB_EXE's native binary: this is the one smoke test that runs the framework-dependent
     // curb.dll, through Curb_Dll, which is what the MSBuild package invokes by default.
-    exec "dotnet" ["publish"; "src/Nullean.Curb.Cli"; "-c"; "Release"; "-o"; ".artifacts/cleanup-smoketest/curb"
-                   "-p:PublishAot=false"; "-p:SelfContained=false"] |> ignore
+    shell {
+        sh $"dotnet publish src/Nullean.Curb.Cli -c Release -o .artifacts/cleanup-smoketest/curb -p:PublishAot=false -p:SelfContained=false"
+    }
 
     let curbDll = Path.GetFullPath(Path.Combine(".artifacts", "cleanup-smoketest", "curb", "curb.dll"))
 
@@ -1164,10 +1098,7 @@ let private cleanupSmoketest (arguments:ParseResults<Arguments>) =
         File.SetLastWriteTimeUtc(source, DateTime.UtcNow)
 
     let build () =
-        let args = ["build"; sample; "-c"; "Debug"; "--nologo"; "-tl:off"; sprintf "-p:Curb_Dll=%s" curbDll]
-        let result = Proc.Start("dotnet", List.toArray args)
-        let output = result.ConsoleOut |> Seq.map (fun l -> l.Line) |> String.concat "\n"
-        result.ExitCode, output
+        sh $"dotnet build {sample} -c Debug --nologo -tl:off -p:Curb_Dll={curbDll}" |> captured |> Cmd.get
 
     // The repository sets UseArtifactsOutput, so the sample's $(IntermediateOutputPath) is under
     // .artifacts rather than beside its project file. Found rather than assumed, because which of the two
@@ -1181,10 +1112,7 @@ let private cleanupSmoketest (arguments:ParseResults<Arguments>) =
 
     let cleanup (extra: string list) =
         let logs = findLogs () |> Array.toList |> List.collect (fun l -> ["--sarif-log"; l])
-        let args = ["exec"; curbDll; "cleanup"; sample] @ logs @ extra
-        let result = Proc.Start("dotnet", List.toArray args)
-        let output = result.ConsoleOut |> Seq.map (fun l -> l.Line) |> String.concat "\n"
-        result.ExitCode, output
+        sh $"dotnet exec {curbDll} cleanup {sample} {logs} {extra}" |> captured |> Cmd.get
 
     try
         // 1. The build fails. IDE0005 is an error here and nothing has fixed it, so if this succeeds the
@@ -1453,8 +1381,8 @@ let private isolateCaseOutput (caseDir: string) =
         |> String.concat "\n")
 
 /// `--shard i/n` as (i, n), 1-based, or None when the whole set is wanted.
-let private shardFrom (arguments:ParseResults<Arguments>) =
-    match arguments.TryGetResult Shard with
+let private shardFrom () =
+    match CommandLine.shard.Value with
     | None -> None
     | Some text ->
         match text.Split('/') with
@@ -1471,14 +1399,15 @@ let private shardOfKey (key: string) (n: int) =
     int (BitConverter.ToUInt32(hash, 0) % uint32 n)
 
 /// Slow, and it needs the SDK, so it is its own target rather than part of `test`.
-let rec private verifyExpectations (arguments:ParseResults<Arguments>) =
+let rec verifyExpectations () =
     let dump = Path.Combine(Paths.Output.FullName, "expectations")
     if Directory.Exists dump then Directory.Delete(dump, true)
     Directory.CreateDirectory dump |> ignore
 
-    Environment.SetEnvironmentVariable("CURB_EXPECTATION_DUMP", dump)
-    exec "dotnet" ["run"; "--project"; "tests/Nullean.Curb.Tests"; "-c"; "Release"] |> ignore
-    Environment.SetEnvironmentVariable("CURB_EXPECTATION_DUMP", null)
+    shell {
+        use! _ = withEnv ["CURB_EXPECTATION_DUMP", dump]
+        sh $"dotnet run --project tests/Nullean.Curb.Tests -c Release"
+    }
 
     let cases = Directory.GetDirectories dump
     printfn "checking %d expectations against dotnet format" cases.Length
@@ -1498,7 +1427,7 @@ let rec private verifyExpectations (arguments:ParseResults<Arguments>) =
     // raw input, computed for free by the same pass that proves Expected.cs (Z) is a fixed point.
     let beforeExpected = cases |> Array.map (fun d -> d, read "Expected.cs" d) |> Map.ofArray
 
-    exec "dotnet" ["format"; "whitespace"; dump; "--folder"] |> ignore
+    shell { sh $"dotnet format whitespace {dump} --folder" }
 
     let divergences = loadDivergences "dotnet-format-whitespace"
 
@@ -1541,20 +1470,21 @@ let rec private verifyExpectations (arguments:ParseResults<Arguments>) =
 /// The engine runs in tools/Nullean.Curb.RazorOracle, its own process with its own package sources: it needs a
 /// prerelease Roslyn, published only to Microsoft's public dnceng feed, which nothing that ships may reference.
 /// Once `dotnet format whitespace` formats Razor itself, this should call it instead, as verifyExpectations does.
-and private verifyRazorExpectations (_: ParseResults<Arguments>) =
+and verifyRazorExpectations () =
     let dump = Path.Combine(Paths.Output.FullName, "razor-expectations")
     if Directory.Exists dump then Directory.Delete(dump, true)
     Directory.CreateDirectory dump |> ignore
 
-    Environment.SetEnvironmentVariable("CURB_RAZOR_EXPECTATION_DUMP", dump)
-    exec "dotnet" ["run"; "--project"; "tests/Nullean.Curb.Tests"; "-c"; "Release"] |> ignore
-    Environment.SetEnvironmentVariable("CURB_RAZOR_EXPECTATION_DUMP", null)
+    shell {
+        use! _ = withEnv ["CURB_RAZOR_EXPECTATION_DUMP", dump]
+        sh $"dotnet run --project tests/Nullean.Curb.Tests -c Release"
+    }
 
     let cases = Directory.GetDirectories dump
     printfn "checking %d Razor expectations against Microsoft's Razor formatter" cases.Length
     if cases.Length = 0 then failwith "no Razor expectations were written — is the dump still wired into the harness?"
 
-    exec "dotnet" ["run"; "--project"; "tools/Nullean.Curb.RazorOracle"; "-c"; "Release"; "--"; dump] |> ignore
+    shell { sh $"dotnet run --project tools/Nullean.Curb.RazorOracle -c Release -- {dump}" }
 
     let testCaseOf (d: string) = (File.ReadAllText(Path.Combine(d, "TestCase.txt"))).Trim()
     let notFixedPoint =
@@ -1615,14 +1545,15 @@ and private gateOnNonFixedPoints (toolLabel: string) (dump: string) (divergences
 /// from different test files both naming `class Widget` in `namespace N` is common (the tests were written
 /// to be read in isolation), and batching would make that a compile error rather than the two independent
 /// snippets the source intended.
-and private verifyCleanupExpectations (arguments:ParseResults<Arguments>) =
+and verifyCleanupExpectations () =
     let dump = Path.Combine(Paths.Output.FullName, "cleanup-expectations")
     if Directory.Exists dump then Directory.Delete(dump, true)
     Directory.CreateDirectory dump |> ignore
 
-    Environment.SetEnvironmentVariable("CURB_CLEANUP_EXPECTATION_DUMP", dump)
-    exec "dotnet" ["run"; "--project"; "tests/Nullean.Curb.Tests"; "-c"; "Release"] |> ignore
-    Environment.SetEnvironmentVariable("CURB_CLEANUP_EXPECTATION_DUMP", null)
+    shell {
+        use! _ = withEnv ["CURB_CLEANUP_EXPECTATION_DUMP", dump]
+        sh $"dotnet run --project tests/Nullean.Curb.Tests -c Release"
+    }
 
     let cases = Directory.GetDirectories dump
     printfn "checking %d cleanup cases against dotnet format style" cases.Length
@@ -1681,10 +1612,7 @@ and private verifyCleanupExpectations (arguments:ParseResults<Arguments>) =
         // --verify-no-changes reports rather than rewrites, so the exit code alone says whether Case.cs
         // (Z) is already a fixed point — no before/after diff needed, unlike the whitespace side.
         let exitCode, output =
-            execQuiet "dotnet"
-                (List.concat [
-                    ["format"; "style"; d; "--verify-no-changes"; "--severity"; "info"; "--diagnostics"]
-                    List.ofArray ruleIds ])
+            sh $"dotnet format style {d} --verify-no-changes --severity info --diagnostics {ruleIds}" |> quietly |> Cmd.get
 
         {| Directory = d; TestCase = testCase; StaysFixedPoint = (exitCode = 0); Output = output |}
 
@@ -1729,14 +1657,15 @@ and private verifyCleanupExpectations (arguments:ParseResults<Arguments>) =
 /// (330/377/404 disagreements across three identical runs); two runs of this one-project shape landed
 /// on the exact same 307-case set, name for name, not just the same count. Many separate project/
 /// compilation contexts, not jb's cleanup logic itself, was almost certainly the source of both problems.
-and private verifyExpectationsJb (arguments:ParseResults<Arguments>) =
+and verifyExpectationsJb () =
     let dump = Path.Combine(Paths.Output.FullName, "expectations-jb")
     if Directory.Exists dump then Directory.Delete(dump, true)
     Directory.CreateDirectory dump |> ignore
 
-    Environment.SetEnvironmentVariable("CURB_EXPECTATION_DUMP", dump)
-    exec "dotnet" ["run"; "--project"; "tests/Nullean.Curb.Tests"; "-c"; "Release"] |> ignore
-    Environment.SetEnvironmentVariable("CURB_EXPECTATION_DUMP", null)
+    shell {
+        use! _ = withEnv ["CURB_EXPECTATION_DUMP", dump]
+        sh $"dotnet run --project tests/Nullean.Curb.Tests -c Release"
+    }
 
     let cases = Directory.GetDirectories dump
     printfn "checking %d expectations against jb cleanupcode" cases.Length
@@ -2046,11 +1975,9 @@ and private verifyExpectationsJb (arguments:ParseResults<Arguments>) =
     // and recreated each time logged "Concurrent modification?" warnings — a fresh, disposable cache
     // avoids reasoning about jb's staleness rules at all.
     let cachesHome = Path.Combine(dump, ".jb-caches")
-    exec "dotnet"
-        [ "jb"; "cleanupcode"; sln; "--no-build"
-          "--profile=Built-in: Reformat & Apply Syntax Style"
-          sprintf "--caches-home=%s" cachesHome
-          "--verbosity=WARN" ]
+    shell {
+        sh $"dotnet jb cleanupcode {sln} --no-build '--profile=Built-in: Reformat & Apply Syntax Style' --caches-home={cachesHome} --verbosity=WARN"
+    }
 
     let divergences = loadDivergences "jb-cleanupcode"
 
@@ -2159,14 +2086,15 @@ and private verifyExpectationsJb (arguments:ParseResults<Arguments>) =
 /// only this flag with nothing else changed. Hundreds of concurrent `dotnet build` processes sharing one
 /// compiler server was apparently enough to make its own diagnostic reporting unreliable under this much
 /// load; a fresh compiler process per case is not.
-and private verifyExpectationsIde0055 (arguments:ParseResults<Arguments>) =
+and verifyExpectationsIde0055 () =
     let dump = Path.Combine(Paths.Output.FullName, "expectations-ide0055")
     if Directory.Exists dump then Directory.Delete(dump, true)
     Directory.CreateDirectory dump |> ignore
 
-    Environment.SetEnvironmentVariable("CURB_EXPECTATION_DUMP", dump)
-    exec "dotnet" ["run"; "--project"; "tests/Nullean.Curb.Tests"; "-c"; "Release"] |> ignore
-    Environment.SetEnvironmentVariable("CURB_EXPECTATION_DUMP", null)
+    shell {
+        use! _ = withEnv ["CURB_EXPECTATION_DUMP", dump]
+        sh $"dotnet run --project tests/Nullean.Curb.Tests -c Release"
+    }
 
     let cases = Directory.GetDirectories dump
     if cases.Length = 0 then failwith "no expectations were written — is the dump still wired into the harness?"
@@ -2181,7 +2109,7 @@ and private verifyExpectationsIde0055 (arguments:ParseResults<Arguments>) =
     // cannot say which shard a case is in; the test name can. Hashing the name rather than the case keeps
     // every case of one test in the same shard, which the registry check below relies on: an entry is
     // keyed by test name, and is only stale if no case of that test reproduces it.
-    let shard = shardFrom arguments
+    let shard = shardFrom ()
     let inShard (testCase: string) =
         match shard with
         | None -> true
@@ -2242,18 +2170,16 @@ and private verifyExpectationsIde0055 (arguments:ParseResults<Arguments>) =
         // multi-node build to parallelise — left at its default, hundreds of these run concurrently
         // (below) each also fanning out its own worker nodes, and ProcNet's stdout/stderr readers
         // started timing out under the combined load. One node per case, many cases at once instead.
-        let result =
-            Proc.Start("dotnet",
-                [| "build"; caseDir; "-tl:off"; "--nologo"; "-maxcpucount:1"
-                   "-p:EnforceCodeStyleInBuild=true"
-                   "-p:RunAnalyzersDuringBuild=true"
-                   "-p:TreatWarningsAsErrors=false"
-                   // Required, not just a speed tweak — see the doc comment above. With the shared
-                   // VBCSCompiler server (the default), which cases report IDE0055 genuinely varied
-                   // between otherwise-identical runs under this much concurrent build load; a fresh
-                   // compiler process per case does not.
-                   "-p:UseSharedCompilation=false" |])
-        let output = result.ConsoleOut |> Seq.map (fun l -> l.Line) |> String.concat "\n"
+        let properties =
+            [ "-p:EnforceCodeStyleInBuild=true"
+              "-p:RunAnalyzersDuringBuild=true"
+              "-p:TreatWarningsAsErrors=false"
+              // Required, not just a speed tweak — see the doc comment above. With the shared
+              // VBCSCompiler server (the default), which cases report IDE0055 genuinely varied
+              // between otherwise-identical runs under this much concurrent build load; a fresh
+              // compiler process per case does not.
+              "-p:UseSharedCompilation=false" ]
+        let _, output = sh $"dotnet build {caseDir} -tl:off --nologo -maxcpucount:1 {properties}" |> captured |> Cmd.get
         d, ide0055Pattern.IsMatch output
 
     printfn "building %d isolated case project(s)..." cases.Length
@@ -2282,13 +2208,13 @@ and private verifyExpectationsIde0055 (arguments:ParseResults<Arguments>) =
 
     gateOnNonFixedPoints "dotnet build (IDE0055)" dump divergences notFixedPoint
 
-let private generatePackages (arguments:ParseResults<Arguments>) =
+let generatePackages () =
     let output = Paths.RootRelative Paths.Output.FullName
     if not Paths.Output.Exists then Paths.Output.Create()
 
     // Managed library packages.
     for project in Paths.mapProjectToNuget.Keys do
-        exec "dotnet" ["pack"; sprintf "src/%s/%s.csproj" project project; "-c"; "Release"; "-o"; output] |> ignore
+        shell { sh $"dotnet pack src/{project}/{project}.csproj -c Release -o {output}" }
 
     // The CLI is a RID-specific tool. A plain `dotnet pack` emits the root package (whose
     // DotnetToolSettings.xml v2 maps each RID to its own package) AND a package per RID — but
@@ -2298,7 +2224,7 @@ let private generatePackages (arguments:ParseResults<Arguments>) =
     // CI matrix, where each is compiled on a matching runner.
     let staging = DirectoryInfo(Path.Combine(Paths.Output.FullName, "..", "cli-staging")).FullName
     if Directory.Exists staging then Directory.Delete(staging, true)
-    exec "dotnet" ["pack"; "src/Nullean.Curb.Cli/Nullean.Curb.Cli.csproj"; "-c"; "Release"; "-o"; Paths.RootRelative staging] |> ignore
+    shell { sh $"dotnet pack src/Nullean.Curb.Cli/Nullean.Curb.Cli.csproj -c Release -o {Paths.RootRelative staging}" }
 
     let ridSuffixes = Paths.AotRuntimeIdentifiers |> List.map (sprintf "curb-cli.%s.")
     DirectoryInfo(staging).GetFiles("*.nupkg")
@@ -2310,7 +2236,7 @@ let private generatePackages (arguments:ParseResults<Arguments>) =
 
     Directory.Delete(staging, true)
 
-let private validatePackages (arguments:ParseResults<Arguments>) =
+let validatePackages () =
     let output = Paths.RootRelative <| Paths.Output.FullName
     // Only managed library packages carry signed assemblies. The root tool package holds just
     // DotnetToolSettings.xml, the per-RID packages hold native binaries, and Nullean.Curb.MSBuild is
@@ -2324,10 +2250,13 @@ let private validatePackages (arguments:ParseResults<Arguments>) =
             Paths.mapNugetToProject.ContainsKey(baseName)
             && not (Paths.buildOnlyPackages.Contains baseName))
 
-    let args = ["-v"; currentVersionInformational.Value; "-k"; Paths.SignKey; "-t"; output]
-    nugetPackages |> Seq.iter (fun p -> exec "dotnet" (["nupkg-validator"; p] @ args) |> ignore)
+    let version = currentVersionInformational.Value
+    shell {
+        for p in nugetPackages do
+            sh $"dotnet nupkg-validator {p} -v {version} -k {Paths.SignKey} -t {output}"
+    }
 
-let private generateApiChanges (arguments:ParseResults<Arguments>) =
+let generateApiChanges () =
     let output = Paths.RootRelative <| Paths.Output.FullName
     let currentVersion = currentVersion.Value
     // Only diff managed packages — per-RID AOT packages and the build-only MSBuild package have no
@@ -2341,15 +2270,13 @@ let private generateApiChanges (arguments:ParseResults<Arguments>) =
         let outputFile = Path.Combine(output, sprintf "breaking-changes-%s.md" p)
         let folder = Paths.mapNugetToProject.TryFind p |> Option.defaultValue p
         let tfm = Paths.mapNugetToTFM.TryFind p |> Option.defaultValue Paths.MainTFM
-        let args =
-            [
-                "assembly-differ"
-                (sprintf "previous-nuget|%s|%s|%s" p currentVersion tfm)
-                (sprintf "directory|.artifacts/bin/%s/release" folder)
-                "-a"; "true"; "--target"; p; "-f"; "github-comment"; "--output"; outputFile
-            ]
-        printfn "dotnet %A" args
-        exec "dotnet" args |> ignore
+        // Values, so the `|` in them stays inside its argument rather than piping
+        let previous = sprintf "previous-nuget|%s|%s|%s" p currentVersion tfm
+        let current = sprintf "directory|.artifacts/bin/%s/release" folder
+        printfn "dotnet %A" [ "assembly-differ"; previous; current; "-a"; "true"; "--target"; p; "-f"; "github-comment"; "--output"; outputFile ]
+        shell {
+            sh $"dotnet assembly-differ {previous} {current} -a true --target {p} -f github-comment --output {outputFile}"
+        }
     )
 
 /// Tags for the container image, mirroring the versioning currentVersion already derives from git:
@@ -2362,7 +2289,7 @@ let private generateApiChanges (arguments:ParseResults<Arguments>) =
 let private containerImageTags =
     lazy(
         let version = currentVersion.Value
-        let sha = Information.getCurrentSHA1(".")
+        let sha = currentSha.Value
         if version.Contains("-") then
             sprintf "edge;%s" sha
         else
@@ -2383,20 +2310,24 @@ let private containerImageTags =
 /// build itself still works, with no ghcr.io credentials configured there, and an env-based "is this
 /// a push?" check would have tried (and failed) to push from that job on every non-PR trigger. Only
 /// the build job, which does log in, passes --push.
-let private publishContainers (arguments:ParseResults<Arguments>) =
+let publishContainers () =
     let baseImageTag = "10.0-noble-chiseled"
-    let registryArgs =
-        if arguments.Contains Push then ["-p"; "ContainerRegistry=ghcr.io"] else []
-    let args =
-        ["publish"; "src/Nullean.Curb.Cli"; "-c"; "Release"; "-r"; "linux-x64"]
-        @ ["/t:PublishContainer"
-           "-p"; "DebugType=none"
-           "-p"; sprintf "ContainerBaseImage=mcr.microsoft.com/dotnet/runtime-deps:%s" baseImageTag
-           "-p"; sprintf "ContainerRepository=%s" Paths.Repository
-           "-p"; sprintf "ContainerImageTags=\"%s\"" containerImageTags.Value
-           "-p"; "ContainerUser=1001:1001"]
-        @ registryArgs
-    exec "dotnet" args |> ignore
+    let baseImage = sprintf "ContainerBaseImage=mcr.microsoft.com/dotnet/runtime-deps:%s" baseImageTag
+    let repository = sprintf "ContainerRepository=%s" Paths.Repository
+    let tags = sprintf "ContainerImageTags=\"%s\"" containerImageTags.Value
+    shell {
+        if CommandLine.push.Value then
+            sh $"""
+                dotnet publish src/Nullean.Curb.Cli -c Release -r linux-x64 /t:PublishContainer
+                  -p DebugType=none -p {baseImage} -p {repository} -p {tags} -p ContainerUser=1001:1001
+                  -p ContainerRegistry=ghcr.io
+            """
+        else
+            sh $"""
+                dotnet publish src/Nullean.Curb.Cli -c Release -r linux-x64 /t:PublishContainer
+                  -p DebugType=none -p {baseImage} -p {repository} -p {tags} -p ContainerUser=1001:1001
+            """
+    }
 
 /// Timings and metrics for one repository in the compare run.
 type private RepoResult = {
@@ -2426,9 +2357,9 @@ type private RepoResult = {
 /// The result table is written both to stdout and into docs/benchmarks/index.md
 /// between the <!-- RESULTS --> ... <!-- /RESULTS --> marker comments, so the doc stays current
 /// without a manual edit.
-let private compare (arguments:ParseResults<Arguments>) =
+let compare () =
     let corpusDir =
-        match arguments.TryGetResult Corpus with
+        match CommandLine.corpus.Value with
         | Some path ->
             let d = DirectoryInfo path
             if not d.Exists then failwithf "compare: corpus not found: %s" d.FullName
@@ -2449,7 +2380,7 @@ let private compare (arguments:ParseResults<Arguments>) =
         sprintf "%s-%s" os arch
 
     printfn "publishing native AOT for %s" rid
-    exec "dotnet" ["publish"; "src/Nullean.Curb.Cli"; "-c"; "Release"; "-r"; rid] |> ignore
+    shell { sh $"dotnet publish src/Nullean.Curb.Cli -c Release -r {rid}" }
 
     let binary =
         let name = if OperatingSystem.IsWindows() then "curb.exe" else "curb"
@@ -2473,7 +2404,7 @@ let private compare (arguments:ParseResults<Arguments>) =
     let countNotFixpt (formatted: string) =
         let check = Path.Combine(scratch, "fixpt_" + Guid.NewGuid().ToString("N"))
         copyTree formatted check
-        execResult "dotnet" ["format"; "whitespace"; check; "--folder"] |> ignore
+        exitCode $"dotnet format whitespace {check} --folder" |> Cmd.get |> ignore
         let diffs = countChanged formatted check
         if Directory.Exists check then Directory.Delete(check, true)
         diffs
@@ -2501,18 +2432,18 @@ let private compare (arguments:ParseResults<Arguments>) =
         copyTree repo.FullName curbDir
         copyTree repo.FullName cspDir
         copyTree repo.FullName dnfDir
-        configureCorpus arguments curbDir
-        configureCorpus arguments cspDir
-        configureCorpus arguments dnfDir
+        configureCorpus curbDir
+        configureCorpus cspDir
+        configureCorpus dnfDir
 
         // Curb cold — best of 3.
-        // Uses execResult (not exec) so a verification failure on one file does not abort the run.
+        // Reads the exit code rather than failing on it, so a verification failure on one file does not abort the run.
         // Exit code 3 means a file could not be verified and was left untouched — expected on repos
         // with raw string literals or BOM handling; the changed-file count still reflects what happened.
         let curbSec =
             [ for _ in 1..3 ->
                 let sw = Diagnostics.Stopwatch.StartNew()
-                execResult binary ["format"; curbDir] |> ignore
+                exitCode $"{binary} format {curbDir}" |> Cmd.get |> ignore
                 sw.Stop()
                 sw.Elapsed.TotalSeconds ]
             |> List.min
@@ -2520,10 +2451,10 @@ let private compare (arguments:ParseResults<Arguments>) =
         // Curb warm — run with --cache enabled. curbDir is already formatted, so the first run
         // populates the cache; the second run is the warm measurement (all files are cache hits).
         let curbCachePath = Path.Combine(scratch, repo.Name + "_curb.cache")
-        execResult binary ["format"; curbDir; "--cache"; curbCachePath] |> ignore
+        exitCode $"{binary} format {curbDir} --cache {curbCachePath}" |> Cmd.get |> ignore
         let curbWarmSec =
             let sw = Diagnostics.Stopwatch.StartNew()
-            execResult binary ["format"; curbDir; "--cache"; curbCachePath] |> ignore
+            exitCode $"{binary} format {curbDir} --cache {curbCachePath}" |> Cmd.get |> ignore
             sw.Stop()
             sw.Elapsed.TotalSeconds
 
@@ -2539,10 +2470,10 @@ let private compare (arguments:ParseResults<Arguments>) =
                 if i > 1 then
                     if Directory.Exists cspDir then Directory.Delete(cspDir, true)
                     copyTree repo.FullName cspDir
-                    configureCorpus arguments cspDir
+                    configureCorpus cspDir
                 if File.Exists csharpierCache then File.Delete csharpierCache
                 let sw = Diagnostics.Stopwatch.StartNew()
-                execResult "csharpier" ["format"; cspDir] |> ignore
+                exitCode $"csharpier format {cspDir}" |> Cmd.get |> ignore
                 sw.Stop()
                 sw.Elapsed.TotalSeconds ]
             |> List.min
@@ -2551,7 +2482,7 @@ let private compare (arguments:ParseResults<Arguments>) =
         // cspDir is now CSharpier-formatted; running again exercises the cache path only.
         let cspWarmSec =
             let sw = Diagnostics.Stopwatch.StartNew()
-            execResult "csharpier" ["format"; cspDir] |> ignore
+            exitCode $"csharpier format {cspDir}" |> Cmd.get |> ignore
             sw.Stop()
             sw.Elapsed.TotalSeconds
 
@@ -2561,9 +2492,9 @@ let private compare (arguments:ParseResults<Arguments>) =
                 if i > 1 then
                     if Directory.Exists dnfDir then Directory.Delete(dnfDir, true)
                     copyTree repo.FullName dnfDir
-                    configureCorpus arguments dnfDir
+                    configureCorpus dnfDir
                 let sw = Diagnostics.Stopwatch.StartNew()
-                execResult "dotnet" ["format"; "whitespace"; dnfDir; "--folder"] |> ignore
+                exitCode $"dotnet format whitespace {dnfDir} --folder" |> Cmd.get |> ignore
                 sw.Stop()
                 sw.Elapsed.TotalSeconds ]
             |> List.min
@@ -2583,7 +2514,7 @@ let private compare (arguments:ParseResults<Arguments>) =
         printfn "checking curb idempotency..."
         let curbDir2 = Path.Combine(scratch, repo.Name + "_curb2")
         copyTree curbDir curbDir2
-        execResult binary ["format"; curbDir2] |> ignore
+        exitCode $"{binary} format {curbDir2}" |> Cmd.get |> ignore
         let curbSecond = countChanged curbDir curbDir2
         if Directory.Exists curbDir2 then Directory.Delete(curbDir2, true)
 
@@ -2636,54 +2567,3 @@ let private compare (arguments:ParseResults<Arguments>) =
             printfn "warning: %s has no <!-- RESULTS --> / <!-- /RESULTS --> markers; table not spliced" docPath
     else
         printfn "warning: %s not found; table not written" docPath
-
-let private options (_:ParseResults<Arguments>) =
-    exec "dotnet" ["run"; "--project"; "tools/Nullean.Curb.OptionDocs"; "-c"; "Release"] |> ignore
-
-let Setup (parsed:ParseResults<Arguments>) (subCommand:Arguments) =
-    let step (name:string) action = Targets.Target(name, new Action(fun _ -> action(parsed)))
-
-    let cmd (name:string) commandsBefore steps action =
-        let singleTarget = (parsed.TryGetResult SingleTarget |> Option.defaultValue false)
-        let deps =
-            match (singleTarget, commandsBefore) with
-            | (true, _) -> []
-            | (_, Some d) -> d
-            | _ -> []
-        let steps = steps |> Option.defaultValue []
-        Targets.Target(name, deps @ steps, Action(action))
-
-    step Clean.Name clean
-    cmd Build.Name None (Some [Clean.Name]) <| fun _ -> build parsed
-
-    cmd Test.Name (Some [Build.Name]) None <| fun _ -> test parsed
-    cmd Benchmark.Name (Some [Build.Name]) None <| fun _ -> benchmark parsed
-    cmd Conformance.Name (Some [Build.Name]) None <| fun _ -> conformance parsed
-    cmd Churn.Name (Some [Build.Name]) None <| fun _ -> churn parsed
-    cmd Perf.Name (Some [Build.Name]) None <| fun _ -> perf parsed
-    cmd Compare.Name (Some [Build.Name]) None <| fun _ -> compare parsed
-    cmd Options.Name (Some [Build.Name]) None <| fun _ -> options parsed
-    cmd MsbuildSmoketest.Name (Some [Build.Name]) None <| fun _ -> msbuildSmoketest parsed
-    cmd FsharpSmoketest.Name (Some [Build.Name]) None <| fun _ -> fsharpSmoketest parsed
-    cmd CleanupSmoketest.Name (Some [Build.Name]) None <| fun _ -> cleanupSmoketest parsed
-    cmd CleanupSafety.Name (Some [Build.Name]) None <| fun _ -> cleanupSafety parsed
-    cmd CleanupConformance.Name (Some [Build.Name]) None <| fun _ -> cleanupConformance parsed
-    cmd XmlSafety.Name (Some [Build.Name]) None <| fun _ -> xmlSafety parsed
-
-    // No dependency on build: the documentation is markdown and one static HTML file, and waiting on
-    // a Release compile to preview a paragraph would make nobody run it.
-    step Docs.Name docs
-    // No dependency on build: generating runs the test suite and the generator with `dotnet run`, which builds
-    // what they need, and the docs-builder source is a git clone.
-    step CloneCorpus.Name cloneCorpusTarget
-    cmd VerifyExpectations.Name (Some [Build.Name]) None <| fun _ -> verifyExpectations parsed
-    cmd VerifyCleanupExpectations.Name (Some [Build.Name]) None <| fun _ -> verifyCleanupExpectations parsed
-    cmd VerifyExpectationsJb.Name (Some [Build.Name]) None <| fun _ -> verifyExpectationsJb parsed
-    cmd VerifyExpectationsIde0055.Name (Some [Build.Name]) None <| fun _ -> verifyExpectationsIde0055 parsed
-    cmd VerifyRazorExpectations.Name (Some [Build.Name]) None <| fun _ -> verifyRazorExpectations parsed
-
-    step GeneratePackages.Name generatePackages
-    step ValidatePackages.Name validatePackages
-    step GenerateApiChanges.Name generateApiChanges
-
-    step PublishContainers.Name publishContainers
