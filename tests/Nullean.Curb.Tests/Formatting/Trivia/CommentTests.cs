@@ -1363,6 +1363,248 @@ public class CommentTests : FormattingTest
 		""",
 		editorConfig: "indent_style = tab");
 
+	// ---- a block comment leading a line ---------------------------------------------------------------
+
+	// dotnet format keeps a `/* */` comment and the code the author wrote after it on one line, except where
+	// that code starts a line of its own: a statement, a member, a case label and the like. Each output is
+	// what dotnet format whitespace writes from the same input.
+
+	[Test]
+	public Task A_block_comment_leading_a_line_keeps_the_code_after_it_on_that_line() => Unchanged(
+		// The comment's line used to end after it, which moved the code onto a line of its own (issue #255).
+		"""
+		using System.Linq;
+
+		public interface IA { }
+
+		public interface IB { }
+
+		public class C<TA,
+		    /* c */ TB> : IA,
+		    /* c */ IB
+		    where TA : class
+		{
+		    private readonly int _x;
+
+		    public C(int a,
+		        /* c */ int b)
+		        /* c */ : this()
+		    {
+		        _x = a +
+		            /* c */ b;
+		    }
+
+		    public C() { }
+
+		    public int Value
+		        /* c */ => _x;
+
+		    public int[] M<T>(int a, int b, int[] xs)
+		        /* c */ where T : struct
+		    {
+		        Use(a,
+		            /* c */ b);
+		        var both = a > 0
+		            /* c */ && b > 0;
+		        var pick = both
+		            /* c */ ? a
+		            : b;
+		        var value =
+		            /* c */ a;
+		        var tuple = (a,
+		            /* c */ b);
+		        int[] list = [a,
+		            /* c */ b];
+		        System.Func<int> f = () =>
+		            /* c */ a;
+		        return xs
+		            .Where(x => x > a)
+		            /* c */ .ToArray();
+		    }
+
+		    private void Use(int a, int b) { }
+		}
+		""");
+
+	[Test]
+	public Task A_block_comment_leading_a_line_keeps_the_gap_the_author_wrote() => Unchanged(
+		// dotnet format leaves the gap as written, none included, and a second comment on the same line.
+		"""
+		public class C
+		{
+		    public void M(int a, int b)
+		    {
+		        Use(a,
+		            /* wide */   b);
+		        Use(a,
+		            /*tight*/b);
+		        Use(a,
+		            /* one */ /* two */ b);
+		        Use(a,
+		            /* block */ // line
+		            b);
+		    }
+
+		    private void Use(int a, int b) { }
+		}
+		""");
+
+	[Test]
+	public Task A_block_comment_leading_a_line_keeps_one_space_after_it_with_a_width() => Formats(
+		// Deterministic layout writes one space, so the line is a function of its tokens.
+		"""
+		public class C
+		{
+		    public void M(int a, int b)
+		    {
+		        Use(a,
+		            /* wide */   b);
+		        Use(a,
+		            /*tight*/b);
+		        Use(a,
+		            /* one */ /* two */ b);
+		        Use(a,
+		            /* block */ // line
+		            b);
+		    }
+
+		    private void Use(int a, int b) { }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M(int a, int b)
+		    {
+		        Use(
+		            a,
+		            /* wide */ b
+		        );
+		        Use(
+		            a,
+		            /*tight*/b
+		        );
+		        Use(
+		            a,
+		            /* one */ /* two */ b
+		        );
+		        Use(
+		            a,
+		            /* block */ // line
+		            b
+		        );
+		    }
+
+		    private void Use(int a, int b)
+		    { }
+		}
+		""",
+		editorConfig: "max_line_length = 120");
+
+	[Test]
+	public Task A_block_comment_ahead_of_a_token_that_starts_its_own_line_ends_its_line() => Formats(
+		// Where dotnet format puts the token on a line of its own, the comment stays behind on the line above.
+		"""
+		public enum E
+		{
+		    A,
+		    /* c */ B,
+		}
+
+		public class C
+		{
+		    /* c */ public int X;
+
+		    public int Y { get; set; }
+
+		    public int M(int a)
+		    {
+		        /* c */ Use(a);
+		        /* one */ /* two */ Use(a);
+		        if (a > 0)
+		        {
+		        }
+		        /* c */ else
+		        {
+		        }
+
+		        switch (a)
+		        {
+		            /* c */ case 1:
+		                break;
+		        }
+
+		        var o = new C
+		        {
+		            X = 1,
+		            /* c */ Y = 2,
+		        };
+
+		        return a switch
+		        {
+		            1 => 2,
+		            /* c */ _ => 3,
+		        };
+		    }
+
+		    private void Use(int a) { }
+		}
+		""",
+		"""
+		public enum E
+		{
+		    A,
+		    /* c */
+		    B,
+		}
+
+		public class C
+		{
+		    /* c */
+		    public int X;
+
+		    public int Y { get; set; }
+
+		    public int M(int a)
+		    {
+		        /* c */
+		        Use(a);
+		        /* one */ /* two */
+		        Use(a);
+		        if (a > 0)
+		        {
+		        }
+		        /* c */
+		        else
+		        {
+		        }
+
+		        switch (a)
+		        {
+		            /* c */
+		            case 1:
+		                break;
+		        }
+
+		        var o = new C
+		        {
+		            X = 1,
+		            /* c */
+		            Y = 2,
+		        };
+
+		        return a switch
+		        {
+		            1 => 2,
+		            /* c */
+		            _ => 3,
+		        };
+		    }
+
+		    private void Use(int a) { }
+		}
+		""");
+
 	[Test]
 	public Task An_inline_block_comment_against_the_next_token_stays_against_it_with_a_width() => Unchanged(
 		"""
