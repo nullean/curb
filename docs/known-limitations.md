@@ -44,10 +44,10 @@ then a diff.
 
 The argument-line shapes that used to account for unsettled files with no width settle in one pass
 now: a comment under a `case` label's trailing comment, a chain line in a lambda argument whose body
-has an operator, a tuple broken after its `(`, an initializer opened out inside a lambda argument, an
-expression body converted after a trailing comment, a switch expression opened out inside a one-line
-argument list, a `//` comment run between an argument's `name:` and its value, and a lone `)` closing
-a list whose `(` the author put on a line of its own.
+has an operator or a query, a tuple broken after its `(`, an initializer opened out inside a lambda
+argument, an expression body converted after a trailing comment, a switch expression opened out inside
+a one-line argument list, a `//` comment run between an argument's `name:` and its value, and a lone `)`
+closing a list whose `(` the author put on a line of its own.
 
 A block body that a `csharp_style_expression_bodied_*` key converts settles in one pass too, in both layout
 modes: the conversion writes the layout the next run gives the arrow it wrote. A `return x switch { … };`

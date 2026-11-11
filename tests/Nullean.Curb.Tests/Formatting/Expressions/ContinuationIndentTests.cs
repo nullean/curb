@@ -413,6 +413,60 @@ public class ContinuationIndentTests : FormattingTest
 		""",
 		editorConfig: "max_line_length = 120");
 
+	// dotnet format moves a query's clauses under its `from` and leaves the chain line after the query
+	// where the author put it. Curb moved the `.Skip` line with the clauses on the first run and again
+	// on the second (issue #239); a chain link keeping its own offset (#246) settles it.
+	[Test]
+	public Task A_chain_after_a_query_in_a_lambda_argument_keeps_its_line() => Formats(
+		"""
+		public class C
+		{
+		    public void M(int[] xs)
+		    {
+		        Check(() => (from x in xs
+		                    where x > 0
+		                    select x)
+		                .Skip(10).Take(10).ToArray())
+		            .Done();
+		        Check(1, () => (from x in xs
+		                       where x > 0
+		                       select x)
+		                    .Skip(10)
+		                    .ToArray())
+		            .Done();
+		        Check(() => (from x in xs
+		                    group x by x into g
+		                    select g.Key)
+		                .Skip(10).ToArray())
+		            .Done();
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M(int[] xs)
+		    {
+		        Check(() => (from x in xs
+		                     where x > 0
+		                     select x)
+		                .Skip(10).Take(10).ToArray())
+		            .Done();
+		        Check(1, () => (from x in xs
+		                        where x > 0
+		                        select x)
+		                    .Skip(10)
+		                    .ToArray())
+		            .Done();
+		        Check(() => (from x in xs
+		                     group x by x into g
+		                     select g.Key)
+		                .Skip(10).ToArray())
+		            .Done();
+		    }
+		}
+		""");
+
 	[Test]
 	public Task A_block_lambda_argument_is_unchanged() => Unchanged(
 		"""
