@@ -555,8 +555,13 @@ internal static partial class Printers
 
 	public static void PostfixUnaryExpression(PostfixUnaryExpressionSyntax node, PrintContext context)
 	{
+		// A `!` the author put at the head of a line, `s` / `!.Length`, stays there, at their offset.
+		var anchor = EnterPatternContinuation(context.AuthorBroke(node.Operand.Span.End, node.OperatorToken.SpanStart), context);
 		Node.Print(node.Operand, context);
+		if (anchor >= 0)
+			_ = ContinuationLine(node.OperatorToken, anchor, context);
 		TokenPrinter.Print(node.OperatorToken, context);
+		ExitPatternContinuation(anchor, context);
 	}
 
 	public static void AwaitExpression(AwaitExpressionSyntax node, PrintContext context)
@@ -1587,8 +1592,27 @@ internal static partial class Printers
 
 	public static void ElementAccessExpression(ElementAccessExpressionSyntax node, PrintContext context)
 	{
+		// An indexer can end a chain, `Convert(s)` / `.ToLowerInvariant()[..8]`, and only the outermost
+		// link prints one: the call below it defers to this node, which printed it flat, joining the
+		// author's breaks (issue #233). Only one the author spread over lines, so a single-line chain
+		// ending in an indexer is still never offered breaks it was not offered before.
+		if (SpansLines(node, context) && TryPrintChain(node, context))
+			return;
+
+		// A `[` the author put on a line of its own stays there, at the offset they gave it.
+		var argumentList = node.ArgumentList;
+		var anchor = EnterPatternContinuation(context.AuthorBroke(node.Expression.Span.End, argumentList.SpanStart), context);
 		Node.Print(node.Expression, context);
-		Node.Print(node.ArgumentList, context);
+		if (anchor < 0)
+		{
+			Node.Print(argumentList, context);
+			return;
+		}
+
+		var offset = ContinuationLine(argumentList.OpenBracketToken, anchor, context);
+		using (context.Arena.AlignedIndent(anchor, offset))
+			Node.Print(argumentList, context);
+		ExitPatternContinuation(anchor, context);
 	}
 
 	public static void BracketedArgumentList(BracketedArgumentListSyntax node, PrintContext context)
@@ -1647,9 +1671,34 @@ internal static partial class Printers
 
 	public static void ConditionalAccessExpression(ConditionalAccessExpressionSyntax node, PrintContext context)
 	{
+		// A break the author put either side of the `?` stays, and the line after it keeps the offset
+		// they gave it from the line the expression starts on, as dotnet format leaves it. Printed
+		// joined, `items?` / `.Where(…)` / `.Count()` came out half joined (issue #233).
+		var breakBefore = context.AuthorBroke(node.Expression.Span.End, node.OperatorToken.SpanStart);
+		var breakAfter = context.AuthorBroke(node.OperatorToken.Span.End, node.WhenNotNull.SpanStart);
+		var anchor = EnterPatternContinuation(breakBefore || breakAfter, context);
+
 		Node.Print(node.Expression, context);
+		if (anchor < 0)
+		{
+			TokenPrinter.Print(node.OperatorToken, context);
+			Node.Print(node.WhenNotNull, context);
+			return;
+		}
+
+		if (breakBefore)
+			_ = ContinuationLine(node.OperatorToken, anchor, context);
 		TokenPrinter.Print(node.OperatorToken, context);
-		Node.Print(node.WhenNotNull, context);
+
+		// The access is printed from the offset of the line it starts on, whichever break put it there.
+		var offset = breakAfter
+			? ContinuationLine(node.WhenNotNull.GetFirstToken(), anchor, context)
+			: context.SourceIndent(node.OperatorToken.SpanStart);
+
+		using (context.Arena.AlignedIndent(anchor, offset))
+			Node.Print(node.WhenNotNull, context);
+
+		ExitPatternContinuation(anchor, context);
 	}
 
 	public static void SwitchExpression(SwitchExpressionSyntax node, PrintContext context)

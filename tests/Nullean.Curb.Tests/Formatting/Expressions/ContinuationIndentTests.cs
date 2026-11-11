@@ -1147,4 +1147,110 @@ public class ContinuationIndentTests : FormattingTest
 		}
 		""",
 		editorConfig: "max_line_length = 120");
+
+	// Issue #238: a chain's links kept one level in from the line the chain starts on, wherever the
+	// author put them. dotnet format leaves each link at the offset the author gave it.
+
+	[Test]
+	public Task Chain_links_at_the_statements_own_column_stay_there() => Unchanged(
+		"""
+		public class C
+		{
+		    public int[] M(int[] items)
+		    {
+		        items
+		        .Distinct()
+		        .ToArray();
+		        return items
+		        .Distinct()
+		        .ToArray();
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Chain_links_keep_the_offset_each_was_given_and_their_contents_follow() => Unchanged(
+		"""
+		public class C
+		{
+		    public object M(int[] items)
+		    {
+		        var b = items
+		                .Distinct()
+		          .ToArray();
+		        var d = items
+		        .Select(x =>
+		        {
+		            return x;
+		        })
+		        .Where(x => new D
+		        {
+		            A = 1,
+		        })
+		        .ToArray();
+		        var e = items
+		                .Select(x => Foo(
+		                    x,
+		                    y))
+		                .Where(x => x > 0).Select(x => new
+		                {
+		                    X = x,
+		                })
+		                .ToArray();
+		        return items
+		        // the first step
+		        .Distinct()
+		                .ToArray();
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_reindented_statement_takes_its_chain_links_along() => Formats(
+		"""
+		public class C
+		{
+		    public object M(int[] items)
+		    {
+		      var c = items
+		            .Distinct()
+		            .ToArray();
+		            return items
+		            .Distinct()
+		            .ToArray();
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public object M(int[] items)
+		    {
+		        var c = items
+		              .Distinct()
+		              .ToArray();
+		        return items
+		        .Distinct()
+		        .ToArray();
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Chain_links_keep_their_offset_with_tabs() => Unchanged(
+		"""
+		public class C
+		{
+			public object M(int[] items)
+			{
+				var a = items
+				.Distinct()
+					.ToArray();
+				return items?
+					.Where(i => i > 0)
+					.Count() ?? 0;
+			}
+		}
+		""",
+		editorConfig: "indent_style = tab");
 }
