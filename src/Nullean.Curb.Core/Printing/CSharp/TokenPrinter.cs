@@ -142,6 +142,10 @@ internal static class TokenPrinter
 		// True while emitting a run of comments that began aligned under a trailing comment.
 		var alignedRun = false;
 
+		// True after a /* */ comment that keeps what follows it on its line: the next comment, or the
+		// token itself (see GluesToNext).
+		var glued = false;
+
 		// True immediately after a documentation comment, false again once anything else follows —
 		// used at the final flush below to keep a doc comment glued to whatever it documents. Unlike
 		// an ordinary comment, a blank line here reads as the comment having come loose from its
@@ -178,6 +182,15 @@ internal static class TokenPrinter
 				case SyntaxKind.MultiLineCommentTrivia:
 				case SyntaxKind.SingleLineDocumentationCommentTrivia:
 				case SyntaxKind.MultiLineDocumentationCommentTrivia:
+					if (glued)
+					{
+						// On the line of the /* */ comment before it, where the author wrote it.
+						EmitLeadingComment(leading, i, count, token, context, trailingBreak, ref pendingNewLines, ref glued);
+						emittedAnything = true;
+						lastWasDocComment = false;
+						break;
+					}
+
 					// Roslyn puts everything up to and including the end of a line into the *trailing*
 					// trivia of the token before it, so anything reaching leading trivia genuinely
 					// starts a fresh line and must be emitted at one. Without this the comment glues
@@ -278,11 +291,14 @@ internal static class TokenPrinter
 						alignedRun = false;
 					}
 
-					pendingNewLines = trivia.IsKind(SyntaxKind.SingleLineDocumentationCommentTrivia)
-						? EmitDocumentationLines(trivia, context, aligned, alignRegister, alignOffset)
-						: EmitTriviaText(trivia, context, CommentFlags(trivia));
-					if (trailingBreak)
-						arena.HardLine();
+					if (trivia.IsKind(SyntaxKind.SingleLineDocumentationCommentTrivia))
+					{
+						pendingNewLines = EmitDocumentationLines(trivia, context, aligned, alignRegister, alignOffset);
+						if (trailingBreak)
+							arena.HardLine();
+					}
+					else
+						EmitLeadingComment(leading, i, count, token, context, trailingBreak, ref pendingNewLines, ref glued);
 					emittedAnything = true;
 					lastWasDocComment = trivia.IsKind(SyntaxKind.SingleLineDocumentationCommentTrivia)
 						|| trivia.IsKind(SyntaxKind.MultiLineDocumentationCommentTrivia);
@@ -427,8 +443,141 @@ internal static class TokenPrinter
 
 		// The break after the last comment or directive went to the ambient indent; the aligned line
 		// reuses it, and moves the token back to its own column.
-		if (aligned && emittedAnything)
+		if (aligned && emittedAnything && !glued)
 			arena.AlignedLine(alignRegister, alignOffset);
+	}
+
+	/// <summary>
+	/// Emits a leading comment, then either the break after it or, for a <c>/* */</c> comment the author
+	/// wrote code after, the gap to that code.
+	/// </summary>
+	private static void EmitLeadingComment(
+		SyntaxTriviaList leading, int index, int count, SyntaxToken token, PrintContext context, bool trailingBreak,
+		ref int pendingNewLines, ref bool glued)
+	{
+		var trivia = leading[index];
+		pendingNewLines = EmitTriviaText(trivia, context, CommentFlags(trivia));
+		var gap = default(SyntaxTrivia);
+		glued = trailingBreak && GluesToNext(leading, index, count, token, context, out gap);
+		if (!glued)
+		{
+			if (trailingBreak)
+				context.Arena.HardLine();
+			return;
+		}
+
+		if (gap.RawKind == 0)
+			return;
+		if (KeepsSpacing(gap, context))
+			context.Arena.SourceText(gap.Span);
+		else
+			context.Arena.Synthetic(SyntheticText.Space);
+	}
+
+	/// <summary>
+	/// True when a <c>/* */</c> comment in leading trivia keeps what the author wrote after it on its line:
+	/// another comment, or the token, unless the token starts a line of its own.
+	/// </summary>
+	/// <remarks>
+	/// dotnet format leaves <c>Foo(a,\n    /* c */ b)</c> as written, and the gap between the two with it. Ending the
+	/// comment's line there moved <c>b</c> onto a line of its own in argument and parameter lists, base lists,
+	/// binary expressions and chains, which dotnet format never does. Where a token starts its own line, ahead
+	/// of a statement or a member say, dotnet format does break after the comment, and so does Curb (see
+	/// <see cref="StartsOwnLine"/>).
+	/// </remarks>
+	/// <param name="leading">The token's leading trivia.</param>
+	/// <param name="index">The comment's position in <paramref name="leading"/>.</param>
+	/// <param name="count">One past the last trivia entry this call prints.</param>
+	/// <param name="token">The token the trivia leads.</param>
+	/// <param name="context">Per-file printing state.</param>
+	/// <param name="gap">The whitespace between the comment and what follows, or default when there is none.</param>
+	private static bool GluesToNext(SyntaxTriviaList leading, int index, int count, SyntaxToken token, PrintContext context, out SyntaxTrivia gap)
+	{
+		gap = default;
+		var trivia = leading[index];
+		if (!trivia.IsKind(SyntaxKind.MultiLineCommentTrivia) && !trivia.IsKind(SyntaxKind.MultiLineDocumentationCommentTrivia))
+			return false;
+
+		// A comment over several lines keeps its own line: with code after it, dotnet format re-indents its
+		// lines, and does not leave Curb's layout of them alone.
+		var span = trivia.Span;
+		for (var i = span.Start; i < span.End; i++)
+		{
+			if (context.Text[i] is '\n' or '\r')
+				return false;
+		}
+
+		var next = index + 1;
+		if (next < count && leading[next].IsKind(SyntaxKind.WhitespaceTrivia))
+			gap = leading[next++];
+
+		if (next < count)
+		{
+			var kind = leading[next].Kind();
+			return kind is SyntaxKind.SingleLineCommentTrivia or SyntaxKind.MultiLineCommentTrivia
+				or SyntaxKind.MultiLineDocumentationCommentTrivia;
+		}
+
+		// Trivia past `count` is printed by another call, so the token is not what follows.
+		return count == leading.Count && !StartsOwnLine(token);
+	}
+
+	/// <summary>
+	/// True for a token dotnet format puts on a line of its own after a comment ahead of it.
+	/// </summary>
+	/// <remarks>
+	/// Roslyn's rules put a line break ahead of these tokens, and when a comment is in the way the break goes
+	/// after it: the start of a statement, a member, a using directive or an accessor; an <c>else</c>,
+	/// <c>catch</c>, <c>finally</c> or case label; a switch expression arm, a query clause, an object or
+	/// <c>with</c> initializer's member, a property pattern's subpattern and an anonymous object's member; what
+	/// follows a member's attribute list; and a brace other than an array or collection initializer's. Measured
+	/// against dotnet format whitespace, construct by construct. Everywhere else, an argument, an operand or a
+	/// chain's <c>.</c> say, the comment and the token stay on one line.
+	///
+	/// Walks the syntax tree, which allocates, so it is asked only of a token with a block comment directly ahead
+	/// of it on its line.
+	/// </remarks>
+	private static bool StartsOwnLine(SyntaxToken token)
+	{
+		if (token.IsKind(SyntaxKind.CloseBraceToken))
+			return true;
+		if (token.IsKind(SyntaxKind.OpenBraceToken))
+			return token.Parent is not InitializerExpressionSyntax initializer
+				|| initializer.IsKind(SyntaxKind.ObjectInitializerExpression)
+				|| initializer.IsKind(SyntaxKind.WithInitializerExpression);
+
+		var previous = token.GetPreviousToken();
+		if (previous.IsKind(SyntaxKind.CloseBracketToken)
+			&& previous.Parent is AttributeListSyntax { Parent: MemberDeclarationSyntax or AccessorDeclarationSyntax or StatementSyntax })
+			return true;
+
+		for (var node = token.Parent; node is not null && node.SpanStart == token.SpanStart; node = node.Parent)
+		{
+			switch (node)
+			{
+				case StatementSyntax:
+				case MemberDeclarationSyntax:
+				case AccessorDeclarationSyntax:
+				case UsingDirectiveSyntax:
+				case ExternAliasDirectiveSyntax:
+				case ElseClauseSyntax:
+				case CatchClauseSyntax:
+				case FinallyClauseSyntax:
+				case SwitchLabelSyntax:
+				case SwitchExpressionArmSyntax:
+				case QueryClauseSyntax:
+				case SelectOrGroupClauseSyntax:
+				case QueryContinuationSyntax:
+				case AnonymousObjectMemberDeclaratorSyntax:
+				case SubpatternSyntax { Parent: PropertyPatternClauseSyntax }:
+					return true;
+				case ExpressionSyntax { Parent: InitializerExpressionSyntax initializer }
+					when initializer.IsKind(SyntaxKind.ObjectInitializerExpression) || initializer.IsKind(SyntaxKind.WithInitializerExpression):
+					return true;
+			}
+		}
+
+		return false;
 	}
 
 	/// <summary>Register holding the column of the most recent trailing comment.</summary>
