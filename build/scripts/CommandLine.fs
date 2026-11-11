@@ -16,16 +16,11 @@ type Arguments =
     | [<CliPrefix(CliPrefix.None);SubCommand>] Docs
     | [<CliPrefix(CliPrefix.None);SubCommand>] CloneCorpus
 
-    | [<CliPrefix(CliPrefix.None);Hidden;SubCommand>] PristineCheck
     | [<CliPrefix(CliPrefix.None);Hidden;SubCommand>] GeneratePackages
     | [<CliPrefix(CliPrefix.None);Hidden;SubCommand>] ValidatePackages
-    | [<CliPrefix(CliPrefix.None);Hidden;SubCommand>] GenerateReleaseNotes
     | [<CliPrefix(CliPrefix.None);Hidden;SubCommand>] GenerateApiChanges
-    | [<CliPrefix(CliPrefix.None);SubCommand>] Release
 
-    | [<CliPrefix(CliPrefix.None);Hidden;SubCommand>] CreateReleaseOnGithub
     | [<CliPrefix(CliPrefix.None);Hidden;SubCommand>] PublishContainers
-    | [<CliPrefix(CliPrefix.None);SubCommand>] Publish
 
     | [<Inherit>] Corpus of string
     | [<Inherit>] Minimum of double
@@ -55,9 +50,7 @@ type Arguments =
     | [<Inherit>] Seed of int
     | [<Inherit>] CorpusSize of double
     | [<Inherit;AltCommandLine("-s")>] SingleTarget of bool
-    | [<Inherit>] Token of string
     | [<Inherit>] Push
-    | [<Inherit;AltCommandLine("-c")>] CleanCheckout of bool
 with
     interface IArgParserTemplate with
         member this.Usage =
@@ -99,20 +92,13 @@ with
             | Deterministic -> "force csharp_keep_existing_linebreaks = false; implies --reflow. Redundant now that a width selects it"
             | Preserve -> "force csharp_keep_existing_linebreaks = true, the opt-out a width no longer gives you"
             | Width _ -> "override the corpus's max_line_length with this column count"
-            | Release -> "runs build, tests, then creates and validates the packages shy of publishing them"
-            | Publish -> "runs the full release"
 
             | SingleTarget _ -> "runs the provided sub command without running its dependencies"
-            | Token _ -> "token used to authenticate with github"
-            | CleanCheckout _ -> "skip the clean checkout check that guards the release/publish targets"
             | Push -> "publishcontainers only: push the built image to ghcr.io instead of building it into the local Docker daemon"
 
-            | PristineCheck
             | GeneratePackages
             | ValidatePackages
-            | GenerateReleaseNotes
             | GenerateApiChanges
-            | CreateReleaseOnGithub
             | PublishContainers
                 -> "Undocumented, dependent target"
 

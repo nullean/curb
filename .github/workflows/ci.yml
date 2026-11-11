@@ -16,12 +16,13 @@ on:
       - 'NOTICE'
     branches:
       - main
-    tags:
-      - "*.*.*"
+  # Publishing the release-drafter draft releases: every gate below runs on the released commit first.
+  release:
+    types: [published]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+  cancel-in-progress: ${{ github.event_name != 'release' }}
 
 permissions:
   contents: read
@@ -36,7 +37,7 @@ permissions:
 #
 #   2. The corpus gates. The fast ones run on every trigger, in "Corpus and conformance" (the required
 #      check). The rest are correct and belong in CI, but do not need to run on every commit: they run on
-#      tag pushes, the weekly schedule and workflow_dispatch (CURB_FULL_GATES). Run one after another in a
+#      a published release, the weekly schedule and workflow_dispatch (CURB_FULL_GATES). Run one after another in a
 #      single job they took 54 minutes; split into parallel jobs a full run takes ~17 (measured on one run each).
 #
 #      Steps gated on CURB_FULL_GATES, in the corpus job:
@@ -55,8 +56,8 @@ permissions:
 #          This is the primary correctness claim, held at its floor on the
 #          default path. It must not be conditional.
 #
-# The weekly run is a strict superset of a push-to-main run. A tag push is also full, so the gates have run
-# on the commit being released, and the release job publishes nothing until every one of them has passed.
+# The weekly run is a strict superset of a push-to-main run. A published release is also full, so the gates have
+# run on the commit being released, and the release job publishes nothing until every one of them has passed.
 #
 # Every job that needs the corpus gets it from `./build.sh clonecorpus`, so where it comes from is decided in
 # one place (materialiseCorpus in build/scripts/Targets.fs). It is generated, by tools/Nullean.Curb.CorpusGenerator:
@@ -74,7 +75,7 @@ env:
   CURB_FULL_GATES: >-
     ${{ github.event_name == 'schedule'
      || github.event_name == 'workflow_dispatch'
-     || startsWith(github.ref, 'refs/tags/') }}
+     || github.event_name == 'release' }}
 
 jobs:
 
@@ -156,7 +157,7 @@ jobs:
         run: docker images nullean/curb --format '{{.Tag}}\t{{.Size}}'
 
       - name: Upload per-RID package
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' || github.event_name == 'release'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: nupkg-${{ matrix.rid }}
@@ -440,7 +441,7 @@ jobs:
         run: ./build.sh verifyrazorexpectations -s true
 
   cleanup-conformance:
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || github.event_name == 'release'
     runs-on: ubuntu-latest
     name: Cleaning a real solution leaves it building
     timeout-minutes: 20
@@ -480,7 +481,7 @@ jobs:
   # four shards. Each shard dumps the suite itself and checks the cases whose test name hashes to it; the
   # four together cover every case exactly once (see verifyExpectationsIde0055 in Targets.fs).
   ide0055:
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || github.event_name == 'release'
     runs-on: ubuntu-latest
     name: IDE0055 under a real build (shard ${{ matrix.shard }}/4)
     timeout-minutes: 30
@@ -547,11 +548,11 @@ jobs:
         run: ./build.sh test -s true
 
       - name: Generate managed packages
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' || github.event_name == 'release'
         run: ./build.sh generatepackages -s true
 
       - name: Download all per-RID AOT packages
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' || github.event_name == 'release'
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: nupkg-*
@@ -559,11 +560,11 @@ jobs:
           merge-multiple: true
 
       - name: Validate managed packages
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' || github.event_name == 'release'
         run: ./build.sh validatepackages -s true
 
       - name: Inspect public API changes
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' || github.event_name == 'release'
         run: ./build.sh generateapichanges -s true
 
       - name: Publish canary to GitHub Packages (branch push)
@@ -581,7 +582,7 @@ jobs:
       # ghcr.io/nullean/curb, matching elastic/docs-builder's own tagging: "edge" and the commit SHA on
       # every push, plus "latest", the semver and "v<major>" when this push is an exact release tag — see
       # publishContainers/containerImageTags in Targets.fs for how that split is decided. action.yml
-      # picks among these tags by the ref a workflow pins. A tag's push happens in the release job below.
+      # picks among these tags by the ref a workflow pins. A release's push happens in the release job below.
       - name: Log in to ghcr.io
         if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads')
         uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
@@ -596,8 +597,8 @@ jobs:
 
       # The packages the release job publishes are exactly the ones validated here, with the breaking-changes
       # notes the API inspection above wrote for the GitHub release body.
-      - name: Hand the validated packages to the release job (tag push)
-        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags')
+      - name: Hand the validated packages to the release job (published release)
+        if: github.event_name == 'release'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: release-packages
@@ -607,18 +608,18 @@ jobs:
           if-no-files-found: error
 
   # ── Release ─────────────────────────────────────────────────────────────────
-  # A tag publishes only once every gate has passed. Publishing used to hang off `build` alone, so 0.9.0
-  # and 0.10.0 both went out while a corpus gate was still running and then failed. Needing the gate jobs
-  # also skips this job if any of them is skipped, which on a tag none is: CURB_FULL_GATES is true.
+  # Publishing the release-drafter draft creates the tag and runs this workflow on it; the packages go out
+  # only once every gate has passed. Publishing used to hang off `build` alone, so 0.9.0 and 0.10.0 both went
+  # out while a corpus gate was still running and then failed. Needing the gate jobs also skips this job if
+  # any of them is skipped, which on a release none is: CURB_FULL_GATES is true.
   release:
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    if: github.event_name == 'release'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: [build, corpus, cleanup-conformance, ide0055]
     permissions:
-      contents: write   # create GitHub release
+      contents: write   # append the public API changes to the release notes
       packages: write   # push the container image
-      issues: write     # release-notes creates labels for its categories
       id-token: write   # NuGet trusted publishing: exchange the workflow's OIDC token for a short-lived key
 
     steps:
@@ -652,14 +653,6 @@ jobs:
       - name: Publish container image
         run: ./build.sh publishcontainers -s true --push
 
-      - name: Generate release notes
-        run: ./build.sh generatereleasenotes -s true
-
-      - name: Create GitHub release
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: ./build.sh createreleaseongithub -s true --token "$GITHUB_TOKEN"
-
       # Trusted publishing: nuget.org trusts this repository's ci.yml (a policy owned by the nullean
       # organization), so there is no long-lived API key to expire. The key it returns lasts an hour, so the
       # login sits right before the push. NUGET_USER is the nuget.org profile name, set at the org level.
@@ -678,6 +671,29 @@ jobs:
             -s https://api.nuget.org/v3/index.json \
             --skip-duplicate \
             --no-symbols
+
+      # After the push, so the notes gain the API changes only once the packages are out. The notes themselves are the
+      # draft release-drafter kept from the merged pull requests; a re-run appends nothing twice.
+      - name: Append the public API changes to the release notes
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          shopt -s nullglob
+          files=(build/output/breaking-changes-*.md)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "no public API changes to add"
+            exit 0
+          fi
+          notes=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json body --jq .body)
+          marker="<!-- public-api-changes -->"
+          case "$notes" in *"$marker"*) echo "already appended"; exit 0 ;; esac
+          {
+            printf '%s\n\n%s\n' "$notes" "$marker"
+            for f in "${files[@]}"; do printf '\n'; cat "$f"; printf '\n'; done
+          } > "$RUNNER_TEMP/notes.md"
+          gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --notes-file "$RUNNER_TEMP/notes.md"
 
   # Static analysis of these workflows (nullean/.github).
   zizmor:

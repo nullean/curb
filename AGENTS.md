@@ -15,6 +15,7 @@ mise run pack             # build, pack the managed packages and validate them
 mise run ci               # what CI's build job runs
 mise run docs             # build the docs and serve them
 mise run check            # workflow security checks (zizmor)
+mise run release          # show the release draft; `mise run release publish` releases
 ```
 
 `./build.sh` runs the same targets and every corpus gate:
@@ -40,6 +41,16 @@ mise run check            # workflow security checks (zizmor)
 
 Test projects are `OutputType=Exe` and run on
 Microsoft.Testing.Platform, so they are launched with `dotnet run`, not `dotnet test`.
+
+## Releasing
+
+release-drafter keeps a draft release current from the labels of merged pull requests; every pull request carries
+exactly one release label (`pr-labels.yml` enforces it). **Publishing the draft** releases: it creates the tag and runs
+`ci.yml` on it with every gate (`CURB_FULL_GATES`), and only then does the `release` job push the container image and
+the packages and append the public API changes to the notes. Pushing a tag on its own does nothing. In 0.x a
+`breaking` label bumps the minor version; 1.0 is the maintainer's call. See the
+[releasing](.claude/skills/releasing/SKILL.md) and [breaking-changes](.claude/skills/breaking-changes/SKILL.md)
+skills, and `mise run release` for the current draft.
 
 ## Layout
 
