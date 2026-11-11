@@ -1,0 +1,15 @@
+name: release-drafter
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  draft:
+    uses: nullean/.github/.github/workflows/release-drafter.yml@09af1fa16762b8ae42d899d45430a4267df5300c # v1.2.0
+    permissions:
+      contents: write
+      pull-requests: read
