@@ -169,6 +169,30 @@ public class EdgeCaseTests : FormattingTest
 		}
 		""");
 
+	// C# 15 lets break and continue name the loop they leave. Printed as plain keyword statements, the label
+	// welded onto the keyword: `break outer;` came out as `breakouter;`.
+	[Test]
+	public Task Labeled_break_and_continue_keep_the_space_before_the_label() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M(int[][] grid)
+		    {
+		    outer:
+		        foreach (var row in grid)
+		        {
+		            foreach (var cell in row)
+		            {
+		                if (cell == 0)
+		                    continue outer;
+		                if (cell < 0)
+		                    break outer;
+		            }
+		        }
+		    }
+		}
+		""");
+
 	[Test]
 	public Task Stackalloc() => Unchanged(
 		"""
