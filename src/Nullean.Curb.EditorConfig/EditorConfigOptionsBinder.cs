@@ -45,6 +45,8 @@ public static class EditorConfigOptionsBinder
 		}
 
 		options = options with { Layout = LayoutOptionsBinder.BindLineEndings(properties, diagnostics, options.Layout) };
+		if (TryBool(properties, "insert_final_newline", null, out _))
+			options = options with { FinalNewLineSet = true };
 
 		if (TryBool(properties, "csharp_new_line_before_else", diagnostics, out var newLineBeforeElse))
 			options = options with { NewLineBeforeElse = newLineBeforeElse };

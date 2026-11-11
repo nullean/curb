@@ -82,11 +82,22 @@ public readonly record struct LayoutOptions
 	/// <summary><c>end_of_line</c>.</summary>
 	public EndOfLine EndOfLine { get; init; } = EndOfLine.Auto;
 
-	/// <summary><c>insert_final_newline</c>.</summary>
+	/// <summary>
+	/// <c>insert_final_newline</c>. A language that leaves an unset key to the file resolves it with
+	/// <see cref="WithFinalNewLineOf"/>; this is the value it takes once set.
+	/// </summary>
 	public bool InsertFinalNewLine { get; init; } = true;
 
 	/// <summary><c>trim_trailing_whitespace</c>.</summary>
 	public bool TrimTrailingWhitespace { get; init; } = true;
+
+	/// <summary>
+	/// The settings with an unset <c>insert_final_newline</c> taken from <paramref name="source"/>: unless
+	/// <paramref name="finalNewLineSet"/>, the file ends with a newline only if it already did, which is what
+	/// <c>dotnet format</c> does with the key unset (issue #262).
+	/// </summary>
+	public LayoutOptions WithFinalNewLineOf(ReadOnlySpan<char> source, bool finalNewLineSet) =>
+		finalNewLineSet ? this : this with { InsertFinalNewLine = source.Length > 0 && source[^1] is '\n' or '\r' };
 
 	/// <summary>
 	/// Resolves <see cref="EndOfLine.Auto"/> to <see cref="System.Environment.NewLine"/> — the same

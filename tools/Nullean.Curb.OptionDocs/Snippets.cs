@@ -1837,15 +1837,15 @@ public static class Snippets
             "the mark it arrived with. The other EditorConfig values (`latin1`, `utf-16be`, `utf-16le`) are reported " +
             "as unrecognised, since re-encoding a file is not a formatting change.",
         ["end_of_line"] =
-            "`lf` and `crlf` write every line ending in the file that way. `auto` writes the platform's own " +
-            "(`Environment.NewLine`), and is what Curb does with the key unset. A code block can't show the difference. " +
-            "With the key unset, `dotnet format` keeps a file's own line endings, so the two disagree on a CRLF file " +
-            "on macOS or Linux ([#261](https://github.com/nullean/curb/issues/261)).",
+            "`lf` and `crlf` write every line ending in the file that way. `auto`, which is also what an unset key " +
+            "means, writes the platform's own (`Environment.NewLine`). A code block can't show the difference. With " +
+            "the key unset, `dotnet format` writes the platform's ending wherever it rewrites a line break, around a " +
+            "file header of two or more lines for one, and keeps each other line's own, so on macOS or Linux it leaves " +
+            "a CRLF file with some lines in LF. It leaves Curb's output, all in the platform's ending, alone.",
         ["insert_final_newline"] =
             "`true` ends the file with a newline, adding one if it's missing. `false` removes the newline after the " +
-            "last line. A code block can't show the difference. With the key unset Curb behaves as `true`, while " +
-            "`dotnet format` leaves the end of the file as it is " +
-            "([#262](https://github.com/nullean/curb/issues/262)).",
+            "last line. With the key unset, the file keeps whether it ends with a newline, as it does in " +
+            "`dotnet format`. A code block can't show the difference.",
     };
 
     /// <summary>

@@ -25,5 +25,5 @@ No known case where Curb's output is not a fixed point of `dotnet format` — se
 
 ## Effect
 
-`lf` and `crlf` write every line ending in the file that way. `auto` writes the platform's own (`Environment.NewLine`), and is what Curb does with the key unset. A code block can't show the difference. With the key unset, `dotnet format` keeps a file's own line endings, so the two disagree on a CRLF file on macOS or Linux ([#261](https://github.com/nullean/curb/issues/261)).
+`lf` and `crlf` write every line ending in the file that way. `auto`, which is also what an unset key means, writes the platform's own (`Environment.NewLine`). A code block can't show the difference. With the key unset, `dotnet format` writes the platform's ending wherever it rewrites a line break, around a file header of two or more lines for one, and keeps each other line's own, so on macOS or Linux it leaves a CRLF file with some lines in LF. It leaves Curb's output, all in the platform's ending, alone.
 
