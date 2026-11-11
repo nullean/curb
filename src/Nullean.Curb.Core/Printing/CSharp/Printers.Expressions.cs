@@ -775,21 +775,29 @@ internal static partial class Printers
 		// here left a blank line above it (issue #195).
 		// A brace on a line of its own sits at the indent of the line the creation starts on, and so does
 		// what it holds: below `select new Customer` in a query that is the `select` line (issue #213).
+		//
+		// That includes a brace the printer moves there itself, because the initializer or the owner's
+		// argument list broke on this run. Deterministic layout never reads the source's answers, so it
+		// only ever takes that path, and it put `select new Row` / `{` at the statement's indent, where
+		// dotnet format moved it back under the `select` (issue #241).
 		var braceBelowOwner = leadingLine
 			&& elementBrace < 0
 			&& BraceOnOwnLine(BraceStyle.ObjectCollectionArrayInitializers, context)
 			&& (ownerBrokeAlone
+				|| !exactly
 				|| (!(exactly && ownerSpansLines)
 					&& (openItOut
 						|| ownerSpansLines
 						|| (asWritten && context.AuthorBroke(node.SpanStart, node.Parent!.SpanStart)))));
 		var ownerLine = braceBelowOwner ? OwnerLineAnchor(node.Parent!.GetFirstToken(), context) : -1;
-		var ownerScope = ownerLine >= 0 ? arena.AlignedIndent(ownerLine, 0) : default;
 
-		if (ownerBrokeAlone)
-			BeforeOpenBrace(BraceStyle.ObjectCollectionArrayInitializers, context);
-		else if (leadingLine && !openItOut && elementBrace < 0 && !ownerSpansLines)
-			BeforeOpenBraceWhenOwnerBroke(BraceStyle.ObjectCollectionArrayInitializers, ownerGroup, context);
+		using (ownerLine >= 0 ? arena.AlignedIndent(ownerLine, 0) : default)
+		{
+			if (ownerBrokeAlone)
+				BeforeOpenBrace(BraceStyle.ObjectCollectionArrayInitializers, context);
+			else if (leadingLine && !openItOut && elementBrace < 0 && !ownerSpansLines)
+				BeforeOpenBraceWhenOwnerBroke(BraceStyle.ObjectCollectionArrayInitializers, ownerGroup, context);
+		}
 
 		// Named and published so an enclosing construct can aim at it — see PrintContext.OwnBlockGroup.
 		var group = arena.NextGroupId();
@@ -801,8 +809,12 @@ internal static partial class Printers
 		if (elementBrace >= 0)
 			aligned = arena.AlignedIndent(elementBrace, ContinuationLine(node.OpenBraceToken, elementBrace, context));
 
+		// The aligned scope sits inside the group rather than around it: a group measures what trails it
+		// only as far as the scope enclosing it ends, so wrapped around the group it hid the `; // note`
+		// after the brace, and an initializer that fitted only without it was joined.
 		using (aligned)
 		using (arena.Group(group))
+		using (ownerLine >= 0 ? arena.AlignedIndent(ownerLine, 0) : default)
 		{
 			// An element's brace is already on its line, above, and so is one whose owner alone broke.
 			if (leadingLine && elementBrace < 0 && !ownerBrokeAlone)
@@ -926,7 +938,6 @@ internal static partial class Printers
 			TokenPrinter.PrintWithoutLeadingTrivia(node.CloseBraceToken, context);
 		}
 
-		ownerScope.Dispose();
 		if (ownerLine >= 0)
 			context.ExitContinuation();
 		if (anchor >= 0)
@@ -1506,18 +1517,24 @@ internal static partial class Printers
 		TokenPrinter.Print(node.NewKeyword, context);
 
 		// A brace on a line of its own sits at the indent of the line `new` is on, and so does what it
-		// holds: below `select new` in a query that is the `select` line (issue #213).
-		var braceBelowNew = BraceOnOwnLine(BraceStyle.AnonymousTypes, context)
-			&& (braceLineOnly || openItOut || (asWritten && context.AuthorBroke(node.NewKeyword.Span.End, node.OpenBraceToken.SpanStart)));
+		// holds: below `select new` in a query that is the `select` line (issue #213). That includes a brace
+		// the group below moves there when the members do not fit, the only way deterministic layout ever
+		// moves it (issue #241).
+		var braceBelowNew = BraceOnOwnLine(BraceStyle.AnonymousTypes, context);
 		var newLine = braceBelowNew ? OwnerLineAnchor(node.NewKeyword, context) : -1;
-		var newScope = newLine >= 0 ? arena.AlignedIndent(newLine, 0) : default;
 
 		// Outside the group, for the same reason as an initializer's: the break the author made is not
 		// one of the members'.
 		if (braceLineOnly)
-			BeforeOpenBrace(BraceStyle.AnonymousTypes, context);
+		{
+			using (newLine >= 0 ? arena.AlignedIndent(newLine, 0) : default)
+				BeforeOpenBrace(BraceStyle.AnonymousTypes, context);
+		}
 
+		// Aligned inside the group, not around it, so that the group measures what trails it: see the
+		// initializer's.
 		using (arena.Group())
+		using (newLine >= 0 ? arena.AlignedIndent(newLine, 0) : default)
 		{
 			if (openItOut || (asWritten && context.AuthorBroke(node.NewKeyword.Span.End, node.OpenBraceToken.SpanStart)))
 				BeforeOpenBrace(BraceStyle.AnonymousTypes, context);
@@ -1564,7 +1581,6 @@ internal static partial class Printers
 			TokenPrinter.Print(node.CloseBraceToken, context);
 		}
 
-		newScope.Dispose();
 		if (newLine >= 0)
 			context.ExitContinuation();
 

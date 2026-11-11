@@ -604,6 +604,104 @@ public class InitializerTests : FormattingTest
 		}
 		""");
 
+	// Issue #241: the same rule when it is the width, not the source, that puts the brace on its own line.
+	// Deterministic layout never reads where the author put the brace, so the brace went to the statement's
+	// indent and dotnet format moved it back under the `select`.
+	[Test]
+	public Task Issue_241_an_initializer_below_select_new_stays_under_the_select_at_a_width() => Unchanged(
+		"""
+		public class C
+		{
+		    public List<Row> M(IEnumerable<KeyValuePair<int, string>> items, int minimum)
+		    {
+		        var rows = (from item in items
+		                    where item.Key > minimum
+		                    select new Row
+		                    {
+		                        Id = item.Key,
+		                        FirstDescriptiveName = item.Value,
+		                        SecondDescriptiveName = item.Value,
+		                        ThirdDescriptiveName = item.Value,
+		                    }).ToList();
+		        return rows;
+		    }
+		}
+		""",
+		editorConfig: "max_line_length = 120");
+
+	// The width opens these out wherever the author put the brace: an object initializer and an anonymous
+	// type below `select new`, with `let` and `orderby` ahead of the `select` too.
+	[Test]
+	public Task Issue_241_a_brace_the_width_opens_out_sits_under_the_select() => Formats(
+		"""
+		public class C
+		{
+		    public void M(IEnumerable<KeyValuePair<int, string>> items, int minimum)
+		    {
+		        var rows = (from item in items where item.Key > minimum select new Row { Id = item.Key, FirstDescriptiveName = item.Value, SecondDescriptiveName = item.Value }).ToList();
+		        var anon = (from item in items where item.Key > minimum select new { Id = item.Key, FirstDescriptiveName = item.Value, SecondDescriptiveName = item.Value, Third = 3 }).ToList();
+		        var lets = from item in items let name = item.Value orderby item.Key descending select new Row { Id = item.Key, FirstDescriptiveName = name, SecondDescriptiveName = name, Third = name };
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M(IEnumerable<KeyValuePair<int, string>> items, int minimum)
+		    {
+		        var rows = (from item in items
+		                    where item.Key > minimum
+		                    select new Row
+		                    {
+		                        Id = item.Key,
+		                        FirstDescriptiveName = item.Value,
+		                        SecondDescriptiveName = item.Value
+		                    }).ToList();
+		        var anon = (from item in items
+		                    where item.Key > minimum
+		                    select new
+		                    {
+		                        Id = item.Key,
+		                        FirstDescriptiveName = item.Value,
+		                        SecondDescriptiveName = item.Value,
+		                        Third = 3
+		                    }).ToList();
+		        var lets = from item in items
+		                   let name = item.Value
+		                   orderby item.Key descending
+		                   select new Row
+		                   {
+		                       Id = item.Key,
+		                       FirstDescriptiveName = name,
+		                       SecondDescriptiveName = name,
+		                       Third = name
+		                   };
+		    }
+		}
+		""",
+		editorConfig: "max_line_length = 120");
+
+	// The anchor's scope must not hide what trails the initializer from the width: joined, this line runs
+	// to 143 columns once its trailing comment is counted.
+	[Test]
+	public Task Issue_241_an_initializer_measures_the_comment_after_it() => Unchanged(
+		"""
+		class C
+		{
+		    object M()
+		    {
+		        var lines = new List<OrderLine>
+		        {
+		            new OrderLine("A-248", 1, 9.99m),
+		            new OrderLine("B-895", 2, 19.5m),
+		            new("C-22", 3, 0.25m),
+		        }; // fast path
+		        return lines;
+		    }
+		}
+		""",
+		editorConfig: "max_line_length = 140");
+
 	// ---- tuples -------------------------------------------------------------------------------
 
 	[Test]
