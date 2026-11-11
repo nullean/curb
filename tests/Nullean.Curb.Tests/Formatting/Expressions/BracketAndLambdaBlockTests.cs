@@ -859,4 +859,234 @@ public class BracketAndLambdaBlockTests : FormattingTest
 		"public class C\n{\n\tpublic void M()\n\t{\n\t\tAction a = () =>\n\t\t\t{\n\t\t\t\tRun();\n\t\t\t};\n\t\tAction b = () =>\n\t\t  {\n\t\t      Run();\n\t\t  };\n\t}\n}",
 		"public class C\n{\n\tpublic void M()\n\t{\n\t\tAction a = () =>\n\t\t\t{\n\t\t\t\tRun();\n\t\t\t};\n\t\tAction b = () =>\n\t\t  {\n\t\t\t  Run();\n\t\t  };\n\t}\n}",
 		editorConfig: "indent_style = tab");
+
+	// ---- a comment between the arrow and the block ----------------------------------------------------
+
+	[Test]
+	public Task A_comment_above_a_lambda_block_goes_to_the_statement_indent() => Formats(
+		// dotnet format writes the comment at the statement's indent and leaves the brace where it was. The
+		// block was printed on the comment's line, so a `//` comment swallowed its brace and the file was
+		// refused (issue #273).
+		"""
+		using System;
+
+		public class C
+		{
+		    public void M()
+		    {
+		        Action f = () =>
+		            // why
+		            { };
+		        Action g = () =>
+		            /* why */
+		            { };
+		        Action h = delegate
+		            // why
+		            {
+		                M();
+		            };
+		        Use(x =>
+		            // why
+		            { });
+		    }
+
+		    private void Use(Action<int> a) { }
+		}
+		""",
+		"""
+		using System;
+
+		public class C
+		{
+		    public void M()
+		    {
+		        Action f = () =>
+		        // why
+		            { };
+		        Action g = () =>
+		        /* why */
+		            { };
+		        Action h = delegate
+		        // why
+		            {
+		                M();
+		            };
+		        Use(x =>
+		        // why
+		            { });
+		    }
+
+		    private void Use(Action<int> a) { }
+		}
+		""");
+
+	[Test]
+	public Task A_comment_above_a_lambda_block_goes_to_the_statement_indent_with_a_width() => Formats(
+		"""
+		using System;
+
+		public class C
+		{
+		    public void M()
+		    {
+		        Action f = () =>
+		            // why
+		            { };
+		        Action g = () =>
+		            /* why */
+		            { };
+		        Action h = delegate
+		            // why
+		            {
+		                M();
+		            };
+		        Use(x =>
+		            // why
+		            { });
+		    }
+
+		    private void Use(Action<int> a) { }
+		}
+		""",
+		"""
+		using System;
+
+		public class C
+		{
+		    public void M()
+		    {
+		        Action f = () =>
+		        // why
+		        { };
+		        Action g = () =>
+		        /* why */
+		        { };
+		        Action h = delegate
+		        // why
+		        {
+		            M();
+		        };
+		        Use(x =>
+		        // why
+		        { });
+		    }
+
+		    private void Use(Action<int> a)
+		    { }
+		}
+		""",
+		editorConfig: "max_line_length = 120");
+
+	[Test]
+	public Task A_comment_above_a_lambda_block_ends_its_line_when_the_brace_has_none() => Formats(
+		// The brace has no line of its own to end the comment's, so the comment's break is the brace's.
+		"""
+		using System;
+
+		public class C
+		{
+		    public void M()
+		    {
+		        Action f = () =>
+		            // why
+		            { };
+		        Action g = () =>
+		            /* why */
+		            { };
+		        Action h = delegate
+		            // why
+		            {
+		                M();
+		            };
+		        Use(x =>
+		            // why
+		            { });
+		    }
+
+		    private void Use(Action<int> a) { }
+		}
+		""",
+		"""
+		using System;
+
+		public class C {
+		    public void M() {
+		        Action f = () =>
+		        // why
+		        { };
+		        Action g = () =>
+		        /* why */
+		        { };
+		        Action h = delegate
+		        // why
+		        {
+		            M();
+		        };
+		        Use(x =>
+		        // why
+		        { });
+		    }
+
+		    private void Use(Action<int> a) { }
+		}
+		""",
+		editorConfig: "csharp_new_line_before_open_brace = none");
+
+	[Test]
+	public Task A_comment_above_an_empty_lambda_block_keeps_it_off_the_comment_line_when_empty_blocks_join() => Formats(
+		// together_same_line joins an empty pair to the arrow's line, with a space. After a comment that space
+		// went onto the comment's line, and a `//` comment swallowed the brace.
+		"""
+		using System;
+
+		public class C
+		{
+		    public void M()
+		    {
+		        Action f = () =>
+		            // why
+		            { };
+		        Action g = () =>
+		            /* why */
+		            { };
+		        Action h = delegate
+		            // why
+		            {
+		                M();
+		            };
+		        Use(x =>
+		            // why
+		            { });
+		    }
+
+		    private void Use(Action<int> a) { }
+		}
+		""",
+		"""
+		using System;
+
+		public class C
+		{
+		    public void M()
+		    {
+		        Action f = () =>
+		        // why
+		        { };
+		        Action g = () =>
+		        /* why */
+		        { };
+		        Action h = delegate
+		        // why
+		            {
+		                M();
+		            };
+		        Use(x =>
+		        // why
+		        { });
+		    }
+
+		    private void Use(Action<int> a) { }
+		}
+		""",
+		editorConfig: "csharp_empty_block_style = together_same_line");
 }
