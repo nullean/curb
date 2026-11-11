@@ -1332,4 +1332,90 @@ public class AuthorBreakTests : FormattingTest
 		}
 		""",
 		editorConfig: "max_line_length = 120");
+
+	// ---- a one-line lambda block after a broken parameter list ----------------------------------------
+
+	[Test]
+	public Task A_one_line_lambda_block_goes_below_a_parameter_list_the_author_broke() => Formats(
+		// dotnet format moves the block off the arrow's line, to the statement's indent, as it moves a one-line
+		// body below a `where` clause. An expression body stays (issue #274).
+		"""
+		using System;
+
+		public class C
+		{
+		    public void M()
+		    {
+		        Action<int, int> a = (int x,
+		            int y) => { };
+		        Action<int, int> b = (int x,
+		            int y) => { M(); };
+		        Action<int, int> c = (x,
+		            y) => { };
+		        Func<int, int, int> d = (int x,
+		            int y) => x;
+		        Use((int x,
+		            int y) => { });
+		        Action<int, int> e = async (int x,
+		            int y) => { };
+		    }
+
+		    private void Use(Action<int, int> a) { }
+		}
+		""",
+		"""
+		using System;
+
+		public class C
+		{
+		    public void M()
+		    {
+		        Action<int, int> a = (int x,
+		            int y) =>
+		        { };
+		        Action<int, int> b = (int x,
+		            int y) =>
+		        { M(); };
+		        Action<int, int> c = (x,
+		            y) =>
+		        { };
+		        Func<int, int, int> d = (int x,
+		            int y) => x;
+		        Use((int x,
+		            int y) =>
+		        { });
+		        Action<int, int> e = async (int x,
+		            int y) =>
+		        { };
+		    }
+
+		    private void Use(Action<int, int> a) { }
+		}
+		""");
+
+	[Test]
+	public Task A_one_line_lambda_block_stays_on_the_arrow_line_when_lambda_braces_do_not_take_one() => Unchanged(
+		"""
+		using System;
+
+		public class C {
+		    public void M() {
+		        Action<int, int> a = (int x,
+		            int y) => { };
+		        Action<int, int> b = (int x,
+		            int y) => { M(); };
+		        Action<int, int> c = (x,
+		            y) => { };
+		        Func<int, int, int> d = (int x,
+		            int y) => x;
+		        Use((int x,
+		            int y) => { });
+		        Action<int, int> e = async (int x,
+		            int y) => { };
+		    }
+
+		    private void Use(Action<int, int> a) { }
+		}
+		""",
+		editorConfig: "csharp_new_line_before_open_brace = none");
 }

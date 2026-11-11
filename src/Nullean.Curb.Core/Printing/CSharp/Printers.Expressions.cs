@@ -1481,15 +1481,20 @@ internal static partial class Printers
 		var group = context.Arena.NextGroupId();
 		using (context.Arena.Group(group))
 		{
+			// dotnet format moves a one-line block below the arrow of a lambda whose parameter list the
+			// author broke, as it moves a one-line body below a `where` clause (issue #274).
+			var belowParameters = block.Parent is ParenthesizedLambdaExpressionSyntax lambda
+				&& context.AuthorBroke(lambda.ParameterList.SpanStart, lambda.ArrowToken.SpanStart);
+
 			var column = OwnLineBraceColumn(block, construct, context);
 			if (column < 0)
-				PrintBody(block, construct, context);
+				PrintBody(block, construct, context, belowClause: belowParameters);
 			else
 			{
 				var register = context.EnterContinuation();
 				context.Arena.LineShiftAnchor(register);
 				using (context.Arena.AlignedIndent(register, column))
-					PrintBody(block, construct, context);
+					PrintBody(block, construct, context, belowClause: belowParameters);
 				context.ExitContinuation();
 			}
 		}
