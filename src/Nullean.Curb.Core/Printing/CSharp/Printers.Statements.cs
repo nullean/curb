@@ -939,10 +939,49 @@ internal static partial class Printers
 			}
 		}
 
-		using (arena.IndentIf(context.Options.IndentBraces))
-			arena.HardLine();
+		// A comment above the closing brace goes where the last section's statements are, as dotnet format
+		// puts it, and with no section where a label would be. Curb printed it with the brace, left of the
+		// labels, and dotnet format moved it back in (issue #230). The blank line above it is kept, as a
+		// block keeps its own.
+		if (TokenPrinter.HasLeadingContent(node.CloseBraceToken))
+		{
+			using (arena.Indent(SwitchClosingCommentIndent(node, context)))
+			{
+				if (!NextStartsWithRegionBoundary(node.CloseBraceToken))
+				{
+					arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
+					if (context.BlankLinesBetween(previousSectionEnd, EffectiveTriviaStart(node.CloseBraceToken)) > 0)
+						arena.HardLine();
+				}
 
-		TokenPrinter.Print(node.CloseBraceToken, context);
+				TokenPrinter.PrintLeadingTrivia(node.CloseBraceToken, context, trailingBreak: false);
+			}
+		}
+
+		using (arena.IndentIf(context.Options.IndentBraces))
+			arena.HardLine(DocFlags.Reindent);
+
+		TokenPrinter.PrintWithoutLeadingTrivia(node.CloseBraceToken, context);
+	}
+
+	/// <summary>The levels in from a switch's braces that a comment above its closing brace sits.</summary>
+	/// <remarks>
+	/// The indent of the last section's statements: <c>csharp_indent_case_contents_when_block</c> when the
+	/// last statement is a block, <c>csharp_indent_case_contents</c> otherwise, including for a section with
+	/// no statements. With no sections, the labels' indent, and so for an <c>#endregion</c>, which dotnet format
+	/// lines up with the labels it closes over.
+	/// </remarks>
+	private static int SwitchClosingCommentIndent(SwitchStatementSyntax node, PrintContext context)
+	{
+		var levels = context.Options.IndentSwitchLabels ? 1 : 0;
+		if (node.Sections.Count == 0 || NextStartsWithRegionBoundary(node.CloseBraceToken))
+			return levels;
+
+		var statements = node.Sections[^1].Statements;
+		var indented = statements.Count > 0 && statements[^1] is BlockSyntax
+			? context.Options.IndentCaseContentsWhenBlock
+			: context.Options.IndentCaseContents;
+		return indented ? levels + 1 : levels;
 	}
 
 	public static void ThrowStatement(ThrowStatementSyntax node, PrintContext context)
