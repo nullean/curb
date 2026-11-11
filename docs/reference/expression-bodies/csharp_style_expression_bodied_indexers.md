@@ -23,7 +23,126 @@ Convert eligible block-bodied indexers. IDE0026.
 
 No known case where Curb's output is not a fixed point of `dotnet format` — see [conformance](../../design-principles/conformance.md).
 
-## Effect
+### `csharp_style_expression_bodied_indexers = false`
 
-Curb accepts this key but doesn't convert indexers yet, so it has no example ([#260](https://github.com/nullean/curb/issues/260)). A get-only property converts under `csharp_style_expression_bodied_properties`.
+```ini
+csharp_style_expression_bodied_indexers = false
+```
+
+::::{tab-set}
+
+:::{tab-item} Before
+```csharp
+namespace N;
+
+public class Widget
+{
+    private int[] _data = new int[10];
+
+    public int this[int index]
+    {
+        get { return _data[index]; }
+    }
+}
+```
+:::
+
+:::{tab-item} After
+```csharp
+namespace N;
+
+public class Widget
+{
+    private int[] _data = new int[10];
+
+    public int this[int index]
+    {
+        get { return _data[index]; }
+    }
+}
+```
+:::
+
+::::
+
+### `csharp_style_expression_bodied_indexers = true`
+
+```ini
+csharp_style_expression_bodied_indexers = true
+```
+
+::::{tab-set}
+
+:::{tab-item} Before
+```csharp
+namespace N;
+
+public class Widget
+{
+    private int[] _data = new int[10];
+
+    public int this[int index]
+    {
+        get { return _data[index]; }
+    }
+}
+```
+:::
+
+:::{tab-item} After
+```csharp
+namespace N;
+
+public class Widget
+{
+    private int[] _data = new int[10];
+
+    public int this[int index] => _data[index];
+}
+```
+:::
+
+::::
+
+### `csharp_style_expression_bodied_indexers = when_on_single_line`
+
+```ini
+csharp_style_expression_bodied_indexers = when_on_single_line
+```
+
+::::{tab-set}
+
+:::{tab-item} Before
+```csharp
+namespace N;
+
+public class Widget
+{
+    private int[] _data = new int[10];
+
+    public int this[int index]
+    {
+        get { return _data[index]; }
+    }
+}
+```
+:::
+
+:::{tab-item} After
+```csharp
+namespace N;
+
+public class Widget
+{
+    private int[] _data = new int[10];
+
+    public int this[int index]
+    {
+        get { return _data[index]; }
+    }
+}
+```
+:::
+
+::::
 
