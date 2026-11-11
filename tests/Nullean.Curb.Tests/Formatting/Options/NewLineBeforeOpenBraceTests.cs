@@ -595,6 +595,73 @@ public class NewLineBeforeOpenBraceTests : FormattingTest
 		""",
 		editorConfig: "csharp_new_line_before_open_brace = types,methods,control_blocks");
 
+	// Issue #271: a one-line body after a parameter list that spans lines goes on a line of its own, as dotnet
+	// format puts it, and stays on one line there. With the list on one line it stays beside the `)`.
+	[Test]
+	public Task A_one_line_anonymous_method_body_moves_below_a_wrapped_parameter_list() => Formats(
+		"""
+		using System;
+
+		public class C
+		{
+		    public void M()
+		    {
+		        Action<int, int> a = delegate (int x,
+		                                       int y) { };
+		        Action<int, int> b = delegate (int x,
+		                                       int y) { Console.WriteLine(x); };
+		        Action<int, int> c = delegate (
+		            int x, int y) { };
+		        Run(delegate (int x,
+		                      int y) { });
+		        Action<int, int> d = delegate (int x, int y) { };
+		    }
+
+		    void Run(Action<int, int> a) { }
+		}
+		""",
+		"""
+		using System;
+
+		public class C
+		{
+		    public void M()
+		    {
+		        Action<int, int> a = delegate (int x,
+		                                       int y)
+		        { };
+		        Action<int, int> b = delegate (int x,
+		                                       int y)
+		        { Console.WriteLine(x); };
+		        Action<int, int> c = delegate (
+		            int x, int y)
+		        { };
+		        Run(delegate (int x,
+		                      int y)
+		        { });
+		        Action<int, int> d = delegate (int x, int y) { };
+		    }
+
+		    void Run(Action<int, int> a) { }
+		}
+		""");
+
+	[Test]
+	public Task Anonymous_methods_excluded_keep_a_one_line_body_after_a_wrapped_parameter_list() => Unchanged(
+		"""
+		using System;
+
+		public class C
+		{
+		    public void M()
+		    {
+		        Action<int, int> a = delegate (int x,
+		                                       int y) { };
+		    }
+		}
+		""",
+		editorConfig: "csharp_new_line_before_open_brace = types,methods,control_blocks");
+
 	// ---- accessors and properties ----------------------------------------------------------------
 	//
 	// These brace on a soft break, so max_line_length is what makes the option observable.

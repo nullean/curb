@@ -1486,9 +1486,15 @@ internal static partial class Printers
 		using (context.Arena.Group(group))
 		{
 			// dotnet format moves a one-line block below the arrow of a lambda whose parameter list the
-			// author broke, as it moves a one-line body below a `where` clause (issue #274).
-			var belowParameters = block.Parent is ParenthesizedLambdaExpressionSyntax lambda
-				&& context.AuthorBroke(lambda.ParameterList.SpanStart, lambda.ArrowToken.SpanStart);
+			// author broke, as it moves a one-line body below a `where` clause (issue #274). An anonymous
+			// method's goes below its `)` the same way, and stays beside a `)` on the `delegate` line (#271).
+			var belowParameters = block.Parent switch
+			{
+				ParenthesizedLambdaExpressionSyntax lambda =>
+					context.AuthorBroke(lambda.ParameterList.SpanStart, lambda.ArrowToken.SpanStart),
+				AnonymousMethodExpressionSyntax { ParameterList: { } parameters } => SpansLines(parameters, context),
+				_ => false,
+			};
 
 			var column = OwnLineBraceColumn(block, construct, context);
 			if (column < 0)
