@@ -1374,10 +1374,15 @@ internal static partial class Printers
 			if (i == arguments.Count - 1)
 				break;
 
-			Spacing.BeforeComma(context);
-			TokenPrinter.Print(arguments.GetSeparator(i), context);
+			// A comma first on its line stays there, as in an ordinary list (issue #269).
+			var separator = arguments.GetSeparator(i);
+			if (register >= 0 && context.AuthorBroke(arguments[i].Span.End, separator.SpanStart))
+				offset = ContinuationLine(separator, register, context);
+			else
+				Spacing.BeforeComma(context);
+			TokenPrinter.Print(separator, context);
 
-			if (register >= 0 && context.AuthorBroke(arguments[i].Span.End, arguments[i + 1].SpanStart))
+			if (register >= 0 && context.AuthorBroke(separator.Span.End, arguments[i + 1].SpanStart))
 				offset = ContinuationLine(arguments[i + 1].GetFirstToken(), register, context);
 			else
 				Spacing.AfterComma(context);
@@ -2690,8 +2695,20 @@ internal static partial class Printers
 			if (i >= list.SeparatorCount)
 				continue;
 
-			Spacing.BeforeComma(context);
-			TokenPrinter.Print(list.GetSeparator(i), context);
+			// A comma the author put first on its line stays there, at the column they gave it: dotnet
+			// format leaves it, and moving it to the end of the line above rewrote a comma-first list
+			// (issue #269). Every element after it measures from the comma's line.
+			// A list with no register, an attribute's, still moves the comma: there is no column to keep it at.
+			var separator = list.GetSeparator(i);
+			var commaFirst = asWritten && lineShift >= 0 && context.AuthorBroke(span.End, separator.SpanStart);
+			if (commaFirst)
+			{
+				BreakBeforeFirstToken(span.End, separator, context);
+				offset = ContinuationLine(separator, lineShift, context);
+			}
+			else
+				Spacing.BeforeComma(context);
+			TokenPrinter.Print(separator, context);
 
 			if (!asWritten)
 			{
@@ -2700,10 +2717,11 @@ internal static partial class Printers
 			}
 
 			var next = list[i + 1];
-			if (context.AuthorJoined(span.End, next.SpanStart))
+			var commaEnd = commaFirst ? separator.Span.End : span.End;
+			if (context.AuthorJoined(commaEnd, next.SpanStart))
 				Spacing.AfterComma(context);
 			else if (lineShift >= 0)
-				offset = MemberContinuationLine(span.End, next, lineShift, context, element: false);
+				offset = MemberContinuationLine(commaEnd, next, lineShift, context, element: false);
 			else
 				BreakBetweenMembers(span.End, next, context);
 		}
