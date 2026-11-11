@@ -162,6 +162,164 @@ public class AuthorBreakTests : FormattingTest
 		""");
 
 	[Test]
+	public Task A_flat_ternary_chain_stays_flat() => Unchanged(
+		// The `else if` style of chain: dotnet format leaves the last `:` under the others, where one
+		// level in from the inner ternary made a staircase of it — issue #237.
+		"""
+		public class C
+		{
+		    public string M(int x)
+		    {
+		        return x == 0
+		            ? "zero"
+		            : x == 1 ? "one"
+		            : "many";
+		    }
+
+		    public string N(int x) => x == 0
+		        ? "zero"
+		        : x == 1
+		        ? "one"
+		        : "many";
+		}
+		""");
+
+	[Test]
+	public Task A_ternary_keeps_the_indent_the_author_gave_its_continuation_lines() => Unchanged(
+		// Past a broken condition, under an argument, behind `??`: dotnet format leaves each where it
+		// was, and the ambient indent plus one level pulled them back — issue #237.
+		"""
+		public class C
+		{
+		    public string N(bool a, bool b, string s)
+		    {
+		        var v = a
+		                && b
+		                    ? "x"
+		                    : "y";
+		        Call(a
+		                ? "a"
+		              : "b", 1);
+		        var w = s
+		            ?? (a
+		                    ? "a"
+		                    : "b");
+		        var z = a ?
+		                    "a" :
+		                        "b";
+		        return v;
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_ternary_branch_keeps_its_own_lines_in_from_its_continuation_line() => Unchanged(
+		// A branch's own lines move with the `?` or `:` line it starts on: an initializer's braces, a
+		// lambda's block, a call's arguments, a member chain's links and a switch expression's braces,
+		// rather than falling back to the ambient indent. The `:` after the block still goes to the
+		// statement's indent, where dotnet format puts it — issue #106.
+		"""
+		public class E
+		{
+		    public object A(bool a, bool b)
+		    {
+		        var v = a
+		                && b
+		                    ? new E
+		                    {
+		                        X = 1,
+		                    }
+		                    : null;
+		        Func<int, int> f = a
+		                ? y =>
+		                {
+		                    return y;
+		                }
+		        : y => y;
+		        var w = a
+		                    ? Call(
+		                        1,
+		                        2)
+		                    : null;
+		        var c = a
+		                    ? items
+		                        .Where(x => x)
+		                        .Select(x => x)
+		                    : x switch
+		                    {
+		                        1 => 2,
+		                        _ => 3,
+		                    };
+		        return v;
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_reindented_ternary_takes_its_continuation_lines_along() => Formats(
+		"""
+		public class C
+		{
+		    public string M(int x)
+		    {
+		          return x == 0
+		              ? "zero"
+		              : x == 1 ? "one"
+		              : "many";
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public string M(int x)
+		    {
+		        return x == 0
+		            ? "zero"
+		            : x == 1 ? "one"
+		            : "many";
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_flat_ternary_chain_is_laid_out_by_width_when_one_is_set() => WithAndWithout(
+		"""
+		public class C
+		{
+		    public string M(int x)
+		    {
+		        return x == 0
+		            ? "zero"
+		            : x == 1 ? "one"
+		            : "many";
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public string M(int x)
+		    {
+		        return x == 0
+		            ? "zero"
+		            : x == 1 ? "one"
+		            : "many";
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public string M(int x)
+		    {
+		        return x == 0 ? "zero" : x == 1 ? "one" : "many";
+		    }
+		}
+		""",
+		"max_line_length = 80");
+
+	[Test]
 	public Task A_joined_ternary_stays_joined() => Unchanged(
 		"""
 		public class C

@@ -295,12 +295,17 @@ internal static partial class Printers
 		else
 			alreadyIndented = StartsOnConditionLine(node, context);
 
-		Node.Print(node.Condition, context);
-
 		// A ternary the author broke keeps exactly their breaks, before or after either operator. The
 		// group below cannot: with no width it never breaks, so it joined them all — issue #102. And
 		// once one break is hard, every Line in the group breaks with it, so the joined positions
 		// need a plain space rather than a Line.
+		//
+		// Each continuation line keeps the offset the author gave it from the line the ternary starts
+		// on, as a broken binary chain's do: dotnet format leaves a flat `: x == 1 ? "one"` chain flat
+		// and a `?` indented past a broken condition where it was, and one level in from the ambient
+		// indent made a staircase of the first and pulled back the second — issue #237. Where Curb
+		// moved the start line itself there is nothing to measure from, and the break falls back to
+		// that indent.
 		//
 		// One that spans lines only inside a branch, such as a block-bodied lambda, keeps its operators
 		// inline and takes no indent: the block anchors to its line, as dotnet format leaves it.
@@ -318,19 +323,27 @@ internal static partial class Printers
 				|| context.AuthorBroke(node.ColonToken.Span.End, node.WhenFalse.SpanStart);
 			var indented = broken && !alreadyIndented;
 
+			// Captured before the condition prints, on the line the ternary starts on; the pattern
+			// continuation's helper, so a ternary in a case label measures from the switch as well.
+			var anchor = EnterPatternContinuation(broken, context);
+
+			Node.Print(node.Condition, context);
+
 			using (arena.IndentIf(indented))
 			{
-				AuthorTernaryBreak(node.Condition.Span.End, node.QuestionToken.SpanStart, spaced, context);
+				// The offset of the continuation line the output is on, or -1 while it is still the
+				// start line. A branch's own lines sit as far in from it as they would from the indent.
+				var offset = AuthorTernaryBreak(node.Condition.Span.End, node.QuestionToken, spaced, anchor, -1, context);
 				TokenPrinter.Print(node.QuestionToken, context);
-				AuthorTernaryBreak(node.QuestionToken.Span.End, node.WhenTrue.SpanStart, spaced, context);
-				Node.Print(node.WhenTrue, context);
+				offset = AuthorTernaryBreak(node.QuestionToken.Span.End, node.WhenTrue.GetFirstToken(), spaced, anchor, offset, context);
+				PrintTernaryBranch(node.WhenTrue, anchor, offset, context);
 
 				if (!colonAfterBlock)
 				{
-					AuthorTernaryBreak(node.WhenTrue.Span.End, node.ColonToken.SpanStart, spaced, context);
+					offset = AuthorTernaryBreak(node.WhenTrue.Span.End, node.ColonToken, spaced, anchor, offset, context);
 					TokenPrinter.Print(node.ColonToken, context);
-					AuthorTernaryBreak(node.ColonToken.Span.End, node.WhenFalse.SpanStart, spaced, context);
-					Node.Print(node.WhenFalse, context);
+					offset = AuthorTernaryBreak(node.ColonToken.Span.End, node.WhenFalse.GetFirstToken(), spaced, anchor, offset, context);
+					PrintTernaryBranch(node.WhenFalse, anchor, offset, context);
 				}
 			}
 
@@ -340,12 +353,16 @@ internal static partial class Printers
 				TokenPrinter.Print(node.ColonToken, context);
 				using (arena.IndentIf(indented && context.AuthorBroke(node.ColonToken.Span.End, node.WhenFalse.SpanStart)))
 				{
-					AuthorTernaryBreak(node.ColonToken.Span.End, node.WhenFalse.SpanStart, spaced, context);
+					AuthorTernaryBreak(node.ColonToken.Span.End, node.WhenFalse.GetFirstToken(), spaced, -1, -1, context);
 					Node.Print(node.WhenFalse, context);
 				}
 			}
+
+			ExitPatternContinuation(anchor, context);
 			return;
 		}
+
+		Node.Print(node.Condition, context);
 
 		// The same `:` after an opened-out block lambda as above: dotnet format moves it to the indent of
 		// the enclosing statement's line whatever the layout, so it does not take the group's break under
@@ -486,12 +503,40 @@ internal static partial class Printers
 		&& !JoinsEmptyBracesToHeader(block, context)
 		&& !context.Options.CollapsesSimpleBlocks;
 
-	private static void AuthorTernaryBreak(int from, int to, bool spaced, PrintContext context)
+	/// <summary>
+	/// The break or space between two parts of a ternary the author broke, returning the offset of the
+	/// continuation line it starts, or <paramref name="offset"/> unchanged where the author joined them.
+	/// </summary>
+	/// <remarks>A negative <paramref name="anchor"/> breaks to the ambient indent instead.</remarks>
+	private static int AuthorTernaryBreak(int from, SyntaxToken next, bool spaced, int anchor, int offset, PrintContext context)
 	{
-		if (context.AuthorBroke(from, to))
-			context.Arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
-		else if (spaced)
+		if (context.AuthorBroke(from, next.SpanStart))
+		{
+			if (anchor < 0)
+			{
+				context.Arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
+				return offset;
+			}
+
+			return ContinuationLine(next, anchor, context);
+		}
+
+		if (spaced)
 			context.Arena.Synthetic(SyntheticText.Space);
+		return offset;
+	}
+
+	/// <summary>A ternary branch, shifted with the continuation line it is on, if it is on one.</summary>
+	private static void PrintTernaryBranch(ExpressionSyntax branch, int anchor, int offset, PrintContext context)
+	{
+		if (offset < 0)
+		{
+			Node.Print(branch, context);
+			return;
+		}
+
+		using (context.Arena.AlignedIndent(anchor, offset))
+			Node.Print(branch, context);
 	}
 
 	/// <summary>Operators csharp_space_after_unary_operator does not reach even when on — measured
