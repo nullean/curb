@@ -60,7 +60,7 @@ public static class DiagnosticLog
 	{
 		var seen = new HashSet<LoggedDiagnostic>();
 		diagnostics = [];
-		contexts = new HashSet<string>(StringComparer.Ordinal);
+		contexts = [with(StringComparer.Ordinal)];
 
 		if (SarifReader.LooksLikeSarif(utf8))
 		{

@@ -93,7 +93,7 @@ public sealed class Ctx(Rng r, string ns, string tag = "")
 		"Measure",
 	];
 
-	private readonly HashSet<string> _usings = new(StringComparer.Ordinal);
+	private readonly HashSet<string> _usings = [with(StringComparer.Ordinal)];
 	private int _next;
 
 	public Rng R { get; } = r;

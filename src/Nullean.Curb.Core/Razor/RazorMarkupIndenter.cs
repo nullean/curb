@@ -29,26 +29,29 @@ namespace Nullean.Curb.Razor;
 /// </remarks>
 public static class RazorMarkupIndenter
 {
-	private static readonly HashSet<string> VoidElements = new(StringComparer.OrdinalIgnoreCase)
-	{
+	private static readonly HashSet<string> VoidElements =
+	[
+		with(StringComparer.OrdinalIgnoreCase),
 		"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr",
-	};
+	];
 
 	// Text whose whitespace is content. Microsoft's formatter re-indents the closing tag of a script or style,
 	// whose content it leaves alone, and leaves a pre's or textarea's closing tag where it is too.
-	private static readonly HashSet<string> RawElements = new(StringComparer.OrdinalIgnoreCase) { "script", "style", "pre", "textarea" };
+	private static readonly HashSet<string> RawElements = [with(StringComparer.OrdinalIgnoreCase), "script", "style", "pre", "textarea"];
 
 	// Directives whose line is C# or a name to its end: `@inject UserManager<ApplicationUser> Users` holds no tag.
-	private static readonly HashSet<string> LineDirectives = new(StringComparer.Ordinal)
-	{
+	private static readonly HashSet<string> LineDirectives =
+	[
+		with(StringComparer.Ordinal),
 		"page", "inject", "inherits", "model", "typeparam", "implements", "attribute", "layout", "namespace",
 		"rendermode", "preservewhitespace", "addTagHelper", "removeTagHelper", "tagHelperPrefix",
-	};
+	];
 
-	private static readonly HashSet<string> CodeConstructs = new(StringComparer.Ordinal)
-	{
+	private static readonly HashSet<string> CodeConstructs =
+	[
+		with(StringComparer.Ordinal),
 		"if", "for", "foreach", "while", "lock", "try", "do", "using",
-	};
+	];
 
 	private enum FrameKind : byte { Element, CodeBlock, CSharpBrace, Section }
 

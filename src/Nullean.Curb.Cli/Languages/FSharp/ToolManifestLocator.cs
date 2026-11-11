@@ -49,7 +49,7 @@ internal sealed class ToolManifestLocator(IFileSystem fileSystem)
 	/// <summary>The ids Fantomas has been published under, newest first.</summary>
 	private static readonly string[] ToolIds = ["fantomas", "fantomas-tool"];
 
-	private readonly Dictionary<string, FantomasManifest?> _byDirectory = new(StringComparer.Ordinal);
+	private readonly Dictionary<string, FantomasManifest?> _byDirectory = [with(StringComparer.Ordinal)];
 
 	/// <summary>The manifest that declares Fantomas for files in <paramref name="directory"/>, or null when none does.</summary>
 	public FantomasManifest? Find(string directory)

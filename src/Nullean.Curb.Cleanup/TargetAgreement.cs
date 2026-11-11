@@ -134,15 +134,15 @@ public readonly record struct Compilation(string Id, string Group, string Label)
 /// </remarks>
 public sealed class TargetAgreement
 {
-	private readonly Dictionary<string, Compilation> _compilations = new(StringComparer.Ordinal);
-	private readonly Dictionary<string, List<string>> _groups = new(StringComparer.Ordinal);
-	private readonly Dictionary<string, HashSet<string>> _compiled = new(StringComparer.Ordinal);
+	private readonly Dictionary<string, Compilation> _compilations = [with(StringComparer.Ordinal)];
+	private readonly Dictionary<string, List<string>> _groups = [with(StringComparer.Ordinal)];
+	private readonly Dictionary<string, HashSet<string>> _compiled = [with(StringComparer.Ordinal)];
 
 	/// <summary>Per file, the compilations whose log mentioned it.</summary>
-	private readonly Dictionary<string, HashSet<string>> _mentions = new(StringComparer.Ordinal);
+	private readonly Dictionary<string, HashSet<string>> _mentions = [with(StringComparer.Ordinal)];
 
 	/// <summary>Per compilation, the files it reported a fixable site in, to check its compile list against.</summary>
-	private readonly Dictionary<string, HashSet<string>> _fixableFiles = new(StringComparer.Ordinal);
+	private readonly Dictionary<string, HashSet<string>> _fixableFiles = [with(StringComparer.Ordinal)];
 
 	/// <summary>Every fixable site, in the order first seen, with the first report and who reported it.</summary>
 	private readonly Dictionary<Site, (CleanupDiagnostic First, HashSet<string> By)> _sites = [];
@@ -167,7 +167,7 @@ public sealed class TargetAgreement
 		Declare(compilation);
 
 		if (!_compiled.TryGetValue(compilation.Id, out var set))
-			_compiled[compilation.Id] = set = new HashSet<string>(StringComparer.Ordinal);
+			_compiled[compilation.Id] = set = [with(StringComparer.Ordinal)];
 
 		set.UnionWith(files);
 	}
@@ -178,7 +178,7 @@ public sealed class TargetAgreement
 		Declare(compilation);
 
 		if (!_mentions.TryGetValue(diagnostic.FilePath, out var by))
-			_mentions[diagnostic.FilePath] = by = new HashSet<string>(StringComparer.Ordinal);
+			_mentions[diagnostic.FilePath] = by = [with(StringComparer.Ordinal)];
 
 		by.Add(compilation.Id);
 
@@ -186,7 +186,7 @@ public sealed class TargetAgreement
 			return;
 
 		if (!_fixableFiles.TryGetValue(compilation.Id, out var files))
-			_fixableFiles[compilation.Id] = files = new HashSet<string>(StringComparer.Ordinal);
+			_fixableFiles[compilation.Id] = files = [with(StringComparer.Ordinal)];
 
 		files.Add(diagnostic.FilePath);
 

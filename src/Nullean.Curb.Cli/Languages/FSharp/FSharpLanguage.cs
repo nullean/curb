@@ -25,9 +25,9 @@ internal sealed class FSharpLanguage(IFileSystem fileSystem, IToolLauncher launc
 	internal const string NoManifest = "no Fantomas in a tool manifest (see https://curb.nullean.net/workflow/fsharp/)";
 
 	private readonly ToolManifestLocator _manifests = new(fileSystem);
-	private readonly Dictionary<string, string> _ignoreByDirectory = new(StringComparer.Ordinal);
+	private readonly Dictionary<string, string> _ignoreByDirectory = [with(StringComparer.Ordinal)];
 	private readonly Dictionary<(FantomasManifest, string Extension, string Ignore), IReadOnlyDictionary<string, string>> _keys = [];
-	private readonly HashSet<string> _warnings = new(StringComparer.Ordinal);
+	private readonly HashSet<string> _warnings = [with(StringComparer.Ordinal)];
 	private readonly List<string> _errors = [];
 
 	public FSharpLanguage(IFileSystem fileSystem) : this(fileSystem, ProcessLauncher.Instance, ToolEnvironment.Current) { }
