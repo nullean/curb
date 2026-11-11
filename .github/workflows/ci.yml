@@ -7,13 +7,7 @@ on:
   # Manual trigger for the same. Also lets you force a full run on a branch before tagging.
   workflow_dispatch:
   pull_request:
-    paths-ignore:
-      - 'README.md'
-      - 'NOTICE'
   push:
-    paths-ignore:
-      - 'README.md'
-      - 'NOTICE'
     branches:
       - main
   # Publishing the release-drafter draft releases: every gate below runs on the released commit first.
