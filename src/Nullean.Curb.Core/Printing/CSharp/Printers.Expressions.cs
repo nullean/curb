@@ -1735,10 +1735,18 @@ internal static partial class Printers
 		// a brace the author put on a line of its own at the offset they gave it, and lines the arms and
 		// the closing brace up from it. Moved to the line's own indent, `.Any(x => x switch` / `{` was
 		// pulled back a level (issue #238). The register reads how far the line the switch starts on moved.
-		var anchor = EnterPatternContinuation(KeepsAuthorBraceOffset(node, context), context);
+		// A `switch` keyword the author put below its governing expression stays there, moved as far as the
+		// line the switch starts on moved, as dotnet format leaves it. Joined, `s` / `switch` changed the
+		// line's length (issue #254). Both read the same register.
+		var keepsBraceOffset = KeepsAuthorBraceOffset(node, context);
+		var switchBroken = context.AuthorBroke(node.GoverningExpression.Span.End, node.SwitchKeyword.SpanStart);
+		var anchor = EnterPatternContinuation(keepsBraceOffset || switchBroken, context);
 
 		Node.Print(node.GoverningExpression, context);
-		arena.Synthetic(SyntheticText.Space);
+		if (switchBroken)
+			_ = ContinuationLine(node.SwitchKeyword, anchor, context);
+		else
+			arena.Synthetic(SyntheticText.Space);
 		TokenPrinter.Print(node.SwitchKeyword, context);
 
 		// dotnet format files this brace under the initializers flag, and otherwise moves it either way
@@ -1750,11 +1758,16 @@ internal static partial class Printers
 		var offset = 0;
 		var ownerLine = -1;
 		var ownerScope = default(DocScope);
-		if (anchor >= 0)
+		if (keepsBraceOffset)
 			offset = ContinuationLine(node.OpenBraceToken, anchor, context);
 		else
 		{
-			ownerLine = OwnerLineAnchor(node.GoverningExpression.GetFirstToken(), context);
+			// A brace kept on a `switch` line of its own sits on that line, and dotnet format indents the
+			// arms from it.
+			var owner = switchBroken && !BraceOnOwnLine(BraceStyle.ObjectCollectionArrayInitializers, context)
+				? node.SwitchKeyword
+				: node.GoverningExpression.GetFirstToken();
+			ownerLine = OwnerLineAnchor(owner, context);
 			ownerScope = arena.AlignedIndent(ownerLine, 0);
 			BeforeOpenBrace(BraceStyle.ObjectCollectionArrayInitializers, context);
 		}
@@ -1770,7 +1783,7 @@ internal static partial class Printers
 
 		// The arms and the closing brace indent from the line the opening brace sits on, so when
 		// csharp_indent_braces moved that brace in, everything after it moves in with it.
-		using (anchor >= 0 ? arena.AlignedIndent(anchor, offset) : default)
+		using (keepsBraceOffset ? arena.AlignedIndent(anchor, offset) : default)
 		using (arena.IndentIf(IndentsOpenBrace(BraceStyle.ObjectCollectionArrayInitializers, context)))
 		{
 			using (arena.Indent())

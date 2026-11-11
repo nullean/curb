@@ -637,4 +637,237 @@ public class SwitchTests : FormattingTest
 		""",
 		opinionConfig: "csharp_indent_case_contents_when_block = false",
 		editorConfig: "csharp_indent_case_contents = false");
+
+	// Issue #254: a `switch` keyword the author put below its governing expression stays on its own line,
+	// moved as far as the statement's first line moved, as dotnet format leaves it.
+
+	[Test]
+	public Task A_switch_keyword_on_a_line_of_its_own_stays_there() => Formats(
+		"""
+		public class C
+		{
+		    public int P => Q
+		        switch
+		    {
+		        1 => 2,
+		        _ => 3,
+		    };
+
+		    public int M(int[] xs, int s, object o)
+		    {
+		            var a = s
+		                switch
+		            {
+		                1 => 2,
+		                _ => 3,
+		            };
+		    var b = xs.Select(x => x
+		        switch
+		        {
+		            1 => 2,
+		            _ => 3,
+		        });
+		        var c = (s
+		            // a note
+		            switch
+		        {
+		            1 => 2,
+		            _ => 3,
+		        });
+		        switch (o)
+		        {
+		            case int i when i
+		                switch
+		            {
+		                1 => true,
+		                _ => false,
+		            }:
+		                return 1;
+		        }
+		        return a + c;
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public int P => Q
+		        switch
+		    {
+		        1 => 2,
+		        _ => 3,
+		    };
+
+		    public int M(int[] xs, int s, object o)
+		    {
+		        var a = s
+		            switch
+		        {
+		            1 => 2,
+		            _ => 3,
+		        };
+		        var b = xs.Select(x => x
+		            switch
+		            {
+		                1 => 2,
+		                _ => 3,
+		            });
+		        var c = (s
+		            // a note
+		            switch
+		        {
+		            1 => 2,
+		            _ => 3,
+		        });
+		        switch (o)
+		        {
+		            case int i when i
+		                switch
+		            {
+		                1 => true,
+		                _ => false,
+		            }:
+		                return 1;
+		        }
+		        return a + c;
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_brace_kept_on_a_switch_line_of_its_own_indents_the_arms_from_that_line() => Formats(
+		"""
+		public class C
+		{
+		    public int M(int s)
+		    {
+		        var a = s
+		            switch {
+		            1 => s
+		                switch {
+		                _ => 4,
+		            },
+		            _ => 3,
+		        };
+		        return a;
+		    }
+		}
+		""",
+		"""
+		public class C {
+		    public int M(int s) {
+		        var a = s
+		            switch {
+		                1 => s
+		                    switch {
+		                        _ => 4,
+		                    },
+		                _ => 3,
+		            };
+		        return a;
+		    }
+		}
+		""",
+		editorConfig: "csharp_new_line_before_open_brace = none");
+
+	[Test]
+	public Task Deterministic_layout_joins_a_switch_keyword_onto_its_expression() => Formats(
+		"""
+		public class C
+		{
+		    public int M(int s)
+		    {
+		        var a = s
+		            switch
+		        {
+		            1 => 2,
+		            _ => 3,
+		        };
+		        return a;
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public int M(int s)
+		    {
+		        var a = s switch
+		        {
+		            1 => 2,
+		            _ => 3,
+		        };
+		        return a;
+		    }
+		}
+		""",
+		editorConfig: "max_line_length = 120");
+
+	// An operand switch and a query's `select` switch in a lambda body, and a brace left on the `switch`
+	// line, take the indent of the line the governing expression starts on, as dotnet format places them.
+	// These came out a level deeper before the #229 fix and are kept here so they stay put.
+
+	[Test]
+	public Task An_operand_or_select_switch_takes_its_governing_lines_indent() => Formats(
+		"""
+		public class C
+		{
+		    public void M(int[] xs)
+		    {
+		        var a = xs.Select(x => 1 + x switch
+		            {
+		                1 => 2,
+		                _ => 3,
+		            });
+		        var b = xs.Select(
+		            x => x switch
+		                {
+		                    1 => 2,
+		                    _ => 3,
+		                } + 1);
+		        var c = xs
+		            .Select(x => x switch {
+		                1 => 2,
+		                _ => 3,
+		            });
+		        var q = from x in xs
+		                select x switch
+		        {
+		            1 => 2,
+		            _ => 3,
+		        };
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M(int[] xs)
+		    {
+		        var a = xs.Select(x => 1 + x switch
+		        {
+		            1 => 2,
+		            _ => 3,
+		        });
+		        var b = xs.Select(
+		            x => x switch
+		            {
+		                1 => 2,
+		                _ => 3,
+		            } + 1);
+		        var c = xs
+		            .Select(x => x switch
+		            {
+		                1 => 2,
+		                _ => 3,
+		            });
+		        var q = from x in xs
+		                select x switch
+		                {
+		                    1 => 2,
+		                    _ => 3,
+		                };
+		    }
+		}
+		""");
 }
