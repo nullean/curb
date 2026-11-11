@@ -51,7 +51,10 @@ See [The build integration](../workflow/msbuild.md) for all properties, diagnost
 
 ## Native binary directly
 
-Download the binary for your platform from the GitHub releases page and put it on `PATH`. No SDK required to run it — only to install it via `dotnet tool`.
+Every [GitHub release](https://github.com/nullean/curb/releases) carries the native binary for each platform:
+`curb-<version>-<rid>.tar.gz` for `linux-x64`, `linux-arm64` and `osx-arm64`, and `curb-<version>-<rid>.zip` for
+`win-x64` and `win-arm64`, with a `SHA256SUMS` file to check them against. Extract it and put `curb` on `PATH`. No SDK
+required to run it — only to install it via `dotnet tool`.
 
 ## GitHub Action
 
