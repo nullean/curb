@@ -422,10 +422,6 @@ public class MemberTests : FormattingTest
 		"""
 		public class T
 		{
-		    public int this[
-		  int i,
-		            int j] => i;
-
 		    public static
 		 T D2(string id) => null;
 		}
@@ -433,10 +429,6 @@ public class MemberTests : FormattingTest
 		"""
 		public class T
 		{
-		    public int this[
-		        int i,
-		        int j] => i;
-
 		    public static
 		        T D2(string id) => null;
 		}
@@ -451,6 +443,26 @@ public class MemberTests : FormattingTest
 		{
 		    public static T D1<
 		  U>() => null;
+		}
+		""");
+
+	// An indexer's parameter lines keep the author's column too, as a method's do and as dotnet format
+	// leaves them (#256).
+	[Test]
+	public Task A_wrapped_indexer_parameter_line_keeps_its_column() => Unchanged(
+		"""
+		public class T
+		{
+		    public int this[
+		  int i,
+		            int j] => i;
+
+		    public int this[string a,
+		                    string b] => 0;
+
+		    public int this[long a
+		                  , long b
+		    ] => 0;
 		}
 		""");
 

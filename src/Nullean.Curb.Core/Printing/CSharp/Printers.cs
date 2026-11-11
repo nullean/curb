@@ -888,23 +888,6 @@ internal static partial class Printers
 		ReleaseLinesAsWritten(register, context);
 	}
 
-	/// <summary>
-	/// Breaks the line where the author broke it between <paramref name="before"/> and
-	/// <paramref name="after"/>, and says whether it did.
-	/// </summary>
-	/// <remarks>
-	/// For lists with no width-driven layout of their own. Under deterministic layout the author's
-	/// breaks are not read, so this never breaks and the list stays on one line as before.
-	/// </remarks>
-	private static bool BreakAsWritten(SyntaxNodeOrToken before, SyntaxNodeOrToken after, PrintContext context)
-	{
-		if (before.RawKind == 0 || after.RawKind == 0 || !context.AuthorBroke(before.Span.End, after.SpanStart))
-			return false;
-
-		context.Arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
-		return true;
-	}
-
 	public static void TypeParameter(TypeParameterSyntax node, PrintContext context)
 	{
 		PrintInlineAttributeLists(node.AttributeLists, context);
@@ -919,14 +902,25 @@ internal static partial class Printers
 		TokenPrinter.Print(node.Identifier, context);
 	}
 
+	/// <summary>A method's, constructor's, delegate's, lambda's or type's <c>(int x, int y)</c>.</summary>
+	/// <remarks>
+	/// A line the author broke stays at the column they gave it, and moves only as far as the line the list
+	/// starts on moved, as a type parameter list's does. Moved a level in from the declaration instead, it
+	/// shifted a <c>where</c> clause or an expression body below it by as much, since those keep their
+	/// offset from the line above.
+	/// </remarks>
 	public static void ParameterList(ParameterListSyntax node, PrintContext context)
 	{
 		var arena = context.Arena;
+
+		// Claimed ahead of the `(`: a trailing `// note` on it ends the line, and an anchor after that
+		// would measure the next line, which nothing has been written to yet.
+		var register = node.Parameters.Count > 0 ? ClaimLinesAsWritten(node, context) : -1;
 		TokenPrinter.Print(node.OpenParenToken, context);
 
 		if (node.Parameters.Count > 0)
 		{
-			var asWritten = SpansLines(node, context);
+			var asWritten = register >= 0;
 
 			// Named, so an expression body hanging off this list can indent against whether it wrapped.
 			var group = arena.NextGroupId();
@@ -944,15 +938,13 @@ internal static partial class Printers
 
 				using (arena.Indent())
 				{
-					if (!asWritten)
-						Spacing.InsideDeclarationParensBreakable(context);
-					else if (context.AuthorBroke(node.SpanStart, node.Parameters[0].SpanStart))
-						arena.HardLine();
+					if (asWritten)
+						ParametersAsWritten(node.OpenParenToken, node.Parameters, register, context);
 					else
-						Spacing.InsideDeclarationParens(context);
-
-					PrintSeparated(node.Parameters, context, asWritten,
-						fill: context.Options.WrapParametersStyle == WrapStyle.WrapIfLong);
+					{
+						Spacing.InsideDeclarationParensBreakable(context);
+						PrintSeparated(node.Parameters, context, fill: context.Options.WrapParametersStyle == WrapStyle.WrapIfLong);
+					}
 				}
 
 				// csharp_wrap_before_declaration_rpar takes the decision away from both the author and
@@ -963,9 +955,7 @@ internal static partial class Printers
 					Spacing.InsideDeclarationParensBreakable(context);
 				else if (rpar == false)
 					Spacing.InsideDeclarationParens(context);
-				else if (context.AuthorBroke(node.Parameters[^1].Span.End, node.Span.End))
-					arena.HardLine();
-				else
+				else if (!LineAsWritten(node.Parameters[^1].Span.End, node.CloseParenToken, register, context))
 					Spacing.InsideDeclarationParens(context);
 			}
 		}
@@ -973,11 +963,55 @@ internal static partial class Printers
 			Spacing.InsideEmptyDeclarationParens(context);
 
 		TokenPrinter.Print(node.CloseParenToken, context);
+		ReleaseLinesAsWritten(register, context);
+	}
+
+	/// <summary>
+	/// The parameters of a list the author broke, each line they broke at the column they gave it, moved
+	/// as far as the line the list starts on moved, and a comma they put first on its line kept there.
+	/// </summary>
+	/// <remarks>
+	/// Shared by a parenthesized and a bracketed list. A parameter's own lines, an attribute's arguments
+	/// or a default value's, sit as far in from its line as they would from the list's level.
+	/// </remarks>
+	private static void ParametersAsWritten(SyntaxToken open, SeparatedSyntaxList<ParameterSyntax> parameters, int register, PrintContext context)
+	{
+		var offset = int.MinValue;
+		if (context.AuthorBroke(open.Span.End, parameters[0].SpanStart))
+			offset = ContinuationLine(parameters[0].GetFirstToken(), register, context);
+		else if (open.IsKind(SyntaxKind.OpenBracketToken))
+			Spacing.InsideBrackets(context);
+		else
+			Spacing.InsideDeclarationParens(context);
+
+		for (var i = 0; i < parameters.Count; i++)
+		{
+			var parameter = parameters[i];
+			using (offset == int.MinValue ? default : context.Arena.AlignedIndent(register, offset))
+				Node.Print(parameter, context);
+
+			if (i >= parameters.SeparatorCount)
+				continue;
+
+			var previousEnd = parameter.Span.End;
+			var separator = parameters.GetSeparator(i);
+			if (context.AuthorBroke(previousEnd, separator.SpanStart))
+				offset = ContinuationLine(separator, register, context);
+			else
+				Spacing.BeforeComma(context);
+			TokenPrinter.Print(separator, context);
+
+			var next = parameters[i + 1];
+			if (context.AuthorJoined(separator.Span.End, next.SpanStart))
+				Spacing.AfterComma(context);
+			else
+				offset = MemberContinuationLine(separator.Span.End, next, register, context);
+		}
 	}
 
 	public static void Parameter(ParameterSyntax node, PrintContext context)
 	{
-		PrintInlineAttributeLists(node.AttributeLists, context);
+		var register = AttributesAsWritten(node.AttributeLists, context);
 
 		// `this ref readonly` is the only order the grammar allows, so this is not a preference.
 		PrintModifiers(node.Modifiers, context, reorder: false);
@@ -995,6 +1029,41 @@ internal static partial class Printers
 
 		// EqualsValueClause supplies its own leading space.
 		Node.Print(node.Default, context);
+
+		if (register >= 0)
+			context.ExitContinuation();
+	}
+
+	/// <summary>
+	/// A parameter's attributes, with the rest of the parameter on the line below them where the author
+	/// put it there, at the column they gave it. Returns the register that cost, or -1.
+	/// </summary>
+	/// <remarks>
+	/// The column moves only as far as the attributes' line moved, as dotnet format moves it. Joining the
+	/// two lengthened a line the author had wrapped on purpose. The caller owes
+	/// <see cref="PrintContext.ExitContinuation"/> for a register it was given.
+	/// </remarks>
+	private static int AttributesAsWritten(SyntaxList<AttributeListSyntax> attributeLists, PrintContext context)
+	{
+		if (attributeLists.Count == 0)
+			return -1;
+
+		var last = attributeLists[^1].GetLastToken();
+		var rest = last.GetNextToken();
+		if (!context.AuthorBroke(last.Span.End, rest.SpanStart))
+		{
+			PrintInlineAttributeLists(attributeLists, context);
+			return -1;
+		}
+
+		foreach (var attributeList in attributeLists)
+			Node.Print(attributeList, context);
+
+		// Captured once the attributes are written, so it measures their line rather than the one below.
+		var register = context.EnterContinuation();
+		context.Arena.LineShiftAnchor(register);
+		ContinuationLine(rest, register, context);
+		return register;
 	}
 
 	public static void Block(BlockSyntax node, PrintContext context)

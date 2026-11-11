@@ -358,4 +358,210 @@ public class MethodTests : FormattingTest
 		}
 		""",
 		editorConfig: "max_line_length = 120");
+
+	// Issue #256: dotnet format leaves a parameter line the author broke at the column they gave it. Moved
+	// a level in, `int y` also dragged the `where` clause below it six columns left, to column 2.
+	[Test]
+	public Task A_wrapped_parameter_line_keeps_its_column() => Unchanged(
+		"""
+		public class C
+		{
+		    void M(int x,
+		                    int y)
+		    {
+		    }
+
+		    void N<T>(int x,
+		              int y)
+		        where T : class
+		    {
+		    }
+
+		    int O(int x,
+		          int y) =>
+		        x + y;
+
+		    public C(int x,
+		             int y)
+		        : base()
+		    {
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_parenthesis_on_its_own_line_keeps_its_column() => Unchanged(
+		"""
+		public class C
+		{
+		    void M(
+		            int x,
+		            int y
+		        )
+		    {
+		    }
+
+		    void N(
+		    int x,
+		    int y)
+		    {
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_leading_comma_stays_first_on_its_line() => Unchanged(
+		"""
+		public class C
+		{
+		    void M(int x
+		         , int y
+		         , int z)
+		    {
+		    }
+
+		    void N(
+		        int x
+		      , int y
+		    )
+		    {
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Every_kind_of_parameter_list_keeps_its_columns() => Unchanged(
+		"""
+		using System;
+
+		public delegate void D(int x,
+		                       int y);
+
+		public record R(int X,
+		                int Y);
+
+		public class P(int x,
+		               int y)
+		{
+		    public static P operator +(P a,
+		                               P b) => a;
+
+		    void M()
+		    {
+		        int Add(int a,
+		                int b) => a + b;
+
+		        Func<int, int, int> f = (int a,
+		                                 int b) => a + b;
+		        Run((int a,
+		             int b) =>
+		        {
+		            return a + b;
+		        });
+		    }
+
+		    void Run(Func<int, int, int> f) { }
+		}
+		""");
+
+	[Test]
+	public Task A_wrapped_parameter_line_moves_with_its_declaration() => Formats(
+		"""
+		public class C
+		{
+		  void M(int x,
+		                    int y)
+		  {
+		  }
+		}
+		""",
+		"""
+		public class C
+		{
+		    void M(int x,
+		                      int y)
+		    {
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_comment_blank_line_or_directive_in_a_parameter_list_keeps_the_column() => Unchanged(
+		"""
+		public class C
+		{
+		    void M( // note
+		        int x,
+		        int y)
+		    {
+		    }
+
+		    void N(int x,
+
+		           int y)
+		    {
+		    }
+
+		    void O(int x,
+		#if DEBUG
+		           int y,
+		#endif
+		           int z)
+		    {
+		    }
+
+		    void P(int x,
+		           // second
+		           int y)
+		    {
+		    }
+		}
+		""");
+
+	// Issue #257: dotnet format keeps a parameter's attribute on a line of its own.
+	[Test]
+	public Task An_attribute_on_its_own_line_stays_above_its_parameter() => Unchanged(
+		"""
+		using System;
+
+		public class C
+		{
+		    void M(int x,
+		           [Obsolete]
+		           int y)
+		    {
+		    }
+
+		    void N(
+		        [Obsolete]
+		            int y)
+		    {
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_width_still_joins_a_wrapped_parameter_list() => Formats(
+		"""
+		using System;
+
+		public class C
+		{
+		    void M(int x
+		         , [Obsolete]
+		           int y)
+		    {
+		    }
+		}
+		""",
+		"""
+		using System;
+
+		public class C
+		{
+		    void M(int x, [Obsolete] int y)
+		    { }
+		}
+		""",
+		editorConfig: "max_line_length = 120");
 }
