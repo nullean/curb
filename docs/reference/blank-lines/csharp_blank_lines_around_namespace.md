@@ -31,21 +31,28 @@ csharp_blank_lines_around_namespace = 1
 
 :::{tab-item} Before
 ```csharp
-using System;
-
-namespace N;
-
-public class Widget { }
+namespace A
+{
+    public class Widget { }
+}
+namespace B
+{
+    public class Gadget { }
+}
 ```
 :::
 
 :::{tab-item} After
 ```csharp
-using System;
+namespace A
+{
+    public class Widget { }
+}
 
-namespace N;
-
-public class Widget { }
+namespace B
+{
+    public class Gadget { }
+}
 ```
 :::
 

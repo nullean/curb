@@ -14,7 +14,7 @@ Put each member of an anonymous type on its own line.
 | Value | Notes |
 |---|---|
 | `true` |  |
-| `false` |  |
+| `false` | No effect yet unless `csharp_new_line_before_members_in_object_initializers = false` is set too ([#259](https://github.com/nullean/curb/issues/259)). `dotnet format` reads this key alone. |
 
 **Default:** `true`
 
@@ -38,7 +38,11 @@ public class Widget
 {
     public object Describe()
     {
-        return new { Name = "curb", Version = 1, Active = true };
+        return new
+        {
+            Name = "curb", Version = 1,
+            Active = true,
+        };
     }
 }
 ```
@@ -52,7 +56,12 @@ public class Widget
 {
     public object Describe()
     {
-        return new { Name = "curb", Version = 1, Active = true };
+        return new
+        {
+            Name = "curb",
+            Version = 1,
+            Active = true,
+        };
     }
 }
 ```
@@ -76,7 +85,12 @@ public class Widget
 {
     public object Describe()
     {
-        return new { Name = "curb", Version = 1, Active = true };
+        return new
+        {
+            Name = "curb",
+            Version = 1,
+            Active = true,
+        };
     }
 }
 ```
@@ -90,7 +104,12 @@ public class Widget
 {
     public object Describe()
     {
-        return new { Name = "curb", Version = 1, Active = true };
+        return new
+        {
+            Name = "curb",
+            Version = 1,
+            Active = true,
+        };
     }
 }
 ```

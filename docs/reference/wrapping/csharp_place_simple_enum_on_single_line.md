@@ -34,12 +34,7 @@ csharp_place_simple_enum_on_single_line = true
 ```csharp
 namespace N;
 
-public enum Status
-{
-    Active,
-    Inactive,
-    Pending,
-}
+public enum Status { Active, Inactive, Pending }
 ```
 :::
 
@@ -47,12 +42,7 @@ public enum Status
 ```csharp
 namespace N;
 
-public enum Status
-{
-    Active,
-    Inactive,
-    Pending,
-}
+public enum Status { Active, Inactive, Pending }
 ```
 :::
 
@@ -70,12 +60,7 @@ csharp_place_simple_enum_on_single_line = false
 ```csharp
 namespace N;
 
-public enum Status
-{
-    Active,
-    Inactive,
-    Pending,
-}
+public enum Status { Active, Inactive, Pending }
 ```
 :::
 
@@ -87,7 +72,7 @@ public enum Status
 {
     Active,
     Inactive,
-    Pending,
+    Pending
 }
 ```
 :::

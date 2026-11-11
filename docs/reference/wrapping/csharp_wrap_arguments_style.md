@@ -26,6 +26,7 @@ No known case where Curb's output is not a fixed point of `dotnet format` — se
 ### `csharp_wrap_arguments_style = chop_always`
 
 ```ini
+max_line_length = 80
 csharp_wrap_arguments_style = chop_always
 ```
 
@@ -37,13 +38,20 @@ namespace N;
 
 public class Widget
 {
-    public void Register(string name, int value, bool active, string tag)
-    {
-    }
-
     public void Run()
     {
         Register("curb", 42, true, "formatter");
+        Register(
+            "a widget with a much longer name",
+            4200,
+            false,
+            "a formatter tag"
+        );
+    }
+
+    private void Register(string name, int value, bool active, string tag)
+    {
+        Console.WriteLine(name);
     }
 }
 ```
@@ -55,14 +63,6 @@ namespace N;
 
 public class Widget
 {
-    public void Register(
-        string name,
-        int value,
-        bool active,
-        string tag
-    )
-    { }
-
     public void Run()
     {
         Register(
@@ -70,6 +70,19 @@ public class Widget
             42,
             true,
             "formatter"
+        );
+        Register(
+            "a widget with a much longer name",
+            4200,
+            false,
+            "a formatter tag"
+        );
+    }
+
+    private void Register(string name, int value, bool active, string tag)
+    {
+        Console.WriteLine(
+            name
         );
     }
 }
@@ -81,6 +94,7 @@ public class Widget
 ### `csharp_wrap_arguments_style = chop_if_long`
 
 ```ini
+max_line_length = 80
 csharp_wrap_arguments_style = chop_if_long
 ```
 
@@ -92,13 +106,15 @@ namespace N;
 
 public class Widget
 {
-    public void Register(string name, int value, bool active, string tag)
-    {
-    }
-
     public void Run()
     {
         Register("curb", 42, true, "formatter");
+        Register("a widget with a much longer name", 4200, false, "a formatter tag");
+    }
+
+    private void Register(string name, int value, bool active, string tag)
+    {
+        Console.WriteLine(name);
     }
 }
 ```
@@ -110,22 +126,20 @@ namespace N;
 
 public class Widget
 {
-    public void Register(
-        string name,
-        int value,
-        bool active,
-        string tag
-    )
-    { }
-
     public void Run()
     {
+        Register("curb", 42, true, "formatter");
         Register(
-            "curb",
-            42,
-            true,
-            "formatter"
+            "a widget with a much longer name",
+            4200,
+            false,
+            "a formatter tag"
         );
+    }
+
+    private void Register(string name, int value, bool active, string tag)
+    {
+        Console.WriteLine(name);
     }
 }
 ```
@@ -136,6 +150,7 @@ public class Widget
 ### `csharp_wrap_arguments_style = wrap_if_long`
 
 ```ini
+max_line_length = 80
 csharp_wrap_arguments_style = wrap_if_long
 ```
 
@@ -147,13 +162,20 @@ namespace N;
 
 public class Widget
 {
-    public void Register(string name, int value, bool active, string tag)
-    {
-    }
-
     public void Run()
     {
         Register("curb", 42, true, "formatter");
+        Register(
+            "a widget with a much longer name",
+            4200,
+            false,
+            "a formatter tag"
+        );
+    }
+
+    private void Register(string name, int value, bool active, string tag)
+    {
+        Console.WriteLine(name);
     }
 }
 ```
@@ -165,20 +187,17 @@ namespace N;
 
 public class Widget
 {
-    public void Register(
-        string name,
-        int value,
-        bool active,
-        string tag
-    )
-    { }
-
     public void Run()
     {
+        Register("curb", 42, true, "formatter");
         Register(
-            "curb", 42, true,
-            "formatter"
+            "a widget with a much longer name", 4200, false, "a formatter tag"
         );
+    }
+
+    private void Register(string name, int value, bool active, string tag)
+    {
+        Console.WriteLine(name);
     }
 }
 ```

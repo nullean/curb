@@ -36,14 +36,20 @@ namespace N;
 
 public class Widget
 {
-    public void Register(string name, int value, bool active, string tag)
-    {
-    }
-
     public void Run()
     {
-        Register("curb", 42, true, "formatter");
+        Move(
+            1,
+            2);
+        Resize(
+            640,
+            480
+        );
     }
+
+    private void Move(int x, int y) { }
+
+    private void Resize(int width, int height) { }
 }
 ```
 :::
@@ -54,14 +60,21 @@ namespace N;
 
 public class Widget
 {
-    public void Register(string name, int value, bool active, string tag)
-    {
-    }
-
     public void Run()
     {
-        Register("curb", 42, true, "formatter");
+        Move(
+            1,
+            2
+        );
+        Resize(
+            640,
+            480
+        );
     }
+
+    private void Move(int x, int y) { }
+
+    private void Resize(int width, int height) { }
 }
 ```
 :::
@@ -82,14 +95,20 @@ namespace N;
 
 public class Widget
 {
-    public void Register(string name, int value, bool active, string tag)
-    {
-    }
-
     public void Run()
     {
-        Register("curb", 42, true, "formatter");
+        Move(
+            1,
+            2);
+        Resize(
+            640,
+            480
+        );
     }
+
+    private void Move(int x, int y) { }
+
+    private void Resize(int width, int height) { }
 }
 ```
 :::
@@ -100,14 +119,19 @@ namespace N;
 
 public class Widget
 {
-    public void Register(string name, int value, bool active, string tag)
-    {
-    }
-
     public void Run()
     {
-        Register("curb", 42, true, "formatter");
+        Move(
+            1,
+            2);
+        Resize(
+            640,
+            480);
     }
+
+    private void Move(int x, int y) { }
+
+    private void Resize(int width, int height) { }
 }
 ```
 :::

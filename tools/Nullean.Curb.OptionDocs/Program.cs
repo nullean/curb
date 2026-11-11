@@ -180,9 +180,8 @@ internal static class Program
 
         var formatter = new CSharpFormatter();
         using var xmlFormatter = new XmlFormatter();
-        var defaultOptions = new FormatOptions();
         var divergences = LoadDivergences(root);
-        EnsureEveryValueIsMapped(defaultOptions);
+        var unchangedPages = new List<string>();
 
         var grouped = OptionDescriptor.All
             .GroupBy(d => d.Group)
@@ -209,13 +208,21 @@ internal static class Program
             {
                 OptionLanguage.Xml => BuildXmlPage(descriptor, snippet, xmlFormatter),
                 OptionLanguage.Razor => BuildRazorPage(descriptor, snippet),
-                _ => BuildPage(descriptor, snippet, formatter, defaultOptions, divergences[descriptor.Key]),
+                _ => BuildPage(descriptor, snippet, formatter, divergences[descriptor.Key], unchangedPages),
             };
             var path = Path.Combine(dir, descriptor.Key + ".md");
             File.WriteAllText(path, page, Encoding.UTF8);
             Console.WriteLine($"  {Path.GetRelativePath(root, path)}");
             generated++;
         }
+
+        // An example whose Before and After match says the key does nothing. A key a code block can't
+        // show says so in Snippets.Unshown instead; every other page has to show its key doing something.
+        if (unchangedPages.Count > 0)
+            throw new InvalidOperationException(
+                "No example on these pages shows a change. Give the snippet something the key acts on, give the key the " +
+                "settings it needs in Snippets.Companions, or say what it does in Snippets.Unshown:" + Environment.NewLine +
+                string.Join(Environment.NewLine, unchangedPages.Select(k => "  " + k)));
 
         // Write group index pages.
         foreach (var (group, descriptors) in grouped)
@@ -282,8 +289,8 @@ internal static class Program
         OptionDescriptor descriptor,
         string snippet,
         CSharpFormatter formatter,
-        FormatOptions defaultOptions,
-        IEnumerable<Divergence> divergences)
+        IEnumerable<Divergence> divergences,
+        List<string> unchangedPages)
     {
         var slug = GroupSlugs[descriptor.Group];
         var sb = new StringBuilder();
@@ -340,6 +347,17 @@ internal static class Program
         }
         sb.AppendLine();
 
+        // A key whose effect a code block can't show says what it does instead of showing two
+        // identical blocks.
+        if (Snippets.Unshown.TryGetValue(descriptor.Key, out var unshown))
+        {
+            sb.AppendLine("## Effect");
+            sb.AppendLine();
+            sb.AppendLine(unshown);
+            sb.AppendLine();
+            return sb.ToString();
+        }
+
         // Collect the iterable values (skip placeholder shapes like <integer>).
         var iterableValues = descriptor.Values
             .Where(v => !v.StartsWith('<') || !v.EndsWith('>'))
@@ -348,18 +366,22 @@ internal static class Program
         // Per-value Before/After sections — no overall "Example" header.
         var input = Snippets.BadSnippets.TryGetValue(descriptor.Key, out var bad) ? bad : snippet;
 
-        var defaultResult = formatter.Format(input, defaultOptions, produceText: true);
-        var defaultOutput = defaultResult.Success ? (defaultResult.Text ?? input) : input;
+        // Every example is formatted with the options the CLI binds from the lines it prints: the
+        // settings the key needs to act, then the key itself. Before is the same settings without the key.
+        var companions = Snippets.Companions.TryGetValue(descriptor.Key, out var c) ? c : [];
+        var defaultOutput = Format(formatter, input, Bind(descriptor.Key, companions));
+        var startsFromInput = Snippets.StartFromInput.Contains(descriptor.Key);
+        var showsAChange = false;
 
         // A concrete demo value stands in for a freeform placeholder like <template>, which is
         // filtered out of iterableValues below since there is nothing to iterate. Emitted first, so
         // the freeform shape is shown before whatever named values the option also accepts.
         if (Snippets.DemoValues.TryGetValue(descriptor.Key, out var forceVal))
         {
-            var opts = BuildOptions(descriptor, forceVal);
-            var r = formatter.Format(input, opts, produceText: true);
-            var output = r.Success ? (r.Text ?? input) : input;
-            EmitValueSection(sb, descriptor.Key, forceVal, input, output);
+            var lines = companions.Append($"{descriptor.Key} = {forceVal}").ToList();
+            var output = Format(formatter, input, Bind(descriptor.Key, lines));
+            showsAChange |= Differs(input, output);
+            EmitValueSection(sb, descriptor.Key, forceVal, input, output, lines);
         }
 
         if (iterableValues.Count == 0)
@@ -371,20 +393,30 @@ internal static class Program
                 sb.AppendLine("```ini");
                 sb.AppendLine($"{descriptor.Key} = <value>");
                 sb.AppendLine("```");
+                return sb.ToString();
             }
         }
         else
         {
             foreach (var value in iterableValues)
             {
-                var opts = BuildOptions(descriptor, value);
-                var r = formatter.Format(input, opts, produceText: true);
-                var output = r.Success ? (r.Text ?? input) : input;
-                // Default value: Before = raw input. Non-default: Before = default-formatted output.
-                var before = value == descriptor.Default ? input : defaultOutput;
-                EmitValueSection(sb, descriptor.Key, value, before, output);
+                var lines = companions.Append($"{descriptor.Key} = {value}").ToList();
+                var options = Bind(descriptor.Key, lines);
+                var output = Format(formatter, input, options);
+                // Default value: Before = raw input. Non-default: Before = default-formatted output, unless
+                // the value applied to that output is not After. That is a value which keeps what the author
+                // wrote, and the default's output has already been normalised: shown against it, the value
+                // would look as though it undid the default. Such a value starts from the input instead.
+                var before = value == descriptor.Default || startsFromInput ? input : defaultOutput;
+                if (!ReferenceEquals(before, input) && Differs(Format(formatter, before, options), output))
+                    before = input;
+                showsAChange |= Differs(before, output);
+                EmitValueSection(sb, descriptor.Key, value, before, output, lines);
             }
         }
+
+        if (!showsAChange)
+            unchangedPages.Add(descriptor.Key);
 
         return sb.ToString();
     }
@@ -448,7 +480,7 @@ internal static class Program
                 after = result.Text!;
             }
 
-            EmitValueSection(sb, descriptor.Key, value, snippet, after, "xml");
+            EmitValueSection(sb, descriptor.Key, value, snippet, after, language: "xml");
         }
 
         return sb.ToString();
@@ -516,7 +548,7 @@ internal static class Program
                 after = result.Text!;
             }
 
-            EmitValueSection(sb, descriptor.Key, value, snippet, after, "html");
+            EmitValueSection(sb, descriptor.Key, value, snippet, after, language: "html");
         }
 
         return sb.ToString();
@@ -543,12 +575,14 @@ internal static class Program
         };
     }
 
-    private static void EmitValueSection(StringBuilder sb, string key, string value, string before, string after, string language = "csharp")
+    private static void EmitValueSection(
+        StringBuilder sb, string key, string value, string before, string after, IReadOnlyList<string>? ini = null, string language = "csharp")
     {
         sb.AppendLine($"### `{key} = {value}`");
         sb.AppendLine();
         sb.AppendLine("```ini");
-        sb.AppendLine($"{key} = {value}");
+        foreach (var line in ini ?? [$"{key} = {value}"])
+            sb.AppendLine(line);
         sb.AppendLine("```");
         sb.AppendLine();
         sb.AppendLine("::::{tab-set}");
@@ -572,271 +606,33 @@ internal static class Program
     }
 
     /// <summary>
-    /// Values that are documented to leave <see cref="FormatOptions"/> at its default: each one means
-    /// "do nothing", so its example rightly shows no change.
+    /// The options <c>curb format</c> resolves from <paramref name="lines"/>, bound by the CLI's own
+    /// binder. A diagnostic fails the run: it means the CLI would ignore or reject a setting the page
+    /// prints, so the example would show output nobody can get.
     /// </summary>
-    private static readonly HashSet<(string Key, string Value)> NoOpValues =
-    [
-        ("csharp_style_namespace_declarations", "block_scoped"),
-        ("dotnet_diagnostic.ide0055.severity", "silent"),
-        ("dotnet_diagnostic.ide0055.severity", "suggestion"),
-        ("dotnet_diagnostic.ide0055.severity", "error"),
-        ("file_header_template", "unset"),
-    ];
-
-    /// <summary>
-    /// Fails the run when a value other than the key's default comes out of <see cref="BuildOptions"/>
-    /// as the default options. That is what a key with no case in <see cref="BuildOptions"/> does: it
-    /// falls through to the default, and every example on its page shows the default's output instead
-    /// of the value's (#227).
-    /// </summary>
-    /// <remarks>
-    /// This checks the options rather than comparing each example's before and after. An unchanged
-    /// example is often correct: a whitespace key such as <c>charset</c> changes nothing visible, and a
-    /// value that matches the snippet's own layout has nothing to change.
-    /// </remarks>
-    private static void EnsureEveryValueIsMapped(FormatOptions defaultOptions)
+    private static FormatOptions Bind(string key, IReadOnlyList<string> lines)
     {
-        var unmapped = new List<string>();
-        foreach (var descriptor in OptionDescriptor.All)
-        {
-            if (descriptor.Language is not (OptionLanguage.Shared or OptionLanguage.CSharp))
-                continue;
-
-            var values = descriptor.Values.Where(v => !v.StartsWith('<') || !v.EndsWith('>')).ToList();
-            if (Snippets.DemoValues.TryGetValue(descriptor.Key, out var demo))
-                values.Add(demo);
-
-            foreach (var value in values)
-            {
-                if (value == descriptor.Default || NoOpValues.Contains((descriptor.Key, value)))
-                    continue;
-                if (BuildOptions(descriptor, value).Equals(defaultOptions))
-                    unmapped.Add($"{descriptor.Key} = {value}");
-            }
-        }
-
-        if (unmapped.Count > 0)
+        var diagnostics = new List<CurbDiagnostic>();
+        var options = EditorConfigText.Bind(lines, diagnostics);
+        if (diagnostics.Count > 0)
             throw new InvalidOperationException(
-                "These values leave FormatOptions at its default, so their examples would show the default's output. " +
-                "Add the key to BuildOptions, or to NoOpValues if the value really does nothing:" + Environment.NewLine +
-                string.Join(Environment.NewLine, unmapped.Select(u => "  " + u)));
+                $"The {key} example's settings do not bind cleanly, so curb format would not do what the page shows:" + Environment.NewLine +
+                string.Join(Environment.NewLine, lines.Select(l => "  " + l)) + Environment.NewLine +
+                string.Join(Environment.NewLine, diagnostics.Select(d => $"  {d.Id}: {d.Message}")));
+        return options;
     }
 
-    /// <summary>
-    /// Returns a <see cref="FormatOptions"/> that differs from the default in exactly one key.
-    /// </summary>
-    private static FormatOptions BuildOptions(OptionDescriptor d, string value)
+    private static string Format(CSharpFormatter formatter, string input, FormatOptions options)
     {
-        var opts = new FormatOptions();
-        bool b = value == "true";
+        // The CLI skips an excluded file before it reaches the formatter (generated_code, an IDE0055
+        // severity of none), so the formatter itself doesn't look at the flag.
+        if (options.Excluded)
+            return input;
 
-        return d.Key switch
-        {
-            "indent_style" => opts with { UseTabs = value == "tab" },
-            "insert_final_newline" => opts with { InsertFinalNewLine = b },
-            "trim_trailing_whitespace" => opts with { TrimTrailingWhitespace = b },
-            "end_of_line" => opts with
-            {
-                EndOfLine = value switch
-                {
-                    "lf" => EndOfLine.Lf,
-                    "crlf" => EndOfLine.CrLf,
-                    _ => EndOfLine.Auto,
-                }
-            },
-            "charset" => opts with
-            {
-                Charset = value switch
-                {
-                    "utf-8" => Charset.Utf8,
-                    "utf-8-bom" => Charset.Utf8Bom,
-                    _ => Charset.Preserve,
-                }
-            },
-
-            "csharp_new_line_before_open_brace" => opts with
-            {
-                NewLineBeforeOpenBrace = BraceStyleParser.TryParse(value, out var braces)
-                    ? braces
-                    : throw new InvalidOperationException($"csharp_new_line_before_open_brace = {value} does not parse"),
-            },
-            "csharp_new_line_before_else" => opts with { NewLineBeforeElse = b },
-            "csharp_new_line_before_catch" => opts with { NewLineBeforeCatch = b },
-            "csharp_new_line_before_finally" => opts with { NewLineBeforeFinally = b },
-            "csharp_new_line_before_members_in_object_initializers" => opts with { NewLineBeforeMembersInObjectInitializers = b },
-            "csharp_new_line_before_members_in_anonymous_types" => opts with { NewLineBeforeMembersInAnonymousTypes = b },
-            "csharp_new_line_between_query_expression_clauses" => opts with { NewLineBetweenQueryExpressionClauses = b },
-
-            "csharp_indent_case_contents" => opts with { IndentCaseContents = b },
-            "csharp_indent_switch_labels" => opts with { IndentSwitchLabels = b },
-            "csharp_indent_block_contents" => opts with { IndentBlockContents = b },
-            "csharp_indent_braces" => opts with { IndentBraces = b },
-            "csharp_indent_case_contents_when_block" => opts with { IndentCaseContentsWhenBlock = b },
-            "csharp_indent_labels" => opts with
-            {
-                IndentLabels = value switch
-                {
-                    "flush_left" => LabelIndent.FlushLeft,
-                    "no_change" => LabelIndent.NoChange,
-                    _ => LabelIndent.OneLessThanCurrent,
-                }
-            },
-
-            "csharp_space_after_cast" => opts with { SpaceAfterCast = b },
-            "csharp_space_after_keywords_in_control_flow_statements" => opts with { SpaceAfterKeywordsInControlFlowStatements = b },
-            "csharp_space_before_colon_in_inheritance_clause" => opts with { SpaceBeforeColonInInheritanceClause = b },
-            "csharp_space_after_colon_in_inheritance_clause" => opts with { SpaceAfterColonInInheritanceClause = b },
-            "csharp_space_around_binary_operators" => opts with
-            {
-                SpaceAroundBinaryOperators = value switch
-                {
-                    "none" => BinaryOperatorSpacing.None,
-                    "ignore" => BinaryOperatorSpacing.Ignore,
-                    _ => BinaryOperatorSpacing.BeforeAndAfter,
-                }
-            },
-            "csharp_space_around_declaration_statements" => opts with
-            {
-                SpaceAroundDeclarationStatements = value switch
-                {
-                    "ignore" => DeclarationSpacing.Ignore,
-                    _ => DeclarationSpacing.Normalise,
-                }
-            },
-            "csharp_space_after_comma" => opts with { SpaceAfterComma = b },
-            "csharp_space_before_comma" => opts with { SpaceBeforeComma = b },
-            "csharp_space_between_parentheses" => opts with
-            {
-                SpaceBetweenParentheses = value switch
-                {
-                    "control_flow_statements" => ParenthesisSpacing.ControlFlowStatements,
-                    "type_casts" => ParenthesisSpacing.TypeCasts,
-                    "expressions" => ParenthesisSpacing.Expressions,
-                    _ => ParenthesisSpacing.None,
-                }
-            },
-            "csharp_space_between_method_declaration_parameter_list_parentheses" => opts with { SpaceInDeclarationParameterList = b },
-            "csharp_space_between_method_declaration_empty_parameter_list_parentheses" => opts with { SpaceInEmptyDeclarationParameterList = b },
-            "csharp_space_between_method_declaration_name_and_open_parenthesis" => opts with { SpaceBeforeDeclarationParameterList = b },
-            "csharp_space_between_method_call_parameter_list_parentheses" => opts with { SpaceInCallArgumentList = b },
-            "csharp_space_between_method_call_empty_parameter_list_parentheses" => opts with { SpaceInEmptyCallArgumentList = b },
-            "csharp_space_between_method_call_name_and_opening_parenthesis" => opts with { SpaceBeforeCallArgumentList = b },
-            "csharp_space_before_open_square_brackets" => opts with { SpaceBeforeOpenSquareBrackets = b },
-            "csharp_space_between_empty_square_brackets" => opts with { SpaceBetweenEmptySquareBrackets = b },
-            "csharp_space_between_square_brackets" => opts with { SpaceBetweenSquareBrackets = b },
-            "csharp_space_before_dot" => opts with { SpaceBeforeDot = b },
-            "csharp_space_after_dot" => opts with { SpaceAfterDot = b },
-            "csharp_space_after_unary_operator" => opts with { SpaceAfterUnaryOperator = b },
-            "csharp_space_around_ternary_operator" => opts with { SpaceAroundTernaryOperator = b },
-            "csharp_space_before_semicolon_in_for_statement" => opts with { SpaceBeforeSemicolonInForStatement = b },
-            "csharp_space_after_semicolon_in_for_statement" => opts with { SpaceAfterSemicolonInForStatement = b },
-
-            "csharp_preserve_single_line_blocks" => opts with { PreserveSingleLineBlocks = b },
-            "csharp_empty_block_style" => opts with
-            {
-                EmptyBlockStyle = value switch
-                {
-                    "multiline" => Nullean.Curb.EmptyBlockStyle.Multiline,
-                    "together" => Nullean.Curb.EmptyBlockStyle.Together,
-                    "together_same_line" => Nullean.Curb.EmptyBlockStyle.TogetherSameLine,
-                    _ => (Nullean.Curb.EmptyBlockStyle?)null,
-                }
-            },
-            "csharp_preserve_single_line_statements" => opts with { PreserveSingleLineStatementsOption = b },
-            "csharp_keep_existing_linebreaks" => opts with { KeepExistingLinebreaksOption = b },
-            "csharp_wrap_before_first_method_call" => opts with { WrapBeforeFirstMethodCall = b },
-            "csharp_wrap_before_first_type_parameter_constraint" => opts with { WrapBeforeFirstTypeParameterConstraint = b },
-            "csharp_wrap_before_extends_colon" => opts with { WrapBeforeExtendsColon = b },
-            "csharp_place_constructor_initializer_on_same_line" => opts with { PlaceConstructorInitializerOnSameLine = b },
-            "csharp_wrap_before_arrow_with_expressions" => opts with { WrapBeforeArrowWithExpressions = b },
-            "csharp_wrap_after_dot_in_method_calls" => opts with { WrapAfterDotInMethodCalls = b },
-            "csharp_place_simple_enum_on_single_line" => opts with { PlaceSimpleEnumOnSingleLine = b },
-            "csharp_place_simple_accessorholder_on_single_line" => opts with { PlaceSimpleAccessorholderOnSingleLine = b },
-            "csharp_place_simple_declaration_blocks_on_single_line" => opts with { PlaceSimpleDeclarationBlocksOnSingleLine = b },
-            "csharp_place_simple_blocks_on_single_line" => opts with { PlaceSimpleBlocksOnSingleLine = b },
-            "csharp_wrap_before_binary_opsign" => opts with { WrapBeforeBinaryOpsign = b },
-            // chop_if_long and wrap_if_long only act once a line does not fit, and none of these three
-            // snippets overflows the default (off) width on its own, so the example would render the
-            // same before and after without one. chop_always forces a break regardless of width, so
-            // giving it one too does not change its own example.
-            "csharp_wrap_chained_binary_expressions" => opts with { WrapChainedBinaryExpressions = ParseWrapStyle(value), MaxLineLength = 40 },
-            "csharp_wrap_parameters_style" => opts with { WrapParametersStyle = ParseWrapStyle(value), MaxLineLength = 40 },
-            "csharp_wrap_arguments_style" => opts with { WrapArgumentsStyle = ParseWrapStyle(value), MaxLineLength = 40 },
-            "csharp_wrap_object_and_collection_initializer_style" => opts with { WrapObjectAndCollectionInitializerStyle = ParseWrapStyle(value) },
-            "csharp_wrap_before_declaration_rpar" => opts with { WrapBeforeDeclarationRpar = b },
-            "csharp_wrap_before_invocation_rpar" => opts with { WrapBeforeInvocationRpar = b },
-            "csharp_place_method_attribute_on_same_line" => opts with { PlaceMethodAttributeOnSameLine = value == "if_owner_is_single_line" ? AttributePlacement.IfOwnerIsSingleLine : AttributePlacement.OwnLine },
-            "csharp_place_field_attribute_on_same_line" => opts with { PlaceFieldAttributeOnSameLine = value == "if_owner_is_single_line" ? AttributePlacement.IfOwnerIsSingleLine : AttributePlacement.OwnLine },
-            "csharp_place_property_attribute_on_same_line" => opts with { PlacePropertyAttributeOnSameLine = value == "if_owner_is_single_line" ? AttributePlacement.IfOwnerIsSingleLine : AttributePlacement.OwnLine },
-            "csharp_place_event_attribute_on_same_line" => opts with { PlaceEventAttributeOnSameLine = value == "if_owner_is_single_line" ? AttributePlacement.IfOwnerIsSingleLine : AttributePlacement.OwnLine },
-
-            "csharp_keep_blank_lines_in_declarations" => opts with { KeepBlankLinesInDeclarations = int.Parse(value) },
-            "csharp_keep_blank_lines_in_code" => opts with { KeepBlankLinesInCode = int.Parse(value) },
-            "csharp_blank_lines_around_invocable" => opts with { BlankLinesAroundInvocable = int.Parse(value) },
-            "csharp_blank_lines_around_type" => opts with { BlankLinesAroundType = int.Parse(value) },
-            "csharp_blank_lines_around_property" => opts with { BlankLinesAroundProperty = int.Parse(value) },
-            "csharp_blank_lines_around_field" => opts with { BlankLinesAroundField = int.Parse(value) },
-            "csharp_blank_lines_inside_type" => opts with { BlankLinesInsideType = int.Parse(value) },
-            "csharp_blank_lines_around_namespace" => opts with { BlankLinesAroundNamespace = int.Parse(value) },
-            "csharp_blank_lines_after_using_list" => opts with { BlankLinesAfterUsingList = int.Parse(value) },
-            "csharp_blank_lines_after_file_scoped_namespace_directive" => opts with { BlankLinesAfterFileScopedNamespace = int.Parse(value) },
-
-            "csharp_style_expression_bodied_methods" => opts with { ExpressionBodiedMethods = ParseExprBody(value) },
-            "csharp_style_expression_bodied_constructors" => opts with { ExpressionBodiedConstructors = ParseExprBody(value) },
-            "csharp_style_expression_bodied_operators" => opts with { ExpressionBodiedOperators = ParseExprBody(value) },
-            "csharp_style_expression_bodied_local_functions" => opts with { ExpressionBodiedLocalFunctions = ParseExprBody(value) },
-            "csharp_style_expression_bodied_accessors" => opts with { ExpressionBodiedAccessors = ParseExprBody(value) },
-            "csharp_style_expression_bodied_properties" => opts with { ExpressionBodiedProperties = ParseExprBody(value) },
-            "csharp_style_expression_bodied_indexers" => opts with { ExpressionBodiedIndexers = ParseExprBody(value) },
-
-            "dotnet_sort_system_directives_first" => opts with { SortUsings = value == "true" ? UsingOrder.SystemFirst : UsingOrder.AsWritten },
-            "dotnet_separate_import_directive_groups" => opts with { SeparateImportDirectiveGroups = b },
-            "csharp_using_directive_placement" => opts with { UsingPlacement = value == "inside_namespace" ? UsingPlacement.InsideNamespace : UsingPlacement.OutsideNamespace },
-
-            "csharp_prefer_braces" => opts with
-            {
-                PreferBraces = value switch
-                {
-                    "true" => BraceRequirement.Always,
-                    "when_multiline" => BraceRequirement.WhenMultiline,
-                    _ => BraceRequirement.AsWritten,
-                }
-            },
-            "csharp_style_namespace_declarations" => opts with { NamespaceStyle = value == "file_scoped" ? NamespaceStyle.FileScoped : NamespaceStyle.AsWritten },
-
-            "csharp_trailing_comma_in_multiline_lists" => opts with { TrailingCommaInMultilineLists = b },
-            "csharp_trailing_comma_in_singleline_lists" => opts with { TrailingCommaInSinglelineLists = b },
-
-            "csharp_remove_blank_lines_near_braces_in_declarations" => opts with { RemoveBlankLinesNearBracesInDeclarations = b },
-            "csharp_remove_blank_lines_near_braces_in_code" => opts with { RemoveBlankLinesNearBracesInCode = b },
-
-            "generated_code" => opts with { Excluded = b },
-            "dotnet_diagnostic.ide0055.severity" => value == "none" ? opts with { Excluded = true } : opts,
-
-            // "unset" turns the rule off, the same as an absent or empty key — not a literal template.
-            "file_header_template" => value == "unset" ? opts : opts with { FileHeaderTemplate = value },
-
-            // Keys with no runtime effect in FormatOptions (modifier order, max counts).
-            "csharp_preferred_modifier_order" => opts,
-            "max_line_length" => value == "off" ? opts : opts with { MaxLineLength = int.TryParse(value, out var w) ? w : FormatOptions.Off },
-
-            // Integer family — generate the page but the value is freeform so BuildOptions won't be called for placeholders.
-            _ => opts,
-        };
+        var result = formatter.Format(input, options, produceText: true);
+        return result.Success ? (result.Text ?? input) : input;
     }
 
-    private static ExpressionBodyStyle ParseExprBody(string value) => value switch
-    {
-        "true" => ExpressionBodyStyle.Always,
-        "when_on_single_line" => ExpressionBodyStyle.WhenOnSingleLine,
-        _ => ExpressionBodyStyle.AsWritten,
-    };
-
-    private static WrapStyle ParseWrapStyle(string value) => value switch
-    {
-        "chop_always" => WrapStyle.ChopAlways,
-        "wrap_if_long" => WrapStyle.WrapIfLong,
-        _ => WrapStyle.ChopIfLong,
-    };
+    /// <summary>Whether two examples render differently, which is what a reader of the page can see.</summary>
+    private static bool Differs(string before, string after) => before.TrimEnd() != after.TrimEnd();
 }

@@ -13,7 +13,7 @@ Skip this file entirely. Curb never formats files marked as generated.
 
 | Value | Notes |
 |---|---|
-| `true` |  |
+| `true` | Curb leaves the file as written. |
 | `false` |  |
 
 **Default:** `false`
@@ -38,9 +38,9 @@ public class Widget
 {
     public int Value { get; set; }
 
-    public int Double()
+    public int Double( )
     {
-        return Value * 2;
+        return Value*2;
     }
 }
 ```
@@ -54,9 +54,9 @@ public class Widget
 {
     public int Value { get; set; }
 
-    public int Double()
+    public int Double( )
     {
-        return Value * 2;
+        return Value*2;
     }
 }
 ```
@@ -80,9 +80,9 @@ public class Widget
 {
     public int Value { get; set; }
 
-    public int Double()
+    public int Double( )
     {
-        return Value * 2;
+        return Value*2;
     }
 }
 ```

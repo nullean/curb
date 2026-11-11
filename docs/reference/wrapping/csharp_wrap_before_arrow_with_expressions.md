@@ -25,6 +25,7 @@ No known case where Curb's output is not a fixed point of `dotnet format` — se
 ### `csharp_wrap_before_arrow_with_expressions = true`
 
 ```ini
+max_line_length = 80
 csharp_wrap_before_arrow_with_expressions = true
 ```
 
@@ -38,15 +39,8 @@ public class Widget
 {
     public int Value { get; set; }
 
-    public int Double()
-    {
-        return Value * 2;
-    }
-
-    public string Describe()
-    {
-        return $"Widget({Value})";
-    }
+    public string Describe() =>
+        $"Widget {Value} of {Value * 2}, built by the widget factory";
 }
 ```
 :::
@@ -59,15 +53,8 @@ public class Widget
 {
     public int Value { get; set; }
 
-    public int Double()
-    {
-        return Value * 2;
-    }
-
     public string Describe()
-    {
-        return $"Widget({Value})";
-    }
+        => $"Widget {Value} of {Value * 2}, built by the widget factory";
 }
 ```
 :::
@@ -77,6 +64,7 @@ public class Widget
 ### `csharp_wrap_before_arrow_with_expressions = false`
 
 ```ini
+max_line_length = 80
 csharp_wrap_before_arrow_with_expressions = false
 ```
 
@@ -90,15 +78,7 @@ public class Widget
 {
     public int Value { get; set; }
 
-    public int Double()
-    {
-        return Value * 2;
-    }
-
-    public string Describe()
-    {
-        return $"Widget({Value})";
-    }
+    public string Describe() => $"Widget {Value} of {Value * 2}, built by the widget factory";
 }
 ```
 :::
@@ -111,15 +91,8 @@ public class Widget
 {
     public int Value { get; set; }
 
-    public int Double()
-    {
-        return Value * 2;
-    }
-
-    public string Describe()
-    {
-        return $"Widget({Value})";
-    }
+    public string Describe() =>
+        $"Widget {Value} of {Value * 2}, built by the widget factory";
 }
 ```
 :::

@@ -25,6 +25,8 @@ No known case where Curb's output is not a fixed point of `dotnet format` — se
 ### `csharp_wrap_before_binary_opsign = true`
 
 ```ini
+max_line_length = 80
+csharp_wrap_chained_binary_expressions = chop_if_long
 csharp_wrap_before_binary_opsign = true
 ```
 
@@ -36,9 +38,9 @@ namespace N;
 
 public class Widget
 {
-    public bool Check(int a, int b, int c)
+    public bool IsValid(string name, int count)
     {
-        return a > 0 && b > 0 && c > 0 && a + b > c && a + c > b && b + c > a;
+        return name.Length > 0 && count > 0 && count < 100 && name != "none" && name != "all";
     }
 }
 ```
@@ -50,9 +52,13 @@ namespace N;
 
 public class Widget
 {
-    public bool Check(int a, int b, int c)
+    public bool IsValid(string name, int count)
     {
-        return a > 0 && b > 0 && c > 0 && a + b > c && a + c > b && b + c > a;
+        return name.Length > 0
+            && count > 0
+            && count < 100
+            && name != "none"
+            && name != "all";
     }
 }
 ```
@@ -63,6 +69,8 @@ public class Widget
 ### `csharp_wrap_before_binary_opsign = false`
 
 ```ini
+max_line_length = 80
+csharp_wrap_chained_binary_expressions = chop_if_long
 csharp_wrap_before_binary_opsign = false
 ```
 
@@ -74,9 +82,13 @@ namespace N;
 
 public class Widget
 {
-    public bool Check(int a, int b, int c)
+    public bool IsValid(string name, int count)
     {
-        return a > 0 && b > 0 && c > 0 && a + b > c && a + c > b && b + c > a;
+        return name.Length > 0
+            && count > 0
+            && count < 100
+            && name != "none"
+            && name != "all";
     }
 }
 ```
@@ -88,9 +100,13 @@ namespace N;
 
 public class Widget
 {
-    public bool Check(int a, int b, int c)
+    public bool IsValid(string name, int count)
     {
-        return a > 0 && b > 0 && c > 0 && a + b > c && a + c > b && b + c > a;
+        return name.Length > 0 &&
+            count > 0 &&
+            count < 100 &&
+            name != "none" &&
+            name != "all";
     }
 }
 ```

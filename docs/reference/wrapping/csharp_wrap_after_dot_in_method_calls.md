@@ -25,6 +25,7 @@ No known case where Curb's output is not a fixed point of `dotnet format` — se
 ### `csharp_wrap_after_dot_in_method_calls = true`
 
 ```ini
+max_line_length = 80
 csharp_wrap_after_dot_in_method_calls = true
 ```
 
@@ -40,7 +41,12 @@ public class Widget
 {
     public string Build()
     {
-        return new StringBuilder().Append("Hello").Append(", ").Append("World").Append("!").ToString();
+        return new StringBuilder()
+            .Append("Hello")
+            .Append(", ")
+            .Append("World")
+            .Append("!")
+            .ToString();
     }
 }
 ```
@@ -56,7 +62,12 @@ public class Widget
 {
     public string Build()
     {
-        return new StringBuilder().Append("Hello").Append(", ").Append("World").Append("!").ToString();
+        return new StringBuilder().
+            Append("Hello").
+            Append(", ").
+            Append("World").
+            Append("!").
+            ToString();
     }
 }
 ```
@@ -67,6 +78,7 @@ public class Widget
 ### `csharp_wrap_after_dot_in_method_calls = false`
 
 ```ini
+max_line_length = 80
 csharp_wrap_after_dot_in_method_calls = false
 ```
 
@@ -98,7 +110,12 @@ public class Widget
 {
     public string Build()
     {
-        return new StringBuilder().Append("Hello").Append(", ").Append("World").Append("!").ToString();
+        return new StringBuilder()
+            .Append("Hello")
+            .Append(", ")
+            .Append("World")
+            .Append("!")
+            .ToString();
     }
 }
 ```

@@ -82,10 +82,12 @@ namespace N;
 
 public class Widget
 {
+
     private int _x;
 
     public void Run()
     {
+
         int a = 1;
         Console.WriteLine(a);
     }

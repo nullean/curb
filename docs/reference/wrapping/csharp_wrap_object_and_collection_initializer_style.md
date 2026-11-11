@@ -25,6 +25,7 @@ No known case where Curb's output is not a fixed point of `dotnet format` — se
 ### `csharp_wrap_object_and_collection_initializer_style = chop_always`
 
 ```ini
+max_line_length = 80
 csharp_wrap_object_and_collection_initializer_style = chop_always
 ```
 
@@ -38,7 +39,14 @@ public class Widget
 {
     public object Make()
     {
-        return new Point { X = 1, Y = 2, Z = 3 };
+        var small = new Point { X = 1, Y = 2 };
+        return new Point
+        {
+            X = 1000,
+            Y = 2000,
+            Z = 3000,
+            Label = "a point with a long label"
+        };
     }
 }
 ```
@@ -52,11 +60,17 @@ public class Widget
 {
     public object Make()
     {
-        return new Point
+        var small = new Point
         {
             X = 1,
-            Y = 2,
-            Z = 3
+            Y = 2
+        };
+        return new Point
+        {
+            X = 1000,
+            Y = 2000,
+            Z = 3000,
+            Label = "a point with a long label"
         };
     }
 }
@@ -68,6 +82,7 @@ public class Widget
 ### `csharp_wrap_object_and_collection_initializer_style = chop_if_long`
 
 ```ini
+max_line_length = 80
 csharp_wrap_object_and_collection_initializer_style = chop_if_long
 ```
 
@@ -81,7 +96,8 @@ public class Widget
 {
     public object Make()
     {
-        return new Point { X = 1, Y = 2, Z = 3 };
+        var small = new Point { X = 1, Y = 2 };
+        return new Point { X = 1000, Y = 2000, Z = 3000, Label = "a point with a long label" };
     }
 }
 ```
@@ -95,7 +111,14 @@ public class Widget
 {
     public object Make()
     {
-        return new Point { X = 1, Y = 2, Z = 3 };
+        var small = new Point { X = 1, Y = 2 };
+        return new Point
+        {
+            X = 1000,
+            Y = 2000,
+            Z = 3000,
+            Label = "a point with a long label"
+        };
     }
 }
 ```

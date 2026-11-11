@@ -13,7 +13,7 @@ When a chain breaks, break before the first call too, leaving the receiver on it
 
 | Value | Notes |
 |---|---|
-| `true` |  |
+| `true` | What Curb does with the key unset: once a chain breaks, its receiver gets a line of its own. |
 | `false` |  |
 
 **Default:** `(not set)`
@@ -25,6 +25,7 @@ No known case where Curb's output is not a fixed point of `dotnet format` — se
 ### `csharp_wrap_before_first_method_call = true`
 
 ```ini
+max_line_length = 80
 csharp_wrap_before_first_method_call = true
 ```
 
@@ -40,7 +41,12 @@ public class Widget
 {
     public string Build()
     {
-        return new StringBuilder().Append("Hello").Append(", ").Append("World").Append("!").ToString();
+        return new StringBuilder()
+            .Append("Hello")
+            .Append(", ")
+            .Append("World")
+            .Append("!")
+            .ToString();
     }
 }
 ```
@@ -56,7 +62,12 @@ public class Widget
 {
     public string Build()
     {
-        return new StringBuilder().Append("Hello").Append(", ").Append("World").Append("!").ToString();
+        return new StringBuilder()
+            .Append("Hello")
+            .Append(", ")
+            .Append("World")
+            .Append("!")
+            .ToString();
     }
 }
 ```
@@ -67,6 +78,7 @@ public class Widget
 ### `csharp_wrap_before_first_method_call = false`
 
 ```ini
+max_line_length = 80
 csharp_wrap_before_first_method_call = false
 ```
 
@@ -82,7 +94,12 @@ public class Widget
 {
     public string Build()
     {
-        return new StringBuilder().Append("Hello").Append(", ").Append("World").Append("!").ToString();
+        return new StringBuilder()
+            .Append("Hello")
+            .Append(", ")
+            .Append("World")
+            .Append("!")
+            .ToString();
     }
 }
 ```
@@ -98,7 +115,11 @@ public class Widget
 {
     public string Build()
     {
-        return new StringBuilder().Append("Hello").Append(", ").Append("World").Append("!").ToString();
+        return new StringBuilder().Append("Hello")
+            .Append(", ")
+            .Append("World")
+            .Append("!")
+            .ToString();
     }
 }
 ```

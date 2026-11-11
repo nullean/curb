@@ -78,7 +78,7 @@ public sealed record OptionDescriptor(
 		new("end_of_line", OptionGroup.Core, ["lf", "crlf", "auto"], "auto", "Line ending to write. auto matches the platform's own (Environment.NewLine), the same default Roslyn uses.", "basic_method"),
 		new("insert_final_newline", OptionGroup.Core, ["true", "false"], "true", "Ensure the file ends with a newline.", "basic_method"),
 		new("trim_trailing_whitespace", OptionGroup.Core, ["true", "false"], "true", "Remove trailing whitespace from each line.", "basic_method"),
-		new("charset", OptionGroup.Core, ["utf-8", "utf-8-bom", "preserve"], "preserve", "Byte-order mark handling. preserve keeps whatever the file arrived with.", "basic_method"),
+		new("charset", OptionGroup.Core, ["utf-8", "utf-8-bom"], "(not set)", "Byte-order mark handling. Not set, a file keeps whatever mark it arrived with.", "basic_method"),
 		new("max_line_length", OptionGroup.Core, ["off", "<integer>"], "off", "Column target for reflow. off disables reflow entirely and selects preservation mode.", "long_chain"),
 
 		// ---- NewLines (7) -------------------------------------------------------------------
@@ -159,10 +159,10 @@ public sealed record OptionDescriptor(
 		new("csharp_max_array_initializer_elements_on_line", OptionGroup.Wrapping, ["<integer>"], "(not set)", "Chop an array initializer carrying more than this many elements.", "array_init"),
 		new("csharp_wrap_before_declaration_rpar", OptionGroup.Wrapping, ["true", "false"], "(not set)", "Put a broken parameter list's ) on its own line.", "method_decl"),
 		new("csharp_wrap_before_invocation_rpar", OptionGroup.Wrapping, ["true", "false"], "(not set)", "Put a broken argument list's ) on its own line.", "call_args"),
-		new("csharp_place_method_attribute_on_same_line", OptionGroup.Wrapping, ["own_line", "if_owner_is_single_line"], "own_line", "Where a method's attribute section goes. if_owner_is_single_line joins it when the method fits on one line. Deterministic mode only.", "attributed_method"),
-		new("csharp_place_field_attribute_on_same_line", OptionGroup.Wrapping, ["own_line", "if_owner_is_single_line"], "own_line", "Where a field's attribute section goes.", "attributed_method"),
-		new("csharp_place_property_attribute_on_same_line", OptionGroup.Wrapping, ["own_line", "if_owner_is_single_line"], "own_line", "Where a property's attribute section goes.", "attributed_method"),
-		new("csharp_place_event_attribute_on_same_line", OptionGroup.Wrapping, ["own_line", "if_owner_is_single_line"], "own_line", "Where an event's attribute section goes.", "attributed_method"),
+		new("csharp_place_method_attribute_on_same_line", OptionGroup.Wrapping, ["false", "if_owner_is_single_line"], "false", "Where a method's attribute section goes. if_owner_is_single_line joins it when the method fits on one line. Deterministic mode only.", "attributed_method"),
+		new("csharp_place_field_attribute_on_same_line", OptionGroup.Wrapping, ["false", "if_owner_is_single_line"], "false", "Where a field's attribute section goes.", "attributed_method"),
+		new("csharp_place_property_attribute_on_same_line", OptionGroup.Wrapping, ["false", "if_owner_is_single_line"], "false", "Where a property's attribute section goes.", "attributed_method"),
+		new("csharp_place_event_attribute_on_same_line", OptionGroup.Wrapping, ["false", "if_owner_is_single_line"], "false", "Where an event's attribute section goes.", "attributed_method"),
 
 		// ---- BlankLines (24) ----------------------------------------------------------------
 		new("csharp_keep_blank_lines_in_declarations", OptionGroup.BlankLines, ["<integer>"], "1", "Maximum consecutive blank lines between members.", "members"),
@@ -200,8 +200,8 @@ public sealed record OptionDescriptor(
 		new("csharp_style_expression_bodied_indexers", OptionGroup.ExpressionBodies, ["false", "true", "when_on_single_line"], "false", "Convert eligible block-bodied indexers. IDE0026.", "indexer"),
 
 		// ---- Usings (3) ---------------------------------------------------------------------
-		new("dotnet_sort_system_directives_first", OptionGroup.Usings, ["true", "false"], "false", "Put System.* usings before all others.", "usings"),
-		new("dotnet_separate_import_directive_groups", OptionGroup.Usings, ["true", "false"], "false", "Separate groups of usings by first namespace segment with a blank line.", "usings"),
+		new("dotnet_sort_system_directives_first", OptionGroup.Usings, ["true", "false"], "(not set)", "Put System.* usings before all others.", "usings"),
+		new("dotnet_separate_import_directive_groups", OptionGroup.Usings, ["true", "false"], "(not set)", "Separate groups of usings by first namespace segment with a blank line.", "usings"),
 		new("csharp_using_directive_placement", OptionGroup.Usings, ["inside_namespace", "outside_namespace"], "(as written)", "Move using directives inside or outside the namespace. IDE0065.", "usings"),
 
 		// ---- ModifiersAndBraces (3) ---------------------------------------------------------
