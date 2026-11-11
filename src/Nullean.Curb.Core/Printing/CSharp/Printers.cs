@@ -918,6 +918,11 @@ internal static partial class Printers
 		var register = node.Parameters.Count > 0 ? ClaimLinesAsWritten(node, context) : -1;
 		TokenPrinter.Print(node.OpenParenToken, context);
 
+		// An empty list has no group, and must not leave the previous member's in place: a body would read
+		// whether that list wrapped, and `void O() { }` after a wrapped `M(int x,` moved below its
+		// signature (issue #287).
+		context.ParameterListGroup = 0;
+
 		if (node.Parameters.Count > 0)
 		{
 			var asWritten = register >= 0;
