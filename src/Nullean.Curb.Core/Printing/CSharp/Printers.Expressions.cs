@@ -667,11 +667,15 @@ internal static partial class Printers
 	/// brace takes a line of its own whenever that list wrapped, which is the one thing dotnet format
 	/// decides here and the only version of the question that survives deterministic layout.
 	/// </param>
+	/// <param name="ownerBroke">
+	/// The creation is known to span lines whatever the layout mode: a comment puts a line break in it.
+	/// </param>
 	public static void InitializerExpression(
 		InitializerExpressionSyntax node,
 		PrintContext context,
 		bool leadingLine = false,
-		ushort ownerGroup = 0)
+		ushort ownerGroup = 0,
+		bool ownerBroke = false)
 	{
 		var arena = context.Arena;
 
@@ -767,7 +771,7 @@ internal static partial class Printers
 		// settling. Where the author put the brace is fixed, so it is that which decides.
 		var ownerSpansLines = leadingLine
 			&& node.Parent is not null
-			&& context.AuthorBroke(node.Parent.SpanStart, node.SpanStart);
+			&& (ownerBroke || context.AuthorBroke(node.Parent.SpanStart, node.SpanStart));
 
 		// The creation spans lines and the initializer does not: `new List<int>` / `{ 1, 2 }`. dotnet
 		// format leaves the members on the brace's line, so the brace's break goes outside the group.
