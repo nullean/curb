@@ -1743,11 +1743,21 @@ internal static partial class Printers
 
 		// dotnet format files this brace under the initializers flag, and otherwise moves it either way
 		// regardless of where the author put it.
+		// Moved, the braces and the arms sit at the indent of the line holding the governing expression's
+		// first token, as an initializer's sit at the line holding its `new`, however deep the scope
+		// printing them. Inside a lambda body or an argument, `(s switch` was a level in from that line,
+		// and dotnet format put it back (issue #229).
 		var offset = 0;
+		var ownerLine = -1;
+		var ownerScope = default(DocScope);
 		if (anchor >= 0)
 			offset = ContinuationLine(node.OpenBraceToken, anchor, context);
 		else
+		{
+			ownerLine = OwnerLineAnchor(node.GoverningExpression.GetFirstToken(), context);
+			ownerScope = arena.AlignedIndent(ownerLine, 0);
 			BeforeOpenBrace(BraceStyle.ObjectCollectionArrayInitializers, context);
+		}
 
 		TokenPrinter.Print(node.OpenBraceToken, context);
 
@@ -1792,6 +1802,9 @@ internal static partial class Printers
 			TokenPrinter.Print(node.CloseBraceToken, context);
 		}
 
+		ownerScope.Dispose();
+		if (ownerLine >= 0)
+			context.ExitContinuation();
 		context.CaseLabelContinuation = outerLabelAnchor;
 		ExitPatternContinuation(anchor, context);
 	}

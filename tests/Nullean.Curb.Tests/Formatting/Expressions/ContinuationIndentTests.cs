@@ -307,6 +307,112 @@ public class ContinuationIndentTests : FormattingTest
 		}
 		""");
 
+	// dotnet format puts a switch expression's braces at the indent of the line its governing
+	// expression starts on, parentheses or not. Curb indented `(s switch` a level in a lambda body or
+	// an argument, and dotnet format put it back (issue #229).
+	[Test]
+	public Task A_parenthesized_switch_in_an_argument_anchors_to_the_statement() => Formats(
+		"""
+		public class C
+		{
+		    public void M(string s)
+		    {
+		        Check(async () => await (s switch
+		            {
+		                "a" => Task.CompletedTask,
+		                _ => throw new ArgumentException(s),
+		            }))
+		            .Throws();
+		        Check(() => (s switch
+		                {
+		                    "a" => "",
+		                    _ => "",
+		                }).Length);
+		        Check((s switch
+		            {
+		                _ => "",
+		            }));
+		        Func<string> f = () => (s switch
+		            {
+		                _ => "",
+		            });
+		        Check(1,
+		            () => (s switch
+		                {
+		                    _ => "",
+		                }));
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M(string s)
+		    {
+		        Check(async () => await (s switch
+		        {
+		            "a" => Task.CompletedTask,
+		            _ => throw new ArgumentException(s),
+		        }))
+		            .Throws();
+		        Check(() => (s switch
+		        {
+		            "a" => "",
+		            _ => "",
+		        }).Length);
+		        Check((s switch
+		        {
+		            _ => "",
+		        }));
+		        Func<string> f = () => (s switch
+		        {
+		            _ => "",
+		        });
+		        Check(1,
+		            () => (s switch
+		            {
+		                _ => "",
+		            }));
+		    }
+		}
+		""");
+
+	// Deterministic layout breaks the argument list and the arrow first, and the braces follow the
+	// `(s switch` line down, which is where dotnet format leaves them too.
+	[Test]
+	public Task A_parenthesized_switch_in_an_argument_follows_its_line_at_a_width() => Formats(
+		"""
+		public class C
+		{
+		    public void M(string s)
+		    {
+		        Check(async () => await (s switch
+		        {
+		            "a" => Task.CompletedTask,
+		            _ => throw new ArgumentException(s),
+		        }))
+		            .Throws();
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M(string s)
+		    {
+		        Check(
+		            async () =>
+		                await (s switch
+		                {
+		                    "a" => Task.CompletedTask,
+		                    _ => throw new ArgumentException(s),
+		                })
+		        ).Throws();
+		    }
+		}
+		""",
+		editorConfig: "max_line_length = 120");
+
 	[Test]
 	public Task A_block_lambda_argument_is_unchanged() => Unchanged(
 		"""
