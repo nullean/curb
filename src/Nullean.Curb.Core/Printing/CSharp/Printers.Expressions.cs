@@ -1450,7 +1450,12 @@ internal static partial class Printers
 			Node.Print(node.ParameterList, context);
 		}
 
-		PrintAnonymousFunctionBody(node.Block, BraceStyle.AnonymousMethods, context);
+		// A one-line body after a parameter list the author broke goes on a line of its own, where the brace
+		// option puts it, and stays on one line there: dotnet format moves it, and leaves it beside a `)` on
+		// the `delegate` line (issue #271). A width that breaks the list puts the `)` on a line of its own,
+		// and the brace already follows it there.
+		var broken = node.ParameterList is { Parameters.Count: > 0 } && SpansLines(node.ParameterList, context);
+		PrintAnonymousFunctionBody(node.Block, BraceStyle.AnonymousMethods, context, broken);
 	}
 
 	/// <summary>
@@ -1463,7 +1468,7 @@ internal static partial class Printers
 	/// it back — issue #135. The block's statements and closing brace follow the opening brace, as they
 	/// would from the indent.
 	/// </remarks>
-	private static void PrintAnonymousFunctionBody(BlockSyntax block, BraceStyle construct, PrintContext context)
+	private static void PrintAnonymousFunctionBody(BlockSyntax block, BraceStyle construct, PrintContext context, bool belowBrokenHeader = false)
 	{
 		// Named and published on the way out, for the creation a hugged argument list belongs to:
 		// `new HttpClient(new Handler(async r => { … })) { BaseAddress = u }` gives that list no group of
@@ -1475,7 +1480,7 @@ internal static partial class Printers
 		{
 			var column = OwnLineBraceColumn(block, construct, context);
 			if (column < 0)
-				PrintBody(block, construct, context);
+				PrintBody(block, construct, context, belowClause: belowBrokenHeader);
 			else
 			{
 				var register = context.EnterContinuation();
