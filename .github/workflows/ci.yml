@@ -618,7 +618,7 @@ jobs:
     timeout-minutes: 20
     needs: [build, corpus, cleanup-conformance, ide0055]
     permissions:
-      contents: write   # append the public API changes to the release notes
+      contents: write   # attach the binaries and append the public API changes to the release
       packages: write   # push the container image
       id-token: write   # NuGet trusted publishing: exchange the workflow's OIDC token for a short-lived key
 
@@ -671,6 +671,43 @@ jobs:
             -s https://api.nuget.org/v3/index.json \
             --skip-duplicate \
             --no-symbols
+
+      # The native binary of every RID, straight out of its validated curb-cli.<rid> package, attached to the release
+      # with checksums, for installing without the .NET SDK. --clobber keeps a re-run safe.
+      - name: Attach the native binaries to the release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          shopt -s nullglob
+          version="${TAG#v}"
+          mkdir -p "$RUNNER_TEMP/assets"
+          rids=0
+          for pkg in build/output/curb-cli.*."$version".nupkg; do
+            name=$(basename "$pkg" ".$version.nupkg")
+            rid="${name#curb-cli.}"
+            case "$rid" in curb-cli|any) continue ;; esac
+            work="$RUNNER_TEMP/extract/$rid"
+            mkdir -p "$work"
+            unzip -q -o "$pkg" "tools/any/$rid/curb" "tools/any/$rid/curb.exe" -d "$work" 2>/dev/null || true
+            case "$rid" in
+              win-*)
+                [ -f "$work/tools/any/$rid/curb.exe" ] || { echo "::error::no curb.exe in $pkg"; exit 1; }
+                (cd "$work/tools/any/$rid" && zip -q "$RUNNER_TEMP/assets/curb-$version-$rid.zip" curb.exe) ;;
+              *)
+                [ -f "$work/tools/any/$rid/curb" ] || { echo "::error::no curb binary in $pkg"; exit 1; }
+                chmod +x "$work/tools/any/$rid/curb"
+                tar -czf "$RUNNER_TEMP/assets/curb-$version-$rid.tar.gz" -C "$work/tools/any/$rid" curb ;;
+            esac
+            rids=$((rids + 1))
+          done
+          if [ "$rids" -eq 0 ]; then
+            echo "::error::no per-RID curb-cli packages for $version in build/output"
+            exit 1
+          fi
+          (cd "$RUNNER_TEMP/assets" && sha256sum -- * > SHA256SUMS)
+          gh release upload "$TAG" "$RUNNER_TEMP"/assets/* --clobber --repo "$GITHUB_REPOSITORY"
 
       # After the push, so the notes gain the API changes only once the packages are out. The notes themselves are the
       # draft release-drafter kept from the merged pull requests; a re-run appends nothing twice.
