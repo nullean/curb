@@ -248,11 +248,19 @@ internal static partial class Printers
 	/// The break and the blank lines go first, and the aligned line then reuses the line they end on,
 	/// since an aligned break reuses a line nothing has been written to.
 	/// </remarks>
-	private static int MemberContinuationLine(int previousEnd, SyntaxNode next, int anchor, PrintContext context)
+	/// <param name="previousEnd">Where the member before <paramref name="next"/> ends.</param>
+	/// <param name="next">The member to break before.</param>
+	/// <param name="anchor">The register the broken lines read.</param>
+	/// <param name="context">Per-file printing state.</param>
+	/// <param name="element">
+	/// The members are a collection's or an initializer's, between which dotnet format leaves a comment on
+	/// the member's line. Between arguments it aligns one under a trailing comment as it does anywhere.
+	/// </param>
+	private static int MemberContinuationLine(int previousEnd, SyntaxNode next, int anchor, PrintContext context, bool element = true)
 	{
 		var first = next.GetFirstToken();
 		BreakBeforeFirstToken(previousEnd, first, context);
-		return ContinuationLine(first, anchor, context, element: true);
+		return ContinuationLine(first, anchor, context, element);
 	}
 
 	public static void AssignmentExpression(AssignmentExpressionSyntax node, PrintContext context)
