@@ -1207,4 +1207,129 @@ public class AuthorBreakTests : FormattingTest
 		}
 		""",
 		editorConfig: "max_line_length = 120");
+
+	// Issue #233: a chain break after an invocation, before or after `?`, before `[` or before `!` was
+	// joined. dotnet format leaves each of these lines where the author put it.
+
+	[Test]
+	public Task A_chain_ending_in_an_indexer_keeps_its_breaks() => Unchanged(
+		"""
+		public class C
+		{
+		    public string M(string s)
+		    {
+		        var a = Convert(Hash(s))
+		            .ToLowerInvariant()[..8];
+		        var b = this
+		                .Values()[0];
+		        var c = items
+		            .Where(x => x > 0)
+		            .ToArray()[0];
+		        return a;
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_break_either_side_of_a_conditional_access_stays() => Unchanged(
+		"""
+		public class C
+		{
+		    public int N(int[]? items)
+		    {
+		        var a = items
+		            ?.Where(i => i > 0)
+		            .Count();
+		        var b = items?
+		                .Where(i => i > 0)
+		          .Count();
+		        var c = items
+		            ?[0];
+		        var d = items?
+		            [0];
+		        var e = items
+		            .First()
+		            ?.ToString()
+		            ?.Length;
+		        return items?
+		            .Where(i => i > 0)
+		            .Count() ?? 0;
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_bracket_or_null_forgiving_operator_on_its_own_line_stays() => Unchanged(
+		"""
+		public class C
+		{
+		    public object M(string? s)
+		    {
+		        var a = Values()
+		            [0];
+		        var b = items
+		            .First()
+		                [1];
+		        var c = s
+		            !.Length;
+		        return a;
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_reindented_statement_takes_its_conditional_access_lines_along() => Formats(
+		"""
+		public class C
+		{
+		    public int N(int[]? items)
+		    {
+		            var a = Convert(Hash(s))
+		                .ToLowerInvariant()[..8];
+		    return items?
+		        .Where(i => i > 0)
+		        .Count() ?? 0;
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public int N(int[]? items)
+		    {
+		        var a = Convert(Hash(s))
+		            .ToLowerInvariant()[..8];
+		        return items?
+		            .Where(i => i > 0)
+		            .Count() ?? 0;
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Deterministic_layout_still_decides_a_conditional_access_break() => Formats(
+		"""
+		public class C
+		{
+		    public int N(int[]? items)
+		    {
+		        var a = Convert(Hash(s))
+		            .ToLowerInvariant()[..8];
+		        return items?
+		            .Where(i => i > 0)
+		            .Count() ?? 0;
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public int N(int[]? items)
+		    {
+		        var a = Convert(Hash(s)).ToLowerInvariant()[..8];
+		        return items?.Where(i => i > 0).Count() ?? 0;
+		    }
+		}
+		""",
+		editorConfig: "max_line_length = 120");
 }

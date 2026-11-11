@@ -55,6 +55,7 @@ internal static partial class Printers
 		// Nested TryPrintChain calls for inner chains append past this frame's slice and truncate only
 		// what they added — the outer frame's slice is untouched throughout.
 		var trailerBase = context.TrailerBuffer.Count;
+		var anchor = -1;
 		try
 		{
 			var links = CollectLinks(node, context, out var receiver);
@@ -68,8 +69,6 @@ internal static partial class Printers
 			// The author's own layout wins: a chain they opened out stays opened out, at their dots.
 			var asWritten = SpansLines(node, context);
 
-			Node.Print(receiver, context);
-
 			// Every receiver stands alone once a chain is breaking at all, unset behaving exactly like
 			// csharp_wrap_before_first_method_call = true — uniform stacking reads more consistently
 			// than a first call that stays attached only because its receiver happened to be a plain
@@ -81,16 +80,26 @@ internal static partial class Printers
 				_ => 0,
 			};
 
+			// Each line the author broke keeps the offset they gave it from the line the chain starts on,
+			// as dotnet format leaves it: breaking to one level in moved links written at the statement's
+			// own column, or two levels in (issue #238). The register reads how far that line moved, so
+			// it is captured ahead of the receiver.
+			var breaksAsWritten = asWritten && BreaksAnywhere(links, receiver, attached, context);
+			anchor = EnterPatternContinuation(breaksAsWritten, context);
+
+			Node.Print(receiver, context);
+
+			var offset = -1;
 			for (var i = 0; i < attached && i < links.Count; i++)
-				PrintLink(links[i], context);
+				PrintLink(links[i], context, anchor, ref offset);
 
 			// A chain that will not break must not open an indent scope: anything inside it that breaks
 			// on its own — an anonymous type, an initializer — would be pushed a level right of where it
 			// belongs, which is a change dotnet format does not make.
-			if (asWritten && !BreaksAnywhere(links, receiver, attached, context))
+			if (asWritten && !breaksAsWritten)
 			{
 				for (var i = attached; i < links.Count; i++)
-					PrintLink(links[i], context);
+					PrintLink(links[i], context, anchor, ref offset);
 
 				return true;
 			}
@@ -121,12 +130,17 @@ internal static partial class Printers
 
 					// Only the separator is conditional. The link itself is always emitted — dropping it
 					// is how this lost `.Values` from a chain the first time round.
+					var previousEnd = PreviousEnd(links, receiver, i);
 					if (!asWritten)
 						arena.SoftLine();
-					else if (context.AuthorBroke(PreviousEnd(links, receiver, i), link.Name.SpanStart))
-						arena.HardLine();
+					else if (context.AuthorBroke(previousEnd, link.Name.SpanStart))
+					{
+						// The token the author started the line with: the dot, unless they left it on the line above.
+						var first = !dotTrails && context.AuthorBroke(previousEnd, link.DotToken.SpanStart) ? link.DotToken : link.Name.Identifier;
+						offset = ContinuationLine(first, anchor, context);
+					}
 
-					PrintLink(link, context, dotAlreadyPrinted: dotTrails);
+					PrintLink(link, context, anchor, ref offset, dotAlreadyPrinted: dotTrails);
 				}
 			}
 
@@ -134,6 +148,8 @@ internal static partial class Printers
 		}
 		finally
 		{
+			ExitPatternContinuation(anchor, context);
+
 			// Restore the buffer to the state it was in before this chain was collected. This frame's
 			// trailer nodes are at [trailerBase..Count) and are no longer needed after printing.
 			context.TrailerBuffer.RemoveRange(trailerBase, context.TrailerBuffer.Count - trailerBase);
@@ -194,7 +210,10 @@ internal static partial class Printers
 	private static int PreviousEnd(List<ChainLink> links, ExpressionSyntax receiver, int index) =>
 		index == 0 ? receiver.Span.End : links[index - 1].End;
 
-	/// <summary>True when the author put a break before any link this printer is responsible for.</summary>
+	/// <summary>
+	/// True when the author put a break before any link this printer is responsible for, or before
+	/// any link's argument or bracket list.
+	/// </summary>
 	/// <remarks>
 	/// Asked of the link's *name*, not its dot, so that it sees a break whichever side of it the
 	/// author left the dot on. Asking about the dot missed `foo.` / `Bar()` entirely — the dot is on
@@ -207,26 +226,57 @@ internal static partial class Printers
 		int from,
 		PrintContext context)
 	{
-		for (var i = from; i < links.Count; i++)
+		var buffer = context.TrailerBuffer;
+		for (var i = 0; i < links.Count; i++)
 		{
-			if (context.AuthorBroke(PreviousEnd(links, receiver, i), links[i].Name.SpanStart))
+			var link = links[i];
+			if (i >= from && context.AuthorBroke(PreviousEnd(links, receiver, i), link.Name.SpanStart))
 				return true;
+
+			var previousEnd = link.Name.Span.End;
+			var end = link.TrailersStart + link.TrailersCount;
+			for (var t = link.TrailersStart; t < end; t++)
+			{
+				if (context.AuthorBroke(previousEnd, buffer[t].SpanStart))
+					return true;
+				previousEnd = buffer[t].Span.End;
+			}
 		}
 
 		return false;
 	}
 
-	private static void PrintLink(in ChainLink link, PrintContext context, bool dotAlreadyPrinted = false)
+	/// <summary>
+	/// Prints one link, from the continuation line <paramref name="offset"/> names when one of the links
+	/// before it broke onto a line of its own (-1 when none did).
+	/// </summary>
+	/// <remarks>
+	/// An argument or bracket list the author put on a line of its own, `.Bar()` / `[1]`, stays there at
+	/// their offset, and moves <paramref name="offset"/> to it for what follows.
+	/// </remarks>
+	private static void PrintLink(in ChainLink link, PrintContext context, int anchor, ref int offset, bool dotAlreadyPrinted = false)
 	{
-		if (!dotAlreadyPrinted)
-			TokenPrinter.Print(link.DotToken, context);
+		using (offset >= 0 ? context.Arena.AlignedIndent(anchor, offset) : default)
+		{
+			if (!dotAlreadyPrinted)
+				TokenPrinter.Print(link.DotToken, context);
 
-		Node.Print(link.Name, context);
+			Node.Print(link.Name, context);
+		}
 
 		var buffer = context.TrailerBuffer;
+		var previousEnd = link.Name.Span.End;
 		var end = link.TrailersStart + link.TrailersCount;
 		for (var i = link.TrailersStart; i < end; i++)
-			Node.Print(buffer[i], context);
+		{
+			var trailer = buffer[i];
+			if (anchor >= 0 && context.AuthorBroke(previousEnd, trailer.SpanStart))
+				offset = ContinuationLine(trailer.GetFirstToken(), anchor, context);
+
+			using (offset >= 0 ? context.Arena.AlignedIndent(anchor, offset) : default)
+				Node.Print(trailer, context);
+			previousEnd = trailer.Span.End;
+		}
 	}
 
 	/// <summary>
