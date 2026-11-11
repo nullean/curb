@@ -426,9 +426,6 @@ public class MemberTests : FormattingTest
 		  int i,
 		            int j] => i;
 
-		    public static T D1<
-		  U>() => null;
-
 		    public static
 		 T D2(string id) => null;
 		}
@@ -440,11 +437,20 @@ public class MemberTests : FormattingTest
 		        int i,
 		        int j] => i;
 
-		    public static T D1<
-		        U>() => null;
-
 		    public static
 		        T D2(string id) => null;
+		}
+		""");
+
+	// A type parameter list's lines stay at the author's column instead, as a type argument list's do and
+	// as dotnet format leaves them (#232).
+	[Test]
+	public Task A_wrapped_type_parameter_line_keeps_its_column() => Unchanged(
+		"""
+		public class T
+		{
+		    public static T D1<
+		  U>() => null;
 		}
 		""");
 

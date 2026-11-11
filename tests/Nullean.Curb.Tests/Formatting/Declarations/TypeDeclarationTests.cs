@@ -225,6 +225,116 @@ public class TypeDeclarationTests : FormattingTest
 		}
 		""");
 
+	// Issue #231: with no width, base list entries the author put on lines of their own stay there, after a
+	// colon that ends the line as well as after one that starts it. dotnet format leaves all of these.
+	[Test]
+	public Task Base_list_entries_on_lines_of_their_own_stay_there() => Unchanged(
+		"""
+		public class C
+		    : IA,
+		      IB
+		{
+		}
+
+		public class D(int x) :
+		    IA,
+		    IB
+		{
+		    public int X => x;
+		}
+
+		public class E : IA,
+		        IB
+		{
+		}
+		""");
+
+	[Test]
+	public Task Base_list_comma_first_lines_stay_there() => Unchanged(
+		"""
+		public class C
+		    : IA
+		    , IB
+		{
+		}
+		""");
+
+	[Test]
+	public Task Base_list_lines_around_comments_stay_there() => Unchanged(
+		"""
+		public class C : IA, // first
+		        IB
+		{
+		}
+
+		public class D :
+		    // leading
+		    IA,
+		    IB
+		{
+		}
+		""");
+
+	[Test]
+	public Task Base_list_lines_move_only_as_far_as_the_declaration_moves() => Formats(
+		"""
+		  public class C
+		          : IA,
+		     IB
+		  {
+		  }
+		""",
+		"""
+		public class C
+		        : IA,
+		   IB
+		{
+		}
+		""");
+
+	[Test]
+	public Task Base_list_broken_as_written_is_joined_at_a_width() => Formats(
+		"""
+		public class C(int x) :
+		    IA,
+		    IB
+		{
+		}
+		""",
+		"""
+		public class C(int x) : IA, IB
+		{
+		}
+		""",
+		editorConfig: "max_line_length = 120");
+
+	[Test]
+	public Task Constraints_on_lines_of_their_own_stay_there() => Unchanged(
+		"""
+		public class C<T>
+		    where T : class,
+		              new()
+		{
+		}
+
+		public class D<T> where T :
+		    class
+		{
+		}
+		""");
+
+	// A type parameter the author aligned stays on its column, and the `where` below keeps its own: moved a
+	// level in, the line took the clause after it the same distance left.
+	[Test]
+	public Task Type_parameter_list_lines_stay_where_the_author_put_them() => Unchanged(
+		"""
+		public class C<T,
+		          U>
+		    where T : class
+		{
+		}
+		""");
+
 	[Test]
 	public Task Attribute_above_a_type() => Unchanged(
 		"""

@@ -194,6 +194,53 @@ internal static partial class Printers
 	}
 
 	/// <summary>
+	/// Claims a register for the lines the author broke inside <paramref name="node"/>, and captures how
+	/// far the line it starts on moved, or returns -1 when the author kept it on one line.
+	/// </summary>
+	/// <remarks>
+	/// For a list with no width-driven layout of its own: a base list, a type argument list, a <c>where</c>
+	/// clause's constraints, a parenthesized expression. Under deterministic layout nothing is broken as
+	/// written, so this claims nothing. A case label's lines measure from the switch, as a chain's do. The
+	/// caller owes <see cref="ReleaseLinesAsWritten"/>.
+	/// </remarks>
+	private static int ClaimLinesAsWritten(SyntaxNode node, PrintContext context)
+	{
+		if (!SpansLines(node, context))
+			return -1;
+
+		if (context.CaseLabelContinuation >= 0)
+			return context.CaseLabelContinuation;
+
+		var register = context.EnterContinuation();
+		context.Arena.LineShiftAnchor(register);
+		return register;
+	}
+
+	/// <summary>Releases what <see cref="ClaimLinesAsWritten"/> claimed.</summary>
+	private static void ReleaseLinesAsWritten(int register, PrintContext context)
+	{
+		if (register >= 0 && register != context.CaseLabelContinuation)
+			context.ExitContinuation();
+	}
+
+	/// <summary>
+	/// Breaks before <paramref name="next"/> where the author broke the line ahead of it, at the column
+	/// they gave it moved as far as the construct's first line moved, and says whether it did.
+	/// </summary>
+	/// <remarks>
+	/// <c>dotnet format</c> leaves such a line where it is and shifts it only with the line above.
+	/// Joining it lengthened a line the author had wrapped on purpose (issues #231, #232, #234).
+	/// </remarks>
+	private static bool LineAsWritten(int previousEnd, SyntaxToken next, int register, PrintContext context)
+	{
+		if (register < 0 || !context.AuthorBroke(previousEnd, next.SpanStart))
+			return false;
+
+		ContinuationLine(next, register, context);
+		return true;
+	}
+
+	/// <summary>
 	/// <see cref="ContinuationLine"/> between two collection or initializer members the author put on
 	/// separate lines, with the blank line they left there, as <see cref="BreakBetweenMembers"/> keeps one.
 	/// </summary>
@@ -474,13 +521,31 @@ internal static partial class Printers
 		Node.Print(node.Expression, context);
 	}
 
+	/// <summary>A parenthesized expression.</summary>
+	/// <remarks>
+	/// A break the author put after the <c>(</c> or before the <c>)</c> stays, at the column they gave the
+	/// line (issue #234). The expression's own lines sit as far in from its line as they would from the
+	/// indent, as a chain operand's do after its continuation line.
+	/// </remarks>
 	public static void ParenthesizedExpression(ParenthesizedExpressionSyntax node, PrintContext context)
 	{
+		var register = ClaimLinesAsWritten(node, context);
 		TokenPrinter.Print(node.OpenParenToken, context);
-		Spacing.InsideExpressionParens(context);
-		Node.Print(node.Expression, context);
-		Spacing.InsideExpressionParens(context);
+		if (LineAsWritten(node.OpenParenToken.Span.End, node.Expression.GetFirstToken(), register, context))
+		{
+			using (context.Arena.AlignedIndent(register, context.SourceIndent(node.Expression.SpanStart)))
+				Node.Print(node.Expression, context);
+		}
+		else
+		{
+			Spacing.InsideExpressionParens(context);
+			Node.Print(node.Expression, context);
+		}
+
+		if (!LineAsWritten(node.Expression.Span.End, node.CloseParenToken, register, context))
+			Spacing.InsideExpressionParens(context);
 		TokenPrinter.Print(node.CloseParenToken, context);
+		ReleaseLinesAsWritten(register, context);
 	}
 
 	public static void CastExpression(CastExpressionSyntax node, PrintContext context)
@@ -1677,27 +1742,38 @@ internal static partial class Printers
 		Node.Print(node.TypeArgumentList, context);
 	}
 
+	/// <summary>A generic name's <c>&lt;T, U&gt;</c>.</summary>
+	/// <remarks>A line the author broke stays broken, at the column they gave it (issue #232).</remarks>
 	public static void TypeArgumentList(TypeArgumentListSyntax node, PrintContext context)
 	{
-		TokenPrinter.Print(node.LessThanToken, context);
-
 		// `Dictionary<,>` names an open generic: its arguments are omitted, so there is nothing for the commas'
 		// spacing options to separate, and dotnet format leaves them together whatever those options say
 		// (issue #218).
 		var omitted = node.Arguments.Count > 0 && node.Arguments[0] is OmittedTypeArgumentSyntax;
+		var register = omitted ? -1 : ClaimLinesAsWritten(node, context);
+		TokenPrinter.Print(node.LessThanToken, context);
+
+		var previousEnd = node.LessThanToken.Span.End;
 		for (var i = 0; i < node.Arguments.Count; i++)
 		{
-			Node.Print(node.Arguments[i], context);
+			var argument = node.Arguments[i];
+			LineAsWritten(previousEnd, argument.GetFirstToken(), register, context);
+			Node.Print(argument, context);
+			previousEnd = argument.Span.End;
 			if (i >= node.Arguments.SeparatorCount)
 				continue;
-			if (!omitted)
+			var separator = node.Arguments.GetSeparator(i);
+			if (!omitted && !LineAsWritten(previousEnd, separator, register, context))
 				Spacing.BeforeComma(context);
-			TokenPrinter.Print(node.Arguments.GetSeparator(i), context);
-			if (!omitted)
+			TokenPrinter.Print(separator, context);
+			previousEnd = separator.Span.End;
+			if (!omitted && (register < 0 || !context.AuthorBroke(previousEnd, node.Arguments[i + 1].SpanStart)))
 				Spacing.AfterComma(context);
 		}
 
+		LineAsWritten(previousEnd, node.GreaterThanToken, register, context);
 		TokenPrinter.Print(node.GreaterThanToken, context);
+		ReleaseLinesAsWritten(register, context);
 	}
 
 	public static void NullableType(NullableTypeSyntax node, PrintContext context)
@@ -1750,13 +1826,20 @@ internal static partial class Printers
 		TokenPrinter.Print(node.CloseBracketToken, context);
 	}
 
+	/// <summary>A type declaration's <c>: Base, IFace</c>.</summary>
+	/// <remarks>
+	/// A break the author put after the colon, or before or after a comma, stays, at the column they gave
+	/// the line (issue #231).
+	/// </remarks>
 	public static void BaseList(BaseListSyntax node, PrintContext context)
 	{
 		var arena = context.Arena;
+		var register = ClaimLinesAsWritten(node, context);
 
 		// The space before the colon is emitted by the caller, which knows what preceded it.
 		TokenPrinter.Print(node.ColonToken, context);
-		Spacing.AfterInheritanceColon(context);
+		if (node.Types.Count == 0 || !LineAsWritten(node.ColonToken.Span.End, node.Types[0].GetFirstToken(), register, context))
+			Spacing.AfterInheritanceColon(context);
 
 		for (var i = 0; i < node.Types.Count; i++)
 		{
@@ -1764,11 +1847,16 @@ internal static partial class Printers
 			if (i >= node.Types.SeparatorCount)
 				continue;
 			var separator = node.Types.GetSeparator(i);
+			LineAsWritten(node.Types[i].Span.End, separator, register, context);
 			TokenPrinter.Print(separator, context);
+
+			if (LineAsWritten(separator.Span.End, node.Types[i + 1].GetFirstToken(), register, context))
+				continue;
 
 			// A trailing `// comment` ends the line, and the next type continues the declaration one
 			// level in, where dotnet format leaves it. The comment's own break would have put it at
-			// the declaration's column. The break merges into the comment's.
+			// the declaration's column. The break merges into the comment's. Reached under deterministic
+			// layout only: with no width the author's break above already placed the line.
 			if (EndsWithLineComment(separator))
 			{
 				using (arena.Indent())
@@ -1777,27 +1865,38 @@ internal static partial class Printers
 			else
 				arena.Synthetic(SyntheticText.Space);
 		}
+
+		ReleaseLinesAsWritten(register, context);
 	}
 
 	public static void TypeParameterConstraintClause(TypeParameterConstraintClauseSyntax node, PrintContext context)
 	{
 		var arena = context.Arena;
 
+		// Constraints the author put on lines of their own stay there, at the column they gave them, as a
+		// base list's types do.
+		var register = ClaimLinesAsWritten(node, context);
 		TokenPrinter.Print(node.WhereKeyword, context);
 		arena.Synthetic(SyntheticText.Space);
 		Tokens(node.Name, context);
 		arena.Synthetic(SyntheticText.Space);
 		TokenPrinter.Print(node.ColonToken, context);
-		arena.Synthetic(SyntheticText.Space);
+		if (node.Constraints.Count == 0 || !LineAsWritten(node.ColonToken.Span.End, node.Constraints[0].GetFirstToken(), register, context))
+			arena.Synthetic(SyntheticText.Space);
 
 		for (var i = 0; i < node.Constraints.Count; i++)
 		{
 			Node.Print(node.Constraints[i], context);
 			if (i >= node.Constraints.SeparatorCount)
 				continue;
-			TokenPrinter.Print(node.Constraints.GetSeparator(i), context);
-			arena.Synthetic(SyntheticText.Space);
+			var separator = node.Constraints.GetSeparator(i);
+			LineAsWritten(node.Constraints[i].Span.End, separator, register, context);
+			TokenPrinter.Print(separator, context);
+			if (!LineAsWritten(separator.Span.End, node.Constraints[i + 1].GetFirstToken(), register, context))
+				arena.Synthetic(SyntheticText.Space);
 		}
+
+		ReleaseLinesAsWritten(register, context);
 	}
 
 	/// <summary>An interpolated or raw string literal: its interior is content, not layout.</summary>

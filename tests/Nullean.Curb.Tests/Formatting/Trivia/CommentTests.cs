@@ -1041,10 +1041,11 @@ public class CommentTests : FormattingTest
 		}
 		""",
 		// The value below `=` stays at the author's column, as dotnet format leaves it: #130 keeps a
-		// value the author put below `=` where they put it, comment or not.
+		// value the author put below `=` where they put it, comment or not. A base list's next type does
+		// too, since #231 keeps every line the author broke a base list onto.
 		"""
 		public class C : Base, // base
-		    IFoo
+		IFoo
 		{
 		    public int M(int a)
 		    {
