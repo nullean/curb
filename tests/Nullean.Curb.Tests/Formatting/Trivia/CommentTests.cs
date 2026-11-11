@@ -2024,4 +2024,99 @@ public class CommentTests : FormattingTest
 		{
 		}
 		""");
+
+	// ---- a comment between query clauses --------------------------------------------------------------
+
+	[Test]
+	public Task A_query_clause_below_a_comment_stays_under_the_from() => Unchanged(
+		// The comment went under the `from`, and the clause after it dropped to the statement's indent,
+		// which dotnet format moved back (issue #272).
+		"""
+		using System.Linq;
+
+		class C
+		{
+		    void M(int[] xs)
+		    {
+		        var q = from x in xs
+		                where x > 0
+		                // group them
+		                group x by x into g
+		                // then pick
+		                select g.Key;
+		        var r =
+		            from x in xs
+		            /* first */
+		            // second
+		            orderby x
+		            select x;
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_query_clause_below_a_comment_stays_under_the_from_with_a_width() => Formats(
+		"""
+		using System.Linq;
+
+		class C
+		{
+		    void M(int[] xs)
+		    {
+		        var q = from x in xs
+		                where x > 0
+		                // group them
+		                group x by x into g
+		                // then pick
+		                select g.Key;
+		        var r =
+		            from x in xs
+		            /* first */
+		            // second
+		            orderby x
+		            select x;
+		    }
+		}
+		""",
+		"""
+		using System.Linq;
+
+		class C
+		{
+		    void M(int[] xs)
+		    {
+		        var q = from x in xs
+		                where x > 0
+		                // group them
+		                group x by x
+		                into g
+		                // then pick
+		                select g.Key;
+		        var r = from x in xs
+		                /* first */
+		                // second
+		                orderby x
+		                select x;
+		    }
+		}
+		""",
+		editorConfig: "max_line_length = 120");
+
+	[Test]
+	public Task A_query_clause_below_a_comment_stays_under_the_from_one_clause_per_line() => Unchanged(
+		"""
+		using System.Linq;
+
+		class C
+		{
+		    void M(int[] xs)
+		    {
+		        var q = from x in xs
+		                // c
+		                where x > 0
+		                select x;
+		    }
+		}
+		""",
+		editorConfig: "csharp_new_line_between_query_expression_clauses = true");
 }
