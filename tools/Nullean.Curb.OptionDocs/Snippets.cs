@@ -1846,10 +1846,6 @@ public static class Snippets
             "last line. A code block can't show the difference. With the key unset Curb behaves as `true`, while " +
             "`dotnet format` leaves the end of the file as it is " +
             "([#262](https://github.com/nullean/curb/issues/262)).",
-        ["csharp_style_expression_bodied_indexers"] =
-            "Curb accepts this key but doesn't convert indexers yet, so it has no example " +
-            "([#260](https://github.com/nullean/curb/issues/260)). A get-only property converts under " +
-            "`csharp_style_expression_bodied_properties`.",
     };
 
     /// <summary>

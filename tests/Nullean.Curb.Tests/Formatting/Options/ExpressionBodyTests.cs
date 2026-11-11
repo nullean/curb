@@ -179,12 +179,87 @@ public class ExpressionBodyTests : FormattingTest
 		""",
 		editorConfig: "csharp_style_expression_bodied_operators = true");
 
-	// csharp_style_expression_bodied_indexers has no case here: it is registered as implemented in
-	// OptionCatalog and bound into FormatOptions, but IndexerDeclaration (Printers.Members.cs) never
-	// calls TryPrintExpressionBody the way PropertyDeclaration and OperatorDeclaration do — it only
-	// keeps an expression body the source already had, never converts a get-only accessor block into
-	// one. A real gap, not a scoping decision: writing a case here would bake the missing conversion in
-	// as the expected behaviour. See checkOptionCoverage's exclusion list in Targets.fs.
+	// ---- indexers ---------------------------------------------------------------------------------
+
+	// Issue #260: the key was bound and never applied. Each getter shape converts as `dotnet format style`
+	// (IDE0026) converts it, and an indexer with a setter keeps its accessors.
+	[Test]
+	public Task A_get_only_indexer_converts_whatever_its_getter_looks_like() => Formats(
+		"""
+		public class C
+		{
+		    private int[] _data = new int[10];
+
+		    public int this[int index]
+		    {
+		        get { return _data[index]; }
+		    }
+
+		    public int this[string key]
+		    {
+		        get
+		        {
+		            return _data[key.Length];
+		        }
+		    }
+
+		    public int this[long i]
+		    {
+		        get { throw new System.NotSupportedException(); }
+		    }
+
+		    public int this[short i]
+		    {
+		        get => _data[i];
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    private int[] _data = new int[10];
+
+		    public int this[int index] => _data[index];
+
+		    public int this[string key] => _data[key.Length];
+
+		    public int this[long i] => throw new System.NotSupportedException();
+
+		    public int this[short i] => _data[i];
+		}
+		""",
+		editorConfig: "csharp_style_expression_bodied_indexers = true");
+
+	[Test]
+	public Task An_indexer_with_a_setter_keeps_its_accessors() => Unchanged(
+		"""
+		public class C
+		{
+		    private int[] _data = new int[10];
+
+		    public int this[int i]
+		    {
+		        get { return _data[i]; }
+		        set { _data[i] = value; }
+		    }
+		}
+		""",
+		editorConfig: "csharp_style_expression_bodied_indexers = true");
+
+	[Test]
+	public Task The_property_key_does_not_reach_an_indexer() => Unchanged(
+		"""
+		public class C
+		{
+		    private int[] _data = new int[10];
+
+		    public int this[int index]
+		    {
+		        get { return _data[index]; }
+		    }
+		}
+		""",
+		editorConfig: "csharp_style_expression_bodied_properties = true");
 
 	// ---- accessors and whole properties -------------------------------------------------------------
 
