@@ -445,4 +445,105 @@ public class InvocationTests : FormattingTest
 		}
 		""",
 		editorConfig: "max_line_length = 55");
+
+	// Issue #269: dotnet format leaves a comma the author put first on its line where it is, at the column
+	// they gave it, and moves it only as far as the line the list starts on moved.
+	[Test]
+	public Task A_leading_comma_stays_first_on_its_line() => Unchanged(
+		"""
+		using System;
+
+		public class C
+		{
+		    void M(int[] a)
+		    {
+		        Foo(1
+		          , 2
+		          , 3);
+		        var c = new C(1
+		                    , 2);
+		        var e = a[0
+		                 , 1];
+		        Foo(
+		            1
+		          , 2
+		          , 3
+		        );
+		        Foo(1 // one
+		          , 2
+		          , 3);
+		        Foo(1
+		          // two
+		          , 2
+
+		          , 3);
+		        Bar(1
+		          , () =>
+		          {
+		              return;
+		          });
+		    }
+
+		    public C(int a, int b) { }
+		    void Foo(int a, int b, int c) { }
+		    void Bar(int a, Action b) { }
+		}
+		""");
+
+	[Test]
+	public Task A_leading_comma_moves_with_its_line() => Formats(
+		"""
+		public class C
+		{
+		  void M()
+		  {
+		      Foo(1
+		        , 2
+		        , 3);
+		  }
+
+		  void Foo(int a, int b, int c) { }
+		}
+		""",
+		"""
+		public class C
+		{
+		    void M()
+		    {
+		        Foo(1
+		          , 2
+		          , 3);
+		    }
+
+		    void Foo(int a, int b, int c) { }
+		}
+		""");
+
+	[Test]
+	public Task A_width_still_joins_a_comma_first_argument_list() => Formats(
+		"""
+		public class C
+		{
+		    void M()
+		    {
+		        Foo(1
+		          , 2
+		          , 3);
+		    }
+
+		    void Foo(int a, int b, int c) => M();
+		}
+		""",
+		"""
+		public class C
+		{
+		    void M()
+		    {
+		        Foo(1, 2, 3);
+		    }
+
+		    void Foo(int a, int b, int c) => M();
+		}
+		""",
+		editorConfig: "max_line_length = 120");
 }
