@@ -5,6 +5,20 @@ width-aware reflow. It ships as a native-AOT `dotnet tool`.
 
 ## Build and test
 
+`mise install` provides the toolchain: the .NET 11 SDK pinned in `global.json`, plus the net10.0 runtime Curb and its
+tests target. The everyday tasks have the same names as in every nullean repository:
+
+```sh
+mise run build            # build the solution
+mise run test             # build, then run the tests
+mise run pack             # build, pack the managed packages and validate them
+mise run ci               # what CI's build job runs
+mise run docs             # build the docs and serve them
+mise run check            # workflow security checks (zizmor)
+```
+
+`./build.sh` runs the same targets and every corpus gate:
+
 ```sh
 ./build.sh build          # dotnet build -c Release
 ./build.sh test           # runs tests/Nullean.Curb.Tests via `dotnet run`
@@ -24,7 +38,7 @@ width-aware reflow. It ships as a native-AOT `dotnet tool`.
 ./build.sh verifyexpectationsjb          # measures the same against jb cleanupcode; reported, not gated yet
 ```
 
-Requires the .NET 10 SDK (pinned in `global.json`). Test projects are `OutputType=Exe` and run on
+Test projects are `OutputType=Exe` and run on
 Microsoft.Testing.Platform, so they are launched with `dotnet run`, not `dotnet test`.
 
 ## Layout

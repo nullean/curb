@@ -2961,6 +2961,7 @@ internal static partial class Printers
 		List<string>? lines = null;
 		var i = 0;
 
+	stop:
 		for (; i < leading.Count; i++)
 		{
 			var trivia = leading[i];
@@ -2978,7 +2979,7 @@ internal static partial class Printers
 					if (onBlankLine)
 					{
 						i++;
-						goto stop;
+						break stop;
 					}
 					onBlankLine = true;
 					break;
@@ -2988,14 +2989,13 @@ internal static partial class Printers
 				case SyntaxKind.MultiLineDocumentationCommentTrivia:
 					if (lines is null)
 						return new HeaderScan(i, null, StoppedAtUnreplaceableComment: true);
-					goto stop;
+					break stop;
 
 				default:
-					goto stop;
+					break stop;
 			}
 		}
 
-	stop:
 		return new HeaderScan(i, lines, StoppedAtUnreplaceableComment: false);
 	}
 

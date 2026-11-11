@@ -24,8 +24,8 @@ public sealed class CurbEditorConfig(IFileSystem fileSystem)
 	// tests reusing the same conventional path could collide and one would silently read the other's
 	// settings. Fixed upstream; no workaround needed here any more.
 	private readonly EditorConfigParser _parser = new(fileSystem);
-	private readonly Dictionary<string, EditorConfigResolvedChain> _chains = new(StringComparer.Ordinal);
-	private readonly Dictionary<string, GlobMatcher> _matchers = new(StringComparer.Ordinal);
+	private readonly Dictionary<string, EditorConfigResolvedChain> _chains = [with(StringComparer.Ordinal)];
+	private readonly Dictionary<string, GlobMatcher> _matchers = [with(StringComparer.Ordinal)];
 
 	/// <summary>The options the parser itself matches section globs with.</summary>
 	private static readonly GlobMatcherOptions GlobOptions = new() { Dot = true, MatchBase = true, AllowWindowsPaths = true };

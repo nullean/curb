@@ -98,16 +98,19 @@ jobs:
     name: AOT pack (${{ matrix.rid }})
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           fetch-depth: 0
 
       - run: git fetch --prune --tags
         shell: bash
 
-      - uses: actions/setup-dotnet@v5
+      - uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
         with:
-          global-json-file: global.json
+          cache: false # this workflow publishes what these jobs build; never restore a cache a PR could have written
+        env:
+          MISE_JOBS: "1" # dotnet versions share one DOTNET_ROOT; installing them in parallel races
 
       # Gate: the engine must link and run under AOT before anything gets packed.
       - name: AOT smoke test — ${{ matrix.rid }}
@@ -154,7 +157,7 @@ jobs:
 
       - name: Upload per-RID package
         if: github.event_name == 'push'
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: nupkg-${{ matrix.rid }}
           path: build/output/*.nupkg
@@ -171,11 +174,15 @@ jobs:
     timeout-minutes: 20
 
     steps:
-      - uses: actions/checkout@v6
-
-      - uses: actions/setup-dotnet@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          global-json-file: global.json
+          persist-credentials: false
+
+      - uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
+        with:
+          cache: false # this workflow publishes what these jobs build; never restore a cache a PR could have written
+        env:
+          MISE_JOBS: "1" # dotnet versions share one DOTNET_ROOT; installing them in parallel races
 
       - name: Build
         run: ./build.sh build -s true
@@ -415,11 +422,15 @@ jobs:
     timeout-minutes: 15
 
     steps:
-      - uses: actions/checkout@v6
-
-      - uses: actions/setup-dotnet@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          global-json-file: global.json
+          persist-credentials: false
+
+      - uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
+        with:
+          cache: false # this workflow publishes what these jobs build; never restore a cache a PR could have written
+        env:
+          MISE_JOBS: "1" # dotnet versions share one DOTNET_ROOT; installing them in parallel races
 
       # The dump runs the whole test suite, and with CI=true its F# tests fail rather than skip without Fantomas.
       - name: Restore the Fantomas the F# tests run against
@@ -435,11 +446,15 @@ jobs:
     timeout-minutes: 20
 
     steps:
-      - uses: actions/checkout@v6
-
-      - uses: actions/setup-dotnet@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          global-json-file: global.json
+          persist-credentials: false
+
+      - uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
+        with:
+          cache: false # this workflow publishes what these jobs build; never restore a cache a PR could have written
+        env:
+          MISE_JOBS: "1" # dotnet versions share one DOTNET_ROOT; installing them in parallel races
 
       # The generator dumps its snippets by running the test suite, and with CI=true the suite's F# tests fail
       # rather than skip when the Fantomas they pin is missing; the IDE0055 job below restores it for the same reason.
@@ -475,11 +490,15 @@ jobs:
         shard: [1, 2, 3, 4]
 
     steps:
-      - uses: actions/checkout@v6
-
-      - uses: actions/setup-dotnet@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          global-json-file: global.json
+          persist-credentials: false
+
+      - uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
+        with:
+          cache: false # this workflow publishes what these jobs build; never restore a cache a PR could have written
+        env:
+          MISE_JOBS: "1" # dotnet versions share one DOTNET_ROOT; installing them in parallel races
 
       # The gate dumps its cases by running the test suite, and with CI=true the suite's F# tests fail rather
       # than skip when the Fantomas they pin is missing. The corpus job gets it from the F# smoke test's
@@ -501,19 +520,19 @@ jobs:
       issues: write     # release-notes creates labels for its categories
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           fetch-depth: 0
 
       # MinVer derives the version from tags, so the full tag list must be present.
       - run: git fetch --prune --tags
 
-      - uses: actions/setup-dotnet@v5
+      - uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
         with:
-          global-json-file: global.json
-          source-url: https://nuget.pkg.github.com/nullean/index.json
+          cache: false # this workflow publishes what these jobs build; never restore a cache a PR could have written
         env:
-          NUGET_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MISE_JOBS: "1" # dotnet versions share one DOTNET_ROOT; installing them in parallel races
 
       - name: Build
         run: ./build.sh build -s true
@@ -533,7 +552,7 @@ jobs:
 
       - name: Download all per-RID AOT packages
         if: github.event_name == 'push'
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: nupkg-*
           path: build/output
@@ -550,9 +569,12 @@ jobs:
       - name: Publish canary to GitHub Packages (branch push)
         if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads')
         shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           until dotnet nuget push 'build/output/*.nupkg' \
-            -k ${{ secrets.GITHUB_TOKEN }} \
+            -k "$GITHUB_TOKEN" \
+            -s https://nuget.pkg.github.com/nullean/index.json \
             --skip-duplicate \
             --no-symbols; do echo "Retrying"; sleep 1; done
 
@@ -562,7 +584,7 @@ jobs:
       # picks among these tags by the ref a workflow pins. A tag's push happens in the release job below.
       - name: Log in to ghcr.io
         if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads')
-        uses: docker/login-action@v3
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -576,7 +598,7 @@ jobs:
       # notes the API inspection above wrote for the GitHub release body.
       - name: Hand the validated packages to the release job (tag push)
         if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags')
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: release-packages
           path: |
@@ -600,25 +622,28 @@ jobs:
       id-token: write   # NuGet trusted publishing: exchange the workflow's OIDC token for a short-lived key
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           fetch-depth: 0
 
       # MinVer derives the version from tags, so the full tag list must be present.
       - run: git fetch --prune --tags
 
-      - uses: actions/setup-dotnet@v5
+      - uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
         with:
-          global-json-file: global.json
+          cache: false # a release never restores a cache PR builds could have written
+        env:
+          MISE_JOBS: "1" # dotnet versions share one DOTNET_ROOT; installing them in parallel races
 
       - name: Download the validated packages
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: release-packages
           path: build/output
 
       - name: Log in to ghcr.io
-        uses: docker/login-action@v3
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -631,24 +656,34 @@ jobs:
         run: ./build.sh generatereleasenotes -s true
 
       - name: Create GitHub release
-        run: ./build.sh createreleaseongithub -s true --token ${{ secrets.GITHUB_TOKEN }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: ./build.sh createreleaseongithub -s true --token "$GITHUB_TOKEN"
 
       # Trusted publishing: nuget.org trusts this repository's ci.yml (a policy owned by the nullean
       # organization), so there is no long-lived API key to expire. The key it returns lasts an hour, so the
       # login sits right before the push. NUGET_USER is the nuget.org profile name, set at the org level.
       - name: Log in to nuget.org (trusted publishing)
         id: nuget-login
-        uses: NuGet/login@v1
+        uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841 # v1.2.0
         with:
           user: ${{ secrets.NUGET_USER }}
 
       - name: Publish to nuget.org
+        env:
+          NUGET_API_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
         run: |
           dotnet nuget push 'build/output/*.nupkg' \
-            -k ${{ steps.nuget-login.outputs.NUGET_API_KEY }} \
+            -k "$NUGET_API_KEY" \
             -s https://api.nuget.org/v3/index.json \
             --skip-duplicate \
             --no-symbols
+
+  # Static analysis of these workflows (nullean/.github).
+  zizmor:
+    uses: nullean/.github/.github/workflows/zizmor.yml@09af1fa16762b8ae42d899d45430a4267df5300c # v1.2.0
+    permissions:
+      contents: read
 
   # The docs build as docs.yml publishes it, without publishing, so a PR proves the build and post-build steps.
   docs:
@@ -656,10 +691,12 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Build documentation
-        uses: elastic/docs-builder@main
+        uses: elastic/docs-builder@036a375759d876e2df67955ebec0382cd6b09249 # v1
         env:
           FEATURE_NAVIGATION_PREVIEW: true
 

@@ -1,7 +1,7 @@
 name: create-major-tag
 
 # Lets a workflow pin this repo as a GitHub Action with `uses: nullean/curb@v1` instead of an exact
-# release tag, the same way actions/checkout@v5 stays on v5 across patch and minor releases.
+# release tag, the same way actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1 stays on v5 across patch and minor releases.
 
 on:
   release:
@@ -20,7 +20,7 @@ jobs:
       contents: write
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: true
 
