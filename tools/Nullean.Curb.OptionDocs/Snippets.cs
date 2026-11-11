@@ -986,16 +986,48 @@ public static class Snippets
 
             """,
 
+        // One construct per value, every brace on its owner's line, so each value moves only its own.
         ["csharp_new_line_before_open_brace"] = """
+            using System;
+
             namespace N;
 
             public class Widget {
-                public int X { get; set; }
+                private int _x;
+
+                public int X {
+                    get {
+                        return _x;
+                    }
+                    set {
+                        _x = value;
+                    }
+                }
+
+                public event EventHandler Changed {
+                    add {
+                    }
+                    remove {
+                    }
+                }
 
                 public void Run() {
                     if (X > 0) {
                         X--;
                     }
+
+                    var point = new {
+                        X = 1,
+                    };
+                    var copy = new Widget {
+                        X = 1,
+                    };
+                    Action log = delegate {
+                        Console.WriteLine(point);
+                    };
+                    Func<int, int> twice = n => {
+                        return n * 2;
+                    };
                 }
             }
 
@@ -1514,6 +1546,18 @@ public static class Snippets
             }
 
             """,
+    };
+
+    /// <summary>
+    /// A note for one value in a C# key's Values table, where the value does something a reader would
+    /// not guess from its name.
+    /// </summary>
+    public static IReadOnlyDictionary<(string Key, string Value), string> ValueNotes { get; } = new Dictionary<(string Key, string Value), string>
+    {
+        [("csharp_new_line_before_open_brace", "events")] =
+            "Accepted, but moves no brace on its own: an event's braces follow `properties`, as in `dotnet format`.",
+        [("csharp_new_line_before_open_brace", "object_collection_array_initializers")] =
+            "Moves an object initializer's brace. A collection or array initializer's brace stays where it was written, as in `dotnet format`.",
     };
 
     public static IReadOnlyDictionary<string, string> DemoValues { get; } = new Dictionary<string, string>
