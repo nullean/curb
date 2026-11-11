@@ -260,4 +260,125 @@ public class AttributeTests : FormattingTest
 		csharp_keep_existing_linebreaks = true
 		csharp_place_property_attribute_on_same_line = if_owner_is_single_line
 		""");
+
+	// Issue #270: dotnet format leaves an attribute's argument lines at the column the author gave them,
+	// and moves them only as far as the attribute's line moved.
+	[Test]
+	public Task A_wrapped_attribute_argument_keeps_its_column() => Unchanged(
+		"""
+		using System;
+
+		[A("a",
+		   false)]
+		public class C
+		{
+		    [A("a",
+		       false)]
+		    public int P { get; set; }
+
+		    [A("a",
+		                false)]
+		    void M(int x, [A("a",
+		                     false)] int y)
+		    {
+		    }
+
+		    [Obsolete("a", // why
+		              false)]
+		    void N()
+		    {
+		    }
+		}
+
+		public class A : Attribute
+		{
+		    public A(string s, bool b) { }
+		}
+		""");
+
+	[Test]
+	public Task A_parenthesis_on_its_own_line_in_an_attribute_keeps_its_column() => Unchanged(
+		"""
+		public class C
+		{
+		    [A(
+		            "a",
+		            false
+		        )]
+		    void M()
+		    {
+		    }
+		}
+
+		public class A : System.Attribute
+		{
+		    public A(string s, bool b) { }
+		}
+		""");
+
+	[Test]
+	public Task A_wrapped_attribute_argument_moves_with_its_attribute() => Formats(
+		"""
+		public class C
+		{
+		  [A("a",
+		     false)]
+		  void M()
+		  {
+		  }
+		}
+
+		public class A : System.Attribute
+		{
+		    public A(string s, bool b) { }
+		}
+		""",
+		"""
+		public class C
+		{
+		    [A("a",
+		       false)]
+		    void M()
+		    {
+		    }
+		}
+
+		public class A : System.Attribute
+		{
+		    public A(string s, bool b) { }
+		}
+		""");
+
+	[Test]
+	public Task A_width_still_joins_a_wrapped_attribute_argument_list() => Formats(
+		"""
+		public class C
+		{
+		    [A("a",
+		       false)]
+		    void M()
+		    {
+		    }
+		}
+
+		public class A : System.Attribute
+		{
+		    public A(string s, bool b) { }
+		}
+		""",
+		"""
+		public class C
+		{
+		    [A("a", false)]
+		    void M()
+		    { }
+		}
+
+		public class A : System.Attribute
+		{
+		    public A(string s, bool b)
+		    { }
+		}
+		""",
+		editorConfig: "max_line_length = 120");
 }
