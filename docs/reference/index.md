@@ -12,7 +12,7 @@ Use the filter above to search by name. Each group below links to its own index.
 - [indent_size](core/indent_size.md) — Columns per indent level.
 - [tab_width](core/tab_width.md) — Columns a tab occupies when measuring line width.
 - [end_of_line](core/end_of_line.md) — Line ending to write. auto matches the platform's own (Environment.NewLine), the same default Roslyn uses.
-- [insert_final_newline](core/insert_final_newline.md) — Ensure the file ends with a newline.
+- [insert_final_newline](core/insert_final_newline.md) — End the file with a newline, or without one. Not set, the file keeps what it has.
 - [trim_trailing_whitespace](core/trim_trailing_whitespace.md) — Remove trailing whitespace from each line.
 - [charset](core/charset.md) — Byte-order mark handling. Not set, a file keeps whatever mark it arrived with.
 - [max_line_length](core/max_line_length.md) — Column target for reflow. off disables reflow entirely and selects preservation mode.

@@ -76,7 +76,7 @@ public sealed record OptionDescriptor(
 		new("indent_size", OptionGroup.Core, ["<integer>"], "4", "Columns per indent level.", "basic_method"),
 		new("tab_width", OptionGroup.Core, ["<integer>"], "4", "Columns a tab occupies when measuring line width.", "basic_method"),
 		new("end_of_line", OptionGroup.Core, ["lf", "crlf", "auto"], "auto", "Line ending to write. auto matches the platform's own (Environment.NewLine), the same default Roslyn uses.", "basic_method"),
-		new("insert_final_newline", OptionGroup.Core, ["true", "false"], "true", "Ensure the file ends with a newline.", "basic_method"),
+		new("insert_final_newline", OptionGroup.Core, ["true", "false"], "(not set)", "End the file with a newline, or without one. Not set, the file keeps what it has.", "basic_method"),
 		new("trim_trailing_whitespace", OptionGroup.Core, ["true", "false"], "true", "Remove trailing whitespace from each line.", "basic_method"),
 		new("charset", OptionGroup.Core, ["utf-8", "utf-8-bom"], "(not set)", "Byte-order mark handling. Not set, a file keeps whatever mark it arrived with.", "basic_method"),
 		new("max_line_length", OptionGroup.Core, ["off", "<integer>"], "off", "Column target for reflow. off disables reflow entirely and selects preservation mode.", "long_chain"),

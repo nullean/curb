@@ -99,8 +99,7 @@ public sealed class XmlFormatter : IDisposable
 			}
 		}
 
-		if (!options.FinalNewLineSet)
-			layout = layout with { InsertFinalNewLine = source.Length > 0 && source[^1] is '\n' or '\r' };
+		layout = layout.WithFinalNewLineOf(source, options.FinalNewLineSet);
 
 		// Trailing whitespace on a layout line is the author's unless the XML's own configuration asks
 		// for it to go: an unset key, or one inherited from [*], leaves it where it is.
