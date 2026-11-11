@@ -22,9 +22,9 @@ Which constructs put their opening brace on a new line.
 | `anonymous_methods` |  |
 | `lambdas` |  |
 | `control_blocks` |  |
-| `object_collection_array_initializers` |  |
+| `object_collection_array_initializers` | Moves an object initializer's brace. A collection or array initializer's brace stays where it was written, as in `dotnet format`. |
 | `properties` |  |
-| `events` |  |
+| `events` | Accepted, but moves no brace on its own: an event's braces follow `properties`, as in `dotnet format`. |
 
 **Default:** `all`
 
@@ -45,15 +45,46 @@ csharp_new_line_before_open_brace = all
 
 :::{tab-item} Before
 ```csharp
+using System;
+
 namespace N;
 
 public class Widget {
-    public int X { get; set; }
+    private int _x;
+
+    public int X {
+        get {
+            return _x;
+        }
+        set {
+            _x = value;
+        }
+    }
+
+    public event EventHandler Changed {
+        add {
+        }
+        remove {
+        }
+    }
 
     public void Run() {
         if (X > 0) {
             X--;
         }
+
+        var point = new {
+            X = 1,
+        };
+        var copy = new Widget {
+            X = 1,
+        };
+        Action log = delegate {
+            Console.WriteLine(point);
+        };
+        Func<int, int> twice = n => {
+            return n * 2;
+        };
     }
 }
 ```
@@ -61,11 +92,35 @@ public class Widget {
 
 :::{tab-item} After
 ```csharp
+using System;
+
 namespace N;
 
 public class Widget
 {
-    public int X { get; set; }
+    private int _x;
+
+    public int X
+    {
+        get
+        {
+            return _x;
+        }
+        set
+        {
+            _x = value;
+        }
+    }
+
+    public event EventHandler Changed
+    {
+        add
+        {
+        }
+        remove
+        {
+        }
+    }
 
     public void Run()
     {
@@ -73,6 +128,23 @@ public class Widget
         {
             X--;
         }
+
+        var point = new
+        {
+            X = 1,
+        };
+        var copy = new Widget
+        {
+            X = 1,
+        };
+        Action log = delegate
+        {
+            Console.WriteLine(point);
+        };
+        Func<int, int> twice = n =>
+        {
+            return n * 2;
+        };
     }
 }
 ```
@@ -90,11 +162,35 @@ csharp_new_line_before_open_brace = none
 
 :::{tab-item} Before
 ```csharp
+using System;
+
 namespace N;
 
 public class Widget
 {
-    public int X { get; set; }
+    private int _x;
+
+    public int X
+    {
+        get
+        {
+            return _x;
+        }
+        set
+        {
+            _x = value;
+        }
+    }
+
+    public event EventHandler Changed
+    {
+        add
+        {
+        }
+        remove
+        {
+        }
+    }
 
     public void Run()
     {
@@ -102,6 +198,23 @@ public class Widget
         {
             X--;
         }
+
+        var point = new
+        {
+            X = 1,
+        };
+        var copy = new Widget
+        {
+            X = 1,
+        };
+        Action log = delegate
+        {
+            Console.WriteLine(point);
+        };
+        Func<int, int> twice = n =>
+        {
+            return n * 2;
+        };
     }
 }
 ```
@@ -109,18 +222,46 @@ public class Widget
 
 :::{tab-item} After
 ```csharp
+using System;
+
 namespace N;
 
-public class Widget
-{
-    public int X { get; set; }
+public class Widget {
+    private int _x;
 
-    public void Run()
-    {
-        if (X > 0)
-        {
+    public int X {
+        get {
+            return _x;
+        }
+        set {
+            _x = value;
+        }
+    }
+
+    public event EventHandler Changed {
+        add {
+        }
+        remove {
+        }
+    }
+
+    public void Run() {
+        if (X > 0) {
             X--;
         }
+
+        var point = new {
+            X = 1,
+        };
+        var copy = new Widget {
+            X = 1,
+        };
+        Action log = delegate {
+            Console.WriteLine(point);
+        };
+        Func<int, int> twice = n => {
+            return n * 2;
+        };
     }
 }
 ```
@@ -138,11 +279,35 @@ csharp_new_line_before_open_brace = types
 
 :::{tab-item} Before
 ```csharp
+using System;
+
 namespace N;
 
 public class Widget
 {
-    public int X { get; set; }
+    private int _x;
+
+    public int X
+    {
+        get
+        {
+            return _x;
+        }
+        set
+        {
+            _x = value;
+        }
+    }
+
+    public event EventHandler Changed
+    {
+        add
+        {
+        }
+        remove
+        {
+        }
+    }
 
     public void Run()
     {
@@ -150,6 +315,23 @@ public class Widget
         {
             X--;
         }
+
+        var point = new
+        {
+            X = 1,
+        };
+        var copy = new Widget
+        {
+            X = 1,
+        };
+        Action log = delegate
+        {
+            Console.WriteLine(point);
+        };
+        Func<int, int> twice = n =>
+        {
+            return n * 2;
+        };
     }
 }
 ```
@@ -157,18 +339,47 @@ public class Widget
 
 :::{tab-item} After
 ```csharp
+using System;
+
 namespace N;
 
 public class Widget
 {
-    public int X { get; set; }
+    private int _x;
 
-    public void Run()
-    {
-        if (X > 0)
-        {
+    public int X {
+        get {
+            return _x;
+        }
+        set {
+            _x = value;
+        }
+    }
+
+    public event EventHandler Changed {
+        add {
+        }
+        remove {
+        }
+    }
+
+    public void Run() {
+        if (X > 0) {
             X--;
         }
+
+        var point = new {
+            X = 1,
+        };
+        var copy = new Widget {
+            X = 1,
+        };
+        Action log = delegate {
+            Console.WriteLine(point);
+        };
+        Func<int, int> twice = n => {
+            return n * 2;
+        };
     }
 }
 ```
@@ -186,11 +397,35 @@ csharp_new_line_before_open_brace = methods
 
 :::{tab-item} Before
 ```csharp
+using System;
+
 namespace N;
 
 public class Widget
 {
-    public int X { get; set; }
+    private int _x;
+
+    public int X
+    {
+        get
+        {
+            return _x;
+        }
+        set
+        {
+            _x = value;
+        }
+    }
+
+    public event EventHandler Changed
+    {
+        add
+        {
+        }
+        remove
+        {
+        }
+    }
 
     public void Run()
     {
@@ -198,6 +433,23 @@ public class Widget
         {
             X--;
         }
+
+        var point = new
+        {
+            X = 1,
+        };
+        var copy = new Widget
+        {
+            X = 1,
+        };
+        Action log = delegate
+        {
+            Console.WriteLine(point);
+        };
+        Func<int, int> twice = n =>
+        {
+            return n * 2;
+        };
     }
 }
 ```
@@ -205,18 +457,47 @@ public class Widget
 
 :::{tab-item} After
 ```csharp
+using System;
+
 namespace N;
 
-public class Widget
-{
-    public int X { get; set; }
+public class Widget {
+    private int _x;
+
+    public int X {
+        get {
+            return _x;
+        }
+        set {
+            _x = value;
+        }
+    }
+
+    public event EventHandler Changed {
+        add {
+        }
+        remove {
+        }
+    }
 
     public void Run()
     {
-        if (X > 0)
-        {
+        if (X > 0) {
             X--;
         }
+
+        var point = new {
+            X = 1,
+        };
+        var copy = new Widget {
+            X = 1,
+        };
+        Action log = delegate {
+            Console.WriteLine(point);
+        };
+        Func<int, int> twice = n => {
+            return n * 2;
+        };
     }
 }
 ```
@@ -234,11 +515,35 @@ csharp_new_line_before_open_brace = accessors
 
 :::{tab-item} Before
 ```csharp
+using System;
+
 namespace N;
 
 public class Widget
 {
-    public int X { get; set; }
+    private int _x;
+
+    public int X
+    {
+        get
+        {
+            return _x;
+        }
+        set
+        {
+            _x = value;
+        }
+    }
+
+    public event EventHandler Changed
+    {
+        add
+        {
+        }
+        remove
+        {
+        }
+    }
 
     public void Run()
     {
@@ -246,6 +551,23 @@ public class Widget
         {
             X--;
         }
+
+        var point = new
+        {
+            X = 1,
+        };
+        var copy = new Widget
+        {
+            X = 1,
+        };
+        Action log = delegate
+        {
+            Console.WriteLine(point);
+        };
+        Func<int, int> twice = n =>
+        {
+            return n * 2;
+        };
     }
 }
 ```
@@ -253,18 +575,50 @@ public class Widget
 
 :::{tab-item} After
 ```csharp
+using System;
+
 namespace N;
 
-public class Widget
-{
-    public int X { get; set; }
+public class Widget {
+    private int _x;
 
-    public void Run()
-    {
-        if (X > 0)
+    public int X {
+        get
         {
+            return _x;
+        }
+        set
+        {
+            _x = value;
+        }
+    }
+
+    public event EventHandler Changed {
+        add
+        {
+        }
+        remove
+        {
+        }
+    }
+
+    public void Run() {
+        if (X > 0) {
             X--;
         }
+
+        var point = new {
+            X = 1,
+        };
+        var copy = new Widget {
+            X = 1,
+        };
+        Action log = delegate {
+            Console.WriteLine(point);
+        };
+        Func<int, int> twice = n => {
+            return n * 2;
+        };
     }
 }
 ```
@@ -282,11 +636,35 @@ csharp_new_line_before_open_brace = anonymous_types
 
 :::{tab-item} Before
 ```csharp
+using System;
+
 namespace N;
 
 public class Widget
 {
-    public int X { get; set; }
+    private int _x;
+
+    public int X
+    {
+        get
+        {
+            return _x;
+        }
+        set
+        {
+            _x = value;
+        }
+    }
+
+    public event EventHandler Changed
+    {
+        add
+        {
+        }
+        remove
+        {
+        }
+    }
 
     public void Run()
     {
@@ -294,6 +672,23 @@ public class Widget
         {
             X--;
         }
+
+        var point = new
+        {
+            X = 1,
+        };
+        var copy = new Widget
+        {
+            X = 1,
+        };
+        Action log = delegate
+        {
+            Console.WriteLine(point);
+        };
+        Func<int, int> twice = n =>
+        {
+            return n * 2;
+        };
     }
 }
 ```
@@ -301,18 +696,47 @@ public class Widget
 
 :::{tab-item} After
 ```csharp
+using System;
+
 namespace N;
 
-public class Widget
-{
-    public int X { get; set; }
+public class Widget {
+    private int _x;
 
-    public void Run()
-    {
-        if (X > 0)
-        {
+    public int X {
+        get {
+            return _x;
+        }
+        set {
+            _x = value;
+        }
+    }
+
+    public event EventHandler Changed {
+        add {
+        }
+        remove {
+        }
+    }
+
+    public void Run() {
+        if (X > 0) {
             X--;
         }
+
+        var point = new
+        {
+            X = 1,
+        };
+        var copy = new Widget {
+            X = 1,
+        };
+        Action log = delegate {
+            Console.WriteLine(point);
+        };
+        Func<int, int> twice = n => {
+            return n * 2;
+        };
     }
 }
 ```
@@ -330,11 +754,35 @@ csharp_new_line_before_open_brace = anonymous_methods
 
 :::{tab-item} Before
 ```csharp
+using System;
+
 namespace N;
 
 public class Widget
 {
-    public int X { get; set; }
+    private int _x;
+
+    public int X
+    {
+        get
+        {
+            return _x;
+        }
+        set
+        {
+            _x = value;
+        }
+    }
+
+    public event EventHandler Changed
+    {
+        add
+        {
+        }
+        remove
+        {
+        }
+    }
 
     public void Run()
     {
@@ -342,6 +790,23 @@ public class Widget
         {
             X--;
         }
+
+        var point = new
+        {
+            X = 1,
+        };
+        var copy = new Widget
+        {
+            X = 1,
+        };
+        Action log = delegate
+        {
+            Console.WriteLine(point);
+        };
+        Func<int, int> twice = n =>
+        {
+            return n * 2;
+        };
     }
 }
 ```
@@ -349,18 +814,47 @@ public class Widget
 
 :::{tab-item} After
 ```csharp
+using System;
+
 namespace N;
 
-public class Widget
-{
-    public int X { get; set; }
+public class Widget {
+    private int _x;
 
-    public void Run()
-    {
-        if (X > 0)
-        {
+    public int X {
+        get {
+            return _x;
+        }
+        set {
+            _x = value;
+        }
+    }
+
+    public event EventHandler Changed {
+        add {
+        }
+        remove {
+        }
+    }
+
+    public void Run() {
+        if (X > 0) {
             X--;
         }
+
+        var point = new {
+            X = 1,
+        };
+        var copy = new Widget {
+            X = 1,
+        };
+        Action log = delegate
+        {
+            Console.WriteLine(point);
+        };
+        Func<int, int> twice = n => {
+            return n * 2;
+        };
     }
 }
 ```
@@ -378,11 +872,35 @@ csharp_new_line_before_open_brace = lambdas
 
 :::{tab-item} Before
 ```csharp
+using System;
+
 namespace N;
 
 public class Widget
 {
-    public int X { get; set; }
+    private int _x;
+
+    public int X
+    {
+        get
+        {
+            return _x;
+        }
+        set
+        {
+            _x = value;
+        }
+    }
+
+    public event EventHandler Changed
+    {
+        add
+        {
+        }
+        remove
+        {
+        }
+    }
 
     public void Run()
     {
@@ -390,6 +908,23 @@ public class Widget
         {
             X--;
         }
+
+        var point = new
+        {
+            X = 1,
+        };
+        var copy = new Widget
+        {
+            X = 1,
+        };
+        Action log = delegate
+        {
+            Console.WriteLine(point);
+        };
+        Func<int, int> twice = n =>
+        {
+            return n * 2;
+        };
     }
 }
 ```
@@ -397,18 +932,47 @@ public class Widget
 
 :::{tab-item} After
 ```csharp
+using System;
+
 namespace N;
 
-public class Widget
-{
-    public int X { get; set; }
+public class Widget {
+    private int _x;
 
-    public void Run()
-    {
-        if (X > 0)
-        {
+    public int X {
+        get {
+            return _x;
+        }
+        set {
+            _x = value;
+        }
+    }
+
+    public event EventHandler Changed {
+        add {
+        }
+        remove {
+        }
+    }
+
+    public void Run() {
+        if (X > 0) {
             X--;
         }
+
+        var point = new {
+            X = 1,
+        };
+        var copy = new Widget {
+            X = 1,
+        };
+        Action log = delegate {
+            Console.WriteLine(point);
+        };
+        Func<int, int> twice = n =>
+        {
+            return n * 2;
+        };
     }
 }
 ```
@@ -426,11 +990,35 @@ csharp_new_line_before_open_brace = control_blocks
 
 :::{tab-item} Before
 ```csharp
+using System;
+
 namespace N;
 
 public class Widget
 {
-    public int X { get; set; }
+    private int _x;
+
+    public int X
+    {
+        get
+        {
+            return _x;
+        }
+        set
+        {
+            _x = value;
+        }
+    }
+
+    public event EventHandler Changed
+    {
+        add
+        {
+        }
+        remove
+        {
+        }
+    }
 
     public void Run()
     {
@@ -438,6 +1026,23 @@ public class Widget
         {
             X--;
         }
+
+        var point = new
+        {
+            X = 1,
+        };
+        var copy = new Widget
+        {
+            X = 1,
+        };
+        Action log = delegate
+        {
+            Console.WriteLine(point);
+        };
+        Func<int, int> twice = n =>
+        {
+            return n * 2;
+        };
     }
 }
 ```
@@ -445,18 +1050,47 @@ public class Widget
 
 :::{tab-item} After
 ```csharp
+using System;
+
 namespace N;
 
-public class Widget
-{
-    public int X { get; set; }
+public class Widget {
+    private int _x;
 
-    public void Run()
-    {
+    public int X {
+        get {
+            return _x;
+        }
+        set {
+            _x = value;
+        }
+    }
+
+    public event EventHandler Changed {
+        add {
+        }
+        remove {
+        }
+    }
+
+    public void Run() {
         if (X > 0)
         {
             X--;
         }
+
+        var point = new {
+            X = 1,
+        };
+        var copy = new Widget {
+            X = 1,
+        };
+        Action log = delegate {
+            Console.WriteLine(point);
+        };
+        Func<int, int> twice = n => {
+            return n * 2;
+        };
     }
 }
 ```
@@ -474,11 +1108,35 @@ csharp_new_line_before_open_brace = object_collection_array_initializers
 
 :::{tab-item} Before
 ```csharp
+using System;
+
 namespace N;
 
 public class Widget
 {
-    public int X { get; set; }
+    private int _x;
+
+    public int X
+    {
+        get
+        {
+            return _x;
+        }
+        set
+        {
+            _x = value;
+        }
+    }
+
+    public event EventHandler Changed
+    {
+        add
+        {
+        }
+        remove
+        {
+        }
+    }
 
     public void Run()
     {
@@ -486,6 +1144,23 @@ public class Widget
         {
             X--;
         }
+
+        var point = new
+        {
+            X = 1,
+        };
+        var copy = new Widget
+        {
+            X = 1,
+        };
+        Action log = delegate
+        {
+            Console.WriteLine(point);
+        };
+        Func<int, int> twice = n =>
+        {
+            return n * 2;
+        };
     }
 }
 ```
@@ -493,18 +1168,47 @@ public class Widget
 
 :::{tab-item} After
 ```csharp
+using System;
+
 namespace N;
 
-public class Widget
-{
-    public int X { get; set; }
+public class Widget {
+    private int _x;
 
-    public void Run()
-    {
-        if (X > 0)
-        {
+    public int X {
+        get {
+            return _x;
+        }
+        set {
+            _x = value;
+        }
+    }
+
+    public event EventHandler Changed {
+        add {
+        }
+        remove {
+        }
+    }
+
+    public void Run() {
+        if (X > 0) {
             X--;
         }
+
+        var point = new {
+            X = 1,
+        };
+        var copy = new Widget
+        {
+            X = 1,
+        };
+        Action log = delegate {
+            Console.WriteLine(point);
+        };
+        Func<int, int> twice = n => {
+            return n * 2;
+        };
     }
 }
 ```
@@ -522,11 +1226,35 @@ csharp_new_line_before_open_brace = properties
 
 :::{tab-item} Before
 ```csharp
+using System;
+
 namespace N;
 
 public class Widget
 {
-    public int X { get; set; }
+    private int _x;
+
+    public int X
+    {
+        get
+        {
+            return _x;
+        }
+        set
+        {
+            _x = value;
+        }
+    }
+
+    public event EventHandler Changed
+    {
+        add
+        {
+        }
+        remove
+        {
+        }
+    }
 
     public void Run()
     {
@@ -534,6 +1262,23 @@ public class Widget
         {
             X--;
         }
+
+        var point = new
+        {
+            X = 1,
+        };
+        var copy = new Widget
+        {
+            X = 1,
+        };
+        Action log = delegate
+        {
+            Console.WriteLine(point);
+        };
+        Func<int, int> twice = n =>
+        {
+            return n * 2;
+        };
     }
 }
 ```
@@ -541,18 +1286,48 @@ public class Widget
 
 :::{tab-item} After
 ```csharp
+using System;
+
 namespace N;
 
-public class Widget
-{
-    public int X { get; set; }
+public class Widget {
+    private int _x;
 
-    public void Run()
+    public int X
     {
-        if (X > 0)
-        {
+        get {
+            return _x;
+        }
+        set {
+            _x = value;
+        }
+    }
+
+    public event EventHandler Changed
+    {
+        add {
+        }
+        remove {
+        }
+    }
+
+    public void Run() {
+        if (X > 0) {
             X--;
         }
+
+        var point = new {
+            X = 1,
+        };
+        var copy = new Widget {
+            X = 1,
+        };
+        Action log = delegate {
+            Console.WriteLine(point);
+        };
+        Func<int, int> twice = n => {
+            return n * 2;
+        };
     }
 }
 ```
@@ -570,11 +1345,35 @@ csharp_new_line_before_open_brace = events
 
 :::{tab-item} Before
 ```csharp
+using System;
+
 namespace N;
 
 public class Widget
 {
-    public int X { get; set; }
+    private int _x;
+
+    public int X
+    {
+        get
+        {
+            return _x;
+        }
+        set
+        {
+            _x = value;
+        }
+    }
+
+    public event EventHandler Changed
+    {
+        add
+        {
+        }
+        remove
+        {
+        }
+    }
 
     public void Run()
     {
@@ -582,6 +1381,23 @@ public class Widget
         {
             X--;
         }
+
+        var point = new
+        {
+            X = 1,
+        };
+        var copy = new Widget
+        {
+            X = 1,
+        };
+        Action log = delegate
+        {
+            Console.WriteLine(point);
+        };
+        Func<int, int> twice = n =>
+        {
+            return n * 2;
+        };
     }
 }
 ```
@@ -589,18 +1405,46 @@ public class Widget
 
 :::{tab-item} After
 ```csharp
+using System;
+
 namespace N;
 
-public class Widget
-{
-    public int X { get; set; }
+public class Widget {
+    private int _x;
 
-    public void Run()
-    {
-        if (X > 0)
-        {
+    public int X {
+        get {
+            return _x;
+        }
+        set {
+            _x = value;
+        }
+    }
+
+    public event EventHandler Changed {
+        add {
+        }
+        remove {
+        }
+    }
+
+    public void Run() {
+        if (X > 0) {
             X--;
         }
+
+        var point = new {
+            X = 1,
+        };
+        var copy = new Widget {
+            X = 1,
+        };
+        Action log = delegate {
+            Console.WriteLine(point);
+        };
+        Func<int, int> twice = n => {
+            return n * 2;
+        };
     }
 }
 ```

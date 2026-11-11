@@ -182,6 +182,7 @@ internal static class Program
         using var xmlFormatter = new XmlFormatter();
         var defaultOptions = new FormatOptions();
         var divergences = LoadDivergences(root);
+        EnsureEveryValueIsMapped(defaultOptions);
 
         var grouped = OptionDescriptor.All
             .GroupBy(d => d.Group)
@@ -305,7 +306,9 @@ internal static class Program
         sb.AppendLine("|---|---|");
         foreach (var v in descriptor.Values)
         {
-            var note = v.StartsWith('<') && v.EndsWith('>') ? "Any integer." : "";
+            var note = v.StartsWith('<') && v.EndsWith('>') ? "Any integer."
+                : Snippets.ValueNotes.TryGetValue((descriptor.Key, v), out var valueNote) ? valueNote
+                : "";
             sb.AppendLine($"| `{v}` | {note} |");
         }
         sb.AppendLine();
@@ -569,6 +572,58 @@ internal static class Program
     }
 
     /// <summary>
+    /// Values that are documented to leave <see cref="FormatOptions"/> at its default: each one means
+    /// "do nothing", so its example rightly shows no change.
+    /// </summary>
+    private static readonly HashSet<(string Key, string Value)> NoOpValues =
+    [
+        ("csharp_style_namespace_declarations", "block_scoped"),
+        ("dotnet_diagnostic.ide0055.severity", "silent"),
+        ("dotnet_diagnostic.ide0055.severity", "suggestion"),
+        ("dotnet_diagnostic.ide0055.severity", "error"),
+        ("file_header_template", "unset"),
+    ];
+
+    /// <summary>
+    /// Fails the run when a value other than the key's default comes out of <see cref="BuildOptions"/>
+    /// as the default options. That is what a key with no case in <see cref="BuildOptions"/> does: it
+    /// falls through to the default, and every example on its page shows the default's output instead
+    /// of the value's (#227).
+    /// </summary>
+    /// <remarks>
+    /// This checks the options rather than comparing each example's before and after. An unchanged
+    /// example is often correct: a whitespace key such as <c>charset</c> changes nothing visible, and a
+    /// value that matches the snippet's own layout has nothing to change.
+    /// </remarks>
+    private static void EnsureEveryValueIsMapped(FormatOptions defaultOptions)
+    {
+        var unmapped = new List<string>();
+        foreach (var descriptor in OptionDescriptor.All)
+        {
+            if (descriptor.Language is not (OptionLanguage.Shared or OptionLanguage.CSharp))
+                continue;
+
+            var values = descriptor.Values.Where(v => !v.StartsWith('<') || !v.EndsWith('>')).ToList();
+            if (Snippets.DemoValues.TryGetValue(descriptor.Key, out var demo))
+                values.Add(demo);
+
+            foreach (var value in values)
+            {
+                if (value == descriptor.Default || NoOpValues.Contains((descriptor.Key, value)))
+                    continue;
+                if (BuildOptions(descriptor, value).Equals(defaultOptions))
+                    unmapped.Add($"{descriptor.Key} = {value}");
+            }
+        }
+
+        if (unmapped.Count > 0)
+            throw new InvalidOperationException(
+                "These values leave FormatOptions at its default, so their examples would show the default's output. " +
+                "Add the key to BuildOptions, or to NoOpValues if the value really does nothing:" + Environment.NewLine +
+                string.Join(Environment.NewLine, unmapped.Select(u => "  " + u)));
+    }
+
+    /// <summary>
     /// Returns a <see cref="FormatOptions"/> that differs from the default in exactly one key.
     /// </summary>
     private static FormatOptions BuildOptions(OptionDescriptor d, string value)
@@ -600,6 +655,12 @@ internal static class Program
                 }
             },
 
+            "csharp_new_line_before_open_brace" => opts with
+            {
+                NewLineBeforeOpenBrace = BraceStyleParser.TryParse(value, out var braces)
+                    ? braces
+                    : throw new InvalidOperationException($"csharp_new_line_before_open_brace = {value} does not parse"),
+            },
             "csharp_new_line_before_else" => opts with { NewLineBeforeElse = b },
             "csharp_new_line_before_catch" => opts with { NewLineBeforeCatch = b },
             "csharp_new_line_before_finally" => opts with { NewLineBeforeFinally = b },
