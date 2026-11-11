@@ -1705,13 +1705,23 @@ internal static partial class Printers
 	{
 		var arena = context.Arena;
 
+		// A switch that is a lambda's body is the exception to the brace rule below: dotnet format leaves
+		// a brace the author put on a line of its own at the offset they gave it, and lines the arms and
+		// the closing brace up from it. Moved to the line's own indent, `.Any(x => x switch` / `{` was
+		// pulled back a level (issue #238). The register reads how far the line the switch starts on moved.
+		var anchor = EnterPatternContinuation(KeepsAuthorBraceOffset(node, context), context);
+
 		Node.Print(node.GoverningExpression, context);
 		arena.Synthetic(SyntheticText.Space);
 		TokenPrinter.Print(node.SwitchKeyword, context);
 
-		// dotnet format files this brace under the initializers flag, and moves it either way regardless
-		// of where the author put it.
-		BeforeOpenBrace(BraceStyle.ObjectCollectionArrayInitializers, context);
+		// dotnet format files this brace under the initializers flag, and otherwise moves it either way
+		// regardless of where the author put it.
+		var offset = 0;
+		if (anchor >= 0)
+			offset = ContinuationLine(node.OpenBraceToken, anchor, context);
+		else
+			BeforeOpenBrace(BraceStyle.ObjectCollectionArrayInitializers, context);
 
 		TokenPrinter.Print(node.OpenBraceToken, context);
 
@@ -1724,6 +1734,7 @@ internal static partial class Printers
 
 		// The arms and the closing brace indent from the line the opening brace sits on, so when
 		// csharp_indent_braces moved that brace in, everything after it moves in with it.
+		using (anchor >= 0 ? arena.AlignedIndent(anchor, offset) : default)
 		using (arena.IndentIf(IndentsOpenBrace(BraceStyle.ObjectCollectionArrayInitializers, context)))
 		{
 			using (arena.Indent())
@@ -1756,6 +1767,46 @@ internal static partial class Printers
 		}
 
 		context.CaseLabelContinuation = outerLabelAnchor;
+		ExitPatternContinuation(anchor, context);
+	}
+
+	/// <summary>
+	/// True when the author put a switch expression's <c>{</c> on a line of its own and the switch is a
+	/// lambda's expression body, or the receiver of the member access, call or <c>!</c> that is.
+	/// </summary>
+	/// <remarks>
+	/// That is where dotnet format leaves the brace. A switch anywhere else in the body, an operand or an
+	/// argument, has its brace moved to its line's indent, as everywhere else. Only with the brace on a
+	/// line of its own under the default brace settings: a brace the author left on the `switch` line is
+	/// still placed by <see cref="BeforeOpenBrace"/>.
+	/// </remarks>
+	private static bool KeepsAuthorBraceOffset(SwitchExpressionSyntax node, PrintContext context)
+	{
+		if (!context.Options.NewLineBeforeOpenBrace.HasFlag(BraceStyle.ObjectCollectionArrayInitializers)
+			|| context.Options.IndentBraces
+			|| !context.AuthorBroke(node.SwitchKeyword.Span.End, node.OpenBraceToken.SpanStart))
+			return false;
+
+		ExpressionSyntax current = node;
+		while (true)
+		{
+			switch (current.Parent)
+			{
+				case MemberAccessExpressionSyntax access when access.Expression == current:
+					current = access;
+					continue;
+				case InvocationExpressionSyntax invocation when invocation.Expression == current:
+					current = invocation;
+					continue;
+				case PostfixUnaryExpressionSyntax postfix when postfix.IsKind(SyntaxKind.SuppressNullableWarningExpression):
+					current = postfix;
+					continue;
+				case LambdaExpressionSyntax lambda:
+					return lambda.ExpressionBody == current;
+				default:
+					return false;
+			}
+		}
 	}
 
 	public static void SwitchExpressionArm(SwitchExpressionArmSyntax node, PrintContext context)

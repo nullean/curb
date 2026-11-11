@@ -300,4 +300,153 @@ public class SwitchTests : FormattingTest
 		    }
 		}
 		""");
+
+	// Issue #238: a switch expression that is a lambda's body keeps a brace the author put on a line of its
+	// own at their offset, with the arms one level in from it, as dotnet format leaves it.
+
+	[Test]
+	public Task A_switch_lambda_body_keeps_the_offset_its_brace_was_given() => Unchanged(
+		"""
+		public class C
+		{
+		    public bool N(int[] xs)
+		    {
+		        var a = xs.Any(x => x switch
+		                {
+		                    0 => true,
+		                    _ => false,
+		                });
+		        Func<int, bool> f = x => x switch
+		                {
+		                    // the common case
+		                    0 => true,
+
+		                    _ => false,
+		                };
+		        var g = xs.Select((x) =>
+		            x switch
+		                {
+		                    0 => y => y switch
+		                        {
+		                            _ => 1,
+		                        },
+		                    _ => null,
+		                });
+		        return xs.Any(x => x switch
+		                {
+		                    0 => true,
+		                    _ => false,
+		                }.Equals(true));
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_switch_lambda_body_brace_lines_its_arms_and_closing_brace_up_from_it() => Formats(
+		"""
+		public class C
+		{
+		    public bool N(int[] xs)
+		    {
+		    var a = xs.Any(x => x switch
+		                {
+		                0 => true,
+		                      _ => false,
+		            });
+		        return false;
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public bool N(int[] xs)
+		    {
+		        var a = xs.Any(x => x switch
+		                    {
+		                        0 => true,
+		                        _ => false,
+		                    });
+		        return false;
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_switch_elsewhere_in_a_lambda_body_still_takes_its_lines_indent() => Formats(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        Foo(x => Bar(1, x switch
+		                {
+		                    0 => true,
+		                    _ => false,
+		                }));
+		        Foo(x =>
+		        {
+		            return x switch
+		                {
+		                    _ => 1,
+		                };
+		        });
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        Foo(x => Bar(1, x switch
+		        {
+		            0 => true,
+		            _ => false,
+		        }));
+		        Foo(x =>
+		        {
+		            return x switch
+		            {
+		                _ => 1,
+		            };
+		        });
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Deterministic_layout_still_places_a_switch_lambda_body_brace() => Formats(
+		"""
+		public class C
+		{
+		    public bool N(int[] xs)
+		    {
+		        var a = xs.Any(x => x switch
+		                {
+		                    0 => true,
+		                    _ => false,
+		                });
+		        return a;
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public bool N(int[] xs)
+		    {
+		        var a = xs.Any(
+		            x =>
+		                x switch
+		                {
+		                    0 => true,
+		                    _ => false,
+		                }
+		        );
+		        return a;
+		    }
+		}
+		""",
+		editorConfig: "max_line_length = 120");
 }
