@@ -14,7 +14,8 @@ mise run test             # build, then run the tests
 mise run pack             # build, pack the managed packages and validate them
 mise run ci               # what CI's build job runs
 mise run docs             # build the docs and serve them
-mise run check            # workflow security checks (zizmor)
+mise run format           # format Curb's own source with Curb, built from this checkout
+mise run check            # unformatted source (Curb) and workflow findings (zizmor); CI runs the Curb half
 mise run release          # show the release draft; `mise run release publish` releases
 ```
 
