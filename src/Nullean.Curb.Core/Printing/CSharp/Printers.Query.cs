@@ -46,27 +46,32 @@ internal static partial class Printers
 		{
 			foreach (var clause in body.Clauses)
 			{
-				Separator(previousEnd, clause.SpanStart);
+				Separator(previousEnd, clause.GetFirstToken());
 				Node.Print(clause, context);
 				previousEnd = clause.Span.End;
 			}
 
-			Separator(previousEnd, body.SelectOrGroup.SpanStart);
+			Separator(previousEnd, body.SelectOrGroup.GetFirstToken());
 			Node.Print(body.SelectOrGroup, context);
 			previousEnd = body.SelectOrGroup.Span.End;
 
 			if (body.Continuation is null)
 				return;
 
-			Separator(previousEnd, body.Continuation.SpanStart);
+			Separator(previousEnd, body.Continuation.IntoKeyword);
 			TokenPrinter.Print(body.Continuation.IntoKeyword, context);
 			arena.Synthetic(SyntheticText.Space);
 			TokenPrinter.Print(body.Continuation.Identifier, context);
 			PrintQueryBody(body.Continuation.Body, body.Continuation.Identifier.Span.End);
 		}
 
-		void Separator(int previousEnd, int nextStart)
+		void Separator(int previousEnd, Microsoft.CodeAnalysis.SyntaxToken next)
 		{
+			// A comment on the line above the clause goes under the `from` with it, and the clause
+			// follows it there rather than dropping to the statement's indent (issue #272).
+			if (TokenPrinter.HasLeadingContent(next))
+				context.AlignLeadingTrivia(next, QueryAnchor, 0);
+
 			// Aligned either way. The option decides whether the break is taken at all; where it
 			// lands when it is taken is the same question, and dotnet format answers it under the
 			// `from` whether the break came from the option or from the width.
@@ -86,7 +91,7 @@ internal static partial class Printers
 			// came apart at the `into`.
 			if (asWritten)
 			{
-				if (context.AuthorJoined(previousEnd, nextStart))
+				if (context.AuthorJoined(previousEnd, next.SpanStart))
 					arena.Synthetic(SyntheticText.Space);
 				else
 					arena.AlignedLine(QueryAnchor);

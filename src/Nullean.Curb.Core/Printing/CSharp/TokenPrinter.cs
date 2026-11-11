@@ -134,6 +134,14 @@ internal static class TokenPrinter
 		// column, where dotnet format puts them, rather than at the ambient indent.
 		var aligned = context.TryTakeLeadingTriviaAlignment(token, out var alignRegister, out var alignOffset, out var alignElement);
 
+		// Where dotnet format measures that continuation line's comments from: the line the statement,
+		// member or element holding the token starts on. Found at the first comment, since most tokens
+		// have none.
+		var shapeBase = default(SyntaxToken);
+		var keepsAtBase = false;
+		var unshaped = false;
+		var shapeBaseFound = false;
+
 		// Blank lines are only preserved *between* things, never introduced at the start of a run,
 		// and never more than one however many the source had.
 		var pendingNewLines = 0;
@@ -267,18 +275,38 @@ internal static class TokenPrinter
 					//
 					// What counts is the output: a blank line the source had but Curb drops, after an
 					// opening brace say, leaves the comment directly under the trailing one.
+					//
+					// On a continuation line, that indent is the statement's, not the token's column: a comment
+					// at the operator's column under `? "a" // because` is out of shape, and dotnet format aligns
+					// it under the trailing comment, while one at the statement's column is in shape and stays.
+					if (!shapeBaseFound)
+					{
+						shapeBase = ContinuationShapeBase(token, context, out unshaped);
+						keepsAtBase = shapeBase.RawKind != 0 && TriviaIsInShape(token, shapeBase, context);
+						shapeBaseFound = true;
+					}
+
 					var isLineComment = trivia.IsKind(SyntaxKind.SingleLineCommentTrivia);
 					var startsAligned = isLineComment
 						&& !emittedAnything
 						&& !blankLineBefore
 						&& !separated
 						&& !(aligned && alignElement)
-						&& AlignsUnderTrailingComment(token, trivia, context);
+						&& AlignsUnderTrailingComment(token, trivia, shapeBase, unshaped, context);
 
 					if (startsAligned || (alignedRun && isLineComment && priorNewLines <= 1))
 					{
 						arena.AlignedLine(TrailingCommentAnchor);
 						alignedRun = true;
+					}
+					else if (keepsAtBase)
+					{
+						// Comments already at the statement's column stay at it, wherever its line was printed.
+						var register = context.EnterContinuation();
+						arena.ContainingLineAnchor(register, shapeBase.SpanStart);
+						arena.AlignedLine(register);
+						context.ExitContinuation();
+						alignedRun = false;
 					}
 					else if (aligned)
 					{
@@ -591,7 +619,7 @@ internal static class TokenPrinter
 	/// Walking to the previous token allocates, so it is asked only of a token that actually carries
 	/// a leading comment — which is uncommon, and never in the middle of an expression.
 	/// </remarks>
-	private static bool AlignsUnderTrailingComment(SyntaxToken token, SyntaxTrivia comment, PrintContext context)
+	private static bool AlignsUnderTrailingComment(SyntaxToken token, SyntaxTrivia comment, SyntaxToken shapeBase, bool unshaped, PrintContext context)
 	{
 		var previous = context.PreviousToken;
 		if (previous.RawKind == 0)
@@ -626,7 +654,98 @@ internal static class TokenPrinter
 				return false;
 		}
 
-		return !TriviaIsInShape(token, context);
+		return unshaped || !TriviaIsInShape(token, shapeBase, context);
+	}
+
+	/// <summary>
+	/// The first token of the statement, member, switch arm, initializer or collection element, or lambda that a
+	/// continuation line starting with <paramref name="token"/> belongs to, when its line's indent is a
+	/// column other than the token's; otherwise <c>default</c>.
+	/// </summary>
+	/// <remarks>
+	/// dotnet format checks the trivia ahead of a token against the indentation of the block it sits in,
+	/// which a continuation line is not indented by: the trivia ahead of <c>: "b"</c> in a broken ternary is
+	/// in shape at the <c>return</c>'s column, not at the colon's. Asked only once the token is known to
+	/// carry a comment.
+	///
+	/// A lambda is measured from the line it starts on, so <c>M(</c> / <c>b => b</c> / <c>? "a" // one</c>
+	/// has its comment in shape at the lambda's line, not at the statement's.
+	///
+	/// A statement that does not start its line, after an <c>if (…)</c> on it say, is indented a level in
+	/// from that line, which no column on it gives. With no width the token's own column stands there, as
+	/// it always has. With a width that column is not where the token is printed, so
+	/// <paramref name="unshaped"/> says no column is in shape and the comment aligns, which is a fixed
+	/// point wherever the statement lands. So is an object initializer's brace the author indented on a
+	/// continuation line: dotnet format moves the brace and re-lays its trivia wherever it was.
+	/// </remarks>
+	private static SyntaxToken ContinuationShapeBase(SyntaxToken token, PrintContext context, out bool unshaped)
+	{
+		unshaped = false;
+		for (var node = token.Parent; node is not null; node = node.Parent)
+		{
+			// A lambda is measured from the line it starts on, wherever on that line it starts.
+			if (node is AnonymousFunctionExpressionSyntax)
+			{
+				var lambdaLine = LineIndentColumn(node.SpanStart, context);
+				return lambdaLine == ColumnOf(token, context) ? default : node.GetFirstToken();
+			}
+
+			// dotnet format indents a constraint clause and lines a query's clauses up itself, so the
+			// trivia in front of one is measured from the clause.
+			var measuredFrom = node is StatementSyntax and not BlockSyntax
+				|| node is MemberDeclarationSyntax
+				|| node is AccessorDeclarationSyntax
+				|| node is SwitchExpressionArmSyntax
+				|| node is TypeParameterConstraintClauseSyntax
+				|| node is QueryClauseSyntax or SelectOrGroupClauseSyntax or QueryContinuationSyntax
+				|| node.Parent is InitializerExpressionSyntax or CollectionExpressionSyntax;
+			if (!measuredFrom)
+				continue;
+
+			var first = node.GetFirstToken();
+			if (first == token)
+				return default;
+
+			var column = ColumnOf(first, context);
+			if (column != LineIndentColumn(first.SpanStart, context))
+			{
+				unshaped = !context.Options.KeepExistingLinebreaks;
+				return default;
+			}
+
+			if (column == ColumnOf(token, context))
+				return default;
+
+			// No column is in shape ahead of an initializer brace dotnet format moves.
+			if (token.IsKind(SyntaxKind.OpenBraceToken)
+				&& (token.Parent.IsKind(SyntaxKind.ObjectInitializerExpression)
+					|| token.Parent.IsKind(SyntaxKind.WithInitializerExpression)
+					|| token.Parent.IsKind(SyntaxKind.AnonymousObjectCreationExpression)))
+			{
+				unshaped = true;
+				return default;
+			}
+
+			return first;
+		}
+
+		return default;
+	}
+
+	/// <summary>The source column <paramref name="token"/> starts at, in characters from its line's start.</summary>
+	private static int ColumnOf(SyntaxToken token, PrintContext context) =>
+		token.SpanStart - context.Text.Lines.GetLineFromPosition(token.SpanStart).Start;
+
+	/// <summary>The column, in characters, of the first non-whitespace character on the source line holding <paramref name="position"/>.</summary>
+	private static int LineIndentColumn(int position, PrintContext context)
+	{
+		var text = context.Text;
+		var line = text.Lines.GetLineFromPosition(position);
+		var i = line.Start;
+		while (i < line.End && text[i] is ' ' or '\t')
+			i++;
+
+		return i - line.Start;
 	}
 
 	/// <summary>
@@ -644,9 +763,15 @@ internal static class TokenPrinter
 	///
 	/// Between the elements of a collection, dotnet format leaves the trivia as written whatever it is
 	/// indented with, so there a comment at the token's column stays there under tabs too.
+	///
+	/// On a continuation line the column that is in shape is <paramref name="shapeBase"/>'s, not the
+	/// token's, and a comment found there is printed at whatever column that line ends up at.
 	/// </remarks>
-	private static bool TriviaIsInShape(SyntaxToken token, PrintContext context) =>
-		CommentsSitAtTokenColumn(token, context)
+	/// <param name="token">The token whose leading trivia is asked about.</param>
+	/// <param name="shapeBase">What <see cref="ContinuationShapeBase"/> found for the token.</param>
+	/// <param name="context">Per-file printing state.</param>
+	private static bool TriviaIsInShape(SyntaxToken token, SyntaxToken shapeBase, PrintContext context) =>
+		CommentsSitAtTokenColumn(token, shapeBase, context)
 		&& (BetweenCollectionElements(token) || (!context.Options.UseTabs && !IndentsWithATab(token.LeadingTrivia)));
 
 	/// <summary>
@@ -687,7 +812,7 @@ internal static class TokenPrinter
 
 	/// <summary>
 	/// True when every comment in front of <paramref name="token"/> starts its line at the column the
-	/// token does.
+	/// token does, or, on a continuation line, at the indent of the line <paramref name="shapeBase"/> is on.
 	/// </summary>
 	/// <remarks>
 	/// dotnet format re-lays the trivia between two tokens only when it is out of shape, and only
@@ -704,11 +829,13 @@ internal static class TokenPrinter
 	/// A label one less than the current indent is the exception: its comments belong a level in,
 	/// where the statements are (see <see cref="Printers.LabeledStatement"/>).
 	/// </remarks>
-	private static bool CommentsSitAtTokenColumn(SyntaxToken token, PrintContext context)
+	private static bool CommentsSitAtTokenColumn(SyntaxToken token, SyntaxToken shapeBase, PrintContext context)
 	{
 		var lines = context.Text.Lines;
 		var tokenStart = token.SpanStart;
-		var tokenColumn = tokenStart - lines.GetLineFromPosition(tokenStart).Start;
+		var tokenColumn = shapeBase.RawKind != 0
+			? LineIndentColumn(shapeBase.SpanStart, context)
+			: tokenStart - lines.GetLineFromPosition(tokenStart).Start;
 		if (Printers.LabelCommentsSitALevelIn(token, context))
 			tokenColumn += context.Options.IndentSize;
 

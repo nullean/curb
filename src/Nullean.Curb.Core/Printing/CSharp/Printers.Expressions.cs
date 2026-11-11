@@ -248,11 +248,19 @@ internal static partial class Printers
 	/// The break and the blank lines go first, and the aligned line then reuses the line they end on,
 	/// since an aligned break reuses a line nothing has been written to.
 	/// </remarks>
-	private static int MemberContinuationLine(int previousEnd, SyntaxNode next, int anchor, PrintContext context)
+	/// <param name="previousEnd">Where the member before <paramref name="next"/> ends.</param>
+	/// <param name="next">The member to break before.</param>
+	/// <param name="anchor">The register the broken lines read.</param>
+	/// <param name="context">Per-file printing state.</param>
+	/// <param name="element">
+	/// The members are a collection's or an initializer's, between which dotnet format leaves a comment on
+	/// the member's line. Between arguments it aligns one under a trailing comment as it does anywhere.
+	/// </param>
+	private static int MemberContinuationLine(int previousEnd, SyntaxNode next, int anchor, PrintContext context, bool element = true)
 	{
 		var first = next.GetFirstToken();
 		BreakBeforeFirstToken(previousEnd, first, context);
-		return ContinuationLine(first, anchor, context, element: true);
+		return ContinuationLine(first, anchor, context, element);
 	}
 
 	public static void AssignmentExpression(AssignmentExpressionSyntax node, PrintContext context)
@@ -1450,12 +1458,7 @@ internal static partial class Printers
 			Node.Print(node.ParameterList, context);
 		}
 
-		// A one-line body after a parameter list the author broke goes on a line of its own, where the brace
-		// option puts it, and stays on one line there: dotnet format moves it, and leaves it beside a `)` on
-		// the `delegate` line (issue #271). A width that breaks the list puts the `)` on a line of its own,
-		// and the brace already follows it there.
-		var broken = node.ParameterList is { Parameters.Count: > 0 } && SpansLines(node.ParameterList, context);
-		PrintAnonymousFunctionBody(node.Block, BraceStyle.AnonymousMethods, context, broken);
+		PrintAnonymousFunctionBody(node.Block, BraceStyle.AnonymousMethods, context);
 	}
 
 	/// <summary>
@@ -1468,7 +1471,7 @@ internal static partial class Printers
 	/// it back — issue #135. The block's statements and closing brace follow the opening brace, as they
 	/// would from the indent.
 	/// </remarks>
-	private static void PrintAnonymousFunctionBody(BlockSyntax block, BraceStyle construct, PrintContext context, bool belowBrokenHeader = false)
+	private static void PrintAnonymousFunctionBody(BlockSyntax block, BraceStyle construct, PrintContext context)
 	{
 		// Named and published on the way out, for the creation a hugged argument list belongs to:
 		// `new HttpClient(new Handler(async r => { … })) { BaseAddress = u }` gives that list no group of
@@ -1478,15 +1481,26 @@ internal static partial class Printers
 		var group = context.Arena.NextGroupId();
 		using (context.Arena.Group(group))
 		{
+			// dotnet format moves a one-line block below the arrow of a lambda whose parameter list the
+			// author broke, as it moves a one-line body below a `where` clause (issue #274). An anonymous
+			// method's goes below its `)` the same way, and stays beside a `)` on the `delegate` line (#271).
+			var belowParameters = block.Parent switch
+			{
+				ParenthesizedLambdaExpressionSyntax lambda =>
+					context.AuthorBroke(lambda.ParameterList.SpanStart, lambda.ArrowToken.SpanStart),
+				AnonymousMethodExpressionSyntax { ParameterList: { } parameters } => SpansLines(parameters, context),
+				_ => false,
+			};
+
 			var column = OwnLineBraceColumn(block, construct, context);
 			if (column < 0)
-				PrintBody(block, construct, context, belowClause: belowBrokenHeader);
+				PrintBody(block, construct, context, belowClause: belowParameters);
 			else
 			{
 				var register = context.EnterContinuation();
 				context.Arena.LineShiftAnchor(register);
 				using (context.Arena.AlignedIndent(register, column))
-					PrintBody(block, construct, context);
+					PrintBody(block, construct, context, belowClause: belowParameters);
 				context.ExitContinuation();
 			}
 		}
