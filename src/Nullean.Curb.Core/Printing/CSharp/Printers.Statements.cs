@@ -1,4 +1,5 @@
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Nullean.Curb.Documents;
 using Nullean.Curb.Options;
@@ -1053,7 +1054,27 @@ internal static partial class Printers
 	}
 
 	/// <summary>Covers <c>break;</c>, <c>continue;</c> and the empty statement.</summary>
-	public static void KeywordStatement(StatementSyntax node, PrintContext context) => Tokens(node, context);
+	/// <remarks>
+	/// C# 15's labeled <c>break outer;</c> and <c>continue outer;</c> put an identifier between the keyword and the
+	/// semicolon. <see cref="Tokens"/> emits tokens with nothing between them, so the label gets the one space a
+	/// keyword needs before a name.
+	/// </remarks>
+	public static void KeywordStatement(StatementSyntax node, PrintContext context)
+	{
+		var previousWasKeyword = false;
+
+		foreach (var token in node.DescendantTokens())
+		{
+			if (token.Span.Length == 0)
+				continue;
+
+			if (previousWasKeyword && token.IsKind(SyntaxKind.IdentifierToken))
+				context.Arena.Synthetic(SyntheticText.Space);
+
+			TokenPrinter.Print(token, context);
+			previousWasKeyword = token.IsKind(SyntaxKind.BreakKeyword) || token.IsKind(SyntaxKind.ContinueKeyword);
+		}
+	}
 
 	public static void LocalFunctionStatement(LocalFunctionStatementSyntax node, PrintContext context)
 	{
