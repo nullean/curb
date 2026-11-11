@@ -885,4 +885,168 @@ public class AuthorBreakTests : FormattingTest
 		}
 		""",
 		editorConfig: "max_line_length = 120");
+	// Issue #232: with no width, a type argument list the author broke stays broken where they broke it.
+	[Test]
+	public Task A_broken_type_argument_list_is_kept() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        Add<List<int>,
+		            Dictionary<string, int>>();
+		        Add<
+		            List<int>,
+		            int>();
+		        Add<int
+		            >();
+		        var map = new Dictionary<string,
+		                      int>();
+		        var names = items.Where(i => i > 0)
+		            .Select<int,
+		                string>(i => i.ToString())
+		            .ToList();
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_broken_type_argument_list_moves_only_as_far_as_its_line() => Formats(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		          Add<List<int>,
+		                  Dictionary<string, int>>();
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        Add<List<int>,
+		                Dictionary<string, int>>();
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_broken_type_argument_list_is_joined_at_a_width() => Formats(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        Add<List<int>,
+		            Dictionary<string, int>>();
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        Add<List<int>, Dictionary<string, int>>();
+		    }
+		}
+		""",
+		editorConfig: "max_line_length = 120");
+
+	// Issue #234: with no width, a break after a parenthesis, or before its close, stays.
+	[Test]
+	public Task A_query_on_the_line_after_its_parenthesis_is_kept() => Unchanged(
+		"""
+		public class C
+		{
+		    public int M(int[] items)
+		    {
+		        var count = (
+		            from i in items
+		            select i
+		            ).Count();
+		        return (
+		                from i in items
+		                where i > 0
+		                select i)
+		            .Count();
+		    }
+		}
+		""");
+
+	[Test]
+	public Task An_expression_on_the_line_after_its_parenthesis_is_kept() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        var sum = (
+		            a + b
+		        );
+		        var total = (
+		              a +
+		                  b);
+		        var f = (
+		            x =>
+		            {
+		                return x;
+		            });
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_parenthesized_query_moves_only_as_far_as_its_line() => Formats(
+		"""
+		public class C
+		{
+		    public int M(int[] items)
+		    {
+		          return (
+		                  from i in items
+		                  select i)
+		              .Count();
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public int M(int[] items)
+		    {
+		        return (
+		                from i in items
+		                select i)
+		            .Count();
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_query_broken_after_its_parenthesis_is_joined_at_a_width() => Formats(
+		"""
+		public class C
+		{
+		    public int M(int[] items)
+		    {
+		        return (
+		            from i in items
+		            select i).Count();
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public int M(int[] items)
+		    {
+		        return (from i in items select i).Count();
+		    }
+		}
+		""",
+		editorConfig: "max_line_length = 120");
 }

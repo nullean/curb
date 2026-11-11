@@ -857,28 +857,35 @@ internal static partial class Printers
 		};
 
 	/// <summary>A declaration's <c>&lt;T, U&gt;</c>.</summary>
-	/// <remarks>A line the author broke stays broken, one level in, as in <see cref="Printers.BracketedParameterList"/>.</remarks>
+	/// <remarks>
+	/// A line the author broke stays broken, at the column they gave it, as in a type argument list.
+	/// Moved a level in from the declaration instead, it shifted the <c>where</c> clause below it by as much,
+	/// since that clause keeps its offset from the line above.
+	/// </remarks>
 	public static void TypeParameterList(TypeParameterListSyntax node, PrintContext context)
 	{
+		var register = ClaimLinesAsWritten(node, context);
 		TokenPrinter.Print(node.LessThanToken, context);
 
-		using (context.Arena.Indent())
+		var previousEnd = node.LessThanToken.Span.End;
+		for (var i = 0; i < node.Parameters.Count; i++)
 		{
-			BreakAsWritten(node.LessThanToken, node.Parameters.FirstOrDefault(), context);
-			for (var i = 0; i < node.Parameters.Count; i++)
-			{
-				Node.Print(node.Parameters[i], context);
-				if (i >= node.Parameters.SeparatorCount)
-					continue;
-				var separator = node.Parameters.GetSeparator(i);
-				TokenPrinter.Print(separator, context);
-				if (!BreakAsWritten(separator, node.Parameters[i + 1], context))
-					context.Arena.Synthetic(SyntheticText.Space);
-			}
+			LineAsWritten(previousEnd, node.Parameters[i].GetFirstToken(), register, context);
+			Node.Print(node.Parameters[i], context);
+			previousEnd = node.Parameters[i].Span.End;
+			if (i >= node.Parameters.SeparatorCount)
+				continue;
+			var separator = node.Parameters.GetSeparator(i);
+			LineAsWritten(previousEnd, separator, register, context);
+			TokenPrinter.Print(separator, context);
+			previousEnd = separator.Span.End;
+			if (register < 0 || !context.AuthorBroke(previousEnd, node.Parameters[i + 1].SpanStart))
+				context.Arena.Synthetic(SyntheticText.Space);
 		}
 
-		BreakAsWritten(node.Parameters.LastOrDefault(), node.GreaterThanToken, context);
+		LineAsWritten(previousEnd, node.GreaterThanToken, register, context);
 		TokenPrinter.Print(node.GreaterThanToken, context);
+		ReleaseLinesAsWritten(register, context);
 	}
 
 	/// <summary>
