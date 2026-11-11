@@ -94,7 +94,8 @@ public sealed class CSharpFormatter : IDisposable
 		DocValidator.Validate<CSharpLayout>(_arena, source.Length);
 #endif
 
-		_printer.Print(_arena, source.AsMemory(), options.Layout, _output);
+		// An unset insert_final_newline is the file's own.
+		_printer.Print(_arena, source.AsMemory(), options.Layout.WithFinalNewLineOf(source, options.FinalNewLineSet), _output);
 
 		var written = _output.Written;
 

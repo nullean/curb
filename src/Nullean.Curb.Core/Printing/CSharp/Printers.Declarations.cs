@@ -537,29 +537,35 @@ internal static partial class Printers
 			return;
 
 		Spacing.BeforeCallParens(context);
-		TokenPrinter.Print(node.ArgumentList.OpenParenToken, context);
 
 		// An argument list the author broke keeps their breaks, as an invocation's does. Printed flat
-		// it was joined onto one line however long — issue #102.
+		// it was joined onto one line however long — issue #102. Each line they broke stays at the column
+		// they gave it, moved only as far as the attribute's line moved, where dotnet format leaves it;
+		// a level in from that line pulled a hand-aligned argument back (issue #270). Claimed ahead of
+		// the `(`, as an invocation's is.
 		var arguments = node.ArgumentList.Arguments;
-		if (arguments.Count > 0 && SpansLines(node.ArgumentList, context))
+		var register = arguments.Count > 0 ? ClaimLinesAsWritten(node.ArgumentList, context) : -1;
+		TokenPrinter.Print(node.ArgumentList.OpenParenToken, context);
+
+		if (register >= 0)
 		{
+			var open = node.ArgumentList.OpenParenToken;
 			using (context.Arena.Indent())
 			{
-				if (context.AuthorBroke(node.ArgumentList.OpenParenToken.Span.End, arguments[0].SpanStart))
-					context.Arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
+				var offset = int.MinValue;
+				if (context.AuthorBroke(open.Span.End, arguments[0].SpanStart))
+					offset = ContinuationLine(arguments[0].GetFirstToken(), register, context);
 				else
 					Spacing.InsideCallParens(context);
 
-				PrintSeparated(arguments, context, asWritten: true, node.ArgumentList.OpenParenToken.Span.End);
+				PrintSeparated(arguments, context, asWritten: true, open.Span.End, lineShift: register, offset: offset);
 			}
 
-			if (context.AuthorBroke(arguments[^1].Span.End, node.ArgumentList.CloseParenToken.SpanStart))
-				context.Arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
-			else
+			if (!LineAsWritten(arguments[^1].Span.End, node.ArgumentList.CloseParenToken, register, context))
 				Spacing.InsideCallParens(context);
 
 			TokenPrinter.Print(node.ArgumentList.CloseParenToken, context);
+			ReleaseLinesAsWritten(register, context);
 			return;
 		}
 

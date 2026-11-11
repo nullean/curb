@@ -1307,4 +1307,91 @@ public class InitializerTests : FormattingTest
 		}
 		""",
 		editorConfig: "csharp_style_expression_bodied_methods = true");
+
+	// ---- a with expression after a comment ------------------------------------------------------------
+
+	[Test]
+	public Task A_with_after_a_comment_puts_its_brace_on_the_next_line_with_a_width() => Formats(
+		// The comment starts `with` on a line of its own, and dotnet format then moves the `{` to the next one.
+		// Deterministic layout cannot read the author's break, so it left `with { A = 1 }` on the line, which
+		// dotnet format rewrote (issue #275). Without a comment the expression still joins.
+		"""
+		public record R(int A, int B);
+
+		public class C
+		{
+		    public R M(R r)
+		    {
+		        var e = r
+		            /* why */
+		            with { A = 1 };
+		        var f = r // why
+		            with { A = 1, B = 2 };
+		        var g = r
+		            with { A = 1 };
+		        return g;
+		    }
+		}
+		""",
+		"""
+		public record R(int A, int B);
+
+		public class C
+		{
+		    public R M(R r)
+		    {
+		        var e = r
+		        /* why */
+		        with
+		        { A = 1 };
+		        var f = r // why
+		        with
+		        { A = 1, B = 2 };
+		        var g = r with { A = 1 };
+		        return g;
+		    }
+		}
+		""",
+		editorConfig: "max_line_length = 120");
+
+	[Test]
+	public Task A_with_after_a_comment_puts_its_brace_on_the_next_line() => Formats(
+		"""
+		public record R(int A, int B);
+
+		public class C
+		{
+		    public R M(R r)
+		    {
+		        var e = r
+		            /* why */
+		            with { A = 1 };
+		        var f = r // why
+		            with { A = 1, B = 2 };
+		        var g = r
+		            with { A = 1 };
+		        return g;
+		    }
+		}
+		""",
+		"""
+		public record R(int A, int B);
+
+		public class C
+		{
+		    public R M(R r)
+		    {
+		        var e = r
+		        /* why */
+		        with
+		        { A = 1 };
+		        var f = r // why
+		        with
+		        { A = 1, B = 2 };
+		        var g = r with
+		        { A = 1 };
+		        return g;
+		    }
+		}
+		""");
 }

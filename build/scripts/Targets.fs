@@ -1343,15 +1343,14 @@ let private checkOptionCoverage (dump: string) (cases: string[]) =
     // that bakes the current, wrong behaviour into a golden expectation — see the comment left next to
     // CoreOptionTests' blank-line cases.
     //
-    // csharp_style_expression_bodied_indexers is the same shape of real gap: bound and catalogued as
-    // implemented, but IndexerDeclaration (Printers.Members.cs) never calls TryPrintExpressionBody the
-    // way PropertyDeclaration and OperatorDeclaration do, so no source indexer is ever converted.
+    // csharp_style_expression_bodied_indexers used to belong here too (bound, but IndexerDeclaration never
+    // converted anything) — fixed in #260 and given real coverage, see ExpressionBodyTests.
     //
     // csharp_blank_lines_after_using_list used to belong here too (bound into FormatOptions with no
     // dispatch case reaching it) — fixed and given real coverage, see BlankLineOptionTests.
     let excluded =
         set [ "generated_code"; "dotnet_diagnostic.ide0055.severity"; "charset"
-              "trim_trailing_whitespace"; "csharp_style_expression_bodied_indexers" ]
+              "trim_trailing_whitespace" ]
 
     let keyPattern = Text.RegularExpressions.Regex(@"^\s*([a-zA-Z0-9_.]+)\s*=", Text.RegularExpressions.RegexOptions.Multiline)
     let covered =

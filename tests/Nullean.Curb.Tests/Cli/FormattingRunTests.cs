@@ -152,7 +152,7 @@ public class FormattingRunTests
 		summary.Failed.Should().Be(1, "the broken file is reported, not silently dropped");
 		summary.Changed.Should().Be(1, "the other file in the same run still gets formatted");
 		summary.ExitCode.Should().Be(3);
-		fs.File.ReadAllText($"{Root}/A.cs").Should().Be("class A { }\n", "the rest of the tree was not aborted");
+		fs.File.ReadAllText($"{Root}/A.cs").Should().Be("class A { }", "the rest of the tree was not aborted");
 		fs.File.ReadAllText($"{Root}/Broken.cs").Should().Be(
 			"class Broken {    }", "a file the write failed for is left exactly as it was found");
 		await Task.CompletedTask;

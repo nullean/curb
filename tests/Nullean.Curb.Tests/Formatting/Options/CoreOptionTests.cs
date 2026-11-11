@@ -99,28 +99,41 @@ public class CoreOptionTests : FormattingTest
 
 	// ---- end_of_line ---------------------------------------------------------------------------
 
+	// Every source here ends with a line break in its own style, so these say nothing about
+	// insert_final_newline, which an unset key leaves to the file.
+
 	[Test]
 	public Task Line_feed_endings() => FormatsExactly(
-		"public class C\n{\n}",
+		"public class C\n{\n}\n",
 		"public class C\n{\n}\n",
 		editorConfig: "end_of_line = lf");
 
 	[Test]
 	public Task Carriage_return_line_feed_endings() => FormatsExactly(
-		"public class C\n{\n}",
+		"public class C\n{\n}\n",
 		"public class C\r\n{\r\n}\r\n",
 		editorConfig: "end_of_line = crlf");
 
 	[Test]
 	public Task Crlf_source_is_converted_to_lf() => FormatsExactly(
-		"public class C\r\n{\r\n}",
+		"public class C\r\n{\r\n}\r\n",
 		"public class C\n{\n}\n",
 		editorConfig: "end_of_line = lf");
 
 	[Test]
 	public Task Unset_end_of_line_matches_the_platform() => FormatsExactly(
-		"public class C\n{\n}",
+		"public class C\n{\n}\n",
 		$"public class C{Environment.NewLine}{{{Environment.NewLine}}}{Environment.NewLine}",
+		editorConfig: "end_of_line = auto");
+
+	// Not the file's own ending, though dotnet format keeps it on most lines: with end_of_line unset it
+	// writes the platform's ending wherever it rewrites a line break, which includes the ones around a
+	// file header of two or more lines and a comment before a member it re-spaces. Kept CRLF on macOS or
+	// Linux, Curb's output stopped being a fixed point of it on 369 of the CI corpus's 1,986 files (#261).
+	[Test]
+	public Task Unset_end_of_line_writes_a_crlf_file_in_the_platform_s_ending() => FormatsExactly(
+		"// one\r\n// two\r\n\r\npublic class C\r\n{\r\n}\r\n",
+		$"// one{Environment.NewLine}// two{Environment.NewLine}{Environment.NewLine}public class C{Environment.NewLine}{{{Environment.NewLine}}}{Environment.NewLine}",
 		editorConfig: "end_of_line = auto");
 
 	// A string literal's newlines are characters of its value, not layout, so end_of_line does not
@@ -131,28 +144,41 @@ public class CoreOptionTests : FormattingTest
 
 	[Test]
 	public Task An_interpolated_raw_string_keeps_its_own_line_endings() => FormatsExactly(
-		"class A\n{\n    string M(string x)\n    {\n        return $\"\"\"\n            <a>{x}</a>\n            \"\"\";\n    }\n}",
+		"class A\n{\n    string M(string x)\n    {\n        return $\"\"\"\n            <a>{x}</a>\n            \"\"\";\n    }\n}\n",
 		"class A\r\n{\r\n    string M(string x)\r\n    {\r\n        return $\"\"\"\n            <a>{x}</a>\n            \"\"\";\r\n    }\r\n}\r\n",
 		editorConfig: "end_of_line = crlf");
 
 	[Test]
 	public Task An_interpolated_verbatim_string_keeps_its_own_line_endings() => FormatsExactly(
-		"class A\r\n{\r\n    string M(int x)\r\n    {\r\n        return $@\"one{x}\r\ntwo\";\r\n    }\r\n}",
+		"class A\r\n{\r\n    string M(int x)\r\n    {\r\n        return $@\"one{x}\r\ntwo\";\r\n    }\r\n}\r\n",
 		"class A\n{\n    string M(int x)\n    {\n        return $@\"one{x}\r\ntwo\";\n    }\n}\n",
 		editorConfig: "end_of_line = lf");
 
 	[Test]
 	public Task A_raw_string_keeps_its_own_line_endings() => FormatsExactly(
-		"class A\n{\n    string M()\n    {\n        return \"\"\"\n            <a>b</a>\n            \"\"\";\n    }\n}",
+		"class A\n{\n    string M()\n    {\n        return \"\"\"\n            <a>b</a>\n            \"\"\";\n    }\n}\n",
 		"class A\r\n{\r\n    string M()\r\n    {\r\n        return \"\"\"\n            <a>b</a>\n            \"\"\";\r\n    }\r\n}\r\n",
 		editorConfig: "end_of_line = crlf");
 
 	// ---- insert_final_newline ------------------------------------------------------------------
 
+	// Issue #262: with the key unset the file keeps whether it ends with a newline, as in dotnet format.
+	// Curb added one.
 	[Test]
-	public Task A_final_newline_is_added_by_default() => FormatsExactly(
+	public Task A_missing_final_newline_stays_missing_by_default() => FormatsExactly(
 		"public class C\n{\n}",
+		"public class C\n{\n}");
+
+	[Test]
+	public Task A_final_newline_stays_by_default() => FormatsExactly(
+		"public class C\n{\n}\n",
 		"public class C\n{\n}\n");
+
+	[Test]
+	public Task A_final_newline_is_added_when_asked_for() => FormatsExactly(
+		"public class C\n{\n}",
+		"public class C\n{\n}\n",
+		editorConfig: "insert_final_newline = true");
 
 	[Test]
 	public Task A_final_newline_can_be_suppressed() => FormatsExactly(
