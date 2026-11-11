@@ -193,8 +193,8 @@ public class MemberSeparatorTests : FormattingTest
 
 	[Test]
 	public Task The_anonymous_type_key_opens_an_anonymous_type_out_on_its_own() => Formats(
-		// Either key spreads an opened-out anonymous type: Roslyn's behaviour rather than its
-		// documentation. With the object initializer key off, the anonymous type key still does.
+		// Each kind follows its own key, as in dotnet format: with the object initializer key off, the
+		// anonymous type key (true by default) still spreads the anonymous type.
 		"""
 		public class C
 		{
@@ -231,6 +231,62 @@ public class MemberSeparatorTests : FormattingTest
 		editorConfig: "csharp_new_line_before_members_in_object_initializers = false");
 
 	// ---- anonymous types --------------------------------------------------------------------------
+
+	// Issue #259: the object initializer key, true by default, kept the anonymous type key's false from
+	// doing anything. dotnet format reads this key alone for an anonymous type.
+	[Test]
+	public Task The_anonymous_type_key_off_keeps_the_members_where_they_are_written() => Unchanged(
+		"""
+		public class C
+		{
+		    public object M()
+		    {
+		        return new
+		        {
+		            Name = "curb", Version = 1,
+		            Active = true,
+		        };
+		    }
+		}
+		""",
+		editorConfig: "csharp_new_line_before_members_in_anonymous_types = false");
+
+	[Test]
+	public Task The_object_initializer_key_does_not_reach_an_anonymous_type() => Formats(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        var o = new Point
+		        {
+		            X = 1, Y = 2
+		        };
+		        var a = new
+		        {
+		            First = 1, Second = 2
+		        };
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        var o = new Point
+		        {
+		            X = 1,
+		            Y = 2
+		        };
+		        var a = new
+		        {
+		            First = 1, Second = 2
+		        };
+		    }
+		}
+		""",
+		editorConfig: "csharp_new_line_before_members_in_object_initializers = true\ncsharp_new_line_before_members_in_anonymous_types = false");
 
 	[Test]
 	public Task An_anonymous_type_that_fits_stays_on_one_line_by_default() => Unchanged(

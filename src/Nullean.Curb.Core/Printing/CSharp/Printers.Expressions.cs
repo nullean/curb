@@ -667,11 +667,15 @@ internal static partial class Printers
 	/// brace takes a line of its own whenever that list wrapped, which is the one thing dotnet format
 	/// decides here and the only version of the question that survives deterministic layout.
 	/// </param>
+	/// <param name="ownerBroke">
+	/// The creation is known to span lines whatever the layout mode: a comment puts a line break in it.
+	/// </param>
 	public static void InitializerExpression(
 		InitializerExpressionSyntax node,
 		PrintContext context,
 		bool leadingLine = false,
-		ushort ownerGroup = 0)
+		ushort ownerGroup = 0,
+		bool ownerBroke = false)
 	{
 		var arena = context.Arena;
 
@@ -767,7 +771,7 @@ internal static partial class Printers
 		// settling. Where the author put the brace is fixed, so it is that which decides.
 		var ownerSpansLines = leadingLine
 			&& node.Parent is not null
-			&& context.AuthorBroke(node.Parent.SpanStart, node.SpanStart);
+			&& (ownerBroke || context.AuthorBroke(node.Parent.SpanStart, node.SpanStart));
 
 		// The creation spans lines and the initializer does not: `new List<int>` / `{ 1, 2 }`. dotnet
 		// format leaves the members on the brace's line, so the brace's break goes outside the group.
@@ -1494,11 +1498,15 @@ internal static partial class Printers
 
 			var column = OwnLineBraceColumn(block, construct, context);
 			if (column < 0)
+			{
+				CommentsAboveBlock(block.OpenBraceToken, context);
 				PrintBody(block, construct, context, belowClause: belowParameters);
+			}
 			else
 			{
 				var register = context.EnterContinuation();
 				context.Arena.LineShiftAnchor(register);
+				CommentsAboveBlock(block.OpenBraceToken, context);
 				using (context.Arena.AlignedIndent(register, column))
 					PrintBody(block, construct, context, belowClause: belowParameters);
 				context.ExitContinuation();
@@ -1508,17 +1516,42 @@ internal static partial class Printers
 		context.OwnBlockGroup = group;
 	}
 
+	/// <summary>
+	/// Prints the comments ahead of a block's brace on lines of their own, at the indent of the statement,
+	/// before the brace is placed.
+	/// </summary>
+	/// <remarks>
+	/// dotnet format puts a comment between <c>=&gt;</c> and the block at the statement's indent and leaves the
+	/// brace where the author put it. Printed with the brace, the comment went to the brace's column, and a
+	/// block kept on one line held the comment on the brace's line: <c>/* c */ { }</c> joined two lines, and a
+	/// <c>//</c> comment swallowed the brace, which the verifier refused (issue #273). The brace's own call then
+	/// skips what was printed here.
+	/// </remarks>
+	private static void CommentsAboveBlock(SyntaxToken brace, PrintContext context)
+	{
+		if (!TokenPrinter.HasLeadingContent(brace))
+			return;
+
+		TokenPrinter.PrintLeadingTrivia(brace, context, trailingBreak: false);
+
+		// Ends the comment's line whatever the brace does next: a brace that takes a line of its own merges
+		// its break into this one, and a brace that would have followed `=>` on its line, under
+		// csharp_new_line_before_open_brace = none or an empty pair csharp_empty_block_style joins, loses
+		// the space it would have had there.
+		context.Arena.LineCommentBreak();
+		context.HeaderSkipTokenPosition = brace.SpanStart;
+		context.HeaderSkipCount = brace.LeadingTrivia.Count;
+	}
+
 	public static void AnonymousObjectCreationExpression(AnonymousObjectCreationExpressionSyntax node, PrintContext context)
 	{
 		var arena = context.Arena;
 
-		// Either key opens an anonymous type out, which is Roslyn's behaviour rather than its
-		// documentation: with only csharp_new_line_before_members_in_object_initializers set,
-		// dotnet format still puts an opened-out `new { First = 1, Second = 2 }` one member per
-		// line. Curb treated the two keys as independent and kept the members together, which is
-		// the one expectation in the suite that dotnet format moved.
-		var oneMemberPerLine = context.Options.NewLineBeforeMembersInAnonymousTypes
-			|| context.Options.NewLineBeforeMembersInObjectInitializers;
+		// Its own key alone, as in dotnet format: csharp_new_line_before_members_in_anonymous_types = false
+		// keeps the members where they were written whatever the object-initializer key says (#259).
+		// abad73c read the two as one, from a measurement with only the object-initializer key set,
+		// but this key defaults to true in Roslyn too, so that measurement was of this key's default.
+		var oneMemberPerLine = context.Options.NewLineBeforeMembersInAnonymousTypes;
 
 		// Same rule as the object initializer above: one member per line *when the type is
 		// opened out*, not a reason to open it. dotnet format leaves `new { P = 1, Q = 2 }` alone

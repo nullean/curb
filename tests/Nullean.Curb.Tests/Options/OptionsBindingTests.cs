@@ -612,7 +612,35 @@ public class OptionsBindingTests
 	[Test]
 	public async Task Auto_end_of_line_resolves_to_the_platform_default()
 	{
+		// For a file with no line break of its own; one that has one keeps it, see CoreOptionTests.
 		new FormatOptions().ResolveEndOfLine().Should().Be(Environment.NewLine, "that is Roslyn's own default when end_of_line is unset");
+		await Task.CompletedTask;
+	}
+
+	// Issue #262: an unset key leaves the end of the file to the file, so the binder has to say whether
+	// the key was set at all.
+	[Test]
+	public async Task Insert_final_newline_is_unset_unless_written()
+	{
+		Bind("root = true\n\n[*.cs]\nindent_size = 4\n", out _).FinalNewLineSet.Should().BeFalse();
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task Insert_final_newline_is_set_by_either_value()
+	{
+		Bind("root = true\n\n[*.cs]\ninsert_final_newline = true\n", out _).FinalNewLineSet.Should().BeTrue();
+		var off = Bind("root = true\n\n[*.cs]\ninsert_final_newline = false\n", out _);
+		off.FinalNewLineSet.Should().BeTrue();
+		off.InsertFinalNewLine.Should().BeFalse();
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task An_unrecognised_insert_final_newline_leaves_the_key_unset()
+	{
+		Bind("root = true\n\n[*.cs]\ninsert_final_newline = sometimes\n", out var diagnostics).FinalNewLineSet.Should().BeFalse();
+		diagnostics.Should().ContainSingle();
 		await Task.CompletedTask;
 	}
 

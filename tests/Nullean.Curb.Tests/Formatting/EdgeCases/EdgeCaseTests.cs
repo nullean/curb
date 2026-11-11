@@ -32,8 +32,9 @@ public class EdgeCaseTests : FormattingTest
 
 	[Test]
 	public Task File_without_a_trailing_newline() => FormatsExactly(
+		// With insert_final_newline unset the file keeps going without one, as in dotnet format (#262).
 		"public class C\n{\n}",
-		"public class C\n{\n}\n");
+		"public class C\n{\n}");
 
 	[Test]
 	public Task Top_level_statements() => Unchanged(
