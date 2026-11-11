@@ -82,6 +82,135 @@ public class InitializerTests : FormattingTest
 		}
 		""");
 
+	// A creation that hugs a block-bodied lambda spans lines because the block does, and dotnet format then
+	// puts the initializer's brace on a line of its own. The hugged list gives the brace no group to aim at,
+	// so with a width it stayed on the `}))` line, where dotnet format moved it (issue #240).
+	[Test]
+	public Task Issue_240_an_initializer_after_a_hugged_block_lambda_keeps_its_own_line_at_a_width() => Unchanged(
+		"""
+		public class C
+		{
+		    public HttpClient M()
+		    {
+		        return new HttpClient(new Stub(async request =>
+		        {
+		            await Task.Yield();
+		            return new HttpResponseMessage();
+		        }))
+		        { BaseAddress = new Uri("https://example.test") };
+		    }
+		}
+		""",
+		editorConfig: "max_line_length = 120");
+
+	// The block opens out at a width wherever the author put it, and the brace follows it down.
+	[Test]
+	public Task Issue_240_an_initializer_follows_a_block_lambda_the_width_opened_out() => Formats(
+		"""
+		public class C
+		{
+		    public HttpClient M()
+		    {
+		        return new HttpClient(new Stub(async request => { await Task.Yield(); return new HttpResponseMessage(); })) { BaseAddress = new Uri("https://example.test") };
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public HttpClient M()
+		    {
+		        return new HttpClient(new Stub(async request =>
+		        {
+		            await Task.Yield();
+		            return new HttpResponseMessage();
+		        }))
+		        { BaseAddress = new Uri("https://example.test") };
+		    }
+		}
+		""",
+		editorConfig: "max_line_length = 120");
+
+	// The same question through each other path a hugged block reaches the creation by: a trailing callback
+	// after other arguments, an anonymous method, a callback inside an expression-bodied lambda, a `with`,
+	// and an empty block, which deterministic layout opens below its arrow too.
+	[Test]
+	public Task Issue_240_every_hugged_block_sends_the_initializer_below_at_a_width() => Formats(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        var a = new Holder(1, () =>
+		        {
+		            Foo();
+		        }) { X = 1 };
+		        var b = new Holder(delegate
+		        {
+		            Foo();
+		        }) { X = 1 };
+		        var c = new Holder(x => x.Add(() =>
+		        {
+		            Foo();
+		        })) { X = 1 };
+		        var d = Make(() =>
+		        {
+		            Foo();
+		        }) with { X = 1 };
+		        var e = new Holder(() => { }) { X = 1 };
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        var a = new Holder(1, () =>
+		        {
+		            Foo();
+		        })
+		        { X = 1 };
+		        var b = new Holder(delegate
+		        {
+		            Foo();
+		        })
+		        { X = 1 };
+		        var c = new Holder(x => x.Add(() =>
+		        {
+		            Foo();
+		        }))
+		        { X = 1 };
+		        var d = Make(() =>
+		        {
+		            Foo();
+		        }) with
+		        { X = 1 };
+		        var e = new Holder(() =>
+		        { })
+		        { X = 1 };
+		    }
+		}
+		""",
+		editorConfig: "max_line_length = 120");
+
+	// The block stays on the arrow's line here, so the creation does not span lines and the brace stays.
+	[Test]
+	public Task Issue_240_an_initializer_after_a_one_line_block_stays_on_its_line_at_a_width() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        var e = new Holder(() => { }) { X = 1 };
+		    }
+		}
+		""",
+		editorConfig: """
+			max_line_length = 120
+			csharp_new_line_before_open_brace = types,methods,object_collection_array_initializers
+			""");
+
 	[Test]
 	public Task Broken_arguments_followed_by_a_comment_keep_the_initializer_brace_on_the_next_line() => Unchanged(
 		"""

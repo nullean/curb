@@ -1454,18 +1454,28 @@ internal static partial class Printers
 	/// </remarks>
 	private static void PrintAnonymousFunctionBody(BlockSyntax block, BraceStyle construct, PrintContext context)
 	{
-		var column = OwnLineBraceColumn(block, construct, context);
-		if (column < 0)
+		// Named and published on the way out, for the creation a hugged argument list belongs to:
+		// `new HttpClient(new Handler(async r => { … })) { BaseAddress = u }` gives that list no group of
+		// its own, and dotnet format puts the initializer's `{` on a line of its own once the creation spans
+		// lines. This group breaks exactly when the block printed across lines, so the brace follows what
+		// this run printed rather than the source, which deterministic layout cannot read (issue #240).
+		var group = context.Arena.NextGroupId();
+		using (context.Arena.Group(group))
 		{
-			PrintBody(block, construct, context);
-			return;
+			var column = OwnLineBraceColumn(block, construct, context);
+			if (column < 0)
+				PrintBody(block, construct, context);
+			else
+			{
+				var register = context.EnterContinuation();
+				context.Arena.LineShiftAnchor(register);
+				using (context.Arena.AlignedIndent(register, column))
+					PrintBody(block, construct, context);
+				context.ExitContinuation();
+			}
 		}
 
-		var register = context.EnterContinuation();
-		context.Arena.LineShiftAnchor(register);
-		using (context.Arena.AlignedIndent(register, column))
-			PrintBody(block, construct, context);
-		context.ExitContinuation();
+		context.OwnBlockGroup = group;
 	}
 
 	public static void AnonymousObjectCreationExpression(AnonymousObjectCreationExpressionSyntax node, PrintContext context)
