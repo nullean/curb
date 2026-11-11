@@ -631,4 +631,24 @@ public class MemberTests : FormattingTest
 		    Green,
 		}
 		""");
+
+	// Issue #287: an empty parameter list read the group of the last list that had parameters, so a
+	// one-line body after a wrapped `M(int x,` moved below every later parameterless signature.
+	[Test]
+	public Task A_parameterless_members_body_ignores_an_earlier_wrapped_parameter_list() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M(int x,
+		                  int y)
+		    {
+		    }
+
+		    public void O() { }
+
+		    public C() { }
+
+		    public int P() => 1;
+		}
+		""");
 }
