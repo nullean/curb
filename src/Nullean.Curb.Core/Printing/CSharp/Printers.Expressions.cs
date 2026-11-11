@@ -1541,13 +1541,11 @@ internal static partial class Printers
 	{
 		var arena = context.Arena;
 
-		// Either key opens an anonymous type out, which is Roslyn's behaviour rather than its
-		// documentation: with only csharp_new_line_before_members_in_object_initializers set,
-		// dotnet format still puts an opened-out `new { First = 1, Second = 2 }` one member per
-		// line. Curb treated the two keys as independent and kept the members together, which is
-		// the one expectation in the suite that dotnet format moved.
-		var oneMemberPerLine = context.Options.NewLineBeforeMembersInAnonymousTypes
-			|| context.Options.NewLineBeforeMembersInObjectInitializers;
+		// Its own key alone, as in dotnet format: csharp_new_line_before_members_in_anonymous_types = false
+		// keeps the members where they were written whatever the object-initializer key says (#259).
+		// abad73c read the two as one, from a measurement with only the object-initializer key set,
+		// but this key defaults to true in Roslyn too, so that measurement was of this key's default.
+		var oneMemberPerLine = context.Options.NewLineBeforeMembersInAnonymousTypes;
 
 		// Same rule as the object initializer above: one member per line *when the type is
 		// opened out*, not a reason to open it. dotnet format leaves `new { P = 1, Q = 2 }` alone

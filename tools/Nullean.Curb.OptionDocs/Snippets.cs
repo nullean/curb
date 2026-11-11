@@ -1865,8 +1865,8 @@ public static class Snippets
         [("csharp_new_line_before_members_in_object_initializers", "false")] =
             "Leaves the members where they were written. It doesn't join them onto one line, and neither does `dotnet format`.",
         [("csharp_new_line_before_members_in_anonymous_types", "false")] =
-            "No effect yet unless `csharp_new_line_before_members_in_object_initializers = false` is set too " +
-            "([#259](https://github.com/nullean/curb/issues/259)). `dotnet format` reads this key alone.",
+            "Leaves the members where they were written, whatever `csharp_new_line_before_members_in_object_initializers` " +
+            "says. It doesn't join them onto one line, and neither does `dotnet format`.",
         [("csharp_wrap_before_first_method_call", "true")] =
             "What Curb does with the key unset: once a chain breaks, its receiver gets a line of its own.",
         [("dotnet_sort_system_directives_first", "false")] =
