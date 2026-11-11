@@ -71,7 +71,7 @@ skills, and `mise run release` for the current draft.
 | `examples/curb-cleanup-smoketest` | Proves cleanup fixes what a build reported, and only that. Not in the solution. |
 | `tools/Nullean.Curb.OptionDocs` | Generates `docs/reference/` from the option catalog. `./build.sh options`; CI fails when it is stale. |
 | `tools/Nullean.Curb.CorpusGenerator` | Writes the corpus every corpus gate runs against. `./build.sh clonecorpus --corpus <path>`. |
-| `build/scripts` | F# Bullseye build runner. |
+| `build/scripts` | F# build runner ([Nullean.Make.Fs](https://www.nuget.org/packages/Nullean.Make.Fs), net11.0): the `Target` cases and options in `CommandLine.fs`, their bindings in `Program.fs`, the corpus gates in `Targets.fs`. Commands are Proc.Fs `sh $"…"` lines and captures, never the C# `ProcNet` API. |
 
 ## Non-negotiables
 
