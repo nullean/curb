@@ -46,8 +46,15 @@ internal sealed class CurbCommands
 	) =>
 		LanguagesFor(msbuildListFile, language) is { } languages
 			? FormattingRun.Execute(
-				_fileSystem, path, write: true, verify: !noVerify, explicitFiles: ResolveExplicitFiles(files, msbuildListFile), cachePath: cache,
-				languages: languages, cancellationToken: Interrupted()).ExitCode
+				_fileSystem,
+				path,
+				write: true,
+				verify: !noVerify,
+				explicitFiles: ResolveExplicitFiles(files, msbuildListFile),
+				cachePath: cache,
+				languages: languages,
+				cancellationToken: Interrupted()
+			).ExitCode
 			: 2;
 
 	/// <summary>Exit non-zero if anything would change.</summary>
@@ -134,7 +141,15 @@ internal sealed class CurbCommands
 		bool forward = false,
 		bool noWhitespace = false
 	) =>
-		CleanupRun.Execute(_fileSystem, path, write: !check, logs: sarifLogs?.ToArray(), explicitFiles: ResolveExplicitFiles(files, msbuildListFile), forward: forward, separateWhitespace: noWhitespace);
+		CleanupRun.Execute(
+			_fileSystem,
+			path,
+			write: !check,
+			logs: sarifLogs?.ToArray(),
+			explicitFiles: ResolveExplicitFiles(files, msbuildListFile),
+			forward: forward,
+			separateWhitespace: noWhitespace
+		);
 
 	/// <summary>Show which code style rules Curb fixes, and which it does not.</summary>
 	/// <param name="cleanupIds">Print only the ids <c>curb cleanup</c> fixes, space separated, for scripting.</param>
@@ -330,7 +345,9 @@ internal sealed class CurbCommands
 
 		var fromListFile = msbuildListFile is null
 			? []
-			: _fileSystem.File.ReadAllLines(msbuildListFile.FullName)
+			: _fileSystem
+				.File
+				.ReadAllLines(msbuildListFile.FullName)
 				.Select(line => line.Trim())
 				.Where(line => line.Length > 0)
 				.Select(_fileSystem.Path.GetFullPath);

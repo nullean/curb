@@ -19,8 +19,7 @@ namespace Nullean.Curb.Printing;
 internal static class WeldDetector
 {
 	/// <summary>Characters that can begin or continue an identifier, keyword or number.</summary>
-	private static bool IsWordChar(char value) =>
-		char.IsLetterOrDigit(value) || value is '_' or '@' or '$';
+	private static bool IsWordChar(char value) => char.IsLetterOrDigit(value) || value is '_' or '@' or '$';
 
 	/// <summary>
 	/// Characters that combine into longer operators — <c>==</c>, <c>&lt;&lt;</c>, <c>=&gt;</c>,
@@ -28,8 +27,7 @@ internal static class WeldDetector
 	/// with anything, so they are excluded and keep the check from firing on ordinary code.
 	/// </summary>
 	private static bool IsCombiningOperator(char value) =>
-		value is '+' or '-' or '*' or '/' or '%' or '&' or '|' or '^' or '!' or '=' or '<' or '>'
-			or '?' or ':' or '.' or '~';
+		value is '+' or '-' or '*' or '/' or '%' or '&' or '|' or '^' or '!' or '=' or '<' or '>' or '?' or ':' or '.' or '~';
 
 	/// <summary>True when <paramref name="left"/> followed directly by <paramref name="right"/> might lex as one token.</summary>
 	public static bool CanWeld(char left, char right)

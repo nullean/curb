@@ -27,13 +27,9 @@ public static class OptionValues
 		"tab_width" => options.TabWidth.ToString(CultureInfo.InvariantCulture),
 		// This key selects the layout mode as well as the width, so it says which one. Somebody looking at
 		// 894 changed files needs to see the mode they are in and what put them there.
-		"max_line_length" => options.ReflowDisabled
-			? "off"
-			: options.MaxLineLength.ToString(CultureInfo.InvariantCulture),
+		"max_line_length" => options.ReflowDisabled ? "off" : options.MaxLineLength.ToString(CultureInfo.InvariantCulture),
 		"end_of_line" => options.EndOfLine.ToString().ToLowerInvariant(),
-		"insert_final_newline" => options.FinalNewLineSet
-			? Bool(options.InsertFinalNewLine)
-			: "unset   # the file keeps whether it ends with a newline",
+		"insert_final_newline" => options.FinalNewLineSet ? Bool(options.InsertFinalNewLine) : "unset   # the file keeps whether it ends with a newline",
 		"trim_trailing_whitespace" => Bool(options.TrimTrailingWhitespace),
 
 		// Read and written but never a layout decision, so there is nothing resolved to report.
@@ -62,9 +58,10 @@ public static class OptionValues
 		"csharp_style_expression_bodied_properties" => Expression(options.ExpressionBodiedProperties),
 		"csharp_style_expression_bodied_indexers" => Expression(options.ExpressionBodiedIndexers),
 		"file_header_template" => options.FileHeaderTemplate ?? "   # no header is required",
-		"csharp_wrap_chained_binary_expressions" => options.WrapChainedBinaryExpressions is null
-			? "   # a chain that does not fit overflows the line rather than breaking"
-			: Wrap(options.WrapChainedBinaryExpressions),
+		"csharp_wrap_chained_binary_expressions" =>
+			options.WrapChainedBinaryExpressions is null
+				? "   # a chain that does not fit overflows the line rather than breaking"
+				: Wrap(options.WrapChainedBinaryExpressions),
 		"csharp_wrap_before_binary_opsign" => Bool(options.WrapBeforeBinaryOpsign),
 		"csharp_wrap_before_first_method_call" => options.WrapBeforeFirstMethodCall switch
 		{
@@ -77,28 +74,21 @@ public static class OptionValues
 		"csharp_place_constructor_initializer_on_same_line" => Clause(options.PlaceConstructorInitializerOnSameLine, "true"),
 		"csharp_wrap_before_arrow_with_expressions" => Bool(options.WrapBeforeArrowWithExpressions),
 		"csharp_wrap_after_dot_in_method_calls" => Bool(options.WrapAfterDotInMethodCalls),
-		"csharp_wrap_chained_method_calls" => options.WrapChainedMethodCalls is null
-			? "chop_if_long   # already the chain printer's own behaviour; the key is the opt-in"
-			: "chop_if_long",
+		"csharp_wrap_chained_method_calls" =>
+			options.WrapChainedMethodCalls is null ? "chop_if_long   # already the chain printer's own behaviour; the key is the opt-in" : "chop_if_long",
 		"csharp_place_simple_enum_on_single_line" => Bool(options.PlaceSimpleEnumOnSingleLine),
 		"csharp_place_simple_accessorholder_on_single_line" => Bool(options.PlaceSimpleAccessorholderOnSingleLine),
 		"csharp_place_simple_declaration_blocks_on_single_line" => Bool(options.PlaceSimpleDeclarationBlocksOnSingleLine),
 		"csharp_place_simple_blocks_on_single_line" => Bool(options.PlaceSimpleBlocksOnSingleLine),
 		"csharp_wrap_parameters_style" => Wrap(options.WrapParametersStyle),
-		"csharp_wrap_arguments_style" => options.KeepExistingLinebreaks
-			? "chop_if_long   # chop_always needs a max_line_length"
-			: Wrap(options.WrapArgumentsStyle),
-		"csharp_wrap_object_and_collection_initializer_style" => options.KeepExistingLinebreaks
-			? "chop_if_long   # chop_always needs a max_line_length"
-			: Wrap(options.WrapObjectAndCollectionInitializerStyle),
-		"csharp_place_method_attribute_on_same_line" =>
-			Placement(options.PlaceMethodAttributeOnSameLine, options.KeepExistingLinebreaks),
-		"csharp_place_field_attribute_on_same_line" =>
-			Placement(options.PlaceFieldAttributeOnSameLine, options.KeepExistingLinebreaks),
-		"csharp_place_property_attribute_on_same_line" =>
-			Placement(options.PlacePropertyAttributeOnSameLine, options.KeepExistingLinebreaks),
-		"csharp_place_event_attribute_on_same_line" =>
-			Placement(options.PlaceEventAttributeOnSameLine, options.KeepExistingLinebreaks),
+		"csharp_wrap_arguments_style" =>
+			options.KeepExistingLinebreaks ? "chop_if_long   # chop_always needs a max_line_length" : Wrap(options.WrapArgumentsStyle),
+		"csharp_wrap_object_and_collection_initializer_style" =>
+			options.KeepExistingLinebreaks ? "chop_if_long   # chop_always needs a max_line_length" : Wrap(options.WrapObjectAndCollectionInitializerStyle),
+		"csharp_place_method_attribute_on_same_line" => Placement(options.PlaceMethodAttributeOnSameLine, options.KeepExistingLinebreaks),
+		"csharp_place_field_attribute_on_same_line" => Placement(options.PlaceFieldAttributeOnSameLine, options.KeepExistingLinebreaks),
+		"csharp_place_property_attribute_on_same_line" => Placement(options.PlacePropertyAttributeOnSameLine, options.KeepExistingLinebreaks),
+		"csharp_place_event_attribute_on_same_line" => Placement(options.PlaceEventAttributeOnSameLine, options.KeepExistingLinebreaks),
 		// The one key whose value is usually nobody's explicit choice, so it says where it came from.
 		// Somebody staring at a large diff needs to see the mode and what selected it.
 		"csharp_keep_existing_linebreaks" => (options.KeepExistingLinebreaks, options.KeepExistingLinebreaksOption) switch
@@ -146,9 +136,8 @@ public static class OptionValues
 			UsingPlacement.AsWritten => "outside_namespace   # directives are left where they are; the key is the opt-in",
 			_ => "outside_namespace",
 		},
-		"csharp_style_namespace_declarations" => options.NamespaceStyle == NamespaceStyle.FileScoped
-			? "file_scoped"
-			: "block   # namespaces are left as written; Curb never adds the braces back",
+		"csharp_style_namespace_declarations" =>
+			options.NamespaceStyle == NamespaceStyle.FileScoped ? "file_scoped" : "block   # namespaces are left as written; Curb never adds the braces back",
 		"csharp_prefer_braces" => options.PreferBraces switch
 		{
 			BraceRequirement.Always => "true",
@@ -156,9 +145,8 @@ public static class OptionValues
 			BraceRequirement.AsWritten => "false   # bodies are left as written; Curb never removes braces",
 			_ => "false",
 		},
-		"csharp_preferred_modifier_order" => options.PreferredModifierOrder is { } order
-			? string.Join(",", order)
-			: "   # modifiers are left as written; the key is the opt-in",
+		"csharp_preferred_modifier_order" =>
+			options.PreferredModifierOrder is { } order ? string.Join(",", order) : "   # modifiers are left as written; the key is the opt-in",
 		"generated_code" => Bool(options.Excluded),
 		"dotnet_diagnostic.ide0055.severity" => options.Excluded ? "none" : "default",
 
@@ -207,8 +195,7 @@ public static class OptionValues
 			BinaryOperatorSpacing.BeforeAndAfter => "before_and_after",
 			_ => "before_and_after",
 		},
-		"csharp_space_around_declaration_statements" =>
-			options.SpaceAroundDeclarationStatements == DeclarationSpacing.Ignore ? "ignore" : "false",
+		"csharp_space_around_declaration_statements" => options.SpaceAroundDeclarationStatements == DeclarationSpacing.Ignore ? "ignore" : "false",
 		"csharp_space_after_comma" => Bool(options.SpaceAfterComma),
 		"csharp_space_before_comma" => Bool(options.SpaceBeforeComma),
 		"csharp_space_after_dot" => Bool(options.SpaceAfterDot),
@@ -237,7 +224,6 @@ public static class OptionValues
 
 	private static string Lines(int value) => value.ToString(CultureInfo.InvariantCulture);
 
-
 	private static string Placement(AttributePlacement value, bool keepsLinebreaks) => value switch
 	{
 		AttributePlacement.IfOwnerIsSingleLine => "if_owner_is_single_line",
@@ -254,8 +240,7 @@ public static class OptionValues
 		_ => "chop_if_long   # width decides; the key is the opt-in",
 	};
 
-	private static string Count(int? value) =>
-		value?.ToString(CultureInfo.InvariantCulture) ?? "   # no limit; width alone breaks a list";
+	private static string Count(int? value) => value?.ToString(CultureInfo.InvariantCulture) ?? "   # no limit; width alone breaks a list";
 
 	private static string Clause(bool? value, string unset) =>
 		value is null ? unset + "   # unless the author broke it; a width joins that too" : Bool(value.Value);

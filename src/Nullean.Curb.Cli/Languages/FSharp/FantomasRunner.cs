@@ -103,8 +103,14 @@ internal sealed class FantomasRunner(IFileSystem fileSystem, IToolLauncher launc
 	}
 
 	private async Task RunGroupAsync(
-		FantomasResolver resolver, FantomasManifest manifest, IReadOnlyList<ExternalFile> files, List<int> indices, FormatResult[] results,
-		bool produceText, CancellationToken cancellationToken)
+		FantomasResolver resolver,
+		FantomasManifest manifest,
+		IReadOnlyList<ExternalFile> files,
+		List<int> indices,
+		FormatResult[] results,
+		bool produceText,
+		CancellationToken cancellationToken
+	)
 	{
 		// The SDK refuses a manifest it cannot read, so `dotnet tool run` would fail here too.
 		if (manifest.Problem is { } problem)
@@ -121,8 +127,9 @@ internal sealed class FantomasRunner(IFileSystem fileSystem, IToolLauncher launc
 		if (!FantomasVersion.AtLeast(manifest.Version, MinimumCliVersion))
 		{
 			throw new ExternalToolException(
-				$"{(useDaemon ? "the Fantomas daemon could not be used, and " : "")}the Fantomas command line fallback needs Fantomas {MinimumCliVersion} or later "
-				+ $"(for `check --json`), but {manifest.ManifestPath} pins {manifest.Version}");
+				$"{(useDaemon ? "the Fantomas daemon could not be used, and " : "")}the Fantomas command line fallback needs Fantomas {MinimumCliVersion} or later " +
+					$"(for `check --json`), but {manifest.ManifestPath} pins {manifest.Version}"
+			);
 		}
 
 		await BatchAsync(tool, files, indices, results, produceText, cancellationToken).ConfigureAwait(false);
@@ -152,12 +159,17 @@ internal sealed class FantomasRunner(IFileSystem fileSystem, IToolLauncher launc
 	}
 
 	/// <summary>The base timeout once per <paramref name="unit"/> bytes of input, and at least once.</summary>
-	internal static TimeSpan Scaled(TimeSpan baseTimeout, long bytes, long unit) =>
-		baseTimeout * Math.Max(1, (bytes + unit - 1) / unit);
+	internal static TimeSpan Scaled(TimeSpan baseTimeout, long bytes, long unit) => baseTimeout * Math.Max(1, (bytes + unit - 1) / unit);
 
 	/// <summary>Formats a group through one daemon. False when the daemon could not be started or did not answer, and nothing was done.</summary>
 	private async Task<bool> TryDaemonAsync(
-		FantomasTool tool, IReadOnlyList<ExternalFile> files, List<int> indices, FormatResult[] results, bool produceText, CancellationToken cancellationToken)
+		FantomasTool tool,
+		IReadOnlyList<ExternalFile> files,
+		List<int> indices,
+		FormatResult[] results,
+		bool produceText,
+		CancellationToken cancellationToken
+	)
 	{
 		var command = tool.Command(environment.Dotnet, [DaemonArgument(tool.Manifest.Version)]);
 		IToolProcess process;
@@ -194,7 +206,8 @@ internal sealed class FantomasRunner(IFileSystem fileSystem, IToolLauncher launc
 			if (!VersionMatches(version, tool.Manifest.Version))
 			{
 				throw new ExternalToolException(
-					$"{tool.Manifest.ManifestPath} pins {tool.Manifest.ToolId} {tool.Manifest.Version}, but the Fantomas that started is {version}. Run `dotnet tool restore`.");
+					$"{tool.Manifest.ManifestPath} pins {tool.Manifest.ToolId} {tool.Manifest.Version}, but the Fantomas that started is {version}. Run `dotnet tool restore`."
+				);
 			}
 
 			try
@@ -211,7 +224,8 @@ internal sealed class FantomasRunner(IFileSystem fileSystem, IToolLauncher launc
 				// process now known to misbehave, and the group fails as a whole.
 				client.Abort();
 				throw new ExternalToolException(
-					$"Fantomas did not answer for {exception.Path} within {exception.Timeout.TotalSeconds:0.#} s, so the daemon was stopped. Set {TimeoutVariable} to allow longer.");
+					$"Fantomas did not answer for {exception.Path} within {exception.Timeout.TotalSeconds:0.#} s, so the daemon was stopped. Set {TimeoutVariable} to allow longer."
+				);
 			}
 			catch (OperationCanceledException)
 			{
@@ -273,10 +287,22 @@ internal sealed class FantomasRunner(IFileSystem fileSystem, IToolLauncher launc
 			{
 				FantomasOutcome.Unchanged => new FormatResult(FormatStatus.Formatted, true, produceText ? formatted : null, 1, null),
 				FantomasOutcome.Formatted => Unstable,
-				FantomasOutcome.Error => new FormatResult(FormatStatus.VerificationFailed, false, null, 1,
-					$"Fantomas produced output that does not parse, so it was not written — {DescribeError(recheck.Message, path)}"),
-				_ => new FormatResult(FormatStatus.VerificationFailed, false, null, 1,
-					"Fantomas ignored its own output on the second pass, so it was not written"),
+				FantomasOutcome.Error =>
+					new FormatResult(
+						FormatStatus.VerificationFailed,
+						false,
+						null,
+						1,
+						$"Fantomas produced output that does not parse, so it was not written — {DescribeError(recheck.Message, path)}"
+					),
+				_ =>
+					new FormatResult(
+						FormatStatus.VerificationFailed,
+						false,
+						null,
+						1,
+						"Fantomas ignored its own output on the second pass, so it was not written"
+					),
 			};
 		}
 		catch (FantomasDaemonException exception)
@@ -291,15 +317,15 @@ internal sealed class FantomasRunner(IFileSystem fileSystem, IToolLauncher launc
 	/// </summary>
 	private static bool SamePath(string? answered, string asked) => answered is null || string.Equals(answered, asked, StringComparison.Ordinal);
 
-	private static FormatResult WrongFile(string? answered) => new(FormatStatus.VerificationFailed, false, null, 1,
-		$"Fantomas answered for another file ({answered}), so nothing was written");
+	private static FormatResult WrongFile(string? answered) =>
+		new(FormatStatus.VerificationFailed, false, null, 1, $"Fantomas answered for another file ({answered}), so nothing was written");
 
 	private static FormatResult Unchanged => new(FormatStatus.Formatted, false, null, 1, null);
 
 	private static FormatResult Ignored => new(FormatStatus.Ignored, false, null, 1, null);
 
-	private static FormatResult Unstable => new(FormatStatus.VerificationFailed, false, null, 1,
-		"Fantomas's output is not stable (formatting it again changes it again), so it was not written");
+	private static FormatResult Unstable =>
+		new(FormatStatus.VerificationFailed, false, null, 1, "Fantomas's output is not stable (formatting it again changes it again), so it was not written");
 
 	/// <summary>
 	/// The batch CLI: <c>check --json</c> to check, and to format, a formatting pass, a <c>check</c> of what
@@ -321,7 +347,13 @@ internal sealed class FantomasRunner(IFileSystem fileSystem, IToolLauncher launc
 	/// </para>
 	/// </remarks>
 	private async Task BatchAsync(
-		FantomasTool tool, IReadOnlyList<ExternalFile> files, List<int> indices, FormatResult[] results, bool produceText, CancellationToken cancellationToken)
+		FantomasTool tool,
+		IReadOnlyList<ExternalFile> files,
+		List<int> indices,
+		FormatResult[] results,
+		bool produceText,
+		CancellationToken cancellationToken
+	)
 	{
 		var paths = indices.Select(i => fileSystem.Path.GetFullPath(files[i].Path)).ToArray();
 		var sizes = indices.Select(i => (long)files[i].Bytes.Length).ToArray();
@@ -355,7 +387,13 @@ internal sealed class FantomasRunner(IFileSystem fileSystem, IToolLauncher launc
 				}
 				catch (Exception exception) when (exception is DecoderFallbackException or IOException or UnauthorizedAccessException)
 				{
-					outcome[k] = new FormatResult(FormatStatus.VerificationFailed, false, null, 1, $"could not read back what Fantomas wrote — {exception.Message}");
+					outcome[k] = new FormatResult(
+						FormatStatus.VerificationFailed,
+						false,
+						null,
+						1,
+						$"could not read back what Fantomas wrote — {exception.Message}"
+					);
 				}
 			}
 
@@ -364,15 +402,21 @@ internal sealed class FantomasRunner(IFileSystem fileSystem, IToolLauncher launc
 			var readable = written.Where(contents.ContainsKey).ToArray();
 			if (readable.Length > 0)
 			{
-				var recheck = await RunCliAsync(tool, check: true, [.. readable.Select(k => paths[k])], [.. readable.Select(k => sizes[k])], cancellationToken)
-					.ConfigureAwait(false);
+				var recheck = await RunCliAsync(
+					tool,
+					check: true,
+					[.. readable.Select(k => paths[k])],
+					[.. readable.Select(k => sizes[k])],
+					cancellationToken
+				).ConfigureAwait(false);
 				foreach (var k in readable)
 				{
 					var second = FromReport(recheck, paths[k], formatted: false);
 					outcome[k] = second is { Status: FormatStatus.Formatted, Changed: false }
 						? new FormatResult(FormatStatus.Formatted, true, contents[k], 1, null)
-						: second.Status == FormatStatus.Formatted ? Unstable
-						: new FormatResult(FormatStatus.VerificationFailed, false, null, 1, $"Fantomas could not check its own output — {second.Message}");
+						: second.Status == FormatStatus.Formatted
+							? Unstable
+							: new FormatResult(FormatStatus.VerificationFailed, false, null, 1, $"Fantomas could not check its own output — {second.Message}");
 				}
 			}
 		}
@@ -425,7 +469,12 @@ internal sealed class FantomasRunner(IFileSystem fileSystem, IToolLauncher launc
 
 	/// <summary>What the CLI reported for each file, by full path. A file it left out was ignored.</summary>
 	private async Task<Dictionary<string, (string Status, string? Message)>> RunCliAsync(
-		FantomasTool tool, bool check, string[] paths, long[] sizes, CancellationToken cancellationToken)
+		FantomasTool tool,
+		bool check,
+		string[] paths,
+		long[] sizes,
+		CancellationToken cancellationToken
+	)
 	{
 		var report = new Dictionary<string, (string, string?)>(OperatingSystem.IsLinux() ? StringComparer.Ordinal : StringComparer.OrdinalIgnoreCase);
 		var sizeOf = new Dictionary<string, long>(StringComparer.Ordinal);
@@ -461,7 +510,8 @@ internal sealed class FantomasRunner(IFileSystem fileSystem, IToolLauncher launc
 				{
 					process.Kill();
 					throw new ExternalToolException(
-						$"the Fantomas command line did not finish within {timeout.TotalSeconds:0.#} s, so it was stopped. Set {TimeoutVariable} to allow longer.");
+						$"the Fantomas command line did not finish within {timeout.TotalSeconds:0.#} s, so it was stopped. Set {TimeoutVariable} to allow longer."
+					);
 				}
 				catch (OperationCanceledException)
 				{
@@ -499,9 +549,11 @@ internal sealed class FantomasRunner(IFileSystem fileSystem, IToolLauncher launc
 
 		foreach (var entry in entries.EnumerateArray())
 		{
-			if (entry.ValueKind != JsonValueKind.Object
-				|| !entry.TryGetProperty("path", out var path) || path.ValueKind != JsonValueKind.String || path.GetString() is not { } relative
-				|| !entry.TryGetProperty("status", out var status) || status.ValueKind != JsonValueKind.String || status.GetString() is not { } outcome)
+			if (
+				entry.ValueKind != JsonValueKind.Object || !entry.TryGetProperty("path", out var path) || path.ValueKind != JsonValueKind.String ||
+				path.GetString() is not { } relative || !entry.TryGetProperty("status", out var status) || status.ValueKind != JsonValueKind.String ||
+				status.GetString() is not { } outcome
+			)
 			{
 				continue;
 			}
@@ -522,9 +574,16 @@ internal sealed class FantomasRunner(IFileSystem fileSystem, IToolLauncher launc
 			"needs-formatting" or "formatted" => new FormatResult(FormatStatus.Formatted, true, null, 1, null),
 			"error" when entry.Message?.Contains("could not be parsed", StringComparison.Ordinal) == true =>
 				new FormatResult(FormatStatus.SyntaxError, false, null, 1, DescribeError(entry.Message, path)),
-			"error" => new FormatResult(FormatStatus.VerificationFailed, false, null, 1,
-				$"Fantomas refused its own output, so it was not written — {DescribeError(entry.Message, path)}"),
-			_ => new FormatResult(FormatStatus.VerificationFailed, false, null, 1, $"Fantomas reported '{entry.Status}'{(formatted ? " while formatting" : "")}"),
+			"error" =>
+				new FormatResult(
+					FormatStatus.VerificationFailed,
+					false,
+					null,
+					1,
+					$"Fantomas refused its own output, so it was not written — {DescribeError(entry.Message, path)}"
+				),
+			_ =>
+				new FormatResult(FormatStatus.VerificationFailed, false, null, 1, $"Fantomas reported '{entry.Status}'{(formatted ? " while formatting" : "")}"),
 		};
 	}
 
@@ -584,8 +643,7 @@ internal sealed class FantomasRunner(IFileSystem fileSystem, IToolLauncher launc
 	/// <summary>
 	/// <c>daemon</c>, or <c>--daemon</c> for a Fantomas from before 8.0.0-alpha-016, which only knows the flag.
 	/// </summary>
-	internal static string DaemonArgument(string version) =>
-		FantomasVersion.AtLeast(version, "8.0.0-alpha-016") ? "daemon" : "--daemon";
+	internal static string DaemonArgument(string version) => FantomasVersion.AtLeast(version, "8.0.0-alpha-016") ? "daemon" : "--daemon";
 
 	/// <summary>Whether the daemon is the version the manifest pins, ignoring build metadata and a <c>v</c> prefix.</summary>
 	internal static bool VersionMatches(string reported, string pinned)
@@ -630,10 +688,9 @@ internal static class FantomasVersion
 		{
 			var leftNumber = int.TryParse(leftParts[i], NumberStyles.None, CultureInfo.InvariantCulture, out var l);
 			var rightNumber = int.TryParse(rightParts[i], NumberStyles.None, CultureInfo.InvariantCulture, out var r);
-			var compared = leftNumber && rightNumber ? l.CompareTo(r)
-				: leftNumber ? -1
-				: rightNumber ? 1
-				: string.Compare(leftParts[i], rightParts[i], StringComparison.OrdinalIgnoreCase);
+			var compared = leftNumber && rightNumber
+				? l.CompareTo(r)
+				: leftNumber ? -1 : rightNumber ? 1 : string.Compare(leftParts[i], rightParts[i], StringComparison.OrdinalIgnoreCase);
 			if (compared != 0)
 				return compared;
 		}

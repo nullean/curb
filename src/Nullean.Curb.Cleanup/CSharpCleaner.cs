@@ -36,7 +36,8 @@ public readonly record struct CleanupResult(
 	int Applied,
 	IReadOnlyList<string> Refusals,
 	IReadOnlyList<CleanupDiagnostic> Unfixed,
-	string? Message)
+	string? Message
+)
 {
 	public bool Success => Status == CleanupStatus.Cleaned;
 }
@@ -111,9 +112,7 @@ public sealed class CSharpCleaner
 
 		if (!CSharpSource.TryParse(source, out var parsed, out var errors))
 		{
-			var detail = errors.Count > 0
-				? errors[0].GetMessage(System.Globalization.CultureInfo.InvariantCulture)
-				: "the source does not parse";
+			var detail = errors.Count > 0 ? errors[0].GetMessage(System.Globalization.CultureInfo.InvariantCulture) : "the source does not parse";
 
 			return new CleanupResult(CleanupStatus.SyntaxError, false, null, 0, [], [.. diagnostics], detail);
 		}
@@ -277,10 +276,9 @@ public sealed class CSharpCleaner
 	}
 
 	private static bool SameEdit(PlannedFix left, PlannedFix right) =>
-		left.Removed == right.Removed
-		&& string.Equals(left.Inserted, right.Inserted, StringComparison.Ordinal)
-		&& left.DroppedTokens.SequenceEqual(right.DroppedTokens)
-		&& left.InsertedTokens.SequenceEqual(right.InsertedTokens, StringComparer.Ordinal);
+		left.Removed == right.Removed && string.Equals(left.Inserted, right.Inserted, StringComparison.Ordinal) && left.DroppedTokens.SequenceEqual(
+			right.DroppedTokens
+		) && left.InsertedTokens.SequenceEqual(right.InsertedTokens, StringComparer.Ordinal);
 
 	/// <summary>
 	/// Removes both of any two fixes whose spans touch.
@@ -385,7 +383,9 @@ public sealed class CSharpCleaner
 
 	/// <summary>True when <paramref name="next"/> written after <paramref name="output"/> would join one word.</summary>
 	private static bool Welds(StringBuilder output, char next) =>
-		output.Length > 0
-		&& Microsoft.CodeAnalysis.CSharp.SyntaxFacts.IsIdentifierPartCharacter(output[^1])
-		&& Microsoft.CodeAnalysis.CSharp.SyntaxFacts.IsIdentifierPartCharacter(next);
+		output.Length > 0 && Microsoft.CodeAnalysis.CSharp.SyntaxFacts.IsIdentifierPartCharacter(output[^1]) && Microsoft
+			.CodeAnalysis
+			.CSharp
+			.SyntaxFacts
+			.IsIdentifierPartCharacter(next);
 }

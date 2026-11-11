@@ -51,7 +51,8 @@ public readonly record struct CleanupDiagnostic(
 	string FilePath,
 	LinePosition Start,
 	LinePosition? End = null,
-	DiagnosticLevel Level = DiagnosticLevel.Unknown)
+	DiagnosticLevel Level = DiagnosticLevel.Unknown
+)
 {
 	/// <summary>True when the log carried a full span rather than only a start.</summary>
 	public bool HasSpan => End is not null;

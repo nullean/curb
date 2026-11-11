@@ -12,10 +12,7 @@ namespace Nullean.Curb.Cleanup;
 /// Exactly the files the log named, sorted, <b>relative to the working directory</b>. Empty means the
 /// whole project, which is what happens when a file cannot be expressed relatively.
 /// </param>
-public readonly record struct ForwardInvocation(
-	string? Subcommand,
-	IReadOnlyList<string> RuleIds,
-	IReadOnlyList<string> Files)
+public readonly record struct ForwardInvocation(string? Subcommand, IReadOnlyList<string> RuleIds, IReadOnlyList<string> Files)
 {
 	/// <summary>
 	/// The arguments to pass to <c>dotnet format</c>.
@@ -63,8 +60,7 @@ public readonly record struct ForwardInvocation(
 	/// <summary>The invocation as someone would type it, for reporting.</summary>
 	public string CommandLine => "dotnet " + string.Join(' ', Arguments.Select(Quote));
 
-	private static string Quote(string argument) =>
-		argument.Contains(' ', StringComparison.Ordinal) ? $"\"{argument}\"" : argument;
+	private static string Quote(string argument) => argument.Contains(' ', StringComparison.Ordinal) ? $"\"{argument}\"" : argument;
 }
 
 /// <summary>A rule Curb will not forward, and why.</summary>
@@ -78,10 +74,7 @@ public readonly record struct WithheldRule(string Id, string Title, string Reaso
 /// </param>
 /// <param name="Withheld">Rules Curb will not hand to another tool either, with the reason.</param>
 /// <param name="Quiet">How many diagnostics were skipped for being reported below warning.</param>
-public readonly record struct ForwardResult(
-	IReadOnlyList<ForwardInvocation> Invocations,
-	IReadOnlyList<WithheldRule> Withheld,
-	int Quiet);
+public readonly record struct ForwardResult(IReadOnlyList<ForwardInvocation> Invocations, IReadOnlyList<WithheldRule> Withheld, int Quiet);
 
 /// <summary>
 /// What to hand to <c>dotnet format</c> for the diagnostics Curb did not fix.
@@ -120,8 +113,7 @@ public static class ForwardPlan
 	/// From <c>--no-whitespace</c>: keep <c>style</c> and <c>analyzers</c> as two invocations instead of one
 	/// bare <c>dotnet format</c>, so the whitespace formatter never runs.
 	/// </param>
-	public static ForwardResult For(
-		IEnumerable<CleanupDiagnostic> unfixed, string workingDirectory, bool separateWhitespace = false)
+	public static ForwardResult For(IEnumerable<CleanupDiagnostic> unfixed, string workingDirectory, bool separateWhitespace = false)
 	{
 		var style = new SortedSet<string>(StringComparer.Ordinal);
 		var analyzers = new SortedSet<string>(StringComparer.Ordinal);

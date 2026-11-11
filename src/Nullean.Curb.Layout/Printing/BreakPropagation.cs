@@ -85,8 +85,7 @@ internal sealed class BreakPropagation
 			if (doc.Kind is DocKind.Group or DocKind.ConditionalGroup)
 				_groupIndices.Add(i);
 
-			var counts = doc.IsBreakish
-				&& (forceFlatDepth == 0 || (doc.Kind == DocKind.Line && doc.LineType == LineType.Literal));
+			var counts = doc.IsBreakish && (forceFlatDepth == 0 || (doc.Kind == DocKind.Line && doc.LineType == LineType.Literal));
 
 			if (counts)
 			{
@@ -149,8 +148,7 @@ internal sealed class BreakPropagation
 	}
 
 	/// <summary>True for the break that ends a trailing <c>//</c> comment. See <see cref="DocArena.LineCommentBreak"/>.</summary>
-	internal static bool IsLineCommentBreak(in Doc doc) =>
-		doc.Kind == DocKind.Line && doc.LineType == LineType.Hard && doc.B == Doc.EndsLineComment;
+	internal static bool IsLineCommentBreak(in Doc doc) => doc.Kind == DocKind.Line && doc.LineType == LineType.Hard && doc.B == Doc.EndsLineComment;
 
 	private void EnsureCapacity(int count)
 	{

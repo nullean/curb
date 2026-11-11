@@ -140,7 +140,8 @@ public readonly record struct FormatOptions
 	// repository that never asked. Gating the mode on the width instead makes it unreachable: no width
 	// means preservation, so there is nothing left to imply.
 
-	public FormatOptions() { }
+	public FormatOptions()
+	{ }
 
 	/// <summary>
 	/// The EditorConfig core keys, which are all the layout printer reads. Every property from
@@ -674,13 +675,7 @@ public readonly record struct FormatOptions
 	/// <remarks>Gates the printer work and the verifier's allowance, so a repository that has not
 	/// opted in pays for neither.</remarks>
 	public bool RewritesExpressionBodies =>
-		ExpressionBodiedMethods != ExpressionBodyStyle.AsWritten
-		|| ExpressionBodiedConstructors != ExpressionBodyStyle.AsWritten
-		|| ExpressionBodiedOperators != ExpressionBodyStyle.AsWritten
-		|| ExpressionBodiedLocalFunctions != ExpressionBodyStyle.AsWritten
-		|| ExpressionBodiedAccessors != ExpressionBodyStyle.AsWritten
-		|| ExpressionBodiedProperties != ExpressionBodyStyle.AsWritten
-		|| ExpressionBodiedIndexers != ExpressionBodyStyle.AsWritten;
+		ExpressionBodiedMethods != ExpressionBodyStyle.AsWritten || ExpressionBodiedConstructors != ExpressionBodyStyle.AsWritten || ExpressionBodiedOperators != ExpressionBodyStyle.AsWritten || ExpressionBodiedLocalFunctions != ExpressionBodyStyle.AsWritten || ExpressionBodiedAccessors != ExpressionBodyStyle.AsWritten || ExpressionBodiedProperties != ExpressionBodyStyle.AsWritten || ExpressionBodiedIndexers != ExpressionBodyStyle.AsWritten;
 
 	/// <summary>
 	/// <c>csharp_using_directive_placement</c>, code style rule IDE0065.
@@ -1334,10 +1329,7 @@ public readonly record struct FormatOptions
 	/// for the family, the same way <see cref="RewritesTrailingCommas"/> gates its own cost.
 	/// </remarks>
 	public bool MeasuresWholeMembers =>
-		PlaceMethodAttributeOnSameLine == AttributePlacement.IfOwnerIsSingleLine
-		|| PlaceFieldAttributeOnSameLine == AttributePlacement.IfOwnerIsSingleLine
-		|| PlacePropertyAttributeOnSameLine == AttributePlacement.IfOwnerIsSingleLine
-		|| PlaceEventAttributeOnSameLine == AttributePlacement.IfOwnerIsSingleLine;
+		PlaceMethodAttributeOnSameLine == AttributePlacement.IfOwnerIsSingleLine || PlaceFieldAttributeOnSameLine == AttributePlacement.IfOwnerIsSingleLine || PlacePropertyAttributeOnSameLine == AttributePlacement.IfOwnerIsSingleLine || PlaceEventAttributeOnSameLine == AttributePlacement.IfOwnerIsSingleLine;
 
 	/// <summary>True when either trailing-comma option asked for anything.</summary>
 	/// <remarks>

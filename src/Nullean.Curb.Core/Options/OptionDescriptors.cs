@@ -45,13 +45,7 @@ public enum OptionLanguage
 /// <param name="Default">The value the default <see cref="FormatOptions"/> produces.</param>
 /// <param name="Summary">One-line description.</param>
 /// <param name="SnippetKey">Key into <c>Snippets.All</c>.</param>
-public sealed record OptionDescriptor(
-	string Key,
-	OptionGroup Group,
-	string[] Values,
-	string Default,
-	string Summary,
-	string SnippetKey)
+public sealed record OptionDescriptor(string Key, OptionGroup Group, string[] Values, string Default, string Summary, string SnippetKey)
 {
 	/// <summary>Which files the key applies to.</summary>
 	/// <remarks>
@@ -70,165 +64,915 @@ public sealed record OptionDescriptor(
 	public static IReadOnlyList<OptionDescriptor> All { get; } = Build();
 
 	private static OptionDescriptor[] Build() =>
-	[
-		// ---- Core (8) -----------------------------------------------------------------------
-		new("indent_style", OptionGroup.Core, ["space", "tab"], "space", "Indent with spaces or tabs.", "basic_method"),
-		new("indent_size", OptionGroup.Core, ["<integer>"], "4", "Columns per indent level.", "basic_method"),
-		new("tab_width", OptionGroup.Core, ["<integer>"], "4", "Columns a tab occupies when measuring line width.", "basic_method"),
-		new("end_of_line", OptionGroup.Core, ["lf", "crlf", "auto"], "auto", "Line ending to write. auto matches the platform's own (Environment.NewLine), the same default Roslyn uses.", "basic_method"),
-		new("insert_final_newline", OptionGroup.Core, ["true", "false"], "(not set)", "End the file with a newline, or without one. Not set, the file keeps what it has.", "basic_method"),
-		new("trim_trailing_whitespace", OptionGroup.Core, ["true", "false"], "true", "Remove trailing whitespace from each line.", "basic_method"),
-		new("charset", OptionGroup.Core, ["utf-8", "utf-8-bom"], "(not set)", "Byte-order mark handling. Not set, a file keeps whatever mark it arrived with.", "basic_method"),
-		new("max_line_length", OptionGroup.Core, ["off", "<integer>"], "off", "Column target for reflow. off disables reflow entirely and selects preservation mode.", "long_chain"),
-
-		// ---- NewLines (7) -------------------------------------------------------------------
-		new(
-			"csharp_new_line_before_open_brace",
-			OptionGroup.NewLines,
-			["all", "none", "types", "methods", "accessors", "anonymous_types", "anonymous_methods",
-			 "lambdas", "control_blocks", "object_collection_array_initializers", "properties", "events"],
-			"all",
-			"Which constructs put their opening brace on a new line.",
-			"class_with_method"),
-		new("csharp_new_line_before_else", OptionGroup.NewLines, ["true", "false"], "true", "Put else on its own line rather than joining it to the preceding brace.", "if_else"),
-		new("csharp_new_line_before_catch", OptionGroup.NewLines, ["true", "false"], "true", "Put catch on its own line.", "try_catch"),
-		new("csharp_new_line_before_finally", OptionGroup.NewLines, ["true", "false"], "true", "Put finally on its own line.", "try_catch"),
-		new("csharp_new_line_before_members_in_object_initializers", OptionGroup.NewLines, ["true", "false"], "true", "Put each member of an object initializer on its own line.", "object_init"),
-		new("csharp_new_line_before_members_in_anonymous_types", OptionGroup.NewLines, ["true", "false"], "true", "Put each member of an anonymous type on its own line.", "anonymous_type"),
-		new("csharp_new_line_between_query_expression_clauses", OptionGroup.NewLines, ["true", "false"], "false", "Put each clause of a query expression on its own line.", "query"),
-
-		// ---- Indentation (6) ----------------------------------------------------------------
-		new("csharp_indent_case_contents", OptionGroup.Indentation, ["true", "false"], "true", "Indent statements inside a case label.", "switch_stmt"),
-		new("csharp_indent_switch_labels", OptionGroup.Indentation, ["true", "false"], "true", "Indent case labels inside their switch.", "switch_stmt"),
-		new("csharp_indent_labels", OptionGroup.Indentation, ["one_less_than_current", "flush_left", "no_change"], "one_less_than_current", "How goto labels are indented.", "goto_label"),
-		new("csharp_indent_block_contents", OptionGroup.Indentation, ["true", "false"], "true", "Indent statements inside a block.", "basic_method"),
-		new("csharp_indent_braces", OptionGroup.Indentation, ["true", "false"], "false", "Indent the brace tokens themselves an extra level.", "basic_method"),
-		new("csharp_indent_case_contents_when_block", OptionGroup.Indentation, ["true", "false"], "true", "Indent a braced case body. csharp_indent_case_contents governs other statements.", "switch_stmt"),
-
-		// ---- Spacing (24) -------------------------------------------------------------------
-		new("csharp_space_after_cast", OptionGroup.Spacing, ["true", "false"], "false", "Space between a cast and its operand.", "cast"),
-		new("csharp_space_after_keywords_in_control_flow_statements", OptionGroup.Spacing, ["true", "false"], "true", "Space between a control-flow keyword and its opening parenthesis.", "if_else"),
-		new("csharp_space_before_colon_in_inheritance_clause", OptionGroup.Spacing, ["true", "false"], "true", "Space before the colon in a base list.", "class_with_method"),
-		new("csharp_space_after_colon_in_inheritance_clause", OptionGroup.Spacing, ["true", "false"], "true", "Space after the colon in a base list.", "class_with_method"),
-		new("csharp_space_around_binary_operators", OptionGroup.Spacing, ["before_and_after", "none", "ignore"], "before_and_after", "Spaces around binary and assignment operators.", "binary_ops"),
-		new("csharp_space_around_declaration_statements", OptionGroup.Spacing, ["false", "ignore"], "false", "Extra spaces in declaration statements. false normalises; ignore leaves them alone.", "declaration"),
-		new("csharp_space_after_comma", OptionGroup.Spacing, ["true", "false"], "true", "Space after a comma.", "call_args"),
-		new("csharp_space_before_comma", OptionGroup.Spacing, ["true", "false"], "false", "Space before a comma.", "call_args"),
-		new("csharp_space_between_parentheses", OptionGroup.Spacing, ["false", "control_flow_statements", "type_casts", "expressions"], "false", "Space just inside parentheses for specific constructs.", "if_else"),
-		new("csharp_space_between_method_declaration_parameter_list_parentheses", OptionGroup.Spacing, ["true", "false"], "false", "Space just inside the parentheses of a parameter list.", "method_decl"),
-		new("csharp_space_between_method_declaration_empty_parameter_list_parentheses", OptionGroup.Spacing, ["true", "false"], "false", "Space inside an empty parameter list ().", "method_decl"),
-		new("csharp_space_between_method_declaration_name_and_open_parenthesis", OptionGroup.Spacing, ["true", "false"], "false", "Space between the method name and its opening parenthesis.", "method_decl"),
-		new("csharp_space_between_method_call_parameter_list_parentheses", OptionGroup.Spacing, ["true", "false"], "false", "Space just inside the parentheses of an argument list.", "call_args"),
-		new("csharp_space_between_method_call_empty_parameter_list_parentheses", OptionGroup.Spacing, ["true", "false"], "false", "Space inside an empty argument list ().", "call_args"),
-		new("csharp_space_between_method_call_name_and_opening_parenthesis", OptionGroup.Spacing, ["true", "false"], "false", "Space between the method name and its opening parenthesis at a call site.", "call_args"),
-		new("csharp_space_before_open_square_brackets", OptionGroup.Spacing, ["true", "false"], "false", "Space before an opening square bracket.", "indexer"),
-		new("csharp_space_between_empty_square_brackets", OptionGroup.Spacing, ["true", "false"], "false", "Space inside empty square brackets [].", "indexer"),
-		new("csharp_space_between_square_brackets", OptionGroup.Spacing, ["true", "false"], "false", "Space inside non-empty square brackets.", "indexer"),
-		new("csharp_space_before_dot", OptionGroup.Spacing, ["true", "false"], "false", "Space before a dot.", "long_chain"),
-		new("csharp_space_after_dot", OptionGroup.Spacing, ["true", "false"], "false", "Space after a dot.", "long_chain"),
-		new("csharp_space_before_semicolon_in_for_statement", OptionGroup.Spacing, ["true", "false"], "false", "Space before a semicolon in a for statement.", "for_loop"),
-		new("csharp_space_after_semicolon_in_for_statement", OptionGroup.Spacing, ["true", "false"], "true", "Space after a semicolon in a for statement.", "for_loop"),
-		new("csharp_space_after_unary_operator", OptionGroup.Spacing, ["true", "false"], "false", "Space after unary minus/plus, logical not, and the unsafe pointer prefix operators. Not bitwise complement or prefix increment/decrement.", "unary"),
-		new("csharp_space_around_ternary_operator", OptionGroup.Spacing, ["true", "false"], "true", "Space around the ?/: of a ternary conditional expression.", "ternary"),
-
-		// ---- Wrapping (28) ------------------------------------------------------------------
-		new("csharp_preserve_single_line_blocks", OptionGroup.Wrapping, ["true", "false"], "true", "Allow a block the author wrote on one line to stay on one line.", "single_line_block"),
-		new("csharp_empty_block_style", OptionGroup.Wrapping, ["multiline", "together", "together_same_line"], "(not set)", "How an empty method, constructor, accessor or control-flow body is laid out. together_same_line keeps { } on the signature's line.", "single_line_block"),
-		new("csharp_preserve_single_line_statements", OptionGroup.Wrapping, ["true", "false"], "true", "Allow a control-flow body the author left on its header's line to stay there. Chained using statements are the exception and take their own lines unless this key is written out and set to true.", "if_else"),
-		new("csharp_keep_existing_linebreaks", OptionGroup.Wrapping, ["true", "false"], "(derived from max_line_length)", "Preservation mode. Defaults to true when max_line_length is off.", "long_chain"),
-		new("csharp_wrap_before_first_method_call", OptionGroup.Wrapping, ["true", "false"], "(not set)", "When a chain breaks, break before the first call too, leaving the receiver on its own line.", "long_chain"),
-		new("csharp_wrap_before_first_type_parameter_constraint", OptionGroup.Wrapping, ["true", "false"], "(not set)", "Put a where clause on its own line, or keep it on the signature's. Not set, a clause the author broke stays broken unless a width decides layout.", "generic_constraint"),
-		new("csharp_wrap_before_extends_colon", OptionGroup.Wrapping, ["true", "false"], "(not set)", "Put a base list on its own line, colon first, or keep it on the declaration's. Not set, a list the author broke stays broken unless a width decides layout.", "class_with_method"),
-		new("csharp_place_constructor_initializer_on_same_line", OptionGroup.Wrapping, ["true", "false"], "(not set)", "Keep : base(...) on the constructor's line, or give it its own. Not set, one the author broke stays broken unless a width decides layout.", "constructor_init"),
-		new("csharp_wrap_before_arrow_with_expressions", OptionGroup.Wrapping, ["true", "false"], "false", "When an expression body wraps, put => at the start of the new line.", "expression_body"),
-		new("csharp_wrap_after_dot_in_method_calls", OptionGroup.Wrapping, ["true", "false"], "false", "When a chain breaks, leave the dot at the end of the preceding line.", "long_chain"),
-		new("csharp_wrap_chained_method_calls", OptionGroup.Wrapping, ["chop_if_long"], "chop_if_long", "Break a chain of three or more calls onto its own line per call once it does not fit. Curb's default behaviour either way; setting the key only makes it explicit.", "long_chain"),
-		new("csharp_place_simple_enum_on_single_line", OptionGroup.Wrapping, ["true", "false"], "true", "Allow a short enum body to stay on one line.", "simple_enum"),
-		new("csharp_place_simple_accessorholder_on_single_line", OptionGroup.Wrapping, ["true", "false"], "true", "Allow { get; set; } to stay on the property's line.", "property"),
-		new("csharp_place_simple_declaration_blocks_on_single_line", OptionGroup.Wrapping, ["true", "false"], "false", "Collapse a method, constructor, operator, destructor, local function or accessor body onto one line when it holds a single statement with no comment and the result fits.", "basic_method"),
-		new("csharp_place_simple_blocks_on_single_line", OptionGroup.Wrapping, ["true", "false"], "false", "The same, for a lambda or anonymous method's block body.", "lambda_block"),
-		new("csharp_wrap_chained_binary_expressions", OptionGroup.Wrapping, ["chop_always", "chop_if_long", "wrap_if_long"], "(not set)", "Break each operand of a long && or || chain onto its own line. chop_always breaks regardless of width; wrap_if_long packs operands instead of breaking every one. Only honoured in deterministic mode (max_line_length set).", "binary_ops"),
-		new("csharp_wrap_before_binary_opsign", OptionGroup.Wrapping, ["true", "false"], "true", "When a binary chain breaks, start the new line with the operator.", "binary_ops"),
-		new("csharp_wrap_parameters_style", OptionGroup.Wrapping, ["chop_always", "chop_if_long", "wrap_if_long"], "chop_if_long", "chop_always gives every parameter its own line regardless of width; wrap_if_long packs parameters instead. wrap_if_long is only honoured in deterministic mode (max_line_length set) — chop_always and chop_if_long work in either.", "method_decl"),
-		new("csharp_wrap_arguments_style", OptionGroup.Wrapping, ["chop_always", "chop_if_long", "wrap_if_long"], "chop_if_long", "chop_always gives every argument its own line; wrap_if_long packs arguments instead. Only honoured in deterministic mode (max_line_length set).", "call_args"),
-		new("csharp_wrap_object_and_collection_initializer_style", OptionGroup.Wrapping, ["chop_always", "chop_if_long"], "chop_if_long", "chop_always gives every initializer element its own line. Only honoured in deterministic mode. wrap_if_long is not offered: dotnet format forces one member per line once an initializer opens out, so a packed layout could never stay put.", "object_init"),
-		new("csharp_max_formal_parameters_on_line", OptionGroup.Wrapping, ["<integer>"], "(not set)", "Chop a parameter list carrying more than this many parameters, regardless of width.", "method_decl"),
-		new("csharp_max_invocation_arguments_on_line", OptionGroup.Wrapping, ["<integer>"], "(not set)", "Chop an argument list carrying more than this many arguments.", "call_args"),
-		new("csharp_max_initializer_elements_on_line", OptionGroup.Wrapping, ["<integer>"], "(not set)", "Chop an initializer carrying more than this many elements.", "object_init"),
-		new("csharp_max_chained_method_calls_on_line", OptionGroup.Wrapping, ["<integer>"], "(not set)", "Chop a chain carrying more than this many calls, regardless of width. Deterministic mode only.", "long_chain"),
-		new("csharp_max_array_initializer_elements_on_line", OptionGroup.Wrapping, ["<integer>"], "(not set)", "Chop an array initializer carrying more than this many elements.", "array_init"),
-		new("csharp_wrap_before_declaration_rpar", OptionGroup.Wrapping, ["true", "false"], "(not set)", "Put a broken parameter list's ) on its own line.", "method_decl"),
-		new("csharp_wrap_before_invocation_rpar", OptionGroup.Wrapping, ["true", "false"], "(not set)", "Put a broken argument list's ) on its own line.", "call_args"),
-		new("csharp_place_method_attribute_on_same_line", OptionGroup.Wrapping, ["false", "if_owner_is_single_line"], "false", "Where a method's attribute section goes. if_owner_is_single_line joins it when the method fits on one line. Deterministic mode only.", "attributed_method"),
-		new("csharp_place_field_attribute_on_same_line", OptionGroup.Wrapping, ["false", "if_owner_is_single_line"], "false", "Where a field's attribute section goes.", "attributed_method"),
-		new("csharp_place_property_attribute_on_same_line", OptionGroup.Wrapping, ["false", "if_owner_is_single_line"], "false", "Where a property's attribute section goes.", "attributed_method"),
-		new("csharp_place_event_attribute_on_same_line", OptionGroup.Wrapping, ["false", "if_owner_is_single_line"], "false", "Where an event's attribute section goes.", "attributed_method"),
-
-		// ---- BlankLines (24) ----------------------------------------------------------------
-		new("csharp_keep_blank_lines_in_declarations", OptionGroup.BlankLines, ["<integer>"], "1", "Maximum consecutive blank lines between members.", "members"),
-		new("csharp_keep_blank_lines_in_code", OptionGroup.BlankLines, ["<integer>"], "1", "Maximum consecutive blank lines between statements.", "members"),
-		new("csharp_blank_lines_around_invocable", OptionGroup.BlankLines, ["<integer>"], "0", "Blank lines before and after each method or constructor. 0 means leave the author's.", "members"),
-		new("csharp_blank_lines_around_local_method", OptionGroup.BlankLines, ["<integer>"], "1", "Blank lines before and after each local function.", "members"),
-		new("csharp_blank_lines_around_type", OptionGroup.BlankLines, ["<integer>"], "1", "Blank lines before and after each type declaration.", "members"),
-		new("csharp_blank_lines_around_property", OptionGroup.BlankLines, ["<integer>"], "0", "Blank lines before and after each property, indexer or event.", "members"),
-		new("csharp_blank_lines_around_accessor", OptionGroup.BlankLines, ["<integer>"], "0", "Blank lines between two accessors of the same property, indexer or event.", "members"),
-		new("csharp_blank_lines_around_field", OptionGroup.BlankLines, ["<integer>"], "0", "Blank lines before and after each field.", "members"),
-		new("csharp_blank_lines_inside_type", OptionGroup.BlankLines, ["<integer>"], "0", "Blank lines below the opening brace and above the closing brace of a type, forced exactly rather than floored.", "members"),
-		new("csharp_blank_lines_around_namespace", OptionGroup.BlankLines, ["<integer>"], "0", "Blank lines before and after a namespace declaration.", "members"),
-		new("csharp_blank_lines_inside_namespace", OptionGroup.BlankLines, ["<integer>"], "0", "Blank lines below the opening brace and above the closing brace of a block-scoped namespace, forced exactly rather than floored.", "members"),
-		new("csharp_blank_lines_around_region", OptionGroup.BlankLines, ["<integer>"], "1", "Blank lines before a #region and after its matching #endregion, forced exactly rather than floored.", "members"),
-		new("csharp_blank_lines_inside_region", OptionGroup.BlankLines, ["<integer>"], "1", "Blank lines below a #region and above its matching #endregion, forced exactly rather than floored.", "members"),
-		new("csharp_blank_lines_after_using_list", OptionGroup.BlankLines, ["<integer>"], "1", "Blank lines below the last using directive, forced exactly rather than floored.", "usings"),
-		new("csharp_blank_lines_after_file_scoped_namespace_directive", OptionGroup.BlankLines, ["<integer>"], "1", "Blank lines after a file-scoped namespace declaration.", "usings"),
-		new("csharp_blank_lines_before_block_statements", OptionGroup.BlankLines, ["<integer>"], "0", "Blank lines above an if/while/for/foreach/do/switch/using/lock/try statement.", "members"),
-		new("csharp_blank_lines_after_block_statements", OptionGroup.BlankLines, ["<integer>"], "0", "Blank lines below one of those statements.", "members"),
-		new("csharp_blank_lines_before_control_transfer_statements", OptionGroup.BlankLines, ["<integer>"], "0", "Blank lines above a return/throw/break/continue/goto/yield statement.", "members"),
-		new("csharp_blank_lines_after_control_transfer_statements", OptionGroup.BlankLines, ["<integer>"], "0", "Blank lines below one of those statements.", "members"),
-		new("csharp_blank_lines_before_case", OptionGroup.BlankLines, ["<integer>"], "0", "Blank lines above a switch section's first label.", "members"),
-		new("csharp_blank_lines_after_case", OptionGroup.BlankLines, ["<integer>"], "0", "Blank lines below a section's labels, above its first statement.", "members"),
-		new("csharp_blank_lines_before_single_line_comment", OptionGroup.BlankLines, ["<integer>"], "0", "Blank lines above a // comment that follows real content.", "members"),
-		new("csharp_remove_blank_lines_near_braces_in_declarations", OptionGroup.BlankLines, ["true", "false"], "true", "Force no blank line directly under a type/namespace's opening brace or above its closing one.", "near_braces"),
-		new("csharp_remove_blank_lines_near_braces_in_code", OptionGroup.BlankLines, ["true", "false"], "true", "The same, for a block's opening and closing braces.", "near_braces"),
-
-		// ---- ExpressionBodies (7) -----------------------------------------------------------
-		new("csharp_style_expression_bodied_methods", OptionGroup.ExpressionBodies, ["false", "true", "when_on_single_line"], "false", "Convert eligible block-bodied methods to expression bodies. IDE0022.", "expression_body"),
-		new("csharp_style_expression_bodied_constructors", OptionGroup.ExpressionBodies, ["false", "true", "when_on_single_line"], "false", "Convert eligible block-bodied constructors to expression bodies. IDE0021.", "constructor_expr"),
-		new("csharp_style_expression_bodied_operators", OptionGroup.ExpressionBodies, ["false", "true", "when_on_single_line"], "false", "Convert eligible block-bodied operators. IDE0023/IDE0024.", "expression_body"),
-		new("csharp_style_expression_bodied_local_functions", OptionGroup.ExpressionBodies, ["false", "true", "when_on_single_line"], "false", "Convert eligible block-bodied local functions. IDE0061.", "expression_body"),
-		new("csharp_style_expression_bodied_accessors", OptionGroup.ExpressionBodies, ["false", "true", "when_on_single_line"], "false", "Convert eligible block-bodied accessors. IDE0027.", "property"),
-		new("csharp_style_expression_bodied_properties", OptionGroup.ExpressionBodies, ["false", "true", "when_on_single_line"], "false", "Convert an eligible single-getter property to an expression body. IDE0025.", "property"),
-		new("csharp_style_expression_bodied_indexers", OptionGroup.ExpressionBodies, ["false", "true", "when_on_single_line"], "false", "Convert eligible block-bodied indexers. IDE0026.", "indexer"),
-
-		// ---- Usings (3) ---------------------------------------------------------------------
-		new("dotnet_sort_system_directives_first", OptionGroup.Usings, ["true", "false"], "(not set)", "Put System.* usings before all others.", "usings"),
-		new("dotnet_separate_import_directive_groups", OptionGroup.Usings, ["true", "false"], "(not set)", "Separate groups of usings by first namespace segment with a blank line.", "usings"),
-		new("csharp_using_directive_placement", OptionGroup.Usings, ["inside_namespace", "outside_namespace"], "(as written)", "Move using directives inside or outside the namespace. IDE0065.", "usings"),
-
-		// ---- ModifiersAndBraces (3) ---------------------------------------------------------
-		new("csharp_preferred_modifier_order", OptionGroup.ModifiersAndBraces, ["<modifier-list>"], "(not set)", "Reorder modifiers to the specified preference. IDE0036. Applied without a compilation.", "modifiers"),
-		new("csharp_prefer_braces", OptionGroup.ModifiersAndBraces, ["false", "true", "when_multiline"], "false", "Add braces to unbraced control-flow bodies. IDE0011. Applied without a compilation.", "if_else"),
-		new("csharp_style_namespace_declarations", OptionGroup.ModifiersAndBraces, ["block_scoped", "file_scoped"], "(as written)", "Convert block namespaces to file-scoped. IDE0161. Applied without a compilation.", "namespace_block"),
-
-		// ---- TrailingCommas (2) -------------------------------------------------------------
-		new("csharp_trailing_comma_in_multiline_lists", OptionGroup.TrailingCommas, ["true", "false"], "false", "Add a trailing comma after the last element of a list that breaks across lines.", "object_init"),
-		new("csharp_trailing_comma_in_singleline_lists", OptionGroup.TrailingCommas, ["true", "false"], "false", "Add a trailing comma after the last element even when the list is on one line.", "call_args"),
-
-		// ---- Suppression (3) ----------------------------------------------------------------
-		new("generated_code", OptionGroup.Suppression, ["true", "false"], "false", "Skip this file entirely. Curb never formats files marked as generated.", "basic_method"),
-		new("dotnet_diagnostic.ide0055.severity", OptionGroup.Suppression, ["none", "silent", "suggestion", "warning", "error"], "warning", "Set this to none to opt a file out of formatting.", "basic_method"),
-		new("file_header_template", OptionGroup.Suppression, ["<template>", "unset"], "(not set)", "Insert or correct a // comment header at the top of the file. Supports {fileName}. IDE0073.", "basic_method"),
-
-		// ---- XML (5) ------------------------------------------------------------------------
-		new("curb_xml_format", OptionGroup.XmlFiles, ["true", "false"], "true", "Format project, props, targets, solution and nuget.config files. false leaves them unread.", "xml_project"),
-		new("curb_xml_extensions", OptionGroup.XmlFiles, ["<extensions>"], "(not set)", "Further extensions to format as generic XML, comma-separated, such as .xml or .runsettings.", "xml_project"),
-		new("xml_max_blank_lines_between_tags", OptionGroup.XmlLayout, ["<integer>"], "1", "The most blank lines kept between two tags of element-only content.", "xml_project"),
-		new("xml_space_before_self_closing", OptionGroup.XmlLayout, ["true", "false"], "(not set)", "Space before />. Unset keeps what each tag has, except in .slnx files, which always get one.", "xml_project"),
-		new("xml_attribute_indent", OptionGroup.XmlLayout, ["single_indent", "double_indent", "align_by_first_attribute"], "(not set)", "Where an attribute on a line of its own starts. Unset keeps its offset from its element as written.", "xml_attributes"),
-
-		// ---- Razor (1, experimental) ----------------------------------------------------------
-		new("curb_razor_format_code_blocks", OptionGroup.Razor, ["true", "false"], "false", "Experimental. Format the C# in @code, @functions and @{ } blocks of .razor and .cshtml files, and nothing else in them. Read only from a section that names those files.", "razor_component"),
-		new("curb_razor_format_markup", OptionGroup.Razor, ["true", "false"], "false", "Experimental. With curb_razor_format_code_blocks, also re-indent markup by its nesting, as Microsoft's Razor formatter does. Only indentation changes. Read only from a section that names Razor files.", "razor_markup"),
-		new("razor_attribute_indent_style", OptionGroup.Razor, ["align_with_first", "indent_by_one", "indent_by_two"], "align_with_first", "With curb_razor_format_markup, where an attribute that starts a line inside a start tag goes. Microsoft's Razor formatter reads the same key.", "razor_attributes"),
-		new("curb_razor_markup_engine_quirks", OptionGroup.Razor, ["true", "false"], "false", "Experimental. With curb_razor_format_markup, indent markup by tab_width rather than indent_size, and align attributes with a tag that has none on its line, as Microsoft's Razor formatter does.", "razor_markup"),
-	];
+		[
+			// ---- Core (8) -----------------------------------------------------------------------
+			new("indent_style", OptionGroup.Core, ["space", "tab"], "space", "Indent with spaces or tabs.", "basic_method"),
+			new("indent_size", OptionGroup.Core, ["<integer>"], "4", "Columns per indent level.", "basic_method"),
+			new("tab_width", OptionGroup.Core, ["<integer>"], "4", "Columns a tab occupies when measuring line width.", "basic_method"),
+			new(
+				"end_of_line",
+				OptionGroup.Core,
+				["lf", "crlf", "auto"],
+				"auto",
+				"Line ending to write. auto matches the platform's own (Environment.NewLine), the same default Roslyn uses.",
+				"basic_method"
+			),
+			new(
+				"insert_final_newline",
+				OptionGroup.Core,
+				["true", "false"],
+				"(not set)",
+				"End the file with a newline, or without one. Not set, the file keeps what it has.",
+				"basic_method"
+			),
+			new("trim_trailing_whitespace", OptionGroup.Core, ["true", "false"], "true", "Remove trailing whitespace from each line.", "basic_method"),
+			new(
+				"charset",
+				OptionGroup.Core,
+				["utf-8", "utf-8-bom"],
+				"(not set)",
+				"Byte-order mark handling. Not set, a file keeps whatever mark it arrived with.",
+				"basic_method"
+			),
+			new(
+				"max_line_length",
+				OptionGroup.Core,
+				["off", "<integer>"],
+				"off",
+				"Column target for reflow. off disables reflow entirely and selects preservation mode.",
+				"long_chain"
+			),
+			// ---- NewLines (7) -------------------------------------------------------------------
+			new(
+				"csharp_new_line_before_open_brace",
+				OptionGroup.NewLines,
+				[
+					"all",
+					"none",
+					"types",
+					"methods",
+					"accessors",
+					"anonymous_types",
+					"anonymous_methods",
+					"lambdas",
+					"control_blocks",
+					"object_collection_array_initializers",
+					"properties",
+					"events"
+				],
+				"all",
+				"Which constructs put their opening brace on a new line.",
+				"class_with_method"
+			),
+			new(
+				"csharp_new_line_before_else",
+				OptionGroup.NewLines,
+				["true", "false"],
+				"true",
+				"Put else on its own line rather than joining it to the preceding brace.",
+				"if_else"
+			),
+			new("csharp_new_line_before_catch", OptionGroup.NewLines, ["true", "false"], "true", "Put catch on its own line.", "try_catch"),
+			new("csharp_new_line_before_finally", OptionGroup.NewLines, ["true", "false"], "true", "Put finally on its own line.", "try_catch"),
+			new(
+				"csharp_new_line_before_members_in_object_initializers",
+				OptionGroup.NewLines,
+				["true", "false"],
+				"true",
+				"Put each member of an object initializer on its own line.",
+				"object_init"
+			),
+			new(
+				"csharp_new_line_before_members_in_anonymous_types",
+				OptionGroup.NewLines,
+				["true", "false"],
+				"true",
+				"Put each member of an anonymous type on its own line.",
+				"anonymous_type"
+			),
+			new(
+				"csharp_new_line_between_query_expression_clauses",
+				OptionGroup.NewLines,
+				["true", "false"],
+				"false",
+				"Put each clause of a query expression on its own line.",
+				"query"
+			),
+			// ---- Indentation (6) ----------------------------------------------------------------
+			new("csharp_indent_case_contents", OptionGroup.Indentation, ["true", "false"], "true", "Indent statements inside a case label.", "switch_stmt"),
+			new("csharp_indent_switch_labels", OptionGroup.Indentation, ["true", "false"], "true", "Indent case labels inside their switch.", "switch_stmt"),
+			new(
+				"csharp_indent_labels",
+				OptionGroup.Indentation,
+				["one_less_than_current", "flush_left", "no_change"],
+				"one_less_than_current",
+				"How goto labels are indented.",
+				"goto_label"
+			),
+			new("csharp_indent_block_contents", OptionGroup.Indentation, ["true", "false"], "true", "Indent statements inside a block.", "basic_method"),
+			new(
+				"csharp_indent_braces",
+				OptionGroup.Indentation,
+				["true", "false"],
+				"false",
+				"Indent the brace tokens themselves an extra level.",
+				"basic_method"
+			),
+			new(
+				"csharp_indent_case_contents_when_block",
+				OptionGroup.Indentation,
+				["true", "false"],
+				"true",
+				"Indent a braced case body. csharp_indent_case_contents governs other statements.",
+				"switch_stmt"
+			),
+			// ---- Spacing (24) -------------------------------------------------------------------
+			new("csharp_space_after_cast", OptionGroup.Spacing, ["true", "false"], "false", "Space between a cast and its operand.", "cast"),
+			new(
+				"csharp_space_after_keywords_in_control_flow_statements",
+				OptionGroup.Spacing,
+				["true", "false"],
+				"true",
+				"Space between a control-flow keyword and its opening parenthesis.",
+				"if_else"
+			),
+			new(
+				"csharp_space_before_colon_in_inheritance_clause",
+				OptionGroup.Spacing,
+				["true", "false"],
+				"true",
+				"Space before the colon in a base list.",
+				"class_with_method"
+			),
+			new(
+				"csharp_space_after_colon_in_inheritance_clause",
+				OptionGroup.Spacing,
+				["true", "false"],
+				"true",
+				"Space after the colon in a base list.",
+				"class_with_method"
+			),
+			new(
+				"csharp_space_around_binary_operators",
+				OptionGroup.Spacing,
+				["before_and_after", "none", "ignore"],
+				"before_and_after",
+				"Spaces around binary and assignment operators.",
+				"binary_ops"
+			),
+			new(
+				"csharp_space_around_declaration_statements",
+				OptionGroup.Spacing,
+				["false", "ignore"],
+				"false",
+				"Extra spaces in declaration statements. false normalises; ignore leaves them alone.",
+				"declaration"
+			),
+			new("csharp_space_after_comma", OptionGroup.Spacing, ["true", "false"], "true", "Space after a comma.", "call_args"),
+			new("csharp_space_before_comma", OptionGroup.Spacing, ["true", "false"], "false", "Space before a comma.", "call_args"),
+			new(
+				"csharp_space_between_parentheses",
+				OptionGroup.Spacing,
+				["false", "control_flow_statements", "type_casts", "expressions"],
+				"false",
+				"Space just inside parentheses for specific constructs.",
+				"if_else"
+			),
+			new(
+				"csharp_space_between_method_declaration_parameter_list_parentheses",
+				OptionGroup.Spacing,
+				["true", "false"],
+				"false",
+				"Space just inside the parentheses of a parameter list.",
+				"method_decl"
+			),
+			new(
+				"csharp_space_between_method_declaration_empty_parameter_list_parentheses",
+				OptionGroup.Spacing,
+				["true", "false"],
+				"false",
+				"Space inside an empty parameter list ().",
+				"method_decl"
+			),
+			new(
+				"csharp_space_between_method_declaration_name_and_open_parenthesis",
+				OptionGroup.Spacing,
+				["true", "false"],
+				"false",
+				"Space between the method name and its opening parenthesis.",
+				"method_decl"
+			),
+			new(
+				"csharp_space_between_method_call_parameter_list_parentheses",
+				OptionGroup.Spacing,
+				["true", "false"],
+				"false",
+				"Space just inside the parentheses of an argument list.",
+				"call_args"
+			),
+			new(
+				"csharp_space_between_method_call_empty_parameter_list_parentheses",
+				OptionGroup.Spacing,
+				["true", "false"],
+				"false",
+				"Space inside an empty argument list ().",
+				"call_args"
+			),
+			new(
+				"csharp_space_between_method_call_name_and_opening_parenthesis",
+				OptionGroup.Spacing,
+				["true", "false"],
+				"false",
+				"Space between the method name and its opening parenthesis at a call site.",
+				"call_args"
+			),
+			new(
+				"csharp_space_before_open_square_brackets",
+				OptionGroup.Spacing,
+				["true", "false"],
+				"false",
+				"Space before an opening square bracket.",
+				"indexer"
+			),
+			new(
+				"csharp_space_between_empty_square_brackets",
+				OptionGroup.Spacing,
+				["true", "false"],
+				"false",
+				"Space inside empty square brackets [].",
+				"indexer"
+			),
+			new("csharp_space_between_square_brackets", OptionGroup.Spacing, ["true", "false"], "false", "Space inside non-empty square brackets.", "indexer"),
+			new("csharp_space_before_dot", OptionGroup.Spacing, ["true", "false"], "false", "Space before a dot.", "long_chain"),
+			new("csharp_space_after_dot", OptionGroup.Spacing, ["true", "false"], "false", "Space after a dot.", "long_chain"),
+			new(
+				"csharp_space_before_semicolon_in_for_statement",
+				OptionGroup.Spacing,
+				["true", "false"],
+				"false",
+				"Space before a semicolon in a for statement.",
+				"for_loop"
+			),
+			new(
+				"csharp_space_after_semicolon_in_for_statement",
+				OptionGroup.Spacing,
+				["true", "false"],
+				"true",
+				"Space after a semicolon in a for statement.",
+				"for_loop"
+			),
+			new(
+				"csharp_space_after_unary_operator",
+				OptionGroup.Spacing,
+				["true", "false"],
+				"false",
+				"Space after unary minus/plus, logical not, and the unsafe pointer prefix operators. Not bitwise complement or prefix increment/decrement.",
+				"unary"
+			),
+			new(
+				"csharp_space_around_ternary_operator",
+				OptionGroup.Spacing,
+				["true", "false"],
+				"true",
+				"Space around the ?/: of a ternary conditional expression.",
+				"ternary"
+			),
+			// ---- Wrapping (28) ------------------------------------------------------------------
+			new(
+				"csharp_preserve_single_line_blocks",
+				OptionGroup.Wrapping,
+				["true", "false"],
+				"true",
+				"Allow a block the author wrote on one line to stay on one line.",
+				"single_line_block"
+			),
+			new(
+				"csharp_empty_block_style",
+				OptionGroup.Wrapping,
+				["multiline", "together", "together_same_line"],
+				"(not set)",
+				"How an empty method, constructor, accessor or control-flow body is laid out. together_same_line keeps { } on the signature's line.",
+				"single_line_block"
+			),
+			new(
+				"csharp_preserve_single_line_statements",
+				OptionGroup.Wrapping,
+				["true", "false"],
+				"true",
+				"Allow a control-flow body the author left on its header's line to stay there. Chained using statements are the exception and take their own lines unless this key is written out and set to true.",
+				"if_else"
+			),
+			new(
+				"csharp_keep_existing_linebreaks",
+				OptionGroup.Wrapping,
+				["true", "false"],
+				"(derived from max_line_length)",
+				"Preservation mode. Defaults to true when max_line_length is off.",
+				"long_chain"
+			),
+			new(
+				"csharp_wrap_before_first_method_call",
+				OptionGroup.Wrapping,
+				["true", "false"],
+				"(not set)",
+				"When a chain breaks, break before the first call too, leaving the receiver on its own line.",
+				"long_chain"
+			),
+			new(
+				"csharp_wrap_before_first_type_parameter_constraint",
+				OptionGroup.Wrapping,
+				["true", "false"],
+				"(not set)",
+				"Put a where clause on its own line, or keep it on the signature's. Not set, a clause the author broke stays broken unless a width decides layout.",
+				"generic_constraint"
+			),
+			new(
+				"csharp_wrap_before_extends_colon",
+				OptionGroup.Wrapping,
+				["true", "false"],
+				"(not set)",
+				"Put a base list on its own line, colon first, or keep it on the declaration's. Not set, a list the author broke stays broken unless a width decides layout.",
+				"class_with_method"
+			),
+			new(
+				"csharp_place_constructor_initializer_on_same_line",
+				OptionGroup.Wrapping,
+				["true", "false"],
+				"(not set)",
+				"Keep : base(...) on the constructor's line, or give it its own. Not set, one the author broke stays broken unless a width decides layout.",
+				"constructor_init"
+			),
+			new(
+				"csharp_wrap_before_arrow_with_expressions",
+				OptionGroup.Wrapping,
+				["true", "false"],
+				"false",
+				"When an expression body wraps, put => at the start of the new line.",
+				"expression_body"
+			),
+			new(
+				"csharp_wrap_after_dot_in_method_calls",
+				OptionGroup.Wrapping,
+				["true", "false"],
+				"false",
+				"When a chain breaks, leave the dot at the end of the preceding line.",
+				"long_chain"
+			),
+			new(
+				"csharp_wrap_chained_method_calls",
+				OptionGroup.Wrapping,
+				["chop_if_long"],
+				"chop_if_long",
+				"Break a chain of three or more calls onto its own line per call once it does not fit. Curb's default behaviour either way; setting the key only makes it explicit.",
+				"long_chain"
+			),
+			new(
+				"csharp_place_simple_enum_on_single_line",
+				OptionGroup.Wrapping,
+				["true", "false"],
+				"true",
+				"Allow a short enum body to stay on one line.",
+				"simple_enum"
+			),
+			new(
+				"csharp_place_simple_accessorholder_on_single_line",
+				OptionGroup.Wrapping,
+				["true", "false"],
+				"true",
+				"Allow { get; set; } to stay on the property's line.",
+				"property"
+			),
+			new(
+				"csharp_place_simple_declaration_blocks_on_single_line",
+				OptionGroup.Wrapping,
+				["true", "false"],
+				"false",
+				"Collapse a method, constructor, operator, destructor, local function or accessor body onto one line when it holds a single statement with no comment and the result fits.",
+				"basic_method"
+			),
+			new(
+				"csharp_place_simple_blocks_on_single_line",
+				OptionGroup.Wrapping,
+				["true", "false"],
+				"false",
+				"The same, for a lambda or anonymous method's block body.",
+				"lambda_block"
+			),
+			new(
+				"csharp_wrap_chained_binary_expressions",
+				OptionGroup.Wrapping,
+				["chop_always", "chop_if_long", "wrap_if_long"],
+				"(not set)",
+				"Break each operand of a long && or || chain onto its own line. chop_always breaks regardless of width; wrap_if_long packs operands instead of breaking every one. Only honoured in deterministic mode (max_line_length set).",
+				"binary_ops"
+			),
+			new(
+				"csharp_wrap_before_binary_opsign",
+				OptionGroup.Wrapping,
+				["true", "false"],
+				"true",
+				"When a binary chain breaks, start the new line with the operator.",
+				"binary_ops"
+			),
+			new(
+				"csharp_wrap_parameters_style",
+				OptionGroup.Wrapping,
+				["chop_always", "chop_if_long", "wrap_if_long"],
+				"chop_if_long",
+				"chop_always gives every parameter its own line regardless of width; wrap_if_long packs parameters instead. wrap_if_long is only honoured in deterministic mode (max_line_length set) — chop_always and chop_if_long work in either.",
+				"method_decl"
+			),
+			new(
+				"csharp_wrap_arguments_style",
+				OptionGroup.Wrapping,
+				["chop_always", "chop_if_long", "wrap_if_long"],
+				"chop_if_long",
+				"chop_always gives every argument its own line; wrap_if_long packs arguments instead. Only honoured in deterministic mode (max_line_length set).",
+				"call_args"
+			),
+			new(
+				"csharp_wrap_object_and_collection_initializer_style",
+				OptionGroup.Wrapping,
+				["chop_always", "chop_if_long"],
+				"chop_if_long",
+				"chop_always gives every initializer element its own line. Only honoured in deterministic mode. wrap_if_long is not offered: dotnet format forces one member per line once an initializer opens out, so a packed layout could never stay put.",
+				"object_init"
+			),
+			new(
+				"csharp_max_formal_parameters_on_line",
+				OptionGroup.Wrapping,
+				["<integer>"],
+				"(not set)",
+				"Chop a parameter list carrying more than this many parameters, regardless of width.",
+				"method_decl"
+			),
+			new(
+				"csharp_max_invocation_arguments_on_line",
+				OptionGroup.Wrapping,
+				["<integer>"],
+				"(not set)",
+				"Chop an argument list carrying more than this many arguments.",
+				"call_args"
+			),
+			new(
+				"csharp_max_initializer_elements_on_line",
+				OptionGroup.Wrapping,
+				["<integer>"],
+				"(not set)",
+				"Chop an initializer carrying more than this many elements.",
+				"object_init"
+			),
+			new(
+				"csharp_max_chained_method_calls_on_line",
+				OptionGroup.Wrapping,
+				["<integer>"],
+				"(not set)",
+				"Chop a chain carrying more than this many calls, regardless of width. Deterministic mode only.",
+				"long_chain"
+			),
+			new(
+				"csharp_max_array_initializer_elements_on_line",
+				OptionGroup.Wrapping,
+				["<integer>"],
+				"(not set)",
+				"Chop an array initializer carrying more than this many elements.",
+				"array_init"
+			),
+			new(
+				"csharp_wrap_before_declaration_rpar",
+				OptionGroup.Wrapping,
+				["true", "false"],
+				"(not set)",
+				"Put a broken parameter list's ) on its own line.",
+				"method_decl"
+			),
+			new(
+				"csharp_wrap_before_invocation_rpar",
+				OptionGroup.Wrapping,
+				["true", "false"],
+				"(not set)",
+				"Put a broken argument list's ) on its own line.",
+				"call_args"
+			),
+			new(
+				"csharp_place_method_attribute_on_same_line",
+				OptionGroup.Wrapping,
+				["false", "if_owner_is_single_line"],
+				"false",
+				"Where a method's attribute section goes. if_owner_is_single_line joins it when the method fits on one line. Deterministic mode only.",
+				"attributed_method"
+			),
+			new(
+				"csharp_place_field_attribute_on_same_line",
+				OptionGroup.Wrapping,
+				["false", "if_owner_is_single_line"],
+				"false",
+				"Where a field's attribute section goes.",
+				"attributed_method"
+			),
+			new(
+				"csharp_place_property_attribute_on_same_line",
+				OptionGroup.Wrapping,
+				["false", "if_owner_is_single_line"],
+				"false",
+				"Where a property's attribute section goes.",
+				"attributed_method"
+			),
+			new(
+				"csharp_place_event_attribute_on_same_line",
+				OptionGroup.Wrapping,
+				["false", "if_owner_is_single_line"],
+				"false",
+				"Where an event's attribute section goes.",
+				"attributed_method"
+			),
+			// ---- BlankLines (24) ----------------------------------------------------------------
+			new(
+				"csharp_keep_blank_lines_in_declarations",
+				OptionGroup.BlankLines,
+				["<integer>"],
+				"1",
+				"Maximum consecutive blank lines between members.",
+				"members"
+			),
+			new(
+				"csharp_keep_blank_lines_in_code",
+				OptionGroup.BlankLines,
+				["<integer>"],
+				"1",
+				"Maximum consecutive blank lines between statements.",
+				"members"
+			),
+			new(
+				"csharp_blank_lines_around_invocable",
+				OptionGroup.BlankLines,
+				["<integer>"],
+				"0",
+				"Blank lines before and after each method or constructor. 0 means leave the author's.",
+				"members"
+			),
+			new(
+				"csharp_blank_lines_around_local_method",
+				OptionGroup.BlankLines,
+				["<integer>"],
+				"1",
+				"Blank lines before and after each local function.",
+				"members"
+			),
+			new("csharp_blank_lines_around_type", OptionGroup.BlankLines, ["<integer>"], "1", "Blank lines before and after each type declaration.", "members"),
+			new(
+				"csharp_blank_lines_around_property",
+				OptionGroup.BlankLines,
+				["<integer>"],
+				"0",
+				"Blank lines before and after each property, indexer or event.",
+				"members"
+			),
+			new(
+				"csharp_blank_lines_around_accessor",
+				OptionGroup.BlankLines,
+				["<integer>"],
+				"0",
+				"Blank lines between two accessors of the same property, indexer or event.",
+				"members"
+			),
+			new("csharp_blank_lines_around_field", OptionGroup.BlankLines, ["<integer>"], "0", "Blank lines before and after each field.", "members"),
+			new(
+				"csharp_blank_lines_inside_type",
+				OptionGroup.BlankLines,
+				["<integer>"],
+				"0",
+				"Blank lines below the opening brace and above the closing brace of a type, forced exactly rather than floored.",
+				"members"
+			),
+			new(
+				"csharp_blank_lines_around_namespace",
+				OptionGroup.BlankLines,
+				["<integer>"],
+				"0",
+				"Blank lines before and after a namespace declaration.",
+				"members"
+			),
+			new(
+				"csharp_blank_lines_inside_namespace",
+				OptionGroup.BlankLines,
+				["<integer>"],
+				"0",
+				"Blank lines below the opening brace and above the closing brace of a block-scoped namespace, forced exactly rather than floored.",
+				"members"
+			),
+			new(
+				"csharp_blank_lines_around_region",
+				OptionGroup.BlankLines,
+				["<integer>"],
+				"1",
+				"Blank lines before a #region and after its matching #endregion, forced exactly rather than floored.",
+				"members"
+			),
+			new(
+				"csharp_blank_lines_inside_region",
+				OptionGroup.BlankLines,
+				["<integer>"],
+				"1",
+				"Blank lines below a #region and above its matching #endregion, forced exactly rather than floored.",
+				"members"
+			),
+			new(
+				"csharp_blank_lines_after_using_list",
+				OptionGroup.BlankLines,
+				["<integer>"],
+				"1",
+				"Blank lines below the last using directive, forced exactly rather than floored.",
+				"usings"
+			),
+			new(
+				"csharp_blank_lines_after_file_scoped_namespace_directive",
+				OptionGroup.BlankLines,
+				["<integer>"],
+				"1",
+				"Blank lines after a file-scoped namespace declaration.",
+				"usings"
+			),
+			new(
+				"csharp_blank_lines_before_block_statements",
+				OptionGroup.BlankLines,
+				["<integer>"],
+				"0",
+				"Blank lines above an if/while/for/foreach/do/switch/using/lock/try statement.",
+				"members"
+			),
+			new(
+				"csharp_blank_lines_after_block_statements",
+				OptionGroup.BlankLines,
+				["<integer>"],
+				"0",
+				"Blank lines below one of those statements.",
+				"members"
+			),
+			new(
+				"csharp_blank_lines_before_control_transfer_statements",
+				OptionGroup.BlankLines,
+				["<integer>"],
+				"0",
+				"Blank lines above a return/throw/break/continue/goto/yield statement.",
+				"members"
+			),
+			new(
+				"csharp_blank_lines_after_control_transfer_statements",
+				OptionGroup.BlankLines,
+				["<integer>"],
+				"0",
+				"Blank lines below one of those statements.",
+				"members"
+			),
+			new("csharp_blank_lines_before_case", OptionGroup.BlankLines, ["<integer>"], "0", "Blank lines above a switch section's first label.", "members"),
+			new(
+				"csharp_blank_lines_after_case",
+				OptionGroup.BlankLines,
+				["<integer>"],
+				"0",
+				"Blank lines below a section's labels, above its first statement.",
+				"members"
+			),
+			new(
+				"csharp_blank_lines_before_single_line_comment",
+				OptionGroup.BlankLines,
+				["<integer>"],
+				"0",
+				"Blank lines above a // comment that follows real content.",
+				"members"
+			),
+			new(
+				"csharp_remove_blank_lines_near_braces_in_declarations",
+				OptionGroup.BlankLines,
+				["true", "false"],
+				"true",
+				"Force no blank line directly under a type/namespace's opening brace or above its closing one.",
+				"near_braces"
+			),
+			new(
+				"csharp_remove_blank_lines_near_braces_in_code",
+				OptionGroup.BlankLines,
+				["true", "false"],
+				"true",
+				"The same, for a block's opening and closing braces.",
+				"near_braces"
+			),
+			// ---- ExpressionBodies (7) -----------------------------------------------------------
+			new(
+				"csharp_style_expression_bodied_methods",
+				OptionGroup.ExpressionBodies,
+				["false", "true", "when_on_single_line"],
+				"false",
+				"Convert eligible block-bodied methods to expression bodies. IDE0022.",
+				"expression_body"
+			),
+			new(
+				"csharp_style_expression_bodied_constructors",
+				OptionGroup.ExpressionBodies,
+				["false", "true", "when_on_single_line"],
+				"false",
+				"Convert eligible block-bodied constructors to expression bodies. IDE0021.",
+				"constructor_expr"
+			),
+			new(
+				"csharp_style_expression_bodied_operators",
+				OptionGroup.ExpressionBodies,
+				["false", "true", "when_on_single_line"],
+				"false",
+				"Convert eligible block-bodied operators. IDE0023/IDE0024.",
+				"expression_body"
+			),
+			new(
+				"csharp_style_expression_bodied_local_functions",
+				OptionGroup.ExpressionBodies,
+				["false", "true", "when_on_single_line"],
+				"false",
+				"Convert eligible block-bodied local functions. IDE0061.",
+				"expression_body"
+			),
+			new(
+				"csharp_style_expression_bodied_accessors",
+				OptionGroup.ExpressionBodies,
+				["false", "true", "when_on_single_line"],
+				"false",
+				"Convert eligible block-bodied accessors. IDE0027.",
+				"property"
+			),
+			new(
+				"csharp_style_expression_bodied_properties",
+				OptionGroup.ExpressionBodies,
+				["false", "true", "when_on_single_line"],
+				"false",
+				"Convert an eligible single-getter property to an expression body. IDE0025.",
+				"property"
+			),
+			new(
+				"csharp_style_expression_bodied_indexers",
+				OptionGroup.ExpressionBodies,
+				["false", "true", "when_on_single_line"],
+				"false",
+				"Convert eligible block-bodied indexers. IDE0026.",
+				"indexer"
+			),
+			// ---- Usings (3) ---------------------------------------------------------------------
+			new("dotnet_sort_system_directives_first", OptionGroup.Usings, ["true", "false"], "(not set)", "Put System.* usings before all others.", "usings"),
+			new(
+				"dotnet_separate_import_directive_groups",
+				OptionGroup.Usings,
+				["true", "false"],
+				"(not set)",
+				"Separate groups of usings by first namespace segment with a blank line.",
+				"usings"
+			),
+			new(
+				"csharp_using_directive_placement",
+				OptionGroup.Usings,
+				["inside_namespace", "outside_namespace"],
+				"(as written)",
+				"Move using directives inside or outside the namespace. IDE0065.",
+				"usings"
+			),
+			// ---- ModifiersAndBraces (3) ---------------------------------------------------------
+			new(
+				"csharp_preferred_modifier_order",
+				OptionGroup.ModifiersAndBraces,
+				["<modifier-list>"],
+				"(not set)",
+				"Reorder modifiers to the specified preference. IDE0036. Applied without a compilation.",
+				"modifiers"
+			),
+			new(
+				"csharp_prefer_braces",
+				OptionGroup.ModifiersAndBraces,
+				["false", "true", "when_multiline"],
+				"false",
+				"Add braces to unbraced control-flow bodies. IDE0011. Applied without a compilation.",
+				"if_else"
+			),
+			new(
+				"csharp_style_namespace_declarations",
+				OptionGroup.ModifiersAndBraces,
+				["block_scoped", "file_scoped"],
+				"(as written)",
+				"Convert block namespaces to file-scoped. IDE0161. Applied without a compilation.",
+				"namespace_block"
+			),
+			// ---- TrailingCommas (2) -------------------------------------------------------------
+			new(
+				"csharp_trailing_comma_in_multiline_lists",
+				OptionGroup.TrailingCommas,
+				["true", "false"],
+				"false",
+				"Add a trailing comma after the last element of a list that breaks across lines.",
+				"object_init"
+			),
+			new(
+				"csharp_trailing_comma_in_singleline_lists",
+				OptionGroup.TrailingCommas,
+				["true", "false"],
+				"false",
+				"Add a trailing comma after the last element even when the list is on one line.",
+				"call_args"
+			),
+			// ---- Suppression (3) ----------------------------------------------------------------
+			new(
+				"generated_code",
+				OptionGroup.Suppression,
+				["true", "false"],
+				"false",
+				"Skip this file entirely. Curb never formats files marked as generated.",
+				"basic_method"
+			),
+			new(
+				"dotnet_diagnostic.ide0055.severity",
+				OptionGroup.Suppression,
+				["none", "silent", "suggestion", "warning", "error"],
+				"warning",
+				"Set this to none to opt a file out of formatting.",
+				"basic_method"
+			),
+			new(
+				"file_header_template",
+				OptionGroup.Suppression,
+				["<template>", "unset"],
+				"(not set)",
+				"Insert or correct a // comment header at the top of the file. Supports {fileName}. IDE0073.",
+				"basic_method"
+			),
+			// ---- XML (5) ------------------------------------------------------------------------
+			new(
+				"curb_xml_format",
+				OptionGroup.XmlFiles,
+				["true", "false"],
+				"true",
+				"Format project, props, targets, solution and nuget.config files. false leaves them unread.",
+				"xml_project"
+			),
+			new(
+				"curb_xml_extensions",
+				OptionGroup.XmlFiles,
+				["<extensions>"],
+				"(not set)",
+				"Further extensions to format as generic XML, comma-separated, such as .xml or .runsettings.",
+				"xml_project"
+			),
+			new(
+				"xml_max_blank_lines_between_tags",
+				OptionGroup.XmlLayout,
+				["<integer>"],
+				"1",
+				"The most blank lines kept between two tags of element-only content.",
+				"xml_project"
+			),
+			new(
+				"xml_space_before_self_closing",
+				OptionGroup.XmlLayout,
+				["true", "false"],
+				"(not set)",
+				"Space before />. Unset keeps what each tag has, except in .slnx files, which always get one.",
+				"xml_project"
+			),
+			new(
+				"xml_attribute_indent",
+				OptionGroup.XmlLayout,
+				["single_indent", "double_indent", "align_by_first_attribute"],
+				"(not set)",
+				"Where an attribute on a line of its own starts. Unset keeps its offset from its element as written.",
+				"xml_attributes"
+			),
+			// ---- Razor (1, experimental) ----------------------------------------------------------
+			new(
+				"curb_razor_format_code_blocks",
+				OptionGroup.Razor,
+				["true", "false"],
+				"false",
+				"Experimental. Format the C# in @code, @functions and @{ } blocks of .razor and .cshtml files, and nothing else in them. Read only from a section that names those files.",
+				"razor_component"
+			),
+			new(
+				"curb_razor_format_markup",
+				OptionGroup.Razor,
+				["true", "false"],
+				"false",
+				"Experimental. With curb_razor_format_code_blocks, also re-indent markup by its nesting, as Microsoft's Razor formatter does. Only indentation changes. Read only from a section that names Razor files.",
+				"razor_markup"
+			),
+			new(
+				"razor_attribute_indent_style",
+				OptionGroup.Razor,
+				["align_with_first", "indent_by_one", "indent_by_two"],
+				"align_with_first",
+				"With curb_razor_format_markup, where an attribute that starts a line inside a start tag goes. Microsoft's Razor formatter reads the same key.",
+				"razor_attributes"
+			),
+			new(
+				"curb_razor_markup_engine_quirks",
+				OptionGroup.Razor,
+				["true", "false"],
+				"false",
+				"Experimental. With curb_razor_format_markup, indent markup by tab_width rather than indent_size, and align attributes with a tag that has none on its line, as Microsoft's Razor formatter does.",
+				"razor_markup"
+			),
+		];
 }

@@ -1,5 +1,5 @@
-using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Nullean.Curb.Documents;
 using Nullean.Curb.Options;
@@ -42,11 +42,7 @@ internal static partial class Printers
 	/// A value that brings its own braces positions its own contents, so it takes a plain space
 	/// rather than a hanging indent — otherwise the whole construct sits one level too deep.
 	/// </remarks>
-	private static void OperandOnRight(
-		SyntaxNode? right,
-		PrintContext context,
-		int operatorEnd = -1,
-		bool suppressIndent = false)
+	private static void OperandOnRight(SyntaxNode? right, PrintContext context, int operatorEnd = -1, bool suppressIndent = false)
 	{
 		var arena = context.Arena;
 
@@ -60,10 +56,11 @@ internal static partial class Printers
 		// operator and hung the RHS on its own indented line — which then measured as fitting flat
 		// at that new, shallower indent, so the RHS's own chain or argument list never broke either:
 		// the assignment ate the only break the line needed.
-		if (right is ExpressionSyntax expression
-			&& (BringsOwnBlock(expression)
-				|| (operatorEnd >= 0 && context.AuthorJoined(operatorEnd, expression.SpanStart))
-				|| (!context.Options.KeepExistingLinebreaks && BreaksWithoutHelp(expression))))
+		if (
+			right is ExpressionSyntax expression &&
+			(BringsOwnBlock(expression) || (operatorEnd >= 0 && context.AuthorJoined(operatorEnd, expression.SpanStart)) ||
+				(!context.Options.KeepExistingLinebreaks && BreaksWithoutHelp(expression)))
+		)
 		{
 			Spacing.BeforeOperator(context);
 			Node.Print(right, context);
@@ -105,9 +102,7 @@ internal static partial class Printers
 		// Relayed one more link down: the rest of a uniform chain prints through node.Left at the
 		// same ambient indent, so its own continuation — reached once Left's BinaryExpression call
 		// gets here in turn — is still the condition's, not a nested construct's.
-		if (alreadyIndented
-			&& node.Left is BinaryExpressionSyntax left
-			&& left.OperatorToken.RawKind == node.OperatorToken.RawKind)
+		if (alreadyIndented && node.Left is BinaryExpressionSyntax left && left.OperatorToken.RawKind == node.OperatorToken.RawKind)
 			context.IndentedCondition = left;
 
 		// A chain the author broke stays broken, and each continuation line keeps the offset the
@@ -325,10 +320,13 @@ internal static partial class Printers
 		if (SpansLines(node, context))
 		{
 			var colonAfterBlock = OpensOutBlock(node.WhenTrue, context);
-			var broken = context.AuthorBroke(node.Condition.Span.End, node.QuestionToken.SpanStart)
-				|| context.AuthorBroke(node.QuestionToken.Span.End, node.WhenTrue.SpanStart)
-				|| (!colonAfterBlock && context.AuthorBroke(node.WhenTrue.Span.End, node.ColonToken.SpanStart))
-				|| context.AuthorBroke(node.ColonToken.Span.End, node.WhenFalse.SpanStart);
+			var broken = context.AuthorBroke(node.Condition.Span.End, node.QuestionToken.SpanStart) || context.AuthorBroke(
+				node.QuestionToken.Span.End,
+				node.WhenTrue.SpanStart
+			) || (!colonAfterBlock && context.AuthorBroke(node.WhenTrue.Span.End, node.ColonToken.SpanStart)) || context.AuthorBroke(
+				node.ColonToken.Span.End,
+				node.WhenFalse.SpanStart
+			);
 			var indented = broken && !alreadyIndented;
 
 			// Captured before the condition prints, on the line the ternary starts on; the pattern
@@ -474,21 +472,17 @@ internal static partial class Printers
 		for (var current = node.Parent; current is not null; current = current.Parent)
 		{
 			// Nor the block around it, whose braces the conversion drops.
-			if (context.ConvertedStatement is { } converted
-				&& (ReferenceEquals(current, converted) || ReferenceEquals(current, converted.Parent)))
+			if (context.ConvertedStatement is { } converted && (ReferenceEquals(current, converted) || ReferenceEquals(current, converted.Parent)))
 				continue;
 
 			switch (current)
 			{
-				case StatementSyntax or AnonymousFunctionExpressionSyntax or SwitchExpressionArmSyntax
-					or ExpressionElementSyntax or AnonymousObjectMemberDeclaratorSyntax:
+				case StatementSyntax or AnonymousFunctionExpressionSyntax or SwitchExpressionArmSyntax or ExpressionElementSyntax or AnonymousObjectMemberDeclaratorSyntax:
 					return current.SpanStart;
 				case ExpressionSyntax when current.Parent is InitializerExpressionSyntax:
 					return current.SpanStart;
 				case MemberDeclarationSyntax member:
-					return member.AttributeLists.Count == 0
-						? member.SpanStart
-						: member.AttributeLists[^1].GetLastToken().GetNextToken().SpanStart;
+					return member.AttributeLists.Count == 0 ? member.SpanStart : member.AttributeLists[^1].GetLastToken().GetNextToken().SpanStart;
 			}
 		}
 
@@ -505,11 +499,8 @@ internal static partial class Printers
 	/// the <c>:</c> on a line of its own.
 	/// </remarks>
 	private static bool OpensOutBlock(ExpressionSyntax expression, PrintContext context) =>
-		expression is AnonymousFunctionExpressionSyntax { Block: { } block }
-		&& !KeepsOneLine(block, context)
-		&& !CollapsesEmptyBraces(block, context)
-		&& !JoinsEmptyBracesToHeader(block, context)
-		&& !context.Options.CollapsesSimpleBlocks;
+		expression is AnonymousFunctionExpressionSyntax { Block: { } block } && !KeepsOneLine(block, context) && !CollapsesEmptyBraces(block, context) &&
+			!JoinsEmptyBracesToHeader(block, context) && !context.Options.CollapsesSimpleBlocks;
 
 	/// <summary>
 	/// The break or space between two parts of a ternary the author broke, returning the offset of the
@@ -550,8 +541,7 @@ internal static partial class Printers
 	/// <summary>Operators csharp_space_after_unary_operator does not reach even when on — measured
 	/// directly against jb: bitwise complement and prefix increment/decrement stay glued to their
 	/// operand regardless.</summary>
-	private static readonly SyntaxKind[] UnspacedPrefixOperators =
-		[SyntaxKind.TildeToken, SyntaxKind.PlusPlusToken, SyntaxKind.MinusMinusToken];
+	private static readonly SyntaxKind[] UnspacedPrefixOperators = [SyntaxKind.TildeToken, SyntaxKind.PlusPlusToken, SyntaxKind.MinusMinusToken];
 
 	public static void PrefixUnaryExpression(PrefixUnaryExpressionSyntax node, PrintContext context)
 	{
@@ -675,7 +665,8 @@ internal static partial class Printers
 		PrintContext context,
 		bool leadingLine = false,
 		ushort ownerGroup = 0,
-		bool ownerBroke = false)
+		bool ownerBroke = false
+	)
 	{
 		var arena = context.Arena;
 
@@ -683,8 +674,7 @@ internal static partial class Printers
 		// The key reaches object initializers only, `new Dictionary { [1] = 2 }` included: dotnet format
 		// leaves a collection or array initializer's elements where the author put them however it is set
 		// (issue #215).
-		var oneMemberPerLine = context.Options.NewLineBeforeMembersInObjectInitializers
-			&& node.IsKind(SyntaxKind.ObjectInitializerExpression);
+		var oneMemberPerLine = context.Options.NewLineBeforeMembersInObjectInitializers && node.IsKind(SyntaxKind.ObjectInitializerExpression);
 
 		// Reproduce the author's own breaks rather than imposing one member per line: an initializer
 		// written across lines with two members sharing one keeps them sharing it.
@@ -707,8 +697,7 @@ internal static partial class Printers
 		// collection expression does. dotnet format leaves both as written, where it opens out an
 		// object initializer that spans lines. The breakable lines below broke as soon as any member
 		// did, so `new[] { a ||` / `b }` came back with its braces on lines of their own — issue #113.
-		var exactly = asWritten
-			&& node.Kind() is SyntaxKind.ArrayInitializerExpression or SyntaxKind.CollectionInitializerExpression;
+		var exactly = asWritten && node.Kind() is SyntaxKind.ArrayInitializerExpression or SyntaxKind.CollectionInitializerExpression;
 
 		// A dictionary initializer — one whose elements are themselves brace-wrapped — is the one
 		// shape Roslyn declines to re-indent: hand `dotnet format` a `{ { "k", "v" } }` block
@@ -726,10 +715,12 @@ internal static partial class Printers
 			// spaces (issue #199). Every line now keeps its column in that style instead.
 			var open = node.OpenBraceToken;
 			var lineStart = context.Text.Lines.GetLineFromPosition(open.SpanStart).Start;
-			if (leadingLine
-				&& !TokenPrinter.HasLeadingContent(open)
-				&& !EndsWithLineComment(open.GetPreviousToken())
-				&& context.AuthorBroke(open.GetPreviousToken().Span.End, open.SpanStart))
+			if (
+				leadingLine && !TokenPrinter.HasLeadingContent(open) && !EndsWithLineComment(open.GetPreviousToken()) && context.AuthorBroke(
+					open.GetPreviousToken().Span.End,
+					open.SpanStart
+				)
+			)
 			{
 				arena.LiteralLine();
 				IndentAsWritten(lineStart, open.SpanStart, context);
@@ -757,9 +748,7 @@ internal static partial class Printers
 		// indent here put them a level in from the collection's line — see BrokenCollectionElement. One
 		// that keeps exactly its breaks already places every line it has against an anchor of its own.
 		var elementBrace = -1;
-		if (leadingLine
-			&& context.TryTakeElementBraceAlignment(node.OpenBraceToken, out var elementRegister)
-			&& !exactly)
+		if (leadingLine && context.TryTakeElementBraceAlignment(node.OpenBraceToken, out var elementRegister) && !exactly)
 			elementBrace = elementRegister;
 
 		// `new HttpClient(new Handler { … }) { Timeout = t }` — once the creation it belongs to has been
@@ -769,9 +758,7 @@ internal static partial class Printers
 		// the creation spanning lines because it never reflows, so its answer cannot change; Curb's reflow
 		// can open a creation out on one run, which would flip the answer on the next and stop the file
 		// settling. Where the author put the brace is fixed, so it is that which decides.
-		var ownerSpansLines = leadingLine
-			&& node.Parent is not null
-			&& (ownerBroke || context.AuthorBroke(node.Parent.SpanStart, node.SpanStart));
+		var ownerSpansLines = leadingLine && node.Parent is not null && (ownerBroke || context.AuthorBroke(node.Parent.SpanStart, node.SpanStart));
 
 		// The creation spans lines and the initializer does not: `new List<int>` / `{ 1, 2 }`. dotnet
 		// format leaves the members on the brace's line, so the brace's break goes outside the group.
@@ -792,15 +779,9 @@ internal static partial class Printers
 		// argument list broke on this run. Deterministic layout never reads the source's answers, so it
 		// only ever takes that path, and it put `select new Row` / `{` at the statement's indent, where
 		// dotnet format moved it back under the `select` (issue #241).
-		var braceBelowOwner = leadingLine
-			&& elementBrace < 0
-			&& BraceOnOwnLine(BraceStyle.ObjectCollectionArrayInitializers, context)
-			&& (ownerBrokeAlone
-				|| !exactly
-				|| (!(exactly && ownerSpansLines)
-					&& (openItOut
-						|| ownerSpansLines
-						|| (asWritten && context.AuthorBroke(node.SpanStart, node.Parent!.SpanStart)))));
+		var braceBelowOwner = leadingLine && elementBrace < 0 && BraceOnOwnLine(BraceStyle.ObjectCollectionArrayInitializers, context) &&
+			(ownerBrokeAlone || !exactly ||
+				(!(exactly && ownerSpansLines) && (openItOut || ownerSpansLines || (asWritten && context.AuthorBroke(node.SpanStart, node.Parent!.SpanStart)))));
 		var ownerLine = braceBelowOwner ? OwnerLineAnchor(node.Parent!.GetFirstToken(), context) : -1;
 
 		using (ownerLine >= 0 ? arena.AlignedIndent(ownerLine, 0) : default)
@@ -833,15 +814,12 @@ internal static partial class Printers
 			{
 				if (exactly && ownerSpansLines)
 					ContinuationLine(node.OpenBraceToken, anchor, context);
-				else if (openItOut
-					|| ownerSpansLines
-					|| (asWritten && context.AuthorBroke(node.SpanStart, node.Parent!.SpanStart)))
+				else if (openItOut || ownerSpansLines || (asWritten && context.AuthorBroke(node.SpanStart, node.Parent!.SpanStart)))
 					BeforeOpenBrace(BraceStyle.ObjectCollectionArrayInitializers, context);
 				else if (exactly)
 					arena.Synthetic(SyntheticText.Space);
 				else
-					BeforeOpenBraceWhenBroken(
-						BraceStyle.ObjectCollectionArrayInitializers, context, DocFlags.OnlyIfNotAtLineStart);
+					BeforeOpenBraceWhenBroken(BraceStyle.ObjectCollectionArrayInitializers, context, DocFlags.OnlyIfNotAtLineStart);
 			}
 
 			TokenPrinter.Print(node.OpenBraceToken, context);
@@ -851,10 +829,7 @@ internal static partial class Printers
 				// A count rather than a column, the same question the parameter and argument limits
 				// ask. Breaking only — an initializer that fits is never closed up by this.
 				var isArray = node.IsKind(SyntaxKind.ArrayInitializerExpression);
-				var limit = isArray
-					? context.Options.MaxArrayInitializerElementsOnLine
-					: context.Options.MaxInitializerElementsOnLine;
-
+				var limit = isArray ? context.Options.MaxArrayInitializerElementsOnLine : context.Options.MaxInitializerElementsOnLine;
 
 				// Not for an initializer sitting in an argument list. Where a construct with its own
 				// braces anchors is read from the source — the line it starts on — and forcing a break
@@ -1014,8 +989,12 @@ internal static partial class Printers
 			_ => null,
 		};
 
-		if (expression is BaseObjectCreationExpressionSyntax { Initializer: { } initializer }
-			&& context.AuthorBroke(initializer.OpenBraceToken.GetPreviousToken().Span.End, initializer.OpenBraceToken.SpanStart))
+		if (
+			expression is BaseObjectCreationExpressionSyntax { Initializer: { } initializer } && context.AuthorBroke(
+				initializer.OpenBraceToken.GetPreviousToken().Span.End,
+				initializer.OpenBraceToken.SpanStart
+			)
+		)
 			context.AlignElementBrace(initializer.OpenBraceToken, anchor);
 
 		var indent = ElementIndent(expression, offset, context);
@@ -1059,9 +1038,10 @@ internal static partial class Printers
 			_ => null,
 		};
 
-		if (arguments is not { Arguments.Count: > 0 }
-			|| !context.AuthorJoined(expression!.SpanStart, arguments.OpenParenToken.SpanStart)
-			|| !context.AuthorBroke(arguments.OpenParenToken.Span.End, arguments.Arguments[0].SpanStart))
+		if (
+			arguments is not { Arguments.Count: > 0 } || !context.AuthorJoined(expression!.SpanStart, arguments.OpenParenToken.SpanStart) ||
+			!context.AuthorBroke(arguments.OpenParenToken.Span.End, arguments.Arguments[0].SpanStart)
+		)
 			return offset;
 
 		return context.SourceIndent(arguments.Arguments[0].SpanStart) - context.LevelColumns;
@@ -1242,10 +1222,10 @@ internal static partial class Printers
 			// the `=` is EqualsValueClause's to place, and one they started on the `=` line stays on it
 			// however its contents break — the line would break with them and open out `= [1,` / `2]`
 			// (issue #113).
-			if (equals.RawKind != 0
-				&& BraceOnOwnLine(BraceStyle.ObjectCollectionArrayInitializers, context)
-				&& !context.AuthorBroke(equals.Span.End, node.SpanStart)
-				&& !context.AuthorJoined(equals.Span.End, node.SpanStart))
+			if (
+				equals.RawKind != 0 && BraceOnOwnLine(BraceStyle.ObjectCollectionArrayInitializers, context) &&
+				!context.AuthorBroke(equals.Span.End, node.SpanStart) && !context.AuthorJoined(equals.Span.End, node.SpanStart)
+			)
 			{
 				using (arena.IndentIf(context.Options.IndentBraces))
 					arena.SoftLine(DocFlags.OnlyIfNotAtLineStart);
@@ -1324,7 +1304,6 @@ internal static partial class Printers
 			return int.MinValue;
 		}
 	}
-
 
 	public static void SimpleLambdaExpression(SimpleLambdaExpressionSyntax node, PrintContext context)
 	{
@@ -1438,8 +1417,9 @@ internal static partial class Printers
 	/// <c>csharp_style_expression_bodied_methods</c> conversion started putting their bodies on the arrow's line.
 	/// </remarks>
 	private static bool HangsOnArrowLine(ExpressionSyntax body) =>
-		body is BinaryExpressionSyntax
-		|| !(BringsOwnBlock(body) || BreaksWithoutHelp(body) || body is IsPatternExpressionSyntax { Pattern: RecursivePatternSyntax { PropertyPatternClause: not null } });
+		body is BinaryExpressionSyntax ||
+			!(BringsOwnBlock(body) || BreaksWithoutHelp(body) ||
+				body is IsPatternExpressionSyntax { Pattern: RecursivePatternSyntax { PropertyPatternClause: not null } });
 
 	/// <summary>The <c>delegate (T x) { }</c> form that predates lambdas.</summary>
 	public static void AnonymousMethodExpression(AnonymousMethodExpressionSyntax node, PrintContext context)
@@ -1490,8 +1470,7 @@ internal static partial class Printers
 			// method's goes below its `)` the same way, and stays beside a `)` on the `delegate` line (#271).
 			var belowParameters = block.Parent switch
 			{
-				ParenthesizedLambdaExpressionSyntax lambda =>
-					context.AuthorBroke(lambda.ParameterList.SpanStart, lambda.ArrowToken.SpanStart),
+				ParenthesizedLambdaExpressionSyntax lambda => context.AuthorBroke(lambda.ParameterList.SpanStart, lambda.ArrowToken.SpanStart),
 				AnonymousMethodExpressionSyntax { ParameterList: { } parameters } => SpansLines(parameters, context),
 				_ => false,
 			};
@@ -1560,8 +1539,8 @@ internal static partial class Printers
 		// Measured from the brace, not from `new`: `new` / `{ P = 1, Q = 2 }` broke only before the brace,
 		// and dotnet format leaves it so. Opening it out from there kept the members together inside
 		// braces of their own lines, which dotnet format then split one per line (issue #136).
-		var braceLineOnly = context.AuthorBroke(node.NewKeyword.Span.End, node.OpenBraceToken.SpanStart)
-			&& !context.AuthorBroke(node.OpenBraceToken.SpanStart, node.CloseBraceToken.Span.End);
+		var braceLineOnly = context.AuthorBroke(node.NewKeyword.Span.End, node.OpenBraceToken.SpanStart) &&
+			!context.AuthorBroke(node.OpenBraceToken.SpanStart, node.CloseBraceToken.Span.End);
 		var openItOut = oneMemberPerLine && !braceLineOnly && SpansLines(node, context);
 		var asWritten = !oneMemberPerLine && !braceLineOnly && SpansLines(node, context);
 		var rewritesComma = RewritesTrailingComma(node.Initializers, node.CloseBraceToken, context);
@@ -1626,9 +1605,7 @@ internal static partial class Printers
 			}
 
 			using (arena.IndentIf(context.Options.IndentBraces))
-				InsideBrace(
-					node.Initializers.Count > 0 ? node.Initializers[^1].Span.End : node.OpenBraceToken.Span.End,
-					node.CloseBraceToken.SpanStart);
+				InsideBrace(node.Initializers.Count > 0 ? node.Initializers[^1].Span.End : node.OpenBraceToken.Span.End, node.CloseBraceToken.SpanStart);
 
 			TokenPrinter.Print(node.CloseBraceToken, context);
 		}
@@ -1715,8 +1692,7 @@ internal static partial class Printers
 				else
 					Spacing.InsideBrackets(context);
 
-				PrintSeparated(arguments, context, asWritten: true, node.OpenBracketToken.Span.End,
-					lineShift: lineShift, offset: offset);
+				PrintSeparated(arguments, context, asWritten: true, node.OpenBracketToken.Span.End, lineShift: lineShift, offset: offset);
 			}
 
 			if (lineShift >= 0)
@@ -1769,9 +1745,7 @@ internal static partial class Printers
 		TokenPrinter.Print(node.OperatorToken, context);
 
 		// The access is printed from the offset of the line it starts on, whichever break put it there.
-		var offset = breakAfter
-			? ContinuationLine(node.WhenNotNull.GetFirstToken(), anchor, context)
-			: context.SourceIndent(node.OperatorToken.SpanStart);
+		var offset = breakAfter ? ContinuationLine(node.WhenNotNull.GetFirstToken(), anchor, context) : context.SourceIndent(node.OperatorToken.SpanStart);
 
 		using (context.Arena.AlignedIndent(anchor, offset))
 			Node.Print(node.WhenNotNull, context);
@@ -1886,9 +1860,10 @@ internal static partial class Printers
 	/// </remarks>
 	private static bool KeepsAuthorBraceOffset(SwitchExpressionSyntax node, PrintContext context)
 	{
-		if (!context.Options.NewLineBeforeOpenBrace.HasFlag(BraceStyle.ObjectCollectionArrayInitializers)
-			|| context.Options.IndentBraces
-			|| !context.AuthorBroke(node.SwitchKeyword.Span.End, node.OpenBraceToken.SpanStart))
+		if (
+			!context.Options.NewLineBeforeOpenBrace.HasFlag(BraceStyle.ObjectCollectionArrayInitializers) || context.Options.IndentBraces ||
+			!context.AuthorBroke(node.SwitchKeyword.Span.End, node.OpenBraceToken.SpanStart)
+		)
 			return false;
 
 		ExpressionSyntax current = node;
@@ -1930,8 +1905,7 @@ internal static partial class Printers
 		// An arrow the author put below the pattern stays below it, one level in, as dotnet format leaves
 		// it. Joined, `_ when a > 3` / `=> 2` lost a break the author chose. The body then lays out from
 		// the arrow's line.
-		var arrowBroken = context.AuthorBroke(
-			node.WhenClause?.Condition.Span.End ?? node.Pattern.Span.End, node.EqualsGreaterThanToken.SpanStart);
+		var arrowBroken = context.AuthorBroke(node.WhenClause?.Condition.Span.End ?? node.Pattern.Span.End, node.EqualsGreaterThanToken.SpanStart);
 
 		using (arena.IndentIf(arrowBroken))
 		{

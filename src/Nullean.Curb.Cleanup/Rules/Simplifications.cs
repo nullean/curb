@@ -47,14 +47,10 @@ internal sealed class SimplifiedDefaults : ICleanupRule
 			return false;
 		}
 
-		var dropped = new List<TextSpan>
-		{
-			TextSpan.FromBounds(expression.OpenParenToken.SpanStart, expression.CloseParenToken.Span.End),
-		};
+		var dropped = new List<TextSpan> { TextSpan.FromBounds(expression.OpenParenToken.SpanStart, expression.CloseParenToken.Span.End), };
 
 		refusal = null;
-		into.Add(PlannedFix.Delete(
-			TextSpan.FromBounds(expression.Keyword.Span.End, expression.CloseParenToken.Span.End), dropped));
+		into.Add(PlannedFix.Delete(TextSpan.FromBounds(expression.Keyword.Span.End, expression.CloseParenToken.Span.End), dropped));
 
 		return true;
 	}
@@ -91,9 +87,10 @@ internal sealed class SimplifiedInterpolations : ICleanupRule
 			return false;
 		}
 
-		if (token.Parent is not MemberAccessExpressionSyntax access
-			|| access.Parent is not InvocationExpressionSyntax invocation
-			|| invocation.Expression != access)
+		if (
+			token.Parent is not MemberAccessExpressionSyntax access || access.Parent is not InvocationExpressionSyntax invocation || invocation.Expression !=
+				access
+		)
 		{
 			refusal = "the reported position is not a method call on a member access";
 			return false;

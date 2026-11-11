@@ -120,9 +120,10 @@ internal static partial class Printers
 		//
 		// Only when there is no author to ask. In preservation mode a value the author put below the `=`
 		// has to stay there, and this would join it.
-		if (BringsOwnBlock(node.Value)
-			|| context.AuthorJoined(node.EqualsToken.Span.End, node.Value.SpanStart)
-			|| (!context.Options.KeepExistingLinebreaks && BreaksWithoutHelp(node.Value)))
+		if (
+			BringsOwnBlock(node.Value) || context.AuthorJoined(node.EqualsToken.Span.End, node.Value.SpanStart) ||
+			(!context.Options.KeepExistingLinebreaks && BreaksWithoutHelp(node.Value))
+		)
 		{
 			arena.Synthetic(SyntheticText.Space);
 			Node.Print(node.Value, context);
@@ -145,33 +146,26 @@ internal static partial class Printers
 	/// own, they merely have somewhere to break. That is enough to make the break after the <c>=</c>
 	/// redundant, and consulted in deterministic mode only — see the call site for why.
 	/// </remarks>
-	private static bool BreaksWithoutHelp(ExpressionSyntax? value) =>
-		value switch
-		{
-			// Looks through to the awaited value: `await dynamoDb.PutItemAsync(…)` has the same break
-			// opportunities `dynamoDb.PutItemAsync(…)` does, the `await` keyword adds none of its own
-			// and hides none of the call's.
-			AwaitExpressionSyntax awaitExpression => BreaksWithoutHelp(awaitExpression.Expression),
+	private static bool BreaksWithoutHelp(ExpressionSyntax? value) => value switch
+	{
+		// Looks through to the awaited value: `await dynamoDb.PutItemAsync(…)` has the same break
+		// opportunities `dynamoDb.PutItemAsync(…)` does, the `await` keyword adds none of its own
+		// and hides none of the call's.
+		AwaitExpressionSyntax awaitExpression => BreaksWithoutHelp(awaitExpression.Expression),
 
-			InvocationExpressionSyntax
-				or MemberAccessExpressionSyntax
-				or ElementAccessExpressionSyntax
-				or ConditionalAccessExpressionSyntax
-				or BinaryExpressionSyntax
-				or ObjectCreationExpressionSyntax
-				or ImplicitObjectCreationExpressionSyntax
-				// A ternary breaks at its own ? and :, one indent in from wherever it starts. Breaking
-				// after the = as well nests those a level deeper than the assignment they belong to —
-				// issue #34.
-				or ConditionalExpressionSyntax
-				// An assignment prints its own left side, operator and OperandOnRight-driven right
-				// side — `context.EnvironmentVariables[k] = v` inside a lambda body needs the arrow
-				// attached to it the same way, not hung on a line of its own only for the assignment
-				// to then decide its own break from a level it does not belong at.
-				or AssignmentExpressionSyntax => true,
+		InvocationExpressionSyntax or MemberAccessExpressionSyntax or ElementAccessExpressionSyntax or ConditionalAccessExpressionSyntax or BinaryExpressionSyntax or ObjectCreationExpressionSyntax or ImplicitObjectCreationExpressionSyntax
+		// A ternary breaks at its own ? and :, one indent in from wherever it starts. Breaking
+		// after the = as well nests those a level deeper than the assignment they belong to —
+		// issue #34.
+		or ConditionalExpressionSyntax
+		// An assignment prints its own left side, operator and OperandOnRight-driven right
+		// side — `context.EnvironmentVariables[k] = v` inside a lambda body needs the arrow
+		// attached to it the same way, not hung on a line of its own only for the assignment
+		// to then decide its own break from a level it does not belong at.
+		or AssignmentExpressionSyntax => true,
 
-			_ => false,
-		};
+		_ => false,
+	};
 
 	/// <summary>
 	/// Prints <paramref name="operatorToken"/> and a <paramref name="value"/> the author put on a line below
@@ -203,23 +197,22 @@ internal static partial class Printers
 	}
 
 	/// <summary>True for values whose own layout supplies the indentation of their contents.</summary>
-	internal static bool BringsOwnBlock(ExpressionSyntax? value) =>
-		value switch
-		{
-			// A lambda or delegate with a block body; an expression-bodied one is a plain value.
-			AnonymousFunctionExpressionSyntax function => function.Block is not null,
-			ObjectCreationExpressionSyntax creation => creation.Initializer is not null,
-			ImplicitObjectCreationExpressionSyntax creation => creation.Initializer is not null,
-			ArrayCreationExpressionSyntax creation => creation.Initializer is not null,
-			ImplicitArrayCreationExpressionSyntax => true,
-			InitializerExpressionSyntax => true,
-			CollectionExpressionSyntax => true,
-			AnonymousObjectCreationExpressionSyntax => true,
-			SwitchExpressionSyntax => true,
-			QueryExpressionSyntax => true,
-			WithExpressionSyntax => true,
-			_ => false,
-		};
+	internal static bool BringsOwnBlock(ExpressionSyntax? value) => value switch
+	{
+		// A lambda or delegate with a block body; an expression-bodied one is a plain value.
+		AnonymousFunctionExpressionSyntax function => function.Block is not null,
+		ObjectCreationExpressionSyntax creation => creation.Initializer is not null,
+		ImplicitObjectCreationExpressionSyntax creation => creation.Initializer is not null,
+		ArrayCreationExpressionSyntax creation => creation.Initializer is not null,
+		ImplicitArrayCreationExpressionSyntax => true,
+		InitializerExpressionSyntax => true,
+		CollectionExpressionSyntax => true,
+		AnonymousObjectCreationExpressionSyntax => true,
+		SwitchExpressionSyntax => true,
+		QueryExpressionSyntax => true,
+		WithExpressionSyntax => true,
+		_ => false,
+	};
 
 	public static void PropertyDeclaration(PropertyDeclarationSyntax node, PrintContext context)
 	{
@@ -279,15 +272,17 @@ internal static partial class Printers
 		// `set => …;` / `}` came back as one line, where dotnet format never joins lines (issue #24).
 		// It opens such a list out itself, braces on lines of their own, and keeps the accessors' own
 		// breaks — which is what expanding prints, and expanding leaves the list spanning lines.
-		var expand = !context.Options.PlaceSimpleAccessorholderOnSingleLine
-			|| !context.Options.PreserveSingleLineBlocks
-			|| context.AuthorBroke(node.OpenBraceToken.SpanStart, node.CloseBraceToken.SpanStart);
+		var expand = !context.Options.PlaceSimpleAccessorholderOnSingleLine || !context.Options.PreserveSingleLineBlocks || context.AuthorBroke(
+			node.OpenBraceToken.SpanStart,
+			node.CloseBraceToken.SpanStart
+		);
 
 		// `Value` / `{ get; set; }` keeps its one-line list on a line of its own, as dotnet format does.
 		// Outside the group, so the break the author made before the brace does not open out the list.
-		var braceLineOnly = !expand
-			&& BraceOnOwnLine(BraceStyle.Properties, context)
-			&& context.AuthorBroke(node.OpenBraceToken.GetPreviousToken().Span.End, node.OpenBraceToken.SpanStart);
+		var braceLineOnly = !expand && BraceOnOwnLine(BraceStyle.Properties, context) && context.AuthorBroke(
+			node.OpenBraceToken.GetPreviousToken().Span.End,
+			node.OpenBraceToken.SpanStart
+		);
 		if (braceLineOnly)
 			BeforeOpenBrace(BraceStyle.Properties, context);
 
@@ -330,8 +325,7 @@ internal static partial class Printers
 					else if (context.Options.BlankLinesAroundAccessor > 0)
 					{
 						arena.HardLine();
-						context.BlankLines(context.DeclarationSeparation(
-							previousEnd, EffectiveStart(accessor), context.Options.BlankLinesAroundAccessor));
+						context.BlankLines(context.DeclarationSeparation(previousEnd, EffectiveStart(accessor), context.Options.BlankLinesAroundAccessor));
 					}
 					else if (expand && context.AuthorJoined(previousEnd, accessor.SpanStart))
 						arena.Synthetic(SyntheticText.Space);

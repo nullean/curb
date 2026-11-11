@@ -18,8 +18,7 @@ namespace Nullean.Curb.Printing;
 /// branches they did not take.
 /// </para>
 /// </remarks>
-internal sealed class DocPrinter<TLanguage>
-	where TLanguage : struct, ILayoutLanguage
+internal sealed class DocPrinter<TLanguage> where TLanguage : struct, ILayoutLanguage
 {
 	private readonly struct Scope(int end, int indent, PrintMode mode, int resume, bool suppressWidth, int align)
 	{
@@ -369,9 +368,7 @@ internal sealed class DocPrinter<TLanguage>
 
 				case DocKind.IfBreak:
 					{
-						var targetBroken = doc.GroupId != 0
-							? _groupModes[doc.GroupId] == PrintMode.Break
-							: scope.Mode == PrintMode.Break;
+						var targetBroken = doc.GroupId != 0 ? _groupModes[doc.GroupId] == PrintMode.Break : scope.Mode == PrintMode.Break;
 
 						var flatStart = i + 1;
 						var breakStart = flatStart + doc.A;
@@ -457,9 +454,7 @@ internal sealed class DocPrinter<TLanguage>
 			if (itemEnd >= end)
 			{
 				// The last item: no separator follows it, so there is no pair to look ahead to.
-				var lastMode = !_breaks.HasHardBreak(itemStart, itemEnd) && Fits(itemStart, itemEnd, scope)
-					? PrintMode.Flat
-					: PrintMode.Break;
+				var lastMode = !_breaks.HasHardBreak(itemStart, itemEnd) && Fits(itemStart, itemEnd, scope) ? PrintMode.Flat : PrintMode.Break;
 				RunSegment(itemStart, itemEnd, scope.Indent, scope.Align, lastMode, scope.SuppressWidth);
 				break;
 			}
@@ -502,8 +497,7 @@ internal sealed class DocPrinter<TLanguage>
 			// the flag does below. A switch section's statement comes after its label's comment: kept at
 			// the label's column, a comment above the statement read back on the next run as out of
 			// shape and moved under the label's comment instead (issue #16).
-			if (mergesIntoCommentBreak && scope.Mode is not (PrintMode.Flat or PrintMode.ForceFlat)
-				&& !doc.Flags.HasFlag(DocFlags.AlignToAnchor))
+			if (mergesIntoCommentBreak && scope.Mode is not (PrintMode.Flat or PrintMode.ForceFlat) && !doc.Flags.HasFlag(DocFlags.AlignToAnchor))
 			{
 				_output.TrimTrailingWhitespace();
 				WriteIndent(scope);
@@ -981,9 +975,7 @@ internal sealed class DocPrinter<TLanguage>
 						// A target the walk has not reached yet has no mode, and there is nothing
 						// better to assume than the enclosing scope.
 						var aimed = doc.GroupId != 0 && _groupModes[doc.GroupId] != PrintMode.Unset;
-						var targetBroken = aimed
-							? _groupModes[doc.GroupId] == PrintMode.Break
-							: !flat && scope.Mode == PrintMode.Break;
+						var targetBroken = aimed ? _groupModes[doc.GroupId] == PrintMode.Break : !flat && scope.Mode == PrintMode.Break;
 						var flatStart = i + 1;
 						var chosen = targetBroken ? flatStart + doc.A : flatStart;
 						var chosenLength = _arena[chosen].Length;

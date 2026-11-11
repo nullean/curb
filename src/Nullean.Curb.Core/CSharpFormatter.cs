@@ -61,13 +61,18 @@ public sealed class CSharpFormatter : IDisposable
 		bool produceText = true,
 		bool expandUnhandled = false,
 		bool verifyRoundTrip = false,
-		bool forceRoundTrip = false)
+		bool forceRoundTrip = false
+	)
 	{
 		if (!CSharpSource.TryParse(source, out var parsed, out var errors))
 		{
 			return new FormatResult(
-				FormatStatus.SyntaxError, false, null, 0,
-				errors.Count > 0 ? errors[0].GetMessage(System.Globalization.CultureInfo.InvariantCulture) : "source does not parse");
+				FormatStatus.SyntaxError,
+				false,
+				null,
+				0,
+				errors.Count > 0 ? errors[0].GetMessage(System.Globalization.CultureInfo.InvariantCulture) : "source does not parse"
+			);
 		}
 
 		_arena.Reset(source.Length);
@@ -99,10 +104,20 @@ public sealed class CSharpFormatter : IDisposable
 
 		var written = _output.Written;
 
-		if (!ContentVerifier.Verify(
-			source.AsSpan(), written, out var failure, context.ReorderedSpans, options.RewritesTrailingCommas,
-			context.BracesAdded, context.NamespaceUnwrapped,
-			context.DroppedSpans, context.ArrowsAdded, HeaderFor(context, options)))
+		if (
+			!ContentVerifier.Verify(
+				source.AsSpan(),
+				written,
+				out var failure,
+				context.ReorderedSpans,
+				options.RewritesTrailingCommas,
+				context.BracesAdded,
+				context.NamespaceUnwrapped,
+				context.DroppedSpans,
+				context.ArrowsAdded,
+				HeaderFor(context, options)
+			)
+		)
 			return new FormatResult(FormatStatus.VerificationFailed, false, null, context.Coverage, failure);
 
 		// The second parse only ever finds a moved token boundary, and the printer already knows
@@ -128,20 +143,26 @@ public sealed class CSharpFormatter : IDisposable
 			// Pass the span and the already-materialised string (null when produceText is off).
 			// Verify will call ToString() on the span only if formattedStr is null, so the string
 			// is never created twice when both produceText and verifyRoundTrip are true.
-			if (!TokenStreamComparer.Verify(
-				parsed.Root, source.AsSpan(), text is not null ? text.AsSpan() : _output.Written, text,
-				out var roundTripFailure,
-				context.UsingsReordered, options.RewritesTrailingCommas, context.ModifiersReordered,
-				context.BracesAdded, context.NamespaceUnwrapped, context.DroppedSpans, context.ArrowsAdded))
+			if (
+				!TokenStreamComparer.Verify(
+					parsed.Root,
+					source.AsSpan(),
+					text is not null ? text.AsSpan() : _output.Written,
+					text,
+					out var roundTripFailure,
+					context.UsingsReordered,
+					options.RewritesTrailingCommas,
+					context.ModifiersReordered,
+					context.BracesAdded,
+					context.NamespaceUnwrapped,
+					context.DroppedSpans,
+					context.ArrowsAdded
+				)
+			)
 				return new FormatResult(FormatStatus.VerificationFailed, false, null, context.Coverage, roundTripFailure);
 		}
 
-		return new FormatResult(
-			FormatStatus.Formatted,
-			changed,
-			text,
-			context.Coverage,
-			null);
+		return new FormatResult(FormatStatus.Formatted, changed, text, context.Coverage, null);
 	}
 
 	/// <summary>The header text the printer wrote, or null when it did not touch the top of the file.</summary>
@@ -152,9 +173,7 @@ public sealed class CSharpFormatter : IDisposable
 	/// starts with exactly this.
 	/// </remarks>
 	private static string? HeaderFor(PrintContext context, in FormatOptions options) =>
-		context.FileHeaderAdded && options.FileHeaderTemplate is { } template
-			? FileHeaderText.Rendered(template, context.FileName)
-			: null;
+		context.FileHeaderAdded && options.FileHeaderTemplate is { } template ? FileHeaderText.Rendered(template, context.FileName) : null;
 
 	/// <summary>Returns the pooled buffers this formatter holds.</summary>
 	public void Dispose() => _output.Dispose();

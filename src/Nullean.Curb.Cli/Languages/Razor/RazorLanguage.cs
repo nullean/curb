@@ -24,7 +24,8 @@ internal sealed class RazorLanguage : IInProcessLanguage
 {
 	public static RazorLanguage Instance { get; } = new();
 
-	private RazorLanguage() { }
+	private RazorLanguage()
+	{ }
 
 	public string Id => "razor";
 
@@ -62,24 +63,22 @@ internal sealed class RazorLanguage : IInProcessLanguage
 	/// nothing until markup is turned on.
 	/// </summary>
 	internal static RazorAttributeIndent AttributesFrom(IReadOnlyDictionary<string, string> properties) =>
-		!properties.TryGetValue(RazorFormatter.AttributeIndentKey, out var value) ? RazorAttributeIndent.AlignWithFirst
-		: value.Equals("indent_by_one", StringComparison.OrdinalIgnoreCase) ? RazorAttributeIndent.IndentByOne
-		: value.Equals("indent_by_two", StringComparison.OrdinalIgnoreCase) ? RazorAttributeIndent.IndentByTwo
-		: RazorAttributeIndent.AlignWithFirst;
+		!properties.TryGetValue(RazorFormatter.AttributeIndentKey, out var value)
+			? RazorAttributeIndent.AlignWithFirst
+			: value.Equals("indent_by_one", StringComparison.OrdinalIgnoreCase)
+				? RazorAttributeIndent.IndentByOne
+				: value.Equals("indent_by_two", StringComparison.OrdinalIgnoreCase) ? RazorAttributeIndent.IndentByTwo : RazorAttributeIndent.AlignWithFirst;
 
 	private static bool IsTrue(IReadOnlyDictionary<string, string> properties, string key) =>
 		properties.TryGetValue(key, out var value) && value.Equals("true", StringComparison.OrdinalIgnoreCase);
 
 	/// <summary>A repository whose <c>.editorconfig</c> files never mention the key has not opted in.</summary>
-	public bool DeclinesUnresolved(string path, CurbEditorConfig editorConfig) =>
-		!editorConfig.Mentions(path, RazorFormatter.EnableKey);
+	public bool DeclinesUnresolved(string path, CurbEditorConfig editorConfig) => !editorConfig.Mentions(path, RazorFormatter.EnableKey);
 
-	public string? NamedDeclineReason =>
-		$"Razor formatting is not enabled for it; set {RazorFormatter.EnableKey} = true in a [*.razor] or [*.cshtml] section";
+	public string? NamedDeclineReason => $"Razor formatting is not enabled for it; set {RazorFormatter.EnableKey} = true in a [*.razor] or [*.cshtml] section";
 
 	/// <summary>Whether <paramref name="explicitProperties"/> turns Razor formatting on.</summary>
-	internal static bool IsEnabled(IReadOnlyDictionary<string, string> explicitProperties) =>
-		IsTrue(explicitProperties, RazorFormatter.EnableKey);
+	internal static bool IsEnabled(IReadOnlyDictionary<string, string> explicitProperties) => IsTrue(explicitProperties, RazorFormatter.EnableKey);
 
 	public bool SkipSource(string source) => false;
 
@@ -125,18 +124,16 @@ internal sealed class RazorOptions : LanguageOptions
 /// <summary>One thread's <see cref="RazorFormatter"/>.</summary>
 internal sealed class RazorWorker(RazorFormatter formatter) : ILanguageWorker
 {
-	public FormatResult Format(
-		string source,
-		LanguageOptions options,
-		string fileName,
-		bool produceText,
-		bool expandUnhandled,
-		bool verifyRoundTrip) =>
+	public FormatResult Format(string source, LanguageOptions options, string fileName, bool produceText, bool expandUnhandled, bool verifyRoundTrip) =>
 		formatter.Format(
-			source, ((RazorOptions)options).Value, produceText, verifyRoundTrip,
+			source,
+			((RazorOptions)options).Value,
+			produceText,
+			verifyRoundTrip,
 			component: !fileName.EndsWith(".cshtml", StringComparison.OrdinalIgnoreCase),
 			markup: ((RazorOptions)options).Markup,
-			attributes: ((RazorOptions)options).Attributes);
+			attributes: ((RazorOptions)options).Attributes
+		);
 
 	/// <summary>Zero, since the run's round-trip line counts <c>.cs</c> files only.</summary>
 	public int RoundTripsChecked => 0;

@@ -271,7 +271,8 @@ internal sealed class XmlTree : IDisposable
 		int depth,
 		XmlProfile profile,
 		out int element,
-		out XmlError error)
+		out XmlError error
+	)
 	{
 		error = default;
 		var open = i;

@@ -111,10 +111,7 @@ internal static class UsingOrganiser
 	/// that is not idempotent on its own output.
 	/// </remarks>
 	public static bool IsEligible(SyntaxNode container, UsingRange usings, in FormatOptions options) =>
-		options.SortUsings != UsingOrder.AsWritten
-		&& usings.Count >= 2
-		&& !container.ContainsDirectives
-		&& !HasContentAfterBanner(usings[0]);
+		options.SortUsings != UsingOrder.AsWritten && usings.Count >= 2 && !container.ContainsDirectives && !HasContentAfterBanner(usings[0]);
 
 	/// <summary>How many of a container's directives lead it as <c>global using</c>s.</summary>
 	public static int GlobalCount(SyntaxList<UsingDirectiveSyntax> usings)
@@ -257,16 +254,14 @@ internal static class UsingOrganiser
 	private static bool IsSystem(UsingDirectiveSyntax directive)
 	{
 		var name = Name(directive);
-		return name.Equals("System", StringComparison.Ordinal)
-			|| name.StartsWith("System.", StringComparison.Ordinal);
+		return name.Equals("System", StringComparison.Ordinal) || name.StartsWith("System.", StringComparison.Ordinal);
 	}
 
 	/// <remarks>
 	/// Allocates, which the hot-path rules forbid — but this runs only for a file whose
 	/// <c>.editorconfig</c> asked for sorting, and only over its using block.
 	/// </remarks>
-	private static string Name(UsingDirectiveSyntax directive) =>
-		directive.NamespaceOrType?.ToString() ?? string.Empty;
+	private static string Name(UsingDirectiveSyntax directive) => directive.NamespaceOrType?.ToString() ?? string.Empty;
 
 	private static ReadOnlySpan<char> FirstSegment(UsingDirectiveSyntax directive)
 	{

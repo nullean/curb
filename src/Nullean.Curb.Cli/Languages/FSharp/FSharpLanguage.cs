@@ -30,7 +30,8 @@ internal sealed class FSharpLanguage(IFileSystem fileSystem, IToolLauncher launc
 	private readonly HashSet<string> _warnings = [with(StringComparer.Ordinal)];
 	private readonly List<string> _errors = [];
 
-	public FSharpLanguage(IFileSystem fileSystem) : this(fileSystem, ProcessLauncher.Instance, ToolEnvironment.Current) { }
+	public FSharpLanguage(IFileSystem fileSystem) : this(fileSystem, ProcessLauncher.Instance, ToolEnvironment.Current)
+	{ }
 
 	public string Id => "fsharp";
 
@@ -44,8 +45,10 @@ internal sealed class FSharpLanguage(IFileSystem fileSystem, IToolLauncher launc
 
 		// Only charset is read from this, for the byte-order mark; the layout itself is Fantomas's.
 		var layout = LayoutOptionsBinder.Bind(configuration.Properties, null, new LayoutOptions());
-		var excluded = configuration.Properties.TryGetValue("generated_code", out var generated)
-			&& generated.Equals("true", StringComparison.OrdinalIgnoreCase);
+		var excluded = configuration.Properties.TryGetValue("generated_code", out var generated) && generated.Equals(
+			"true",
+			StringComparison.OrdinalIgnoreCase
+		);
 
 		var manifest = _manifests.Find(directory);
 

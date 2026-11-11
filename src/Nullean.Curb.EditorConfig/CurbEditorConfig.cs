@@ -109,8 +109,10 @@ public sealed class CurbEditorConfig(IFileSystem fileSystem)
 			return mentions;
 
 		var path = Path.Combine(directory, ".editorconfig");
-		mentions = (fileSystem.File.Exists(path) && fileSystem.File.ReadAllText(path).Contains(key, StringComparison.OrdinalIgnoreCase))
-			|| MentionsFrom(Path.GetDirectoryName(directory), key);
+		mentions = (fileSystem.File.Exists(path) && fileSystem.File.ReadAllText(path).Contains(key, StringComparison.OrdinalIgnoreCase)) || MentionsFrom(
+			Path.GetDirectoryName(directory),
+			key
+		);
 		_mentions[(directory, key)] = mentions;
 		return mentions;
 	}

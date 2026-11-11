@@ -99,10 +99,10 @@ internal static partial class Printers
 	/// its own line never asks; braces Curb adds are left to the option.
 	/// </remarks>
 	private static bool KeepsBraceBelowEmptyForHeader(SyntaxNode? body, PrintContext context) =>
-		body is BlockSyntax { Parent: ForStatementSyntax header } block
-		&& header.Statement == block
-		&& IsEmptyForHeader(header)
-		&& context.AuthorBroke(header.CloseParenToken.Span.End, block.OpenBraceToken.SpanStart);
+		body is BlockSyntax { Parent: ForStatementSyntax header } block && header.Statement == block && IsEmptyForHeader(header) && context.AuthorBroke(
+			header.CloseParenToken.Span.End,
+			block.OpenBraceToken.SpanStart
+		);
 
 	/// <summary>
 	/// Whether this body should be given braces it was not written with.
@@ -215,28 +215,22 @@ internal static partial class Printers
 	/// <summary>
 	/// End of the header a statement hangs off, or -1 when it is not an embedded body.
 	/// </summary>
-	private static int EmbeddedHeaderEnd(StatementSyntax statement) =>
-		statement.Parent switch
-		{
-			IfStatementSyntax parent when parent.Statement == statement => parent.CloseParenToken.Span.End,
-			ElseClauseSyntax parent when parent.Statement == statement => parent.ElseKeyword.Span.End,
-			WhileStatementSyntax parent when parent.Statement == statement => parent.CloseParenToken.Span.End,
-			DoStatementSyntax parent when parent.Statement == statement => parent.DoKeyword.Span.End,
-			ForStatementSyntax parent when parent.Statement == statement => parent.CloseParenToken.Span.End,
-			CommonForEachStatementSyntax parent when parent.Statement == statement => parent.CloseParenToken.Span.End,
-			UsingStatementSyntax parent when parent.Statement == statement => parent.CloseParenToken.Span.End,
-			LockStatementSyntax parent when parent.Statement == statement => parent.CloseParenToken.Span.End,
-			FixedStatementSyntax parent when parent.Statement == statement => parent.CloseParenToken.Span.End,
-			_ => -1,
-		};
+	private static int EmbeddedHeaderEnd(StatementSyntax statement) => statement.Parent switch
+	{
+		IfStatementSyntax parent when parent.Statement == statement => parent.CloseParenToken.Span.End,
+		ElseClauseSyntax parent when parent.Statement == statement => parent.ElseKeyword.Span.End,
+		WhileStatementSyntax parent when parent.Statement == statement => parent.CloseParenToken.Span.End,
+		DoStatementSyntax parent when parent.Statement == statement => parent.DoKeyword.Span.End,
+		ForStatementSyntax parent when parent.Statement == statement => parent.CloseParenToken.Span.End,
+		CommonForEachStatementSyntax parent when parent.Statement == statement => parent.CloseParenToken.Span.End,
+		UsingStatementSyntax parent when parent.Statement == statement => parent.CloseParenToken.Span.End,
+		LockStatementSyntax parent when parent.Statement == statement => parent.CloseParenToken.Span.End,
+		FixedStatementSyntax parent when parent.Statement == statement => parent.CloseParenToken.Span.End,
+		_ => -1,
+	};
 
 	/// <summary>Emits <c>keyword (expression)</c>, the shape every control-flow header shares.</summary>
-	private static void ConditionHeader(
-		SyntaxToken keyword,
-		SyntaxToken openParen,
-		SyntaxNode? condition,
-		SyntaxToken closeParen,
-		PrintContext context)
+	private static void ConditionHeader(SyntaxToken keyword, SyntaxToken openParen, SyntaxNode? condition, SyntaxToken closeParen, PrintContext context)
 	{
 		var arena = context.Arena;
 
@@ -252,10 +246,8 @@ internal static partial class Printers
 		//
 		// Safe to read from the source because it asks about exactly the two positions this printer
 		// reproduces: if Curb does break after the `(`, the next run sees that break and keeps it.
-		var breakAfterOpen = condition is not null
-			&& context.AuthorBroke(openParen.Span.End, condition.SpanStart);
-		var breakBeforeClose = condition is not null
-			&& context.AuthorBroke(condition.Span.End, closeParen.SpanStart);
+		var breakAfterOpen = condition is not null && context.AuthorBroke(openParen.Span.End, condition.SpanStart);
+		var breakBeforeClose = condition is not null && context.AuthorBroke(condition.Span.End, closeParen.SpanStart);
 
 		TokenPrinter.Print(keyword, context);
 		Spacing.AfterControlFlowKeyword(context);
@@ -305,8 +297,7 @@ internal static partial class Printers
 
 		// A body that just gained braces ends in one, so `else` continues from a block whatever the
 		// source looked like.
-		var afterBlock = node.Statement is BlockSyntax
-			|| WantsBraces(node.Statement, context);
+		var afterBlock = node.Statement is BlockSyntax || WantsBraces(node.Statement, context);
 
 		if (ElseStaysOnLine(node, context))
 			context.Arena.Synthetic(SyntheticText.Space);
@@ -342,9 +333,7 @@ internal static partial class Printers
 	/// </remarks>
 	private static bool ElseStaysOnLine(IfStatementSyntax node, PrintContext context)
 	{
-		if (node.Else is null
-			|| !context.Options.PreserveSingleLineStatements
-			|| !context.AuthorJoined(node.SpanStart, node.Span.End))
+		if (node.Else is null || !context.Options.PreserveSingleLineStatements || !context.AuthorJoined(node.SpanStart, node.Span.End))
 			return false;
 
 		for (var current = node; ;)
@@ -403,9 +392,7 @@ internal static partial class Printers
 		if (node.Statement is BlockSyntax block)
 			return context.AuthorJoined(block.CloseBraceToken.Span.End, node.WhileKeyword.SpanStart);
 
-		return !WantsBraces(node.Statement, context)
-			&& context.Options.PreserveSingleLineStatements
-			&& context.AuthorJoined(node.SpanStart, node.Span.End);
+		return !WantsBraces(node.Statement, context) && context.Options.PreserveSingleLineStatements && context.AuthorJoined(node.SpanStart, node.Span.End);
 	}
 
 	public static void ForStatement(ForStatementSyntax node, PrintContext context)
@@ -607,9 +594,10 @@ internal static partial class Printers
 			// An empty catch always prints as `catch { }`, whatever csharp_preserve_single_line_blocks
 			// says and whatever the source had — see PrintStatementBody's alwaysJoinsEmpty. A non-empty
 			// body is unaffected: it follows the block's own rule, same as any other braced construct.
-			var headerEnd = catchClause.Filter?.CloseParenToken.Span.End
-				?? catchClause.Declaration?.CloseParenToken.Span.End
-				?? catchClause.CatchKeyword.Span.End;
+			var headerEnd = catchClause.Filter?.CloseParenToken.Span.End ?? catchClause.Declaration?.CloseParenToken.Span.End ?? catchClause
+				.CatchKeyword
+				.Span
+				.End;
 			PrintClauseBody(catchClause.Block, headerEnd, context);
 		}
 
@@ -634,9 +622,7 @@ internal static partial class Printers
 	/// </remarks>
 	private static void PrintClauseBody(BlockSyntax block, int headerEnd, PrintContext context)
 	{
-		if (HeaderJoinSurvives(block, context)
-			&& !IsEmptyBraces(block)
-			&& context.AuthorJoined(headerEnd, block.Span.End))
+		if (HeaderJoinSurvives(block, context) && !IsEmptyBraces(block) && context.AuthorJoined(headerEnd, block.Span.End))
 		{
 			context.Arena.Synthetic(SyntheticText.Space);
 			using (context.Arena.ForceFlat())
@@ -677,8 +663,7 @@ internal static partial class Printers
 		// false splits, and only an explicit true hands the decision back to the author's own line breaks.
 		if (node.Statement is UsingStatementSyntax chained)
 		{
-			if (context.Options.PreserveSingleLineStatementsOption == true
-				&& context.AuthorJoined(node.CloseParenToken.Span.End, chained.SpanStart))
+			if (context.Options.PreserveSingleLineStatementsOption == true && context.AuthorJoined(node.CloseParenToken.Span.End, chained.SpanStart))
 				arena.Synthetic(SyntheticText.Space);
 			else
 				arena.HardLine();
@@ -710,9 +695,7 @@ internal static partial class Printers
 
 		// flush_left is column zero rather than a level relative to anything, so it needs the scope
 		// that ignores the enclosing indent instead of one that shifts it.
-		using (placement == LabelIndent.FlushLeft
-			? arena.IndentToRoot()
-			: arena.Indent(placement == LabelIndent.OneLessThanCurrent ? -1 : 0))
+		using (placement == LabelIndent.FlushLeft ? arena.IndentToRoot() : arena.Indent(placement == LabelIndent.OneLessThanCurrent ? -1 : 0))
 		{
 			arena.HardLine(DocFlags.Reindent);
 			if (commentsStayIn)
@@ -731,9 +714,7 @@ internal static partial class Printers
 	/// whose comments sit a level in from it.
 	/// </summary>
 	internal static bool LabelCommentsSitALevelIn(SyntaxToken token, PrintContext context) =>
-		context.Options.IndentLabels == LabelIndent.OneLessThanCurrent
-		&& token.Parent is LabeledStatementSyntax label
-		&& label.Identifier == token;
+		context.Options.IndentLabels == LabelIndent.OneLessThanCurrent && token.Parent is LabeledStatementSyntax label && label.Identifier == token;
 
 	public static void FixedStatement(FixedStatementSyntax node, PrintContext context)
 	{
@@ -817,8 +798,7 @@ internal static partial class Printers
 		// A switch on one line necessarily has each statement on its label's line, which is
 		// csharp_preserve_single_line_statements' business rather than the block option's — so
 		// dotnet format expands it as soon as either is off, and so does Curb.
-		var oneLine = context.Options.PreserveSingleLineStatements
-			&& KeepsOneLine(node.OpenBraceToken, node.CloseBraceToken, context);
+		var oneLine = context.Options.PreserveSingleLineStatements && KeepsOneLine(node.OpenBraceToken, node.CloseBraceToken, context);
 
 		using (arena.ForceFlatIf(oneLine))
 		{
@@ -879,8 +859,7 @@ internal static partial class Printers
 					if (firstLabel && !firstSection)
 					{
 						arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
-						context.BlankLines(context.CodeSeparation(
-							previousSectionEnd, EffectiveStart(label), context.Options.BlankLinesBeforeCase));
+						context.BlankLines(context.CodeSeparation(previousSectionEnd, EffectiveStart(label), context.Options.BlankLinesBeforeCase));
 					}
 					else
 						arena.HardLine();
@@ -900,8 +879,7 @@ internal static partial class Printers
 				foreach (var statement in section.Statements)
 				{
 					// `case 1: break;` — a statement on its label's line stays there.
-					if (context.Options.PreserveSingleLineStatements
-						&& context.AuthorJoined(labelEnd, statement.Span.End))
+					if (context.Options.PreserveSingleLineStatements && context.AuthorJoined(labelEnd, statement.Span.End))
 					{
 						arena.Synthetic(SyntheticText.Space);
 						using (arena.ForceFlat())
@@ -911,9 +889,7 @@ internal static partial class Printers
 						continue;
 					}
 
-					var indented = statement is BlockSyntax
-						? context.Options.IndentCaseContentsWhenBlock
-						: context.Options.IndentCaseContents;
+					var indented = statement is BlockSyntax ? context.Options.IndentCaseContentsWhenBlock : context.Options.IndentCaseContents;
 
 					using (arena.Indent(indented ? 1 : 0))
 					{
@@ -979,9 +955,7 @@ internal static partial class Printers
 			return levels;
 
 		var statements = node.Sections[^1].Statements;
-		var indented = statements.Count > 0 && statements[^1] is BlockSyntax
-			? context.Options.IndentCaseContentsWhenBlock
-			: context.Options.IndentCaseContents;
+		var indented = statements.Count > 0 && statements[^1] is BlockSyntax ? context.Options.IndentCaseContentsWhenBlock : context.Options.IndentCaseContents;
 		return indented ? levels + 1 : levels;
 	}
 
@@ -1118,8 +1092,7 @@ internal static partial class Printers
 		TokenPrinter.PrintIfPresent(node.SemicolonToken, context);
 	}
 
-	public static void GlobalStatement(GlobalStatementSyntax node, PrintContext context) =>
-		Node.Print(node.Statement, context);
+	public static void GlobalStatement(GlobalStatementSyntax node, PrintContext context) => Node.Print(node.Statement, context);
 
 	public static void CaseSwitchLabel(CaseSwitchLabelSyntax node, PrintContext context)
 	{

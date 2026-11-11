@@ -68,7 +68,8 @@ public readonly record struct XmlOptions
 	/// <summary>The defaults XML starts from before <c>.editorconfig</c> is read: two-space indents.</summary>
 	public static LayoutOptions DefaultLayout { get; } = new() { IndentSize = 2, TabWidth = 2 };
 
-	public XmlOptions() { }
+	public XmlOptions()
+	{ }
 
 	/// <summary>The core keys.</summary>
 	public LayoutOptions Layout { get; init; } = DefaultLayout;
@@ -99,9 +100,7 @@ public readonly record struct XmlOptions
 	/// space added to every <c>&lt;PackageReference … /&gt;</c> in a repository is churn nobody asked for.
 	/// </remarks>
 	public SelfClosingSpace SpaceBeforeSelfClosing =>
-		SpaceBeforeSelfClosingOption != SelfClosingSpace.Preserve || Profile != XmlProfile.Slnx
-			? SpaceBeforeSelfClosingOption
-			: SelfClosingSpace.Always;
+		SpaceBeforeSelfClosingOption != SelfClosingSpace.Preserve || Profile != XmlProfile.Slnx ? SpaceBeforeSelfClosingOption : SelfClosingSpace.Always;
 
 	/// <summary><c>xml_attribute_indent</c>.</summary>
 	public AttributeIndent AttributeIndent { get; init; }
@@ -144,7 +143,23 @@ public readonly record struct XmlOptions
 	/// formatting the XML does.
 	/// </remarks>
 	public static readonly string[] OptInExtensions =
-		[".xml", ".config", ".nuspec", ".resx", ".runsettings", ".ruleset", ".xsd", ".xsl", ".xslt", ".manifest", ".vsixmanifest", ".xaml", ".axaml", ".wxs", ".wxi"];
+	[
+		".xml",
+		".config",
+		".nuspec",
+		".resx",
+		".runsettings",
+		".ruleset",
+		".xsd",
+		".xsl",
+		".xslt",
+		".manifest",
+		".vsixmanifest",
+		".xaml",
+		".axaml",
+		".wxs",
+		".wxi"
+	];
 
 	/// <summary>The extensions that are MSBuild files.</summary>
 	public static readonly string[] MsBuildExtensions = [".csproj", ".fsproj", ".vbproj", ".proj", ".props", ".targets"];

@@ -30,12 +30,7 @@ public enum ParenthesisSpacing : byte
 public static class ParenthesisSpacingParser
 {
 	/// <summary>The names the option accepts, as written in a <c>.editorconfig</c>.</summary>
-	public static readonly string[] Names =
-	[
-		"control_flow_statements",
-		"expressions",
-		"type_casts",
-	];
+	public static readonly string[] Names = ["control_flow_statements", "expressions", "type_casts",];
 
 	/// <summary>Renders a value back as a <c>.editorconfig</c> would write it.</summary>
 	public static string ToEditorConfigValue(ParenthesisSpacing spacing)
@@ -60,8 +55,7 @@ public static class ParenthesisSpacingParser
 
 			// Roslyn documents the off value as `false`; `none` is accepted for symmetry with the
 			// other list-valued options rather than because anything writes it.
-			if (name.Equals("false", StringComparison.OrdinalIgnoreCase)
-				|| name.Equals("none", StringComparison.OrdinalIgnoreCase))
+			if (name.Equals("false", StringComparison.OrdinalIgnoreCase) || name.Equals("none", StringComparison.OrdinalIgnoreCase))
 				continue;
 
 			var single = name switch

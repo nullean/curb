@@ -28,12 +28,7 @@ public enum FormatStatus
 /// <param name="Text">The formatted text, or null when it was not requested or not produced.</param>
 /// <param name="Coverage">Share of tokens emitted by a real printer rather than verbatim.</param>
 /// <param name="Message">Detail for a non-successful status, or for what <see cref="Declined"/> counts.</param>
-public readonly record struct FormatResult(
-	FormatStatus Status,
-	bool Changed,
-	string? Text,
-	double Coverage,
-	string? Message)
+public readonly record struct FormatResult(FormatStatus Status, bool Changed, string? Text, double Coverage, string? Message)
 {
 	public bool Success => Status == FormatStatus.Formatted;
 

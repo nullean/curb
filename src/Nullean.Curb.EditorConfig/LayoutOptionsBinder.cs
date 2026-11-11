@@ -23,10 +23,7 @@ namespace Nullean.Curb.EditorConfig;
 public static class LayoutOptionsBinder
 {
 	/// <summary>Binds every core key over <paramref name="defaults"/>.</summary>
-	public static LayoutOptions Bind(
-		IReadOnlyDictionary<string, string> properties,
-		ICollection<CurbDiagnostic>? diagnostics,
-		LayoutOptions defaults) =>
+	public static LayoutOptions Bind(IReadOnlyDictionary<string, string> properties, ICollection<CurbDiagnostic>? diagnostics, LayoutOptions defaults) =>
 		BindLineEndings(properties, diagnostics, BindIndentationAndWidth(properties, diagnostics, defaults));
 
 	/// <summary>
@@ -36,7 +33,8 @@ public static class LayoutOptionsBinder
 	public static LayoutOptions BindIndentationAndWidth(
 		IReadOnlyDictionary<string, string> properties,
 		ICollection<CurbDiagnostic>? diagnostics,
-		LayoutOptions defaults)
+		LayoutOptions defaults
+	)
 	{
 		var options = defaults;
 
@@ -103,7 +101,8 @@ public static class LayoutOptionsBinder
 	public static LayoutOptions BindLineEndings(
 		IReadOnlyDictionary<string, string> properties,
 		ICollection<CurbDiagnostic>? diagnostics,
-		LayoutOptions defaults)
+		LayoutOptions defaults
+	)
 	{
 		var options = defaults;
 
@@ -141,11 +140,7 @@ public static class LayoutOptionsBinder
 		return options;
 	}
 
-	private static bool TryIndentWidth(
-		IReadOnlyDictionary<string, string> properties,
-		string key,
-		ICollection<CurbDiagnostic>? diagnostics,
-		out int value)
+	private static bool TryIndentWidth(IReadOnlyDictionary<string, string> properties, string key, ICollection<CurbDiagnostic>? diagnostics, out int value)
 	{
 		value = 0;
 		if (!properties.TryGetValue(key, out var raw))
@@ -163,11 +158,7 @@ public static class LayoutOptionsBinder
 	}
 
 	/// <summary>Reads a <c>true</c>/<c>false</c> key, case-insensitively. Shared with every language's binder.</summary>
-	internal static bool TryBool(
-		IReadOnlyDictionary<string, string> properties,
-		string key,
-		ICollection<CurbDiagnostic>? diagnostics,
-		out bool value)
+	internal static bool TryBool(IReadOnlyDictionary<string, string> properties, string key, ICollection<CurbDiagnostic>? diagnostics, out bool value)
 	{
 		value = false;
 		if (!properties.TryGetValue(key, out var raw))

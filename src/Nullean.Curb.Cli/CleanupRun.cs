@@ -49,15 +49,17 @@ internal static class CleanupRun
 		string[]? logs = null,
 		string[]? explicitFiles = null,
 		bool forward = false,
-		bool separateWhitespace = false)
+		bool separateWhitespace = false
+	)
 	{
 		logs = logs is { Length: > 0 } ? logs : Discover(fileSystem, target);
 
 		if (logs.Length == 0)
 		{
 			Console.Error.WriteLine(
-				$"No diagnostics log found. Build first — the {LogName} files the compiler writes are what "
-				+ "cleanup reads — or point at one with --sarif-log <path>.");
+				$"No diagnostics log found. Build first — the {LogName} files the compiler writes are what " +
+					"cleanup reads — or point at one with --sarif-log <path>."
+			);
 			return 3;
 		}
 
@@ -128,19 +130,21 @@ internal static class CleanupRun
 			forFile.Add(declined);
 		}
 
-		var wanted = explicitFiles is { Length: > 0 }
-			? new HashSet<string>(explicitFiles.Select(fileSystem.Path.GetFullPath), StringComparer.Ordinal)
-			: null;
+		var wanted = explicitFiles is { Length: > 0 } ? new HashSet<string>(explicitFiles.Select(fileSystem.Path.GetFullPath), StringComparer.Ordinal) : null;
 
 		// A file whose every site was declined is still work: it is counted, and says why, only once it has
 		// passed the same gates a fixed file would (opted out, generated, stale).
-		var work = verdict.Agreed.Keys
+		var work = verdict
+			.Agreed
+			.Keys
 			.Concat(declinedByFile.Keys.Where(path => !verdict.Agreed.ContainsKey(path)))
 			.Where(path => wanted is null || wanted.Contains(path))
-			.Select(path => (
-				Path: path,
-				Diagnostics: verdict.Agreed.TryGetValue(path, out var agreed) ? (IReadOnlyList<CleanupDiagnostic>)agreed : [],
-				Declined: declinedByFile.TryGetValue(path, out var declined) ? (IReadOnlyList<DeclinedSite>)declined : []))
+			.Select(
+				path =>
+					(Path: path, Diagnostics: verdict.Agreed.TryGetValue(path, out var agreed)
+						? (IReadOnlyList<CleanupDiagnostic>)agreed
+						: [], Declined: declinedByFile.TryGetValue(path, out var declined) ? (IReadOnlyList<DeclinedSite>)declined : [])
+			)
 			.ToArray();
 
 		var editorConfig = new CurbEditorConfig(fileSystem);
@@ -287,36 +291,40 @@ internal static class CleanupRun
 					return worker;
 				}
 			},
-			worker => worker.Formatter.Dispose());
+			worker => worker.Formatter.Dispose()
+		);
 
 		stopwatch.Stop();
 
 		foreach (var message in messages.Take(20))
 			Console.Error.WriteLine(message);
 
-		Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
-			$"{(write ? "Cleaned" : "Checked")} {work.Length} file(s) from {logs.Length} log(s) in {stopwatch.ElapsedMilliseconds}ms — "
-			+ $"{applied} fix(es) in {changed} file(s){(write ? "" : " would change")}, "
-			+ $"{refused} refused, {stale} stale, {skipped} skipped, {failed} failed"));
+		Console.WriteLine(
+			string.Create(
+				CultureInfo.InvariantCulture,
+				$"{(write ? "Cleaned" : "Checked")} {work.Length} file(s) from {logs.Length} log(s) in {stopwatch.ElapsedMilliseconds}ms — " +
+					$"{applied} fix(es) in {changed} file(s){(write ? "" : " would change")}, " +
+					$"{refused} refused, {stale} stale, {skipped} skipped, {failed} failed"
+			)
+		);
 
 		if (disagreed > 0)
 		{
 			Console.WriteLine(
-				$"  {disagreed} of the refused were reported by only some of the target frameworks that compile the file, "
-				+ "so fixing them could break the others. They are counted as refused and left as they are.");
+				$"  {disagreed} of the refused were reported by only some of the target frameworks that compile the file, " +
+					"so fixing them could break the others. They are counted as refused and left as they are."
+			);
 		}
 
 		if (stale > 0)
 		{
-			Console.WriteLine(
-				$"  {stale} file(s) changed after the build, so nothing was applied to them. Build again to pick them up.");
+			Console.WriteLine($"  {stale} file(s) changed after the build, so nothing was applied to them. Build again to pick them up.");
 		}
 
 		var forwardFailed = false;
 		if (forward)
 		{
-			forwardFailed = Forward(
-				fileSystem.Path.GetFullPath(target), [.. notOurs, .. unfixed], stopwatch.ElapsedMilliseconds, write, separateWhitespace);
+			forwardFailed = Forward(fileSystem.Path.GetFullPath(target), [.. notOurs, .. unfixed], stopwatch.ElapsedMilliseconds, write, separateWhitespace);
 		}
 
 		if (failed > 0 || forwardFailed)
@@ -344,8 +352,7 @@ internal static class CleanupRun
 	/// </para>
 	/// </remarks>
 	/// <returns>True when a forwarded invocation failed.</returns>
-	private static bool Forward(
-		string target, IReadOnlyList<CleanupDiagnostic> remainder, long ourMilliseconds, bool write, bool separateWhitespace)
+	private static bool Forward(string target, IReadOnlyList<CleanupDiagnostic> remainder, long ourMilliseconds, bool write, bool separateWhitespace)
 	{
 		var plan = ForwardPlan.For(remainder, target, separateWhitespace);
 
@@ -358,8 +365,10 @@ internal static class CleanupRun
 
 		if (plan.Quiet > 0)
 		{
-			Console.WriteLine($"  {plan.Quiet} diagnostic(s) not forwarded, reported below warning — "
-				+ "your build did not show them, so nothing rewrites source on their account");
+			Console.WriteLine(
+				$"  {plan.Quiet} diagnostic(s) not forwarded, reported below warning — " +
+					"your build did not show them, so nothing rewrites source on their account"
+			);
 		}
 
 		if (plan.Invocations.Count == 0)
@@ -372,9 +381,7 @@ internal static class CleanupRun
 		{
 			// `--verify-no-changes` under --check, so the two halves agree about whether they are allowed to
 			// write. A check that quietly rewrote the tree would be worse than no check.
-			var arguments = write
-				? invocation.Arguments
-				: [.. invocation.Arguments, "--verify-no-changes"];
+			var arguments = write ? invocation.Arguments : [.. invocation.Arguments, "--verify-no-changes"];
 
 			var scope = invocation.Files.Count > 0
 				? $"{invocation.Files.Count} file(s)"
@@ -382,8 +389,7 @@ internal static class CleanupRun
 
 			var command = invocation.Subcommand is { Length: > 0 } sub ? $"dotnet format {sub}" : "dotnet format";
 
-			Console.WriteLine($"  forwarding {invocation.RuleIds.Count} rule(s) in {scope} "
-				+ $"to `{command}`: {string.Join(' ', invocation.RuleIds)}");
+			Console.WriteLine($"  forwarding {invocation.RuleIds.Count} rule(s) in {scope} " + $"to `{command}`: {string.Join(' ', invocation.RuleIds)}");
 
 			var start = Stopwatch.StartNew();
 			var exitCode = Run(target, arguments);
@@ -399,13 +405,15 @@ internal static class CleanupRun
 			}
 		}
 
-		var ratio = ourMilliseconds > 0
-			? string.Create(CultureInfo.InvariantCulture, $" ({forwardedMilliseconds / (double)ourMilliseconds:F1}x)")
-			: "";
+		var ratio = ourMilliseconds > 0 ? string.Create(CultureInfo.InvariantCulture, $" ({forwardedMilliseconds / (double)ourMilliseconds:F1}x)") : "";
 
-		Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
-			$"  curb {ourMilliseconds}ms · dotnet format {forwardedMilliseconds}ms{ratio}"
-			+ $" — the difference is the workspace load, which no amount of scoping avoids"));
+		Console.WriteLine(
+			string.Create(
+				CultureInfo.InvariantCulture,
+				$"  curb {ourMilliseconds}ms · dotnet format {forwardedMilliseconds}ms{ratio}" +
+					$" — the difference is the workspace load, which no amount of scoping avoids"
+			)
+		);
 
 		return failed;
 	}
@@ -456,13 +464,7 @@ internal static class CleanupRun
 		if (!fileSystem.File.Exists(list))
 			return null;
 
-		return
-		[
-			.. fileSystem.File.ReadAllLines(list)
-				.Select(line => line.Trim())
-				.Where(line => line.Length > 0)
-				.Select(fileSystem.Path.GetFullPath),
-		];
+		return [.. fileSystem.File.ReadAllLines(list).Select(line => line.Trim()).Where(line => line.Length > 0).Select(fileSystem.Path.GetFullPath),];
 	}
 
 	/// <summary>Finds the compiler's error logs under a directory. They live in <c>obj</c>, so nothing is excluded.</summary>
@@ -473,8 +475,6 @@ internal static class CleanupRun
 		if (fileSystem.File.Exists(root))
 			return [root];
 
-		return fileSystem.Directory.Exists(root)
-			? [.. fileSystem.Directory.EnumerateFiles(root, LogName, SearchOption.AllDirectories)]
-			: [];
+		return fileSystem.Directory.Exists(root) ? [.. fileSystem.Directory.EnumerateFiles(root, LogName, SearchOption.AllDirectories)] : [];
 	}
 }

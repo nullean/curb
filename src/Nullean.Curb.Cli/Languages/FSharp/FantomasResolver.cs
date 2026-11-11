@@ -40,9 +40,7 @@ internal sealed record FantomasTool(FantomasManifest Manifest, string? EntryPoin
 /// <param name="HomeDirectory">The user's profile folder.</param>
 internal sealed record ToolEnvironment(Func<string, string?> GetVariable, string HomeDirectory)
 {
-	public static ToolEnvironment Current { get; } = new(
-		Environment.GetEnvironmentVariable,
-		Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
+	public static ToolEnvironment Current { get; } = new(Environment.GetEnvironmentVariable, Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
 
 	/// <summary>The host to run tools on: the one MSBuild is running on when there is one, else <c>dotnet</c> from the path.</summary>
 	public string Dotnet => GetVariable("DOTNET_HOST_PATH") is { Length: > 0 } host ? host : "dotnet";
@@ -83,8 +81,10 @@ internal sealed class FantomasResolver(IFileSystem fileSystem, ToolEnvironment e
 		var packageFolder = fileSystem.Path.Combine(packages, manifest.ToolId.ToLowerInvariant(), manifest.Version.ToLowerInvariant());
 		if (!fileSystem.Directory.Exists(packageFolder))
 		{
-			return new Resolution(null,
-				$"{manifest.ToolId} {manifest.Version} is declared in {manifest.ManifestPath} but is not restored. Run `dotnet tool restore`.");
+			return new Resolution(
+				null,
+				$"{manifest.ToolId} {manifest.Version} is declared in {manifest.ManifestPath} but is not restored. Run `dotnet tool restore`."
+			);
 		}
 
 		var entryPoint = FromPackage(packages, packageFolder, manifest.Version);
@@ -113,19 +113,18 @@ internal sealed class FantomasResolver(IFileSystem fileSystem, ToolEnvironment e
 
 			foreach (var entry in document.RootElement.EnumerateArray())
 			{
-				if (entry.ValueKind != JsonValueKind.Object
-					|| !entry.TryGetProperty("Version", out var version) || version.ValueKind != JsonValueKind.String
-					|| !string.Equals(version.GetString(), manifest.Version, StringComparison.OrdinalIgnoreCase)
-					|| !entry.TryGetProperty("PathToExecutable", out var executable) || executable.ValueKind != JsonValueKind.String)
+				if (
+					entry.ValueKind != JsonValueKind.Object || !entry.TryGetProperty("Version", out var version) || version.ValueKind != JsonValueKind.String ||
+					!string.Equals(version.GetString(), manifest.Version, StringComparison.OrdinalIgnoreCase) ||
+					!entry.TryGetProperty("PathToExecutable", out var executable) || executable.ValueKind != JsonValueKind.String
+				)
 				{
 					continue;
 				}
 
 				// Only a framework-dependent entry point can be run with `dotnet exec`, and only one that is
 				// still there: the cache outlives a cleared packages folder.
-				if (executable.GetString() is { } dll
-					&& dll.EndsWith(".dll", StringComparison.OrdinalIgnoreCase)
-					&& fileSystem.File.Exists(dll))
+				if (executable.GetString() is { } dll && dll.EndsWith(".dll", StringComparison.OrdinalIgnoreCase) && fileSystem.File.Exists(dll))
 				{
 					return dll;
 				}
@@ -197,8 +196,9 @@ internal sealed class FantomasResolver(IFileSystem fileSystem, ToolEnvironment e
 					continue;
 
 				var name = fileSystem.Path.GetFileName(framework);
-				var frameworkVersion = name.StartsWith("net", StringComparison.OrdinalIgnoreCase)
-					&& Version.TryParse(name.AsSpan(3), out var parsed) ? parsed : new Version(0, 0);
+				var frameworkVersion = name.StartsWith("net", StringComparison.OrdinalIgnoreCase) && Version.TryParse(name.AsSpan(3), out var parsed)
+					? parsed
+					: new Version(0, 0);
 				if (best is null || frameworkVersion > bestVersion)
 				{
 					best = settings;
@@ -231,9 +231,10 @@ internal sealed class FantomasResolver(IFileSystem fileSystem, ToolEnvironment e
 					entryPoint = reader.GetAttribute("EntryPoint");
 					runner = reader.GetAttribute("Runner");
 				}
-				else if (reader.LocalName == "RuntimeIdentifierPackage"
-					&& reader.GetAttribute("RuntimeIdentifier") is { } runtime
-					&& reader.GetAttribute("Id") is { } id)
+				else if (
+					reader.LocalName == "RuntimeIdentifierPackage" && reader.GetAttribute("RuntimeIdentifier") is { } runtime &&
+					reader.GetAttribute("Id") is { } id
+				)
 				{
 					runtimePackages.Add((runtime, id));
 				}

@@ -35,7 +35,8 @@ internal static class XmlVerifier
 		ReadOnlySpan<XmlToken> before,
 		ReadOnlySpan<char> output,
 		ReadOnlySpan<XmlToken> after,
-		out string? failure)
+		out string? failure
+	)
 	{
 		failure = null;
 		var i = 0;
@@ -68,8 +69,10 @@ internal static class XmlVerifier
 
 			var expected = before[i];
 			var actual = after[j];
-			if (expected.Kind != actual.Kind
-				|| !EqualIgnoringLineEndings(source.Slice(expected.Start, expected.Length), output.Slice(actual.Start, actual.Length)))
+			if (
+				expected.Kind != actual.Kind ||
+				!EqualIgnoringLineEndings(source.Slice(expected.Start, expected.Length), output.Slice(actual.Start, actual.Length))
+			)
 			{
 				failure = Describe(source, expected, "changed");
 				return false;

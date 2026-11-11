@@ -88,9 +88,7 @@ internal static class Spacing
 	/// </remarks>
 	public static void AfterEmptyForHeader(bool bodyIsEmptyStatement, PrintContext context)
 	{
-		var space = bodyIsEmptyStatement
-			? context.Options.SpaceBeforeSemicolonInForStatement
-			: context.Options.SpaceAfterSemicolonInForStatement;
+		var space = bodyIsEmptyStatement ? context.Options.SpaceBeforeSemicolonInForStatement : context.Options.SpaceAfterSemicolonInForStatement;
 		if (space)
 			context.Arena.Synthetic(SyntheticText.Space);
 	}

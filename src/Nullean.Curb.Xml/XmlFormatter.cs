@@ -45,8 +45,12 @@ public sealed class XmlFormatter : IDisposable
 		if (!encoding.IsEmpty && !IsUtf8(encoding))
 		{
 			return new FormatResult(
-				FormatStatus.SyntaxError, false, null, 0,
-				$"declares encoding '{encoding}'; only UTF-8 XML is rewritten, so the file is left unchanged");
+				FormatStatus.SyntaxError,
+				false,
+				null,
+				0,
+				$"declares encoding '{encoding}'; only UTF-8 XML is rewritten, so the file is left unchanged"
+			);
 		}
 
 		var layout = ResolveLayout(span, options);
@@ -63,7 +67,13 @@ public sealed class XmlFormatter : IDisposable
 		var written = _output.Written;
 
 		if (!XmlLexer.Lex(written, _outputTokens, out var outputError))
-			return new FormatResult(FormatStatus.VerificationFailed, false, null, 1, "verification failed: the output does not lex " + outputError.Describe(written));
+			return new FormatResult(
+				FormatStatus.VerificationFailed,
+				false,
+				null,
+				1,
+				"verification failed: the output does not lex " + outputError.Describe(written)
+			);
 
 		if (!XmlVerifier.Verify(span, _tokens.Tokens, written, _outputTokens.Tokens, out var failure))
 			return new FormatResult(FormatStatus.VerificationFailed, false, null, 1, failure);
@@ -92,9 +102,9 @@ public sealed class XmlFormatter : IDisposable
 			{
 				layout = layout with
 				{
-					EndOfLine = source[lineBreak] == '\n' ? EndOfLine.Lf
-						: lineBreak + 1 < source.Length && source[lineBreak + 1] == '\n' ? EndOfLine.CrLf
-						: EndOfLine.Cr,
+					EndOfLine = source[lineBreak] == '\n'
+						? EndOfLine.Lf
+						: lineBreak + 1 < source.Length && source[lineBreak + 1] == '\n' ? EndOfLine.CrLf : EndOfLine.Cr,
 				};
 			}
 		}

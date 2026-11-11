@@ -15,15 +15,11 @@ public readonly record struct CurbDiagnostic(string Id, DiagnosticSeverity Sever
 {
 	/// <summary>A recognised key whose value Curb could not parse. The default is kept.</summary>
 	public static CurbDiagnostic UnrecognisedValue(string key, string value, string expected) =>
-		new("CURB1001", DiagnosticSeverity.Warning,
-			$"unrecognised value '{value}' for '{key}'; expected {expected}. Using the default.");
+		new("CURB1001", DiagnosticSeverity.Warning, $"unrecognised value '{value}' for '{key}'; expected {expected}. Using the default.");
 
 	/// <summary>A <c>csharp_*</c> / <c>dotnet_*</c> key Curb has never heard of — most often a typo.</summary>
 	public static CurbDiagnostic UnknownKey(string key, string? suggestion) =>
-		new("CURB1002", DiagnosticSeverity.Warning,
-			suggestion is null
-				? $"unknown option '{key}'."
-				: $"unknown option '{key}'. Did you mean '{suggestion}'?");
+		new("CURB1002", DiagnosticSeverity.Warning, suggestion is null ? $"unknown option '{key}'." : $"unknown option '{key}'. Did you mean '{suggestion}'?");
 
 	/// <summary>
 	/// A genuine IDE0055 option that Curb recognises but has not implemented yet. Reporting this is
@@ -31,8 +27,7 @@ public readonly record struct CurbDiagnostic(string Id, DiagnosticSeverity Sever
 	/// exactly like support.
 	/// </summary>
 	public static CurbDiagnostic NotImplemented(string key) =>
-		new("CURB1003", DiagnosticSeverity.Warning,
-			$"'{key}' is a supported .NET formatting option but Curb does not implement it yet, so it has no effect.");
+		new("CURB1003", DiagnosticSeverity.Warning, $"'{key}' is a supported .NET formatting option but Curb does not implement it yet, so it has no effect.");
 
 	/// <summary>
 	/// A key whose meaning depends on the author's line breaks, set alongside
@@ -55,10 +50,13 @@ public readonly record struct CurbDiagnostic(string Id, DiagnosticSeverity Sever
 	/// would look for the reason it was.
 	/// </remarks>
 	public static CurbDiagnostic DeterministicLayoutNeedsAWidth() =>
-		new("CURB1007", DiagnosticSeverity.Warning,
-			"'csharp_keep_existing_linebreaks = false' needs a 'max_line_length' to lay out against; with no "
-			+ "width every construct that fits would be joined onto one line. Ignored, so your line breaks "
-			+ "are preserved. Set a width and deterministic layout is the default anyway.");
+		new(
+			"CURB1007",
+			DiagnosticSeverity.Warning,
+			"'csharp_keep_existing_linebreaks = false' needs a 'max_line_length' to lay out against; with no " +
+				"width every construct that fits would be joined onto one line. Ignored, so your line breaks " +
+				"are preserved. Set a width and deterministic layout is the default anyway."
+		);
 
 	/// <summary>
 	/// A recognised value Curb refuses because <c>dotnet format</c> would undo it on the next save.
@@ -70,9 +68,11 @@ public readonly record struct CurbDiagnostic(string Id, DiagnosticSeverity Sever
 	/// to refuse it loudly than to write layout that Format Document reverts.
 	/// </remarks>
 	public static CurbDiagnostic OverruledByDotnetFormat(string key, string value, string instead) =>
-		new("CURB1006", DiagnosticSeverity.Warning,
-			$"'{key} = {value}' is not honoured: dotnet format undoes it, so the layout would not survive "
-			+ $"the next Format Document. {instead}");
+		new(
+			"CURB1006",
+			DiagnosticSeverity.Warning,
+			$"'{key} = {value}' is not honoured: dotnet format undoes it, so the layout would not survive " + $"the next Format Document. {instead}"
+		);
 
 	/// <summary>
 	/// A key Curb honours only under <c>csharp_keep_existing_linebreaks = false</c>, set without it.
@@ -84,15 +84,19 @@ public readonly record struct CurbDiagnostic(string Id, DiagnosticSeverity Sever
 	/// corpus files. The key is not wrong, it is asking for something only the other mode can give.
 	/// </remarks>
 	public static CurbDiagnostic RequiresDeterministicLayout(string key) =>
-		new("CURB1005", DiagnosticSeverity.Warning,
-			$"'{key}' is honoured only with 'csharp_keep_existing_linebreaks = false'. Forcing this "
-			+ "construct to wrap moves what is nested inside it, which preserved layout elsewhere then "
-			+ "disagrees with on the next run. Ignored here.");
+		new(
+			"CURB1005",
+			DiagnosticSeverity.Warning,
+			$"'{key}' is honoured only with 'csharp_keep_existing_linebreaks = false'. Forcing this " +
+				"construct to wrap moves what is nested inside it, which preserved layout elsewhere then " + "disagrees with on the next run. Ignored here."
+		);
 
 	public static CurbDiagnostic InertUnderDeterministicLayout(string key, string effect) =>
-		new("CURB1004", DiagnosticSeverity.Warning,
-			$"'{key}' asks about the line breaks you wrote, and 'csharp_keep_existing_linebreaks = false' "
-			+ $"means there are none to ask about; {effect}.");
+		new(
+			"CURB1004",
+			DiagnosticSeverity.Warning,
+			$"'{key}' asks about the line breaks you wrote, and 'csharp_keep_existing_linebreaks = false' " + $"means there are none to ask about; {effect}."
+		);
 
 	public override string ToString() => $"{Severity.ToString().ToLowerInvariant()} {Id}: {Message}";
 }

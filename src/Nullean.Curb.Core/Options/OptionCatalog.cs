@@ -43,7 +43,6 @@ public static class OptionCatalog
 		"csharp_new_line_before_members_in_object_initializers",
 		"csharp_new_line_before_members_in_anonymous_types",
 		"csharp_new_line_between_query_expression_clauses",
-
 		// Indentation options (6)
 		"csharp_indent_case_contents",
 		"csharp_indent_switch_labels",
@@ -51,7 +50,6 @@ public static class OptionCatalog
 		"csharp_indent_block_contents",
 		"csharp_indent_braces",
 		"csharp_indent_case_contents_when_block",
-
 		// Spacing options (22)
 		"csharp_space_after_cast",
 		"csharp_space_after_keywords_in_control_flow_statements",
@@ -75,143 +73,136 @@ public static class OptionCatalog
 		"csharp_space_before_open_square_brackets",
 		"csharp_space_between_empty_square_brackets",
 		"csharp_space_between_square_brackets",
-
 		// Wrap options (2)
 		"csharp_preserve_single_line_statements",
 		"csharp_preserve_single_line_blocks",
-
 		// .NET formatting options (2)
 		"dotnet_sort_system_directives_first",
 		"dotnet_separate_import_directive_groups",
 	}.ToFrozenSet(StringComparer.Ordinal);
 
 	/// <summary>Keys Curb actually acts on today. Everything else in the catalog reports CURB1003.</summary>
-	public static readonly FrozenSet<string> ImplementedKeys =
-		CoreKeys.Concat([
-			// ReSharper's keys, not Curb's. Curb invents no formatting keys: Rider has held this
-			// opinion for years and already reads these, so a repository that configured Rider has
-			// said what it wants. Opt-in, because this is the one opinion that moves a token.
-			"csharp_trailing_comma_in_multiline_lists",
-			"csharp_trailing_comma_in_singleline_lists",
-			"csharp_empty_block_style",
-
-			// IDE0021-0027 and IDE0061, which dotnet format can only apply with a compilation.
-			"csharp_style_expression_bodied_methods",
-			"csharp_style_expression_bodied_constructors",
-			"csharp_style_expression_bodied_operators",
-			"csharp_style_expression_bodied_local_functions",
-			"csharp_style_expression_bodied_accessors",
-			"csharp_style_expression_bodied_properties",
-			"csharp_style_expression_bodied_indexers",
-			"csharp_using_directive_placement",
-			"csharp_wrap_before_first_method_call",
-			"csharp_wrap_before_first_type_parameter_constraint",
-			"csharp_wrap_before_extends_colon",
-			"csharp_place_constructor_initializer_on_same_line",
-			"csharp_wrap_before_arrow_with_expressions",
-			"csharp_wrap_after_dot_in_method_calls",
-			"csharp_place_simple_enum_on_single_line",
-			"csharp_place_simple_accessorholder_on_single_line",
-			"csharp_place_simple_declaration_blocks_on_single_line",
-			"csharp_place_simple_blocks_on_single_line",
-			"csharp_wrap_chained_binary_expressions",
-			"csharp_wrap_chained_method_calls",
-			"csharp_wrap_before_binary_opsign",
-			"csharp_wrap_parameters_style",
-			"csharp_wrap_arguments_style",
-			"csharp_wrap_object_and_collection_initializer_style",
-			"csharp_place_method_attribute_on_same_line",
-			"csharp_place_field_attribute_on_same_line",
-			"csharp_place_property_attribute_on_same_line",
-			"csharp_place_event_attribute_on_same_line",
-			"csharp_keep_existing_linebreaks",
-			"csharp_keep_blank_lines_in_declarations",
-			"csharp_keep_blank_lines_in_code",
-			"csharp_blank_lines_around_invocable",
-			"csharp_blank_lines_around_local_method",
-			"csharp_blank_lines_around_type",
-			"csharp_blank_lines_around_property",
-			"csharp_blank_lines_around_accessor",
-			"csharp_blank_lines_around_field",
-			"csharp_blank_lines_inside_type",
-			"csharp_blank_lines_around_namespace",
-			"csharp_blank_lines_inside_namespace",
-			"csharp_blank_lines_around_region",
-			"csharp_blank_lines_inside_region",
-			"csharp_blank_lines_after_using_list",
-			"csharp_blank_lines_after_file_scoped_namespace_directive",
-			"csharp_blank_lines_before_block_statements",
-			"csharp_blank_lines_after_block_statements",
-			"csharp_blank_lines_before_control_transfer_statements",
-			"csharp_blank_lines_after_control_transfer_statements",
-			"csharp_blank_lines_before_case",
-			"csharp_blank_lines_after_case",
-			"csharp_blank_lines_before_single_line_comment",
-			"csharp_remove_blank_lines_near_braces_in_declarations",
-			"csharp_remove_blank_lines_near_braces_in_code",
-			"csharp_max_initializer_elements_on_line",
-			"csharp_max_chained_method_calls_on_line",
-			"csharp_max_array_initializer_elements_on_line",
-			"csharp_max_formal_parameters_on_line",
-			"csharp_max_invocation_arguments_on_line",
-			"csharp_wrap_before_declaration_rpar",
-			"csharp_wrap_before_invocation_rpar",
-			"file_header_template",
-
-			// IDE0036 and IDE0011, which dotnet format can only apply with a full compilation.
-			"csharp_preferred_modifier_order",
-			"csharp_prefer_braces",
-			"csharp_style_namespace_declarations",
-
-			// Not IDE0055 options: the two native ways a file says it should not be formatted.
-			"generated_code",
-			"dotnet_diagnostic.ide0055.severity",
-			"csharp_new_line_before_open_brace",
-			"csharp_new_line_before_else",
-			"csharp_new_line_before_catch",
-			"csharp_new_line_before_finally",
-			"csharp_new_line_before_members_in_object_initializers",
-			"csharp_new_line_before_members_in_anonymous_types",
-			"csharp_new_line_between_query_expression_clauses",
-			"dotnet_sort_system_directives_first",
-			"dotnet_separate_import_directive_groups",
-			"csharp_preserve_single_line_blocks",
-			"csharp_preserve_single_line_statements",
-			"csharp_indent_case_contents",
-			"csharp_indent_case_contents_when_block",
-			"csharp_indent_switch_labels",
-			"csharp_indent_block_contents",
-			"csharp_indent_braces",
-			"csharp_indent_labels",
-			"csharp_space_around_declaration_statements",
-			"csharp_space_after_cast",
-			"csharp_space_after_keywords_in_control_flow_statements",
-			"csharp_space_before_colon_in_inheritance_clause",
-			"csharp_space_after_colon_in_inheritance_clause",
-			"csharp_space_around_binary_operators",
-			"csharp_space_after_comma",
-			"csharp_space_before_comma",
-			"csharp_space_between_parentheses",
-			"csharp_space_between_method_declaration_parameter_list_parentheses",
-			"csharp_space_between_method_declaration_empty_parameter_list_parentheses",
-			"csharp_space_between_method_declaration_name_and_open_parenthesis",
-			"csharp_space_between_method_call_parameter_list_parentheses",
-			"csharp_space_between_method_call_empty_parameter_list_parentheses",
-			"csharp_space_between_method_call_name_and_opening_parenthesis",
-			"csharp_space_before_open_square_brackets",
-			"csharp_space_between_empty_square_brackets",
-			"csharp_space_between_square_brackets",
-			"csharp_space_before_dot",
-			"csharp_space_after_dot",
-			"csharp_space_before_semicolon_in_for_statement",
-			"csharp_space_after_semicolon_in_for_statement",
-
-			// ReSharper's generalized space_after_unary_operator/space_around_ternary_operator, not
-			// part of IDE0055's 39 — the same "Curb invents no formatting keys, Rider already reads
-			// these" reasoning as the trailing-comma/empty-block keys above.
-			"csharp_space_after_unary_operator",
-			"csharp_space_around_ternary_operator",
-		]).ToFrozenSet(StringComparer.Ordinal);
+	public static readonly FrozenSet<string> ImplementedKeys = CoreKeys.Concat([
+		// ReSharper's keys, not Curb's. Curb invents no formatting keys: Rider has held this
+		// opinion for years and already reads these, so a repository that configured Rider has
+		// said what it wants. Opt-in, because this is the one opinion that moves a token.
+		"csharp_trailing_comma_in_multiline_lists",
+		"csharp_trailing_comma_in_singleline_lists",
+		"csharp_empty_block_style",
+		// IDE0021-0027 and IDE0061, which dotnet format can only apply with a compilation.
+		"csharp_style_expression_bodied_methods",
+		"csharp_style_expression_bodied_constructors",
+		"csharp_style_expression_bodied_operators",
+		"csharp_style_expression_bodied_local_functions",
+		"csharp_style_expression_bodied_accessors",
+		"csharp_style_expression_bodied_properties",
+		"csharp_style_expression_bodied_indexers",
+		"csharp_using_directive_placement",
+		"csharp_wrap_before_first_method_call",
+		"csharp_wrap_before_first_type_parameter_constraint",
+		"csharp_wrap_before_extends_colon",
+		"csharp_place_constructor_initializer_on_same_line",
+		"csharp_wrap_before_arrow_with_expressions",
+		"csharp_wrap_after_dot_in_method_calls",
+		"csharp_place_simple_enum_on_single_line",
+		"csharp_place_simple_accessorholder_on_single_line",
+		"csharp_place_simple_declaration_blocks_on_single_line",
+		"csharp_place_simple_blocks_on_single_line",
+		"csharp_wrap_chained_binary_expressions",
+		"csharp_wrap_chained_method_calls",
+		"csharp_wrap_before_binary_opsign",
+		"csharp_wrap_parameters_style",
+		"csharp_wrap_arguments_style",
+		"csharp_wrap_object_and_collection_initializer_style",
+		"csharp_place_method_attribute_on_same_line",
+		"csharp_place_field_attribute_on_same_line",
+		"csharp_place_property_attribute_on_same_line",
+		"csharp_place_event_attribute_on_same_line",
+		"csharp_keep_existing_linebreaks",
+		"csharp_keep_blank_lines_in_declarations",
+		"csharp_keep_blank_lines_in_code",
+		"csharp_blank_lines_around_invocable",
+		"csharp_blank_lines_around_local_method",
+		"csharp_blank_lines_around_type",
+		"csharp_blank_lines_around_property",
+		"csharp_blank_lines_around_accessor",
+		"csharp_blank_lines_around_field",
+		"csharp_blank_lines_inside_type",
+		"csharp_blank_lines_around_namespace",
+		"csharp_blank_lines_inside_namespace",
+		"csharp_blank_lines_around_region",
+		"csharp_blank_lines_inside_region",
+		"csharp_blank_lines_after_using_list",
+		"csharp_blank_lines_after_file_scoped_namespace_directive",
+		"csharp_blank_lines_before_block_statements",
+		"csharp_blank_lines_after_block_statements",
+		"csharp_blank_lines_before_control_transfer_statements",
+		"csharp_blank_lines_after_control_transfer_statements",
+		"csharp_blank_lines_before_case",
+		"csharp_blank_lines_after_case",
+		"csharp_blank_lines_before_single_line_comment",
+		"csharp_remove_blank_lines_near_braces_in_declarations",
+		"csharp_remove_blank_lines_near_braces_in_code",
+		"csharp_max_initializer_elements_on_line",
+		"csharp_max_chained_method_calls_on_line",
+		"csharp_max_array_initializer_elements_on_line",
+		"csharp_max_formal_parameters_on_line",
+		"csharp_max_invocation_arguments_on_line",
+		"csharp_wrap_before_declaration_rpar",
+		"csharp_wrap_before_invocation_rpar",
+		"file_header_template",
+		// IDE0036 and IDE0011, which dotnet format can only apply with a full compilation.
+		"csharp_preferred_modifier_order",
+		"csharp_prefer_braces",
+		"csharp_style_namespace_declarations",
+		// Not IDE0055 options: the two native ways a file says it should not be formatted.
+		"generated_code",
+		"dotnet_diagnostic.ide0055.severity",
+		"csharp_new_line_before_open_brace",
+		"csharp_new_line_before_else",
+		"csharp_new_line_before_catch",
+		"csharp_new_line_before_finally",
+		"csharp_new_line_before_members_in_object_initializers",
+		"csharp_new_line_before_members_in_anonymous_types",
+		"csharp_new_line_between_query_expression_clauses",
+		"dotnet_sort_system_directives_first",
+		"dotnet_separate_import_directive_groups",
+		"csharp_preserve_single_line_blocks",
+		"csharp_preserve_single_line_statements",
+		"csharp_indent_case_contents",
+		"csharp_indent_case_contents_when_block",
+		"csharp_indent_switch_labels",
+		"csharp_indent_block_contents",
+		"csharp_indent_braces",
+		"csharp_indent_labels",
+		"csharp_space_around_declaration_statements",
+		"csharp_space_after_cast",
+		"csharp_space_after_keywords_in_control_flow_statements",
+		"csharp_space_before_colon_in_inheritance_clause",
+		"csharp_space_after_colon_in_inheritance_clause",
+		"csharp_space_around_binary_operators",
+		"csharp_space_after_comma",
+		"csharp_space_before_comma",
+		"csharp_space_between_parentheses",
+		"csharp_space_between_method_declaration_parameter_list_parentheses",
+		"csharp_space_between_method_declaration_empty_parameter_list_parentheses",
+		"csharp_space_between_method_declaration_name_and_open_parenthesis",
+		"csharp_space_between_method_call_parameter_list_parentheses",
+		"csharp_space_between_method_call_empty_parameter_list_parentheses",
+		"csharp_space_between_method_call_name_and_opening_parenthesis",
+		"csharp_space_before_open_square_brackets",
+		"csharp_space_between_empty_square_brackets",
+		"csharp_space_between_square_brackets",
+		"csharp_space_before_dot",
+		"csharp_space_after_dot",
+		"csharp_space_before_semicolon_in_for_statement",
+		"csharp_space_after_semicolon_in_for_statement",
+		// ReSharper's generalized space_after_unary_operator/space_around_ternary_operator, not
+		// part of IDE0055's 39 — the same "Curb invents no formatting keys, Rider already reads
+		// these" reasoning as the trailing-comma/empty-block keys above.
+		"csharp_space_after_unary_operator",
+		"csharp_space_around_ternary_operator",
+	]).ToFrozenSet(StringComparer.Ordinal);
 
 	/// <summary>
 	/// The keys only XML files read. Kept apart from <see cref="ImplementedKeys"/>, which is what C#'s
@@ -247,7 +238,8 @@ public static class OptionCatalog
 	/// <see cref="OptionLanguage.Razor"/> the core keys and <see cref="RazorKeys"/>.
 	/// </remarks>
 	public static IEnumerable<string> ImplementedKeysFor(OptionLanguage language) =>
-		OptionDescriptor.All
+		OptionDescriptor
+			.All
 			.Where(descriptor => descriptor.Language == OptionLanguage.Shared || descriptor.Language == language)
 			.Select(descriptor => descriptor.Key)
 			.Where(key => ImplementedKeys.Contains(key) || XmlKeys.Contains(key) || RazorKeys.Contains(key));
@@ -262,14 +254,16 @@ public static class OptionCatalog
 	/// them rather than warn about them. These are <c>dotnet format style</c>'s territory.
 	/// </summary>
 	public static bool IsOtherCodeStyleKey(string key) =>
-		key.StartsWith("dotnet_style_", StringComparison.Ordinal)
-		|| key.StartsWith("csharp_style_", StringComparison.Ordinal)
-		|| key.StartsWith("csharp_prefer_", StringComparison.Ordinal)
-		|| key.StartsWith("dotnet_naming_", StringComparison.Ordinal)
-		|| key.StartsWith("dotnet_diagnostic.", StringComparison.Ordinal)
-		|| key.StartsWith("dotnet_analyzer_diagnostic", StringComparison.Ordinal)
-		|| key.StartsWith("dotnet_code_quality", StringComparison.Ordinal)
-		|| key.StartsWith("dotnet_remove_unnecessary_suppression_exclusions", StringComparison.Ordinal);
+		key.StartsWith("dotnet_style_", StringComparison.Ordinal) || key.StartsWith("csharp_style_", StringComparison.Ordinal) || key.StartsWith(
+			"csharp_prefer_",
+			StringComparison.Ordinal
+		) || key.StartsWith("dotnet_naming_", StringComparison.Ordinal) || key.StartsWith("dotnet_diagnostic.", StringComparison.Ordinal) || key.StartsWith(
+			"dotnet_analyzer_diagnostic",
+			StringComparison.Ordinal
+		) || key.StartsWith("dotnet_code_quality", StringComparison.Ordinal) || key.StartsWith(
+			"dotnet_remove_unnecessary_suppression_exclusions",
+			StringComparison.Ordinal
+		);
 
 	/// <summary>Finds the closest known key to <paramref name="key"/>, for "did you mean" suggestions.</summary>
 	public static string? Suggest(string key)

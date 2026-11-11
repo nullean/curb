@@ -29,21 +29,12 @@ internal static class CSharpSyntheticText
 	public const int Semicolon = SyntheticText.LanguageBase + 3;
 	public const int Arrow = SyntheticText.LanguageBase + 4;
 
-	public static readonly string[] Table =
-	[
-		.. SyntheticText.Shared,
-		",",
-		"{",
-		"}",
-		";",
-		"=>",
-	];
+	public static readonly string[] Table = [.. SyntheticText.Shared, ",", "{", "}", ";", "=>",];
 }
 
 /// <summary>The one <see cref="DocArena"/> overload that speaks Roslyn, kept out of the language-neutral arena.</summary>
 internal static class DocArenaExtensions
 {
 	/// <summary>Emits a span of the original source verbatim.</summary>
-	public static void SourceText(this DocArena arena, Microsoft.CodeAnalysis.Text.TextSpan span) =>
-		arena.SourceText(span.Start, span.Length);
+	public static void SourceText(this DocArena arena, Microsoft.CodeAnalysis.Text.TextSpan span) => arena.SourceText(span.Start, span.Length);
 }

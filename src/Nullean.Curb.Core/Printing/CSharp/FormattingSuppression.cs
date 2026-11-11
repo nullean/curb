@@ -118,8 +118,7 @@ internal static class FormattingSuppression
 
 		foreach (var code in pragma.ErrorCodes)
 		{
-			if (code is IdentifierNameSyntax identifier
-				&& identifier.Identifier.ValueText.Equals(FormattingRule, StringComparison.OrdinalIgnoreCase))
+			if (code is IdentifierNameSyntax identifier && identifier.Identifier.ValueText.Equals(FormattingRule, StringComparison.OrdinalIgnoreCase))
 				return true;
 		}
 

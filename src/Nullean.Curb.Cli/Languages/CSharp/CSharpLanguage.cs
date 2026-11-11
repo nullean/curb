@@ -15,7 +15,8 @@ internal sealed class CSharpLanguage : IInProcessLanguage
 	/// </summary>
 	public const string ExtensionList = "cs";
 
-	private CSharpLanguage() { }
+	private CSharpLanguage()
+	{ }
 
 	public string Id => "csharp";
 
@@ -26,8 +27,7 @@ internal sealed class CSharpLanguage : IInProcessLanguage
 
 	public bool SkipSource(string source) => CSharpSource.HasGeneratedHeader(source);
 
-	public ILanguageWorker CreateWorker(bool collectUnhandled) =>
-		new CSharpWorker(new CSharpFormatter { UnhandledByKind = collectUnhandled ? [] : null });
+	public ILanguageWorker CreateWorker(bool collectUnhandled) => new CSharpWorker(new CSharpFormatter { UnhandledByKind = collectUnhandled ? [] : null });
 
 	public string DescribeUnhandledKind(int kind) => ((SyntaxKind)kind).ToString();
 }
@@ -45,16 +45,15 @@ internal sealed class CSharpOptions(FormatOptions options) : LanguageOptions
 /// <summary>One thread's <see cref="CSharpFormatter"/>.</summary>
 internal sealed class CSharpWorker(CSharpFormatter formatter) : ILanguageWorker
 {
-	public FormatResult Format(
-		string source,
-		LanguageOptions options,
-		string fileName,
-		bool produceText,
-		bool expandUnhandled,
-		bool verifyRoundTrip) =>
+	public FormatResult Format(string source, LanguageOptions options, string fileName, bool produceText, bool expandUnhandled, bool verifyRoundTrip) =>
 		formatter.Format(
-			source, ((CSharpOptions)options).Value, fileName,
-			produceText: produceText, expandUnhandled: expandUnhandled, verifyRoundTrip: verifyRoundTrip);
+			source,
+			((CSharpOptions)options).Value,
+			fileName,
+			produceText: produceText,
+			expandUnhandled: expandUnhandled,
+			verifyRoundTrip: verifyRoundTrip
+		);
 
 	public int RoundTripsChecked => formatter.RoundTripsChecked;
 

@@ -17,7 +17,8 @@ internal sealed class XmlLanguage : IInProcessLanguage
 {
 	public static XmlLanguage Instance { get; } = new();
 
-	private XmlLanguage() { }
+	private XmlLanguage()
+	{ }
 
 	public string Id => "xml";
 
@@ -75,13 +76,7 @@ internal sealed class XmlLanguageOptions(XmlOptions options, bool claimed, IRead
 /// <summary>One thread's <see cref="XmlFormatter"/>.</summary>
 internal sealed class XmlWorker(XmlFormatter formatter) : ILanguageWorker
 {
-	public FormatResult Format(
-		string source,
-		LanguageOptions options,
-		string fileName,
-		bool produceText,
-		bool expandUnhandled,
-		bool verifyRoundTrip) =>
+	public FormatResult Format(string source, LanguageOptions options, string fileName, bool produceText, bool expandUnhandled, bool verifyRoundTrip) =>
 		formatter.Format(source, ((XmlLanguageOptions)options).Value, produceText);
 
 	/// <summary>Always zero: every XML output is re-lexed and verified, which is not a second parse.</summary>
