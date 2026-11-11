@@ -172,8 +172,23 @@ public readonly record struct FormatOptions
 	/// <summary><c>end_of_line</c>.</summary>
 	public EndOfLine EndOfLine { get => Layout.EndOfLine; init => Layout = Layout with { EndOfLine = value }; }
 
-	/// <summary><c>insert_final_newline</c>.</summary>
-	public bool InsertFinalNewLine { get => Layout.InsertFinalNewLine; init => Layout = Layout with { InsertFinalNewLine = value }; }
+	/// <summary><c>insert_final_newline</c>. Setting it also sets <see cref="FinalNewLineSet"/>.</summary>
+	public bool InsertFinalNewLine
+	{
+		get => Layout.InsertFinalNewLine;
+		init
+		{
+			Layout = Layout with { InsertFinalNewLine = value };
+			FinalNewLineSet = true;
+		}
+	}
+
+	/// <summary>
+	/// True when <c>insert_final_newline</c> was set. Otherwise a file keeps whether it ends with a
+	/// newline, as it does in <c>dotnet format</c> (issue #262), and <see cref="InsertFinalNewLine"/> is
+	/// not read.
+	/// </summary>
+	public bool FinalNewLineSet { get; init; }
 
 	/// <summary><c>trim_trailing_whitespace</c>.</summary>
 	public bool TrimTrailingWhitespace { get => Layout.TrimTrailingWhitespace; init => Layout = Layout with { TrimTrailingWhitespace = value }; }

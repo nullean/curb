@@ -194,6 +194,11 @@ internal static partial class Printers
 		TokenPrinter.Print(node.ThisKeyword, context);
 		Node.Print(node.ParameterList, context);
 
+		// IDE0026: a get-only indexer, the same rewrite a get-only property takes. The key was bound
+		// and never read here, so it converted nothing (#260).
+		if (TryPrintExpressionProperty(node.AccessorList, context.Options.ExpressionBodiedIndexers, context))
+			return;
+
 		Node.Print(node.AccessorList, context);
 
 		if (node.ExpressionBody is not null)

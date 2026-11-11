@@ -622,9 +622,13 @@ internal static partial class Printers
 		Node.Print(node.Expression, context);
 		var ownerGroup = context.ArgumentListGroup;
 
+		// A comment ahead of `with` starts it on a line of its own, and dotnet format then puts the `{` on a line
+		// of its own too, in either layout mode (issue #275).
+		var withStartsLine = TokenPrinter.HasLeadingContent(node.WithKeyword) || EndsWithLineComment(node.WithKeyword.GetPreviousToken());
+
 		context.Arena.Synthetic(SyntheticText.Space);
 		TokenPrinter.Print(node.WithKeyword, context);
-		InitializerExpression(node.Initializer, context, leadingLine: true, ownerGroup: ownerGroup);
+		InitializerExpression(node.Initializer, context, leadingLine: true, ownerGroup: ownerGroup, ownerBroke: withStartsLine);
 	}
 
 	public static void ThrowExpression(ThrowExpressionSyntax node, PrintContext context)

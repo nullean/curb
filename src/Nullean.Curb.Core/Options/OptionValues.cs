@@ -31,7 +31,9 @@ public static class OptionValues
 			? "off"
 			: options.MaxLineLength.ToString(CultureInfo.InvariantCulture),
 		"end_of_line" => options.EndOfLine.ToString().ToLowerInvariant(),
-		"insert_final_newline" => Bool(options.InsertFinalNewLine),
+		"insert_final_newline" => options.FinalNewLineSet
+			? Bool(options.InsertFinalNewLine)
+			: "unset   # the file keeps whether it ends with a newline",
 		"trim_trailing_whitespace" => Bool(options.TrimTrailingWhitespace),
 
 		// Read and written but never a layout decision, so there is nothing resolved to report.
