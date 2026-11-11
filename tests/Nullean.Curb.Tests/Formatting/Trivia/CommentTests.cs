@@ -817,6 +817,312 @@ public class CommentTests : FormattingTest
 		}
 		""");
 
+	// Issue #264: on a continuation line dotnet format measures the trivia from the statement's indent,
+	// not from the operator's or the argument's column, so a comment at that column under a trailing
+	// comment is out of shape and goes under the trailing comment.
+	[Test]
+	public Task A_comment_under_a_continuation_lines_trailing_comment_aligns_under_it() => Formats(
+		"""
+		using System.Linq;
+
+		public class C
+		{
+		    string M(bool b, int[] a, string s)
+		    {
+		        var t = s
+		            + s // one
+		            // two
+		            + s;
+		        var q = a
+		            .Where(x => x > 1) // one
+		            // two
+		            .Select(x => x);
+		        Call(b, // one
+		            // two
+		            b);
+		        if (b
+		            || b // one
+		            // two
+		            || b)
+		        {
+		        }
+		        return b
+		            ? "a" // one
+		            // two
+		            // three
+		            : "b";
+		    }
+
+		    void Call(bool a, bool b) { }
+		}
+		""",
+		"""
+		using System.Linq;
+
+		public class C
+		{
+		    string M(bool b, int[] a, string s)
+		    {
+		        var t = s
+		            + s // one
+		                // two
+		            + s;
+		        var q = a
+		            .Where(x => x > 1) // one
+		                               // two
+		            .Select(x => x);
+		        Call(b, // one
+		                // two
+		            b);
+		        if (b
+		            || b // one
+		                 // two
+		            || b)
+		        {
+		        }
+		        return b
+		            ? "a" // one
+		                  // two
+		                  // three
+		            : "b";
+		    }
+
+		    void Call(bool a, bool b) { }
+		}
+		""");
+
+	// Issues #264 and #265: at the statement's indent the trivia is in shape, so dotnet format leaves it
+	// there, under a trailing comment or not.
+	[Test]
+	public Task A_comment_at_the_statement_column_above_a_continuation_line_stays_there() => Unchanged(
+		"""
+		public class C
+		{
+		    string M(bool b)
+		    {
+		        Call(b, // one
+		        // two
+		            b);
+		        if (b
+		            && b // one
+		        // two
+		            && b)
+		        {
+		        }
+		        var x = b
+		        // no trailing comment above
+		            && b;
+		        return b
+		            ? "a" // one
+		        // two
+		            : "b";
+		    }
+
+		    void Call(bool a, bool b) { }
+		}
+		""");
+
+	// A lambda's body is measured from the line the lambda starts on, wherever on it the lambda starts:
+	// at that line's indent the comment stays, at the statement's or the operator's it is out of shape.
+	[Test]
+	public Task A_comment_in_a_lambda_body_is_measured_from_the_lambdas_line() => Formats(
+		"""
+		using System;
+
+		public class C
+		{
+		    void M(Func<bool, string> f) { }
+
+		    void N()
+		    {
+		        M(
+		            b => b
+		                ? "a" // one
+		                // at the operator
+		                : "b");
+		        M(
+		            b => b
+		                ? "a" // one
+		            // at the lambda's line
+		                : "b");
+		        M(
+		            b => b
+		                ? "a" // one
+		        // at the statement
+		                : "b");
+		        M(b => b
+		            ? "a" // one
+		        // at the lambda's line, which is the statement's
+		            : "b");
+		    }
+		}
+		""",
+		"""
+		using System;
+
+		public class C
+		{
+		    void M(Func<bool, string> f) { }
+
+		    void N()
+		    {
+		        M(
+		            b => b
+		                ? "a" // one
+		                      // at the operator
+		                : "b");
+		        M(
+		            b => b
+		                ? "a" // one
+		            // at the lambda's line
+		                : "b");
+		        M(
+		            b => b
+		                ? "a" // one
+		                      // at the statement
+		                : "b");
+		        M(b => b
+		            ? "a" // one
+		        // at the lambda's line, which is the statement's
+		            : "b");
+		    }
+		}
+		""");
+
+	// dotnet format indents a constraint clause and lines a query's clauses up itself, so the trivia in
+	// front of one is in shape at the clause's own column, not at the declaration's or the statement's.
+	[Test]
+	public Task A_comment_above_a_constraint_or_query_clause_stays_at_the_clause_column() => Unchanged(
+		"""
+		using System.Linq;
+
+		public class C<T> // one
+		    // above the constraint
+		    where T : class
+		{
+		    int[] M(int[] a)
+		    {
+		        var r =
+		            from x in a // one
+		            // above the where
+		            where x > 1
+		            select x;
+		        return r.ToArray();
+		    }
+		}
+		""");
+
+	// With a width the continuation line is Curb's, not the author's: the lambda moves to a line of its
+	// own, and the comment goes under the trailing comment there, which is a fixed point wherever it lands.
+	[Test]
+	public Task With_a_width_a_comment_under_a_continuation_lines_trailing_comment_aligns_under_it() => Formats(
+		"""
+		using System;
+
+		public class C
+		{
+		    void M(Func<bool, string> f)
+		    { }
+
+		    void N()
+		    {
+		        M(b => b
+		            ? "a" // one
+		            // two
+		            : "b");
+		    }
+		}
+		""",
+		"""
+		using System;
+
+		public class C
+		{
+		    void M(Func<bool, string> f)
+		    { }
+
+		    void N()
+		    {
+		        M(
+		            b => b
+		                ? "a" // one
+		                      // two
+		                : "b"
+		        );
+		    }
+		}
+		""",
+		editorConfig: "max_line_length = 120");
+
+	// dotnet format moves an initializer brace the author indented on a continuation line, and re-lays the
+	// trivia in front of it wherever it was: even at the statement's column, the comment goes under the
+	// trailing comment.
+	[Test]
+	public Task A_comment_above_an_indented_initializer_brace_aligns_under_the_trailing_comment() => Formats(
+		"""
+		public class C
+		{
+		    public int A;
+
+		    public void M()
+		    {
+		        var x = new C() // one
+		        // two
+		            {
+		                A = 1,
+		            };
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public int A;
+
+		    public void M()
+		    {
+		        var x = new C() // one
+		                        // two
+		        {
+		            A = 1,
+		        };
+		    }
+		}
+		""");
+
+	// A statement after `if (…)` on the same line has no column of its own to measure from, and with a
+	// width Curb moves it to a line of its own anyway, so the comment goes under the trailing comment.
+	[Test]
+	public Task With_a_width_a_comment_in_a_statement_moved_off_its_ifs_line_aligns_under_the_trailing_comment() => Formats(
+		"""
+		public class C
+		{
+		    public string M(bool b)
+		    {
+		        if (b) return b
+		            ? "a" // one
+		            // two
+		            : "b";
+		        return "";
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public string M(bool b)
+		    {
+		        if (b)
+		            return b
+		                ? "a" // one
+		                      // two
+		                : "b";
+		        return "";
+		    }
+		}
+		""",
+		editorConfig: "max_line_length = 120");
+
 	[Test]
 	public Task Only_a_line_comment_aligns_under_a_trailing_line_comment() => Formats(
 		// A block or doc comment under a trailing `//`, or a `//` under a trailing `/* */`, goes to the

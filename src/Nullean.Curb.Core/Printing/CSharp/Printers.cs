@@ -2698,7 +2698,7 @@ internal static partial class Printers
 			if (context.AuthorJoined(span.End, next.SpanStart))
 				Spacing.AfterComma(context);
 			else if (lineShift >= 0)
-				offset = MemberContinuationLine(span.End, next, lineShift, context);
+				offset = MemberContinuationLine(span.End, next, lineShift, context, element: false);
 			else
 				BreakBetweenMembers(span.End, next, context);
 		}
