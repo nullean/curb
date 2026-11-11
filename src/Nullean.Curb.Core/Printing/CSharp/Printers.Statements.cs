@@ -567,7 +567,7 @@ internal static partial class Printers
 		// too, in both directions, so an unconditional `{ }` is the cleaner default here as well. The
 		// one exception is csharp_preserve_single_line_statements = false, under which dotnet format
 		// does move it off the keyword; PrintStatementBody honours that for a try but not a clause.
-		PrintStatementBody(node.Block, BraceStyle.ControlBlocks, context, alwaysJoinsEmpty: true);
+		PrintClauseBody(node.Block, node.TryKeyword.Span.End, context);
 
 		foreach (var catchClause in node.Catches)
 		{
@@ -606,7 +606,10 @@ internal static partial class Printers
 			// An empty catch always prints as `catch { }`, whatever csharp_preserve_single_line_blocks
 			// says and whatever the source had — see PrintStatementBody's alwaysJoinsEmpty. A non-empty
 			// body is unaffected: it follows the block's own rule, same as any other braced construct.
-			PrintStatementBody(catchClause.Block, BraceStyle.ControlBlocks, context, alwaysJoinsEmpty: true);
+			var headerEnd = catchClause.Filter?.CloseParenToken.Span.End
+				?? catchClause.Declaration?.CloseParenToken.Span.End
+				?? catchClause.CatchKeyword.Span.End;
+			PrintClauseBody(catchClause.Block, headerEnd, context);
 		}
 
 		if (node.Finally is null)
@@ -615,7 +618,32 @@ internal static partial class Printers
 		BeforeContinuation(context.Options.NewLineBeforeFinally, followsABrace: true, context);
 		TokenPrinter.Print(node.Finally.FinallyKeyword, context);
 		// Same reasoning as catch, above.
-		PrintStatementBody(node.Finally.Block, BraceStyle.ControlBlocks, context, alwaysJoinsEmpty: true);
+		PrintClauseBody(node.Finally.Block, node.Finally.FinallyKeyword.Span.End, context);
+	}
+
+	/// <summary>The block of a <c>try</c>, <c>catch</c> or <c>finally</c>.</summary>
+	/// <remarks>
+	/// A block written whole on its keyword's line stays there, as an embedded statement's does:
+	/// <c>try { Run(); }</c> above a <c>catch (E) { Log(); }</c> on the next line is left alone by dotnet
+	/// format, and Curb moved each brace below its keyword, leaving <c>{ Run(); }</c> on a line of its own
+	/// (issue #235). With <c>csharp_preserve_single_line_statements = false</c> only the <c>try</c> block moves
+	/// down: dotnet format leaves a <c>catch</c> or <c>finally</c> block on its keyword's line whatever either
+	/// preserve option says, which is <see cref="HeaderJoinSurvives"/>'s rule. An empty block keeps the
+	/// <c>{ }</c> rule <see cref="PrintStatementBody"/> gives it.
+	/// </remarks>
+	private static void PrintClauseBody(BlockSyntax block, int headerEnd, PrintContext context)
+	{
+		if (HeaderJoinSurvives(block, context)
+			&& !IsEmptyBraces(block)
+			&& context.AuthorJoined(headerEnd, block.Span.End))
+		{
+			context.Arena.Synthetic(SyntheticText.Space);
+			using (context.Arena.ForceFlat())
+				Node.Print(block, context);
+			return;
+		}
+
+		PrintStatementBody(block, BraceStyle.ControlBlocks, context, alwaysJoinsEmpty: true);
 	}
 
 	public static void UsingStatement(UsingStatementSyntax node, PrintContext context)

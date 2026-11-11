@@ -366,6 +366,127 @@ public class PreserveSingleLineTests : FormattingTest
 		""");
 
 	/// <summary>
+	/// A <c>try</c>, <c>catch</c> or <c>finally</c> block written on its keyword's line stays there when the
+	/// statement spans lines, as dotnet format leaves it. Curb moved each brace below its keyword and left
+	/// <c>{ Run(); }</c> on a line of its own. See <see href="https://github.com/nullean/curb/issues/235">issue #235</see>.
+	/// </summary>
+	[Test]
+	public Task One_line_try_catch_and_finally_blocks_stay_on_their_keywords() => Unchanged(
+		"""
+		using System;
+
+		public class C
+		{
+		    public void M()
+		    {
+		        try { Run(); }
+		        catch (Exception ex) when (ex is not OperationCanceledException) { Log(ex); }
+		        finally { Run(); }
+		        try { Run(); Run(); }
+		        catch { Log(null); }
+		        try /* c */ { Run(); } // trailing
+		        catch (Exception) { Log(null); }
+		        finally { }
+		        try
+		        {
+		            Run();
+		        }
+		        catch (Exception ex) { Log(ex); }
+		    }
+
+		    void Run() { }
+
+		    void Log(Exception ex) { }
+		}
+		""");
+
+	/// <summary>
+	/// With a width, layout no longer reads the author's lines, so the blocks open out, as an <c>if</c>
+	/// body's do.
+	/// </summary>
+	[Test]
+	public Task One_line_try_catch_and_finally_blocks_open_out_at_a_width() => Formats(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        try { Run(); }
+		        catch (Exception ex) when (ex is not OperationCanceledException) { Log(ex); }
+		        finally { Run(); }
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        try
+		        {
+		            Run();
+		        }
+		        catch (Exception ex) when (ex is not OperationCanceledException)
+		        {
+		            Log(ex);
+		        }
+		        finally
+		        {
+		            Run();
+		        }
+		    }
+		}
+		""",
+		editorConfig: "max_line_length = 120");
+
+	/// <summary>
+	/// With <c>csharp_preserve_single_line_statements = false</c> the <c>try</c> block moves below its keyword
+	/// and keeps its braces collapsed, while <c>catch</c> and <c>finally</c> keep theirs on the keyword's line:
+	/// dotnet format writes exactly this, with <c>csharp_preserve_single_line_blocks</c> on or off.
+	/// </summary>
+	[Test]
+	public Task Disabling_it_moves_a_one_line_try_block_but_not_its_clauses() => WithAndWithout(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        try { Run(); }
+		        catch (Exception ex) when (ex is not OperationCanceledException) { Log(ex); }
+		        finally { Run(); }
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        try
+		        { Run(); }
+		        catch (Exception ex) when (ex is not OperationCanceledException) { Log(ex); }
+		        finally { Run(); }
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        try
+		        {
+		            Run();
+		        }
+		        catch (Exception ex) when (ex is not OperationCanceledException) { Log(ex); }
+		        finally { Run(); }
+		    }
+		}
+		""",
+		opinionConfig: "csharp_preserve_single_line_blocks = false",
+		editorConfig: "csharp_preserve_single_line_statements = false");
+
+	/// <summary>
 	/// An <c>if</c>/<c>else</c> chain on one line stays there, as a whole <c>try</c> does. See
 	/// <see href="https://github.com/nullean/curb/issues/152">issue #152</see>.
 	/// </summary>
