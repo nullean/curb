@@ -99,10 +99,13 @@ public static class EditorConfigOptionsBinder
 				options = options with { SpaceBetweenParentheses = parenSpacing };
 			else
 			{
-				diagnostics?.Add(CurbDiagnostic.UnrecognisedValue(
-					"csharp_space_between_parentheses",
-					betweenParentheses,
-					"false, or a comma-separated list of " + string.Join(", ", ParenthesisSpacingParser.Names)));
+				diagnostics?.Add(
+					CurbDiagnostic.UnrecognisedValue(
+						"csharp_space_between_parentheses",
+						betweenParentheses,
+						"false, or a comma-separated list of " + string.Join(", ", ParenthesisSpacingParser.Names)
+					)
+				);
 			}
 		}
 
@@ -147,10 +150,9 @@ public static class EditorConfigOptionsBinder
 					options = options with { SpaceAroundBinaryOperators = BinaryOperatorSpacing.Ignore };
 					break;
 				default:
-					diagnostics?.Add(CurbDiagnostic.UnrecognisedValue(
-						"csharp_space_around_binary_operators",
-						binaryOperators,
-						"before_and_after, none or ignore"));
+					diagnostics?.Add(
+						CurbDiagnostic.UnrecognisedValue("csharp_space_around_binary_operators", binaryOperators, "before_and_after, none or ignore")
+					);
 					break;
 			}
 		}
@@ -168,10 +170,7 @@ public static class EditorConfigOptionsBinder
 				default:
 					// `true` is not a value this option takes: the choice is between normalising the
 					// spacing and reproducing it, not between adding and removing spaces.
-					diagnostics?.Add(CurbDiagnostic.UnrecognisedValue(
-						"csharp_space_around_declaration_statements",
-						declarationSpacing,
-						"false or ignore"));
+					diagnostics?.Add(CurbDiagnostic.UnrecognisedValue("csharp_space_around_declaration_statements", declarationSpacing, "false or ignore"));
 					break;
 			}
 		}
@@ -219,9 +218,10 @@ public static class EditorConfigOptionsBinder
 			ExpressionBodiedIndexers = ExpressionBody(properties, "indexers", diagnostics, deterministic),
 		};
 
-		if (properties.TryGetValue("file_header_template", out var header)
-			&& !string.IsNullOrWhiteSpace(header)
-			&& !string.Equals(header, "unset", StringComparison.OrdinalIgnoreCase))
+		if (
+			properties.TryGetValue("file_header_template", out var header) && !string.IsNullOrWhiteSpace(header) &&
+			!string.Equals(header, "unset", StringComparison.OrdinalIgnoreCase)
+		)
 			options = options with { FileHeaderTemplate = header };
 
 		if (TryPrefixedBool(properties, "wrap_before_binary_opsign", diagnostics, out var beforeOpsign))
@@ -241,18 +241,21 @@ public static class EditorConfigOptionsBinder
 					options = options with { WrapChainedMethodCalls = WrapStyle.ChopIfLong };
 					break;
 				case "chop_always":
-					diagnostics?.Add(CurbDiagnostic.UnrecognisedValue(
-						prefix + "wrap_chained_method_calls", methodChainWrap,
-						"chop_if_long; chop_always is not supported, see csharp_max_chained_method_calls_on_line"));
+					diagnostics?.Add(
+						CurbDiagnostic.UnrecognisedValue(
+							prefix + "wrap_chained_method_calls",
+							methodChainWrap,
+							"chop_if_long; chop_always is not supported, see csharp_max_chained_method_calls_on_line"
+						)
+					);
 					break;
 				case "wrap_if_long":
-					diagnostics?.Add(CurbDiagnostic.UnrecognisedValue(
-						prefix + "wrap_chained_method_calls", methodChainWrap,
-						"chop_if_long; wrap_if_long is not implemented"));
+					diagnostics?.Add(
+						CurbDiagnostic.UnrecognisedValue(prefix + "wrap_chained_method_calls", methodChainWrap, "chop_if_long; wrap_if_long is not implemented")
+					);
 					break;
 				default:
-					diagnostics?.Add(CurbDiagnostic.UnrecognisedValue(
-						prefix + "wrap_chained_method_calls", methodChainWrap, "chop_if_long"));
+					diagnostics?.Add(CurbDiagnostic.UnrecognisedValue(prefix + "wrap_chained_method_calls", methodChainWrap, "chop_if_long"));
 					break;
 			}
 
@@ -426,8 +429,9 @@ public static class EditorConfigOptionsBinder
 					options = options with { UsingPlacement = UsingPlacement.OutsideNamespace };
 					break;
 				default:
-					diagnostics?.Add(CurbDiagnostic.UnrecognisedValue(
-						"csharp_using_directive_placement", usingPlacement, "inside_namespace or outside_namespace"));
+					diagnostics?.Add(
+						CurbDiagnostic.UnrecognisedValue("csharp_using_directive_placement", usingPlacement, "inside_namespace or outside_namespace")
+					);
 					break;
 			}
 		}
@@ -447,8 +451,7 @@ public static class EditorConfigOptionsBinder
 					// `block_scoped`, not `block`. Roslyn throws on the short spelling rather than
 					// ignoring it, so accepting it here would have let Curb bless a file that stops
 					// `dotnet format` dead — which is what verifyexpectations caught on its first run.
-					diagnostics?.Add(CurbDiagnostic.UnrecognisedValue(
-						"csharp_style_namespace_declarations", namespaceStyle, "file_scoped or block_scoped"));
+					diagnostics?.Add(CurbDiagnostic.UnrecognisedValue("csharp_style_namespace_declarations", namespaceStyle, "file_scoped or block_scoped"));
 					break;
 			}
 		}
@@ -469,8 +472,7 @@ public static class EditorConfigOptionsBinder
 					// Roslyn reads this as "take the braces off". Curb only ever adds them.
 					break;
 				default:
-					diagnostics?.Add(CurbDiagnostic.UnrecognisedValue(
-						"csharp_prefer_braces", preferBraces, "true, false or when_multiline"));
+					diagnostics?.Add(CurbDiagnostic.UnrecognisedValue("csharp_prefer_braces", preferBraces, "true, false or when_multiline"));
 					break;
 			}
 		}
@@ -484,14 +486,12 @@ public static class EditorConfigOptionsBinder
 			var colon = modifierOrder.LastIndexOf(':');
 			var value = colon >= 0 ? modifierOrder[..colon] : modifierOrder;
 
-			var order = value
-				.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+			var order = value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
 			if (order.Length > 0)
 				options = options with { PreferredModifierOrder = order };
 			else
-				diagnostics?.Add(CurbDiagnostic.UnrecognisedValue(
-					"csharp_preferred_modifier_order", modifierOrder, "a comma-separated list of modifiers"));
+				diagnostics?.Add(CurbDiagnostic.UnrecognisedValue("csharp_preferred_modifier_order", modifierOrder, "a comma-separated list of modifiers"));
 		}
 
 		// The two native ways of saying "do not format this file".
@@ -499,8 +499,13 @@ public static class EditorConfigOptionsBinder
 			options = options with { Excluded = true };
 
 		// EditorConfig lower-cases keys, so the rule id arrives as `ide0055` however it was written.
-		if (properties.TryGetValue("dotnet_diagnostic.ide0055.severity", out var formattingSeverity)
-			&& string.Equals(formattingSeverity, "none", StringComparison.OrdinalIgnoreCase))
+		if (
+			properties.TryGetValue("dotnet_diagnostic.ide0055.severity", out var formattingSeverity) && string.Equals(
+				formattingSeverity,
+				"none",
+				StringComparison.OrdinalIgnoreCase
+			)
+		)
 			options = options with { Excluded = true };
 
 		// The two effects below are narrower than "no effect", and getting them wrong once already shipped:
@@ -510,9 +515,7 @@ public static class EditorConfigOptionsBinder
 		if (TryBool(properties, "csharp_preserve_single_line_statements", diagnostics, out var preserveStatements))
 		{
 			options = options with { PreserveSingleLineStatementsOption = preserveStatements };
-			ReportIfDeterministic(
-				"csharp_preserve_single_line_statements",
-				"every body, label and statement takes its own line");
+			ReportIfDeterministic("csharp_preserve_single_line_statements", "every body, label and statement takes its own line");
 		}
 
 		if (TryBool(properties, "csharp_preserve_single_line_blocks", diagnostics, out var preserveBlocks))
@@ -520,8 +523,9 @@ public static class EditorConfigOptionsBinder
 			options = options with { PreserveSingleLineBlocks = preserveBlocks };
 			ReportIfDeterministic(
 				"csharp_preserve_single_line_blocks",
-				"block, type, namespace, enum and switch bodies each take their own lines. Accessor lists "
-				+ "still answer to it, alongside csharp_place_simple_accessorholder_on_single_line");
+				"block, type, namespace, enum and switch bodies each take their own lines. Accessor lists " +
+					"still answer to it, alongside csharp_place_simple_accessorholder_on_single_line"
+			);
 		}
 
 		// ReSharper's key, not dotnet format's — see FormatOptions.EmptyBlockStyle for how it differs
@@ -562,10 +566,7 @@ public static class EditorConfigOptionsBinder
 					// of its EditorConfig values — so a repository writing the documented `flush_left`
 					// was answered with a diagnostic and the default, and `flush_left` itself was
 					// never implemented. verifyexpectations is what surfaced it.
-					diagnostics?.Add(CurbDiagnostic.UnrecognisedValue(
-						"csharp_indent_labels",
-						indentLabels,
-						"one_less_than_current, no_change or flush_left"));
+					diagnostics?.Add(CurbDiagnostic.UnrecognisedValue("csharp_indent_labels", indentLabels, "one_less_than_current, no_change or flush_left"));
 					break;
 			}
 		}
@@ -576,10 +577,13 @@ public static class EditorConfigOptionsBinder
 				options = options with { NewLineBeforeOpenBrace = style };
 			else
 			{
-				diagnostics?.Add(CurbDiagnostic.UnrecognisedValue(
-					"csharp_new_line_before_open_brace",
-					braceStyle,
-					"all, none, or a comma-separated list of " + string.Join(", ", BraceStyleParser.Names[2..])));
+				diagnostics?.Add(
+					CurbDiagnostic.UnrecognisedValue(
+						"csharp_new_line_before_open_brace",
+						braceStyle,
+						"all, none, or a comma-separated list of " + string.Join(", ", BraceStyleParser.Names[2..])
+					)
+				);
 			}
 		}
 
@@ -634,10 +638,14 @@ public static class EditorConfigOptionsBinder
 			if (style != WrapStyle.WrapIfLong)
 				return style;
 
-			diagnostics?.Add(CurbDiagnostic.UnrecognisedValue(
-				"csharp_wrap_object_and_collection_initializer_style", "wrap_if_long",
-				"chop_always or chop_if_long; wrap_if_long is not supported here — dotnet format forces "
-				+ "one member per line once an initializer opens out, so a packed layout could never stay put"));
+			diagnostics?.Add(
+				CurbDiagnostic.UnrecognisedValue(
+					"csharp_wrap_object_and_collection_initializer_style",
+					"wrap_if_long",
+					"chop_always or chop_if_long; wrap_if_long is not supported here — dotnet format forces " +
+						"one member per line once an initializer opens out, so a packed layout could never stay put"
+				)
+			);
 			return null;
 		}
 
@@ -698,7 +706,8 @@ public static class EditorConfigOptionsBinder
 		IReadOnlyDictionary<string, string> properties,
 		string member,
 		ICollection<CurbDiagnostic>? diagnostics,
-		bool deterministic = false)
+		bool deterministic = false
+	)
 	{
 		var key = "csharp_style_expression_bodied_" + member;
 		if (!properties.TryGetValue(key, out var raw))
@@ -711,14 +720,12 @@ public static class EditorConfigOptionsBinder
 				return ExpressionBodyStyle.Always;
 			case "when_on_single_line":
 				if (deterministic)
-					diagnostics?.Add(CurbDiagnostic.InertUnderDeterministicLayout(
-						key, "no body is rewritten, as 'false' would"));
+					diagnostics?.Add(CurbDiagnostic.InertUnderDeterministicLayout(key, "no body is rewritten, as 'false' would"));
 				return ExpressionBodyStyle.WhenOnSingleLine;
 			case "false":
 				return ExpressionBodyStyle.AsWritten;
 			default:
-				diagnostics?.Add(CurbDiagnostic.UnrecognisedValue(
-					key, raw, "true, false or when_on_single_line"));
+				diagnostics?.Add(CurbDiagnostic.UnrecognisedValue(key, raw, "true, false or when_on_single_line"));
 				return ExpressionBodyStyle.AsWritten;
 		}
 	}
@@ -728,10 +735,7 @@ public static class EditorConfigOptionsBinder
 	/// ReSharper writes the conditional value as <c>if_owner_is_single_line</c> and the other two as plain
 	/// booleans, so all three spellings are accepted here rather than normalised in the caller.
 	/// </remarks>
-	private static AttributePlacement? PlacementOf(
-		IReadOnlyDictionary<string, string> properties,
-		string key,
-		ICollection<CurbDiagnostic>? diagnostics)
+	private static AttributePlacement? PlacementOf(IReadOnlyDictionary<string, string> properties, string key, ICollection<CurbDiagnostic>? diagnostics)
 	{
 		foreach (var prefix in ReSharperPrefixes)
 		{
@@ -745,16 +749,20 @@ public static class EditorConfigOptionsBinder
 					// back changed on 347 of 1,196 corpus files, because dotnet format moves an attribute
 					// off a member that spans lines. Its rule is if_owner_is_single_line, so that is the
 					// value to point at.
-					diagnostics?.Add(CurbDiagnostic.OverruledByDotnetFormat(
-						prefix + key, "true", "Use 'if_owner_is_single_line', which is the rule dotnet format itself applies."));
+					diagnostics?.Add(
+						CurbDiagnostic.OverruledByDotnetFormat(
+							prefix + key,
+							"true",
+							"Use 'if_owner_is_single_line', which is the rule dotnet format itself applies."
+						)
+					);
 					return AttributePlacement.OwnLine;
 				case "false":
 					return AttributePlacement.OwnLine;
 				case "if_owner_is_single_line":
 					return AttributePlacement.IfOwnerIsSingleLine;
 				default:
-					diagnostics?.Add(CurbDiagnostic.UnrecognisedValue(
-						prefix + key, raw, "true, false or if_owner_is_single_line"));
+					diagnostics?.Add(CurbDiagnostic.UnrecognisedValue(prefix + key, raw, "true, false or if_owner_is_single_line"));
 					return null;
 			}
 		}
@@ -770,10 +778,7 @@ public static class EditorConfigOptionsBinder
 	/// <c>chop_always</c> — see <c>DeterministicOnlyWrapStyle</c> and <c>ParametersWrapStyle</c> — since
 	/// forcing a break by measuring width carries the same risk in preservation mode either value does.
 	/// </remarks>
-	private static WrapStyle? WrapStyleOf(
-		IReadOnlyDictionary<string, string> properties,
-		string key,
-		ICollection<CurbDiagnostic>? diagnostics)
+	private static WrapStyle? WrapStyleOf(IReadOnlyDictionary<string, string> properties, string key, ICollection<CurbDiagnostic>? diagnostics)
 	{
 		foreach (var prefix in ReSharperPrefixes)
 		{
@@ -790,8 +795,7 @@ public static class EditorConfigOptionsBinder
 				case "wrap_if_long":
 					return WrapStyle.WrapIfLong;
 				default:
-					diagnostics?.Add(CurbDiagnostic.UnrecognisedValue(
-						prefix + key, raw, "chop_always, chop_if_long or wrap_if_long"));
+					diagnostics?.Add(CurbDiagnostic.UnrecognisedValue(prefix + key, raw, "chop_always, chop_if_long or wrap_if_long"));
 					return null;
 			}
 		}
@@ -803,9 +807,7 @@ public static class EditorConfigOptionsBinder
 	/// Reads <c>[resharper_]csharp_empty_block_style</c> / <c>[resharper_]empty_block_style</c>, under all
 	/// four spellings.
 	/// </summary>
-	private static EmptyBlockStyle? EmptyBlockStyleOf(
-		IReadOnlyDictionary<string, string> properties,
-		ICollection<CurbDiagnostic>? diagnostics)
+	private static EmptyBlockStyle? EmptyBlockStyleOf(IReadOnlyDictionary<string, string> properties, ICollection<CurbDiagnostic>? diagnostics)
 	{
 		foreach (var prefix in ReSharperPrefixes)
 		{
@@ -822,8 +824,7 @@ public static class EditorConfigOptionsBinder
 				case "together_same_line":
 					return EmptyBlockStyle.TogetherSameLine;
 				default:
-					diagnostics?.Add(CurbDiagnostic.UnrecognisedValue(
-						key, raw, "multiline, together or together_same_line"));
+					diagnostics?.Add(CurbDiagnostic.UnrecognisedValue(key, raw, "multiline, together or together_same_line"));
 					return null;
 			}
 		}
@@ -832,11 +833,7 @@ public static class EditorConfigOptionsBinder
 	}
 
 	/// <summary>Reads a blank-line count, which unlike the wrapping limits may legitimately be zero.</summary>
-	private static bool TryPrefixedLines(
-		IReadOnlyDictionary<string, string> properties,
-		string key,
-		ICollection<CurbDiagnostic>? diagnostics,
-		out int value)
+	private static bool TryPrefixedLines(IReadOnlyDictionary<string, string> properties, string key, ICollection<CurbDiagnostic>? diagnostics, out int value)
 	{
 		foreach (var prefix in ReSharperPrefixes)
 		{
@@ -845,8 +842,7 @@ public static class EditorConfigOptionsBinder
 
 			// Capped rather than trusted. A file is not improved by two hundred blank lines, and a
 			// typo in a config should not be able to ask for them.
-			if (int.TryParse(raw.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out value)
-				&& value is >= 0 and <= 8)
+			if (int.TryParse(raw.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out value) && value is >= 0 and <= 8)
 				return true;
 
 			diagnostics?.Add(CurbDiagnostic.UnrecognisedValue(prefix + key, raw, "a number from 0 to 8"));
@@ -859,11 +855,7 @@ public static class EditorConfigOptionsBinder
 	}
 
 	/// <summary>Reads a positive count under ReSharper's four spellings.</summary>
-	private static bool TryPrefixedCount(
-		IReadOnlyDictionary<string, string> properties,
-		string key,
-		ICollection<CurbDiagnostic>? diagnostics,
-		out int value)
+	private static bool TryPrefixedCount(IReadOnlyDictionary<string, string> properties, string key, ICollection<CurbDiagnostic>? diagnostics, out int value)
 	{
 		foreach (var prefix in ReSharperPrefixes)
 		{
@@ -890,11 +882,7 @@ public static class EditorConfigOptionsBinder
 	/// <c>x</c> for the same setting, and real repositories use all four. Whichever is present wins,
 	/// and the more specific one wins when several are.
 	/// </remarks>
-	private static bool TryPrefixedBool(
-		IReadOnlyDictionary<string, string> properties,
-		string key,
-		ICollection<CurbDiagnostic>? diagnostics,
-		out bool value)
+	private static bool TryPrefixedBool(IReadOnlyDictionary<string, string> properties, string key, ICollection<CurbDiagnostic>? diagnostics, out bool value)
 	{
 		foreach (var prefix in ReSharperPrefixes)
 		{
@@ -908,10 +896,6 @@ public static class EditorConfigOptionsBinder
 
 	private static readonly string[] ReSharperPrefixes = ["resharper_csharp_", "csharp_", "resharper_", ""];
 
-	private static bool TryBool(
-		IReadOnlyDictionary<string, string> properties,
-		string key,
-		ICollection<CurbDiagnostic>? diagnostics,
-		out bool value) =>
+	private static bool TryBool(IReadOnlyDictionary<string, string> properties, string key, ICollection<CurbDiagnostic>? diagnostics, out bool value) =>
 		LayoutOptionsBinder.TryBool(properties, key, diagnostics, out value);
 }

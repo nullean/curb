@@ -14,8 +14,7 @@ namespace Nullean.Curb.Documents;
 internal static class DocDumper
 {
 	/// <typeparam name="TLanguage">Whose <see cref="ILayoutLanguage.SyntheticTable"/> the <c>syn</c> ids index.</typeparam>
-	public static string Dump<TLanguage>(DocArena arena, ReadOnlySpan<char> source)
-		where TLanguage : struct, ILayoutLanguage
+	public static string Dump<TLanguage>(DocArena arena, ReadOnlySpan<char> source) where TLanguage : struct, ILayoutLanguage
 	{
 		var builder = new StringBuilder();
 		Write(arena, source, TLanguage.SyntheticTable, builder, 0, arena.Count, 0);
@@ -78,10 +77,13 @@ internal static class DocDumper
 					break;
 
 				case DocKind.Indent:
-					output.Append("indent ")
-						.Append(doc.Flags.HasFlag(DocFlags.AlignToAnchor) ? "aligned"
-							: doc.B == Doc.IndentToRoot ? "to-root"
-							: doc.B.ToString(System.Globalization.CultureInfo.InvariantCulture))
+					output
+						.Append("indent ")
+						.Append(
+							doc.Flags.HasFlag(DocFlags.AlignToAnchor)
+								? "aligned"
+								: doc.B == Doc.IndentToRoot ? "to-root" : doc.B.ToString(System.Globalization.CultureInfo.InvariantCulture)
+						)
 						.AppendLine();
 					Write(arena, source, synthetic, output, i + 1, i + doc.Length, depth + 1);
 					break;

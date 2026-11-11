@@ -290,9 +290,7 @@ internal readonly struct Doc
 	/// Safe to leave out of the count: a group can only break once its parent has, so a line that
 	/// fires is already inside something broken.
 	/// </remarks>
-	public bool IsBreakish =>
-		Kind == DocKind.BreakParent
-		|| (Kind == DocKind.Line && GroupId == 0 && (LineType is LineType.Hard or LineType.Literal));
+	public bool IsBreakish => Kind == DocKind.BreakParent || (Kind == DocKind.Line && GroupId == 0 && (LineType is LineType.Hard or LineType.Literal));
 
 	public bool HasChildren => Length > 1;
 }

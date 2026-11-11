@@ -242,11 +242,11 @@ internal static class TokenPrinter
 						// Call1() through the statement printer, so this comment is the very first thing
 						// in *this* PrintLeadingTrivia call, where emittedAnything starts false
 						// regardless of the real content immediately before it.
-						var commentHasRealPredecessor = context.PreviousToken.RawKind != 0
-							&& !context.PreviousToken.IsKind(SyntaxKind.OpenBraceToken);
-						if (trivia.IsKind(SyntaxKind.SingleLineCommentTrivia)
-							&& commentHasRealPredecessor
-							&& context.Options.BlankLinesBeforeSingleLineComment > 0)
+						var commentHasRealPredecessor = context.PreviousToken.RawKind != 0 && !context.PreviousToken.IsKind(SyntaxKind.OpenBraceToken);
+						if (
+							trivia.IsKind(SyntaxKind.SingleLineCommentTrivia) &&
+							commentHasRealPredecessor && context.Options.BlankLinesBeforeSingleLineComment > 0
+						)
 						{
 							pendingNewLines = Math.Max(pendingNewLines, 2);
 							FlushBlankLine(arena, ref pendingNewLines, emittedAnything: true);
@@ -287,12 +287,8 @@ internal static class TokenPrinter
 					}
 
 					var isLineComment = trivia.IsKind(SyntaxKind.SingleLineCommentTrivia);
-					var startsAligned = isLineComment
-						&& !emittedAnything
-						&& !blankLineBefore
-						&& !separated
-						&& !(aligned && alignElement)
-						&& AlignsUnderTrailingComment(token, trivia, shapeBase, unshaped, context);
+					var startsAligned = isLineComment && !emittedAnything && !blankLineBefore && !separated &&
+						!(aligned && alignElement) && AlignsUnderTrailingComment(token, trivia, shapeBase, unshaped, context);
 
 					if (startsAligned || (alignedRun && isLineComment && priorNewLines <= 1))
 					{
@@ -328,8 +324,9 @@ internal static class TokenPrinter
 					else
 						EmitLeadingComment(leading, i, count, token, context, trailingBreak, ref pendingNewLines, ref glued);
 					emittedAnything = true;
-					lastWasDocComment = trivia.IsKind(SyntaxKind.SingleLineDocumentationCommentTrivia)
-						|| trivia.IsKind(SyntaxKind.MultiLineDocumentationCommentTrivia);
+					lastWasDocComment = trivia.IsKind(SyntaxKind.SingleLineDocumentationCommentTrivia) || trivia.IsKind(
+						SyntaxKind.MultiLineDocumentationCommentTrivia
+					);
 					break;
 
 				case SyntaxKind.DisabledTextTrivia:
@@ -387,8 +384,8 @@ internal static class TokenPrinter
 					// walk (`// grouped for readability` right above the #region, say) is real content
 					// jb still wants a blank line after, but a comment is trivia, not a token, so it
 					// never touches PreviousToken at all.
-					var hasRealPredecessor = emittedAnything || (context.PreviousToken.RawKind != 0
-						&& !context.PreviousToken.IsKind(SyntaxKind.OpenBraceToken));
+					var hasRealPredecessor = emittedAnything ||
+						(context.PreviousToken.RawKind != 0 && !context.PreviousToken.IsKind(SyntaxKind.OpenBraceToken));
 
 					if (forcesRegionGap && hasRealPredecessor)
 					{
@@ -480,8 +477,15 @@ internal static class TokenPrinter
 	/// wrote code after, the gap to that code.
 	/// </summary>
 	private static void EmitLeadingComment(
-		SyntaxTriviaList leading, int index, int count, SyntaxToken token, PrintContext context, bool trailingBreak,
-		ref int pendingNewLines, ref bool glued)
+		SyntaxTriviaList leading,
+		int index,
+		int count,
+		SyntaxToken token,
+		PrintContext context,
+		bool trailingBreak,
+		ref int pendingNewLines,
+		ref bool glued
+	)
 	{
 		var trivia = leading[index];
 		pendingNewLines = EmitTriviaText(trivia, context, CommentFlags(trivia));
@@ -542,8 +546,7 @@ internal static class TokenPrinter
 		if (next < count)
 		{
 			var kind = leading[next].Kind();
-			return kind is SyntaxKind.SingleLineCommentTrivia or SyntaxKind.MultiLineCommentTrivia
-				or SyntaxKind.MultiLineDocumentationCommentTrivia;
+			return kind is SyntaxKind.SingleLineCommentTrivia or SyntaxKind.MultiLineCommentTrivia or SyntaxKind.MultiLineDocumentationCommentTrivia;
 		}
 
 		// Trivia past `count` is printed by another call, so the token is not what follows.
@@ -570,13 +573,15 @@ internal static class TokenPrinter
 		if (token.IsKind(SyntaxKind.CloseBraceToken))
 			return true;
 		if (token.IsKind(SyntaxKind.OpenBraceToken))
-			return token.Parent is not InitializerExpressionSyntax initializer
-				|| initializer.IsKind(SyntaxKind.ObjectInitializerExpression)
-				|| initializer.IsKind(SyntaxKind.WithInitializerExpression);
+			return token.Parent is not InitializerExpressionSyntax initializer || initializer.IsKind(
+				SyntaxKind.ObjectInitializerExpression
+			) || initializer.IsKind(SyntaxKind.WithInitializerExpression);
 
 		var previous = token.GetPreviousToken();
-		if (previous.IsKind(SyntaxKind.CloseBracketToken)
-			&& previous.Parent is AttributeListSyntax { Parent: MemberDeclarationSyntax or AccessorDeclarationSyntax or StatementSyntax })
+		if (
+			previous.IsKind(SyntaxKind.CloseBracketToken) &&
+			previous.Parent is AttributeListSyntax { Parent: MemberDeclarationSyntax or AccessorDeclarationSyntax or StatementSyntax }
+		)
 			return true;
 
 		for (var node = token.Parent; node is not null && node.SpanStart == token.SpanStart; node = node.Parent)
@@ -599,8 +604,9 @@ internal static class TokenPrinter
 				case AnonymousObjectMemberDeclaratorSyntax:
 				case SubpatternSyntax { Parent: PropertyPatternClauseSyntax }:
 					return true;
-				case ExpressionSyntax { Parent: InitializerExpressionSyntax initializer }
-					when initializer.IsKind(SyntaxKind.ObjectInitializerExpression) || initializer.IsKind(SyntaxKind.WithInitializerExpression):
+				case ExpressionSyntax { Parent: InitializerExpressionSyntax initializer } when initializer.IsKind(
+					SyntaxKind.ObjectInitializerExpression
+				) || initializer.IsKind(SyntaxKind.WithInitializerExpression):
 					return true;
 			}
 		}
@@ -692,13 +698,10 @@ internal static class TokenPrinter
 
 			// dotnet format indents a constraint clause and lines a query's clauses up itself, so the
 			// trivia in front of one is measured from the clause.
-			var measuredFrom = node is StatementSyntax and not BlockSyntax
-				|| node is MemberDeclarationSyntax
-				|| node is AccessorDeclarationSyntax
-				|| node is SwitchExpressionArmSyntax
-				|| node is TypeParameterConstraintClauseSyntax
-				|| node is QueryClauseSyntax or SelectOrGroupClauseSyntax or QueryContinuationSyntax
-				|| node.Parent is InitializerExpressionSyntax or CollectionExpressionSyntax;
+			var measuredFrom = node is StatementSyntax and not BlockSyntax || node is MemberDeclarationSyntax || node is AccessorDeclarationSyntax || node is
+				SwitchExpressionArmSyntax || node is TypeParameterConstraintClauseSyntax ||
+				node is QueryClauseSyntax or SelectOrGroupClauseSyntax or QueryContinuationSyntax ||
+				node.Parent is InitializerExpressionSyntax or CollectionExpressionSyntax;
 			if (!measuredFrom)
 				continue;
 
@@ -717,10 +720,12 @@ internal static class TokenPrinter
 				return default;
 
 			// No column is in shape ahead of an initializer brace dotnet format moves.
-			if (token.IsKind(SyntaxKind.OpenBraceToken)
-				&& (token.Parent.IsKind(SyntaxKind.ObjectInitializerExpression)
-					|| token.Parent.IsKind(SyntaxKind.WithInitializerExpression)
-					|| token.Parent.IsKind(SyntaxKind.AnonymousObjectCreationExpression)))
+			if (
+				token.IsKind(SyntaxKind.OpenBraceToken) &&
+				(token.Parent.IsKind(SyntaxKind.ObjectInitializerExpression) || token.Parent.IsKind(
+					SyntaxKind.WithInitializerExpression
+				) || token.Parent.IsKind(SyntaxKind.AnonymousObjectCreationExpression))
+			)
 			{
 				unshaped = true;
 				return default;
@@ -733,8 +738,7 @@ internal static class TokenPrinter
 	}
 
 	/// <summary>The source column <paramref name="token"/> starts at, in characters from its line's start.</summary>
-	private static int ColumnOf(SyntaxToken token, PrintContext context) =>
-		token.SpanStart - context.Text.Lines.GetLineFromPosition(token.SpanStart).Start;
+	private static int ColumnOf(SyntaxToken token, PrintContext context) => token.SpanStart - context.Text.Lines.GetLineFromPosition(token.SpanStart).Start;
 
 	/// <summary>The column, in characters, of the first non-whitespace character on the source line holding <paramref name="position"/>.</summary>
 	private static int LineIndentColumn(int position, PrintContext context)
@@ -771,8 +775,8 @@ internal static class TokenPrinter
 	/// <param name="shapeBase">What <see cref="ContinuationShapeBase"/> found for the token.</param>
 	/// <param name="context">Per-file printing state.</param>
 	private static bool TriviaIsInShape(SyntaxToken token, SyntaxToken shapeBase, PrintContext context) =>
-		CommentsSitAtTokenColumn(token, shapeBase, context)
-		&& (BetweenCollectionElements(token) || (!context.Options.UseTabs && !IndentsWithATab(token.LeadingTrivia)));
+		CommentsSitAtTokenColumn(token, shapeBase, context) &&
+			(BetweenCollectionElements(token) || (!context.Options.UseTabs && !IndentsWithATab(token.LeadingTrivia)));
 
 	/// <summary>
 	/// True when <paramref name="token"/> starts an element of a collection or array initializer or a
@@ -790,9 +794,9 @@ internal static class TokenPrinter
 			element = parent;
 		var list = element?.Parent;
 
-		return list is CollectionExpressionSyntax
-			|| list.IsKind(SyntaxKind.CollectionInitializerExpression)
-			|| list.IsKind(SyntaxKind.ArrayInitializerExpression);
+		return list is CollectionExpressionSyntax || list.IsKind(SyntaxKind.CollectionInitializerExpression) || list.IsKind(
+			SyntaxKind.ArrayInitializerExpression
+		);
 	}
 
 	/// <summary>True when a line in <paramref name="leading"/> is indented with a tab.</summary>
@@ -833,18 +837,16 @@ internal static class TokenPrinter
 	{
 		var lines = context.Text.Lines;
 		var tokenStart = token.SpanStart;
-		var tokenColumn = shapeBase.RawKind != 0
-			? LineIndentColumn(shapeBase.SpanStart, context)
-			: tokenStart - lines.GetLineFromPosition(tokenStart).Start;
+		var tokenColumn = shapeBase.RawKind != 0 ? LineIndentColumn(shapeBase.SpanStart, context) : tokenStart - lines.GetLineFromPosition(tokenStart).Start;
 		if (Printers.LabelCommentsSitALevelIn(token, context))
 			tokenColumn += context.Options.IndentSize;
 
 		foreach (var trivia in token.LeadingTrivia)
 		{
-			if (!trivia.IsKind(SyntaxKind.SingleLineCommentTrivia)
-				&& !trivia.IsKind(SyntaxKind.MultiLineCommentTrivia)
-				&& !trivia.IsKind(SyntaxKind.SingleLineDocumentationCommentTrivia)
-				&& !trivia.IsKind(SyntaxKind.MultiLineDocumentationCommentTrivia))
+			if (
+				!trivia.IsKind(SyntaxKind.SingleLineCommentTrivia) && !trivia.IsKind(SyntaxKind.MultiLineCommentTrivia) &&
+				!trivia.IsKind(SyntaxKind.SingleLineDocumentationCommentTrivia) && !trivia.IsKind(SyntaxKind.MultiLineDocumentationCommentTrivia)
+			)
 				continue;
 
 			var start = trivia.FullSpan.Start;
@@ -893,9 +895,7 @@ internal static class TokenPrinter
 						// The break the enclosing printer emits next is merged into this one.
 						context.Arena.LineCommentBreak();
 					}
-					else if (i + 2 == trailing.Count
-						&& KeepsSpacing(trailing[i + 1], context)
-						&& trailing[i + 1].Span.End < context.Text.Length)
+					else if (i + 2 == trailing.Count && KeepsSpacing(trailing[i + 1], context) && trailing[i + 1].Span.End < context.Text.Length)
 					{
 						// The author's own gap to the code after it, which dotnet format leaves as written
 						// (issue #148). The printer's space in front of that code is held back by the glue.
@@ -903,8 +903,9 @@ internal static class TokenPrinter
 						context.Arena.GlueTo(trailing[i + 1].Span.End);
 						break;
 					}
-					else if (i + 1 < trailing.Count
-						&& (trailing[i + 1].IsKind(SyntaxKind.WhitespaceTrivia) || trailing[i + 1].IsKind(SyntaxKind.EndOfLineTrivia)))
+					else if (
+						i + 1 < trailing.Count && (trailing[i + 1].IsKind(SyntaxKind.WhitespaceTrivia) || trailing[i + 1].IsKind(SyntaxKind.EndOfLineTrivia))
+					)
 					{
 						// A /* */ comment can have code after it on the same line; keep them apart,
 						// with the one space the printer may already be about to write.

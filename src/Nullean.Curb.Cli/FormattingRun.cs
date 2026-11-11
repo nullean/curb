@@ -35,8 +35,7 @@ internal static class FormattingRun
 	private static readonly UTF8Encoding Utf8WithBom = new(encoderShouldEmitUTF8Identifier: true);
 
 	/// <summary>Renders the skipped count only when there is one, to keep the usual line unchanged.</summary>
-	private static string SkippedText(int skipped) =>
-		skipped == 0 ? "" : string.Create(CultureInfo.InvariantCulture, $"{skipped} skipped, ");
+	private static string SkippedText(int skipped) => skipped == 0 ? "" : string.Create(CultureInfo.InvariantCulture, $"{skipped} skipped, ");
 
 	/// <summary>Renders the blocks a language left as written only when there are some.</summary>
 	private static string DeclinedText(int declined) =>
@@ -47,8 +46,7 @@ internal static class FormattingRun
 	/// after it — coverage, megabytes of source, the allocation ratio — covers only the files that were
 	/// actually printed. Absent when nothing was served from cache, so the usual line is unchanged.
 	/// </summary>
-	private static string CachedText(int cached) =>
-		cached == 0 ? "" : string.Create(CultureInfo.InvariantCulture, $" ({cached} from cache)");
+	private static string CachedText(int cached) => cached == 0 ? "" : string.Create(CultureInfo.InvariantCulture, $" ({cached} from cache)");
 
 	/// <param name="fileSystem">Abstracted so a run can be driven entirely in memory by a test.</param>
 	/// <param name="target">A file or directory to walk. Ignored when <paramref name="explicitFiles"/> is given.</param>
@@ -85,7 +83,8 @@ internal static class FormattingRun
 		string? cachePath = null,
 		string? unformattedListPath = null,
 		LanguageRegistry? languages = null,
-		CancellationToken cancellationToken = default)
+		CancellationToken cancellationToken = default
+	)
 	{
 		languages ??= LanguageRegistry.Default(fileSystem);
 
@@ -103,9 +102,7 @@ internal static class FormattingRun
 			cachePath = null;
 		}
 
-		var cache = cachePath is null
-			? null
-			: FormattingCache.Load(fileSystem, fileSystem.Path.GetFullPath(cachePath), DateTimeOffset.UtcNow);
+		var cache = cachePath is null ? null : FormattingCache.Load(fileSystem, fileSystem.Path.GetFullPath(cachePath), DateTimeOffset.UtcNow);
 
 		string[] files;
 
@@ -122,9 +119,7 @@ internal static class FormattingRun
 		{
 			var root = fileSystem.Path.GetFullPath(target);
 			named = !fileSystem.Directory.Exists(root);
-			files = named
-				? [root]
-				: [.. Walk(fileSystem, root, languages).Where(path => IsFormattable(languages, path))];
+			files = named ? [root] : [.. Walk(fileSystem, root, languages).Where(path => IsFormattable(languages, path))];
 		}
 
 		var editorConfig = new CurbEditorConfig(fileSystem);
@@ -175,12 +170,11 @@ internal static class FormattingRun
 				continue;
 			}
 
-			claimed.Add((
-				files[i],
-				language,
-				options,
-				cache is null ? "" : fileSystem.Path.GetFullPath(files[i]),
-				fingerprinter is null ? default : OptionsHash(fingerprinter, configuration, options)));
+			claimed.Add(
+				(files[i], language, options, cache is null ? "" : fileSystem.Path.GetFullPath(files[i]), fingerprinter is null
+					? default
+					: OptionsHash(fingerprinter, configuration, options))
+			);
 		}
 
 		// A file someone named that its language turns down without a reason the run reports (Razor without
@@ -234,42 +228,46 @@ internal static class FormattingRun
 		//
 		// The two hashes ride along because the reader has already computed the content one to ask the
 		// cache; recomputing it in the worker to record the answer would hash every file twice.
-		var channel = Channel.CreateBounded<(string Path, int Language, LanguageOptions Options, byte[] Bytes, string CacheKey, UInt128 ContentHash, UInt128 OptionsHash)>(
-			new BoundedChannelOptions(32) { SingleWriter = false, SingleReader = false });
+		var channel = Channel.CreateBounded<(string Path, int Language, LanguageOptions Options, byte[] Bytes, string CacheKey, UInt128 ContentHash, UInt128 OptionsHash)>(new BoundedChannelOptions(
+			32
+		)
+		{ SingleWriter = false, SingleReader = false });
 
 		// 4 reader tasks mirror the old gate width. Each races for the next index via an atomic
 		// counter so readers don't need coordination beyond the channel itself.
 		var nextIndex = -1;
-		var readerTasks = Enumerable.Range(0, 4).Select(_ => Task.Run(async () =>
-		{
-			int i;
-			while ((i = Interlocked.Increment(ref nextIndex)) < work.Length)
+		var readerTasks = Enumerable
+			.Range(0, 4)
+			.Select(_ => Task.Run(async () =>
 			{
-				var item = work[i];
-				// Read bytes rather than text: ReadAllText silently swallows a byte-order mark and
-				// WriteAllText silently writes none, so `charset` was unobservable at both ends and
-				// every file Curb touched lost its mark.
-				var bytes = fileSystem.File.ReadAllBytes(item.Path);
-
-				// Asked here rather than in the formatter worker, so a hit costs the read and the hash
-				// and then stops: the file never enters the channel and is never decoded. The decode is
-				// the larger half of what a file needing no work would otherwise cost.
-				var contentHash = cache is null ? default : Fingerprint.OfContent(bytes);
-				if (cache is not null && cache.IsFixedPoint(item.CacheKey, contentHash, item.OptionsHash))
+				int i;
+				while ((i = Interlocked.Increment(ref nextIndex)) < work.Length)
 				{
-					Interlocked.Increment(ref cached);
-					continue;
-				}
+					var item = work[i];
+					// Read bytes rather than text: ReadAllText silently swallows a byte-order mark and
+					// WriteAllText silently writes none, so `charset` was unobservable at both ends and
+					// every file Curb touched lost its mark.
+					var bytes = fileSystem.File.ReadAllBytes(item.Path);
 
-				// await WriteAsync so the thread is released (rather than blocked) when the channel
-				// is full; the reader backs off without pinning a thread-pool thread.
-				await channel.Writer.WriteAsync((item.Path, item.Language, item.Options, bytes, item.CacheKey, contentHash, item.OptionsHash));
-			}
-		})).ToArray();
+					// Asked here rather than in the formatter worker, so a hit costs the read and the hash
+					// and then stops: the file never enters the channel and is never decoded. The decode is
+					// the larger half of what a file needing no work would otherwise cost.
+					var contentHash = cache is null ? default : Fingerprint.OfContent(bytes);
+					if (cache is not null && cache.IsFixedPoint(item.CacheKey, contentHash, item.OptionsHash))
+					{
+						Interlocked.Increment(ref cached);
+						continue;
+					}
+
+					// await WriteAsync so the thread is released (rather than blocked) when the channel
+					// is full; the reader backs off without pinning a thread-pool thread.
+					await channel.Writer.WriteAsync((item.Path, item.Language, item.Options, bytes, item.CacheKey, contentHash, item.OptionsHash));
+				}
+			}))
+			.ToArray();
 
 		// Complete the channel — with any reader exception — once all readers exit.
-		Task.WhenAll(readerTasks).ContinueWith(t =>
-			channel.Writer.TryComplete(t.IsFaulted ? t.Exception?.InnerException : null));
+		Task.WhenAll(readerTasks).ContinueWith(t => channel.Writer.TryComplete(t.IsFaulted ? t.Exception?.InnerException : null));
 
 		// One worker per language per OS thread: a worker owns pooled buffers and is not thread-safe.
 		// ThreadLocal initialises each thread's slots on first access, and a slot is filled the first time
@@ -279,10 +277,11 @@ internal static class FormattingRun
 
 		// Parallel.ForEachAsync consumes the IAsyncEnumerable produced by ReadAllAsync; it
 		// completes only after the channel is drained and the Writer has been marked complete.
-		Parallel.ForEachAsync(
-			channel.Reader.ReadAllAsync(CancellationToken.None),
-			new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount },
-			(item, _) =>
+		Parallel
+			.ForEachAsync(channel.Reader.ReadAllAsync(CancellationToken.None), new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, (
+				item,
+				_
+			) =>
 			{
 				var workers = threadWorkers.Value!;
 
@@ -322,7 +321,17 @@ internal static class FormattingRun
 						return ValueTask.CompletedTask;
 					}
 
-					var pending = new PendingFile(item.Path, item.Language, item.Options, item.Bytes, hadBom, source, item.CacheKey, item.ContentHash, item.OptionsHash);
+					var pending = new PendingFile(
+						item.Path,
+						item.Language,
+						item.Options,
+						item.Bytes,
+						hadBom,
+						source,
+						item.CacheKey,
+						item.ContentHash,
+						item.OptionsHash
+					);
 
 					// Another tool's file goes into its batch, already read, decoded and past the skip rules.
 					if (language is IExternalLanguage)
@@ -339,8 +348,13 @@ internal static class FormattingRun
 					}
 
 					var result = worker.Format(
-						source, item.Options, fileSystem.Path.GetFileName(item.Path),
-						produceText: write, expandUnhandled: expandUnhandled, verifyRoundTrip: verifyRoundTrip);
+						source,
+						item.Options,
+						fileSystem.Path.GetFileName(item.Path),
+						produceText: write,
+						expandUnhandled: expandUnhandled,
+						verifyRoundTrip: verifyRoundTrip
+					);
 
 					Apply(pending, result);
 				}
@@ -352,7 +366,9 @@ internal static class FormattingRun
 				}
 
 				return ValueTask.CompletedTask;
-			}).GetAwaiter().GetResult();
+			})
+			.GetAwaiter()
+			.GetResult();
 
 		// The other tools' batches, one call per language, after the in-process work. A tool is started only
 		// here, so a run whose files all came from the cache starts nothing.
@@ -366,10 +382,14 @@ internal static class FormattingRun
 			FormatResult[] results;
 			try
 			{
-				results = tool.FormatBatchAsync(
-					[.. batch.Select(file => new ExternalFile(file.Path, file.Source, file.Options, file.Bytes))],
-					produceText: write,
-					cancellationToken).GetAwaiter().GetResult();
+				results = tool
+					.FormatBatchAsync(
+						[.. batch.Select(file => new ExternalFile(file.Path, file.Source, file.Options, file.Bytes))],
+						produceText: write,
+						cancellationToken
+					)
+					.GetAwaiter()
+					.GetResult();
 				if (results.Length != batch.Length)
 					throw new InvalidOperationException($"answered for {results.Length} of {batch.Length} file(s)");
 			}
@@ -453,10 +473,7 @@ internal static class FormattingRun
 						// After the write, not before: a write that throws is caught below and
 						// counted as failed, and a file only counts as changed once it actually is.
 						if (write)
-							fileSystem.File.WriteAllText(
-								item.Path,
-								result.Text ?? item.Source,
-								wantsBom ? Utf8WithBom : Utf8);
+							fileSystem.File.WriteAllText(item.Path, result.Text ?? item.Source, wantsBom ? Utf8WithBom : Utf8);
 						else
 							unformatted?.Add(item.Path);
 						Interlocked.Increment(ref changed);
@@ -546,9 +563,13 @@ internal static class FormattingRun
 		// Coverage is a C# figure. A run that printed only XML has none to report, rather than a
 		// vacuous 100 %; a run that printed nothing at all keeps the line it always had.
 		var coverageText = totalTokens == 0 && uncovered > 0 ? "" : string.Create(CultureInfo.InvariantCulture, $", printer coverage {coverage:P1}");
-		Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
-			$"{(write ? "Formatted" : "Checked")} {files.Length} file(s){CachedText(cached)} in {stopwatch.ElapsedMilliseconds}ms — "
-			+ $"{changed} {(write ? "changed" : "would change")}, {SkippedText(skipped)}{failed} failed, {unparsable} unparsable{coverageText}"));
+		Console.WriteLine(
+			string.Create(
+				CultureInfo.InvariantCulture,
+				$"{(write ? "Formatted" : "Checked")} {files.Length} file(s){CachedText(cached)} in {stopwatch.ElapsedMilliseconds}ms — " +
+					$"{changed} {(write ? "changed" : "would change")}, {SkippedText(skipped)}{failed} failed, {unparsable} unparsable{coverageText}"
+			)
+		);
 
 		// Only once a second language ran, or a language declined part of a file, so a C#-only run prints
 		// exactly what it always has.
@@ -560,9 +581,13 @@ internal static class FormattingRun
 			{
 				if (tallies[i].Files == 0)
 					continue;
-				Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
-					$"  {languages[i].Id}: {tallies[i].Files} file(s) — {tallies[i].Changed} {(write ? "changed" : "would change")}, "
-					+ $"{SkippedText(tallies[i].Skipped)}{tallies[i].Failed} failed, {tallies[i].Unparsable} unparsable{DeclinedText(tallies[i].Declined)}"));
+				Console.WriteLine(
+					string.Create(
+						CultureInfo.InvariantCulture,
+						$"  {languages[i].Id}: {tallies[i].Files} file(s) — {tallies[i].Changed} {(write ? "changed" : "would change")}, " +
+							$"{SkippedText(tallies[i].Skipped)}{tallies[i].Failed} failed, {tallies[i].Unparsable} unparsable{DeclinedText(tallies[i].Declined)}"
+					)
+				);
 			}
 		}
 
@@ -570,14 +595,17 @@ internal static class FormattingRun
 		// not a problem: it changes no counter and no exit code.
 		foreach (var ((language, reason), count) in declined.OrderBy(pair => pair.Key.Language))
 		{
-			Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
-				$"  {languages[language].Id}: {count} file(s) skipped — {reason}"));
+			Console.WriteLine(string.Create(CultureInfo.InvariantCulture, $"  {languages[language].Id}: {count} file(s) skipped — {reason}"));
 		}
 
 		var costModel = expandUnhandled ? "  [full-coverage cost model]" : string.Empty;
-		Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
-			$"  {sourceBytes / 1024.0 / 1024.0:F2} MB source, allocated {allocated / 1024.0 / 1024.0:F1} MB "
-			+ $"({allocated / (double)Math.Max(1, sourceBytes):F1}x source){costModel}"));
+		Console.WriteLine(
+			string.Create(
+				CultureInfo.InvariantCulture,
+				$"  {sourceBytes / 1024.0 / 1024.0:F2} MB source, allocated {allocated / 1024.0 / 1024.0:F1} MB " +
+					$"({allocated / (double)Math.Max(1, sourceBytes):F1}x source){costModel}"
+			)
+		);
 
 		if (coverageReport && unhandled.Count > 0)
 		{
@@ -585,8 +613,9 @@ internal static class FormattingRun
 			Console.WriteLine("# tokens still emitted verbatim, by syntax kind");
 			foreach (var (key, count) in unhandled.OrderByDescending(p => p.Value).Take(25))
 			{
-				Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
-					$"  {count,8}  {((IInProcessLanguage)languages[key.Language]).DescribeUnhandledKind(key.Kind)}"));
+				Console.WriteLine(
+					string.Create(CultureInfo.InvariantCulture, $"  {count,8}  {((IInProcessLanguage)languages[key.Language]).DescribeUnhandledKind(key.Kind)}")
+				);
 			}
 			Console.WriteLine();
 		}
@@ -601,14 +630,29 @@ internal static class FormattingRun
 			var printed = files.Length - cached - uncovered;
 			if (printed > 0 || uncovered == 0)
 			{
-				Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
-					$"  round-trip verified {reparsed} of {printed} file(s) "
-					+ $"({reparsed / (double)Math.Max(1, printed):P1} needed a second parse)"));
+				Console.WriteLine(
+					string.Create(
+						CultureInfo.InvariantCulture,
+						$"  round-trip verified {reparsed} of {printed} file(s) " + $"({reparsed / (double)Math.Max(1, printed):P1} needed a second parse)"
+					)
+				);
 			}
 		}
 
 		var exitCode = failed > 0 ? 3 : !write && changed > 0 ? 1 : 0;
-		return new FormattingRunSummary(files.Length, changed, cached, skipped, failed, unparsable, reparsed, coverage, exitCode, blocksDeclined, namedDeclined);
+		return new FormattingRunSummary(
+			files.Length,
+			changed,
+			cached,
+			skipped,
+			failed,
+			unparsable,
+			reparsed,
+			coverage,
+			exitCode,
+			blocksDeclined,
+			namedDeclined
+		);
 	}
 
 	/// <summary>
@@ -673,9 +717,8 @@ internal static class FormattingRun
 	/// import, looks like from here.
 	/// </summary>
 	private static bool IsFormattable(LanguageRegistry languages, string path) =>
-		languages.IndexOf(path) >= 0
-		&& !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal)
-		&& !path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.Ordinal);
+		languages.IndexOf(path) >= 0 && !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal) &&
+			!path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.Ordinal);
 }
 
 /// <summary>What a formatting run did, for a caller that needs more than an exit code.</summary>
@@ -694,7 +737,8 @@ internal readonly record struct FormattingRunSummary(
 	double Coverage,
 	int ExitCode,
 	int Declined = 0,
-	int NamedDeclined = 0);
+	int NamedDeclined = 0
+);
 
 /// <summary>One language's share of a run's outcomes.</summary>
 internal struct LanguageTally
@@ -719,4 +763,5 @@ internal readonly record struct PendingFile(
 	string Source,
 	string CacheKey,
 	UInt128 ContentHash,
-	UInt128 OptionsHash);
+	UInt128 OptionsHash
+);

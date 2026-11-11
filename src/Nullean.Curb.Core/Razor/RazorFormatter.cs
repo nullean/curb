@@ -77,7 +77,8 @@ public sealed class RazorFormatter : IDisposable
 		bool verifyRoundTrip = true,
 		bool component = true,
 		RazorMarkup markup = RazorMarkup.Off,
-		RazorAttributeIndent attributes = RazorAttributeIndent.AlignWithFirst)
+		RazorAttributeIndent attributes = RazorAttributeIndent.AlignWithFirst
+	)
 	{
 		if (markup == RazorMarkup.Off)
 			return FormatBlocks(source, options, produceText, verifyRoundTrip, component);
@@ -86,18 +87,22 @@ public sealed class RazorFormatter : IDisposable
 		// against the line where it now is.
 		var unit = markup == RazorMarkup.EngineQuirks ? options.TabWidth : options.IndentSize;
 		var indented = RazorMarkupIndenter.TryIndent(
-			source, component, unit, options.UseTabs, options.TabWidth, out var refusal, attributes, markup == RazorMarkup.EngineQuirks);
+			source,
+			component,
+			unit,
+			options.UseTabs,
+			options.TabWidth,
+			out var refusal,
+			attributes,
+			markup == RazorMarkup.EngineQuirks
+		);
 		if (indented is null)
 		{
 			var asWritten = FormatBlocks(source, options, produceText, verifyRoundTrip, component);
 			if (asWritten.Status != FormatStatus.Formatted)
 				return asWritten;
 			var note = "markup left as written, " + refusal;
-			return asWritten with
-			{
-				Message = asWritten.Message is null ? note : note + "; " + asWritten.Message,
-				Declined = asWritten.Declined + 1,
-			};
+			return asWritten with { Message = asWritten.Message is null ? note : note + "; " + asWritten.Message, Declined = asWritten.Declined + 1, };
 		}
 
 		if (!RazorMarkupIndenter.OnlyIndentationChanged(source, indented))
@@ -135,12 +140,18 @@ public sealed class RazorFormatter : IDisposable
 				if (result.Status == FormatStatus.VerificationFailed)
 				{
 					return new FormatResult(
-						FormatStatus.VerificationFailed, false, null, 1,
-						$"line {RazorBlockScanner.LineOf(source, block.Directive)}: {block.Name} block: {result.Message}");
+						FormatStatus.VerificationFailed,
+						false,
+						null,
+						1,
+						$"line {RazorBlockScanner.LineOf(source, block.Directive)}: {block.Name} block: {result.Message}"
+					);
 				}
 
-				if (refusal == RazorBlockRefusal.None && result.Text is { } text
-					&& !source.AsSpan(block.InnerStart, block.InnerEnd - block.InnerStart).SequenceEqual(text))
+				if (
+					refusal == RazorBlockRefusal.None && result.Text is { } text &&
+					!source.AsSpan(block.InnerStart, block.InnerEnd - block.InnerStart).SequenceEqual(text)
+				)
 				{
 					replacements[i] = text;
 					changed = true;
@@ -154,8 +165,12 @@ public sealed class RazorFormatter : IDisposable
 				if (refusals.Length > 0)
 					refusals.Append("; ");
 				refusals
-					.Append("line ").Append(RazorBlockScanner.LineOf(source, block.Directive)).Append(": ")
-					.Append(block.Name).Append(" block left as written, ").Append(Describe(refusal));
+					.Append("line ")
+					.Append(RazorBlockScanner.LineOf(source, block.Directive))
+					.Append(": ")
+					.Append(block.Name)
+					.Append(" block left as written, ")
+					.Append(Describe(refusal));
 				if (detail is not null)
 					refusals.Append(" (").Append(detail).Append(')');
 			}
@@ -194,7 +209,8 @@ public sealed class RazorFormatter : IDisposable
 		in FormatOptions options,
 		bool verifyRoundTrip,
 		out RazorBlockRefusal refusal,
-		out string? detail)
+		out string? detail
+	)
 	{
 		refusal = RazorBlockRefusal.None;
 		detail = null;
@@ -206,21 +222,21 @@ public sealed class RazorFormatter : IDisposable
 			return new FormatResult(FormatStatus.Formatted, false, null, 1, null);
 
 		// The block keeps the line break its own `{` line ends with; see the class remarks.
-		var newLine = source[block.InnerStart - 1] == '\n'
-			? block.InnerStart >= 2 && source[block.InnerStart - 2] == '\r' ? "\r\n" : "\n"
-			: "\r";
+		var newLine = source[block.InnerStart - 1] == '\n' ? block.InnerStart >= 2 && source[block.InnerStart - 2] == '\r' ? "\r\n" : "\n" : "\r";
 
 		var indentColumns = Columns(source.AsSpan(block.LineStart, block.Directive - block.LineStart), options.TabWidth);
 		var blockOptions = options with
 		{
 			// A header belongs at the top of a file, and the wrapper is not one.
 			FileHeaderTemplate = null,
-			EndOfLine = newLine switch { "\r\n" => EndOfLine.CrLf, "\n" => EndOfLine.Lf, _ => EndOfLine.Cr },
-
+			EndOfLine = newLine switch
+			{
+				"\r\n" => EndOfLine.CrLf,
+				"\n" => EndOfLine.Lf,
+				_ => EndOfLine.Cr
+			},
 			// Every line ends up indentColumns further right than the formatter sees it.
-			MaxLineLength = options.MaxLineLength == FormatOptions.Off
-				? FormatOptions.Off
-				: Math.Max(1, options.MaxLineLength - indentColumns),
+			MaxLineLength = options.MaxLineLength == FormatOptions.Off ? FormatOptions.Off : Math.Max(1, options.MaxLineLength - indentColumns),
 		};
 
 		// Members go in a class; statements in a block of their own, a top-level statement, so they come
@@ -257,9 +273,7 @@ public sealed class RazorFormatter : IDisposable
 			return result;
 		}
 
-		var text = indentColumns == 0
-			? formatted[start..end]
-			: Indent(formatted, start, end, source[block.LineStart..block.Directive]);
+		var text = indentColumns == 0 ? formatted[start..end] : Indent(formatted, start, end, source[block.LineStart..block.Directive]);
 		return new FormatResult(FormatStatus.Formatted, true, text, 1, null);
 	}
 
@@ -424,7 +438,8 @@ public sealed class RazorFormatter : IDisposable
 		string?[] replacements,
 		List<RazorBlock> rescan,
 		bool component,
-		out string? failure)
+		out string? failure
+	)
 	{
 		failure = null;
 		rescan.Clear();
@@ -450,8 +465,10 @@ public sealed class RazorFormatter : IDisposable
 			if (replacements[i] is not { } replacement)
 				continue;
 
-			if (!source.AsSpan(inSource, before.InnerStart - inSource).SequenceEqual(output.AsSpan(inOutput, after.InnerStart - inOutput))
-				|| !output.AsSpan(after.InnerStart, after.InnerEnd - after.InnerStart).SequenceEqual(replacement))
+			if (
+				!source.AsSpan(inSource, before.InnerStart - inSource).SequenceEqual(output.AsSpan(inOutput, after.InnerStart - inOutput)) ||
+				!output.AsSpan(after.InnerStart, after.InnerEnd - after.InnerStart).SequenceEqual(replacement)
+			)
 			{
 				failure = $"line {RazorBlockScanner.LineOf(source, before.Directive)}: markup around the {before.Name} block changed";
 				return false;

@@ -83,7 +83,8 @@ internal static class ContentVerifier
 		IReadOnlyList<TextSpan>? dropped = null,
 		int arrowsAdded = 0,
 		string? headerAdded = null,
-		IReadOnlyList<InsertedToken>? inserted = null)
+		IReadOnlyList<InsertedToken>? inserted = null
+	)
 	{
 		var sourceIndex = 0;
 		var outputIndex = 0;
@@ -166,8 +167,7 @@ internal static class ContentVerifier
 			// Both halves are permitted exactly once, so a stray brace elsewhere is still damage.
 			if (namespaceUnwrapped)
 			{
-				if (!sourceDone && !outputDone
-					&& source[sourceIndex] == '{' && output[outputIndex] == ';' && !namespaceBraceOwed)
+				if (!sourceDone && !outputDone && source[sourceIndex] == '{' && output[outputIndex] == ';' && !namespaceBraceOwed)
 				{
 					namespaceBraceOwed = true;
 					sourceIndex++;
@@ -175,8 +175,7 @@ internal static class ContentVerifier
 					continue;
 				}
 
-				if (!sourceDone && source[sourceIndex] == '}' && namespaceBraceOwed
-					&& (outputDone || output[outputIndex] != '}'))
+				if (!sourceDone && source[sourceIndex] == '}' && namespaceBraceOwed && (outputDone || output[outputIndex] != '}'))
 				{
 					namespaceBraceOwed = false;
 					sourceIndex++;
@@ -208,9 +207,10 @@ internal static class ContentVerifier
 				}
 			}
 
-			if (!outputDone && arrowsOwed > 0
-				&& output[outputIndex] == '=' && outputIndex + 1 < output.Length && output[outputIndex + 1] == '>'
-				&& (sourceDone || source[sourceIndex] != '='))
+			if (
+				!outputDone && arrowsOwed > 0 && output[outputIndex] == '=' && outputIndex + 1 < output.Length && output[outputIndex + 1] == '>' &&
+				(sourceDone || source[sourceIndex] != '=')
+			)
 			{
 				// The arrow that replaced a dropped block. One per opening brace dropped, no more.
 				arrowsOwed--;
@@ -222,16 +222,25 @@ internal static class ContentVerifier
 			// a disagreement. Gating on a mismatch is what an earlier version did and it was wrong: `var`
 			// inserted in front of a variable called `version` leaves both sides reading `v`, so the skip
 			// never fired and the walk desynchronised. The offset removes the guess.
-			if (inserted is not null && nextInserted < inserted.Count && !outputDone
-				&& outputIndex == inserted[nextInserted].Offset
-				&& StartsWithWord(output, outputIndex, inserted[nextInserted].Text))
+			if (
+				inserted is not null && nextInserted < inserted.Count && !outputDone && outputIndex == inserted[nextInserted].Offset && StartsWithWord(
+					output,
+					outputIndex,
+					inserted[nextInserted].Text
+				)
+			)
 			{
 				// The same word twice with no source between: one site, two insertions. Each was declared, so
 				// without this the pair passed. A multi-targeted project reports a site once per target
 				// framework, and applying the fix per report wrote `readonly readonly` (CS1004). A site takes
 				// a given word once; two different words at one site (`private readonly`) are still fine.
-				if (nextInserted > 0 && lastInsertedAt == sourceIndex
-					&& string.Equals(inserted[nextInserted - 1].Text, inserted[nextInserted].Text, StringComparison.Ordinal))
+				if (
+					nextInserted > 0 && lastInsertedAt == sourceIndex && string.Equals(
+						inserted[nextInserted - 1].Text,
+						inserted[nextInserted].Text,
+						StringComparison.Ordinal
+					)
+				)
 				{
 					failure = $"'{inserted[nextInserted].Text}' was inserted twice at one site, at output offset {outputIndex}";
 					return false;
@@ -298,9 +307,8 @@ internal static class ContentVerifier
 				if (trailingCommas && SkipTrailingComma(source, ref sourceIndex))
 					continue;
 
-				failure =
-					$"formatting changed content at source offset {sourceIndex}: "
-					+ $"expected {Excerpt(source, sourceIndex)} but produced {Excerpt(output, outputIndex)}";
+				failure = $"formatting changed content at source offset {sourceIndex}: " +
+					$"expected {Excerpt(source, sourceIndex)} but produced {Excerpt(output, outputIndex)}";
 				return false;
 			}
 
@@ -391,7 +399,8 @@ internal static class ContentVerifier
 		int count,
 		bool braceAvailable,
 		out bool braceTaken,
-		out string? failure)
+		out string? failure
+	)
 	{
 		var expected = new char[count];
 		var actual = new char[count];
@@ -477,8 +486,7 @@ internal static class ContentVerifier
 			return false;
 
 		var after = at + text.Length;
-		return (at == 0 || !IsWordCharacter(output[at - 1]))
-			&& (after >= output.Length || !IsWordCharacter(output[after]));
+		return (at == 0 || !IsWordCharacter(output[at - 1])) && (after >= output.Length || !IsWordCharacter(output[after]));
 	}
 
 	private static bool IsWordCharacter(char value) => char.IsLetterOrDigit(value) || value == '_';

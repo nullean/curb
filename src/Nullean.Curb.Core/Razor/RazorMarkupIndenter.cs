@@ -32,7 +32,20 @@ public static class RazorMarkupIndenter
 	private static readonly HashSet<string> VoidElements =
 	[
 		with(StringComparer.OrdinalIgnoreCase),
-		"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr",
+		"area",
+		"base",
+		"br",
+		"col",
+		"embed",
+		"hr",
+		"img",
+		"input",
+		"link",
+		"meta",
+		"param",
+		"source",
+		"track",
+		"wbr",
 	];
 
 	// Text whose whitespace is content. Microsoft's formatter re-indents the closing tag of a script or style,
@@ -43,17 +56,31 @@ public static class RazorMarkupIndenter
 	private static readonly HashSet<string> LineDirectives =
 	[
 		with(StringComparer.Ordinal),
-		"page", "inject", "inherits", "model", "typeparam", "implements", "attribute", "layout", "namespace",
-		"rendermode", "preservewhitespace", "addTagHelper", "removeTagHelper", "tagHelperPrefix",
+		"page",
+		"inject",
+		"inherits",
+		"model",
+		"typeparam",
+		"implements",
+		"attribute",
+		"layout",
+		"namespace",
+		"rendermode",
+		"preservewhitespace",
+		"addTagHelper",
+		"removeTagHelper",
+		"tagHelperPrefix",
 	];
 
-	private static readonly HashSet<string> CodeConstructs =
-	[
-		with(StringComparer.Ordinal),
-		"if", "for", "foreach", "while", "lock", "try", "do", "using",
-	];
+	private static readonly HashSet<string> CodeConstructs = [with(StringComparer.Ordinal), "if", "for", "foreach", "while", "lock", "try", "do", "using",];
 
-	private enum FrameKind : byte { Element, CodeBlock, CSharpBrace, Section }
+	private enum FrameKind : byte
+	{
+		Element,
+		CodeBlock,
+		CSharpBrace,
+		Section
+	}
 
 	/// <summary>Something open at the current position: an element, a code block or a C# brace in one.</summary>
 	/// <remarks>
@@ -96,8 +123,15 @@ public static class RazorMarkupIndenter
 	/// </param>
 	/// <param name="refusal">Why the file is left as written.</param>
 	public static string? TryIndent(
-		string source, bool component, int indentColumns, bool useTabs, int tabWidth, out string? refusal,
-		RazorAttributeIndent attributes = RazorAttributeIndent.AlignWithFirst, bool engineQuirks = false)
+		string source,
+		bool component,
+		int indentColumns,
+		bool useTabs,
+		int tabWidth,
+		out string? refusal,
+		RazorAttributeIndent attributes = RazorAttributeIndent.AlignWithFirst,
+		bool engineQuirks = false
+	)
 	{
 		var scanner = new Scanner(source, component, tabWidth);
 		var lines = Lines(source);
@@ -517,7 +551,9 @@ public static class RazorMarkupIndenter
 				if (keyword == "else")
 				{
 					var next = SkipWhitespace(end);
-					if (source.AsSpan(next).StartsWith("if", StringComparison.Ordinal) && (next + 2 >= source.Length || !char.IsLetterOrDigit(source[next + 2])))
+					if (
+						source.AsSpan(next).StartsWith("if", StringComparison.Ordinal) && (next + 2 >= source.Length || !char.IsLetterOrDigit(source[next + 2]))
+					)
 						return next + 2;
 				}
 
@@ -680,9 +716,11 @@ public static class RazorMarkupIndenter
 		/// <summary>Just past the bracket that closes the one at <paramref name="open"/>, or -1.</summary>
 		private int Matching(int open) =>
 			RazorBlockScanner.PastMatch(
-				source, open,
+				source,
+				open,
 				source[open] == '(' ? SyntaxKind.OpenParenToken : SyntaxKind.OpenBraceToken,
-				source[open] == '(' ? SyntaxKind.CloseParenToken : SyntaxKind.CloseBraceToken);
+				source[open] == '(' ? SyntaxKind.CloseParenToken : SyntaxKind.CloseBraceToken
+			);
 
 		private int LineStart(int i)
 		{
@@ -708,9 +746,11 @@ public static class RazorMarkupIndenter
 						continue;
 					case '@' when i + 1 < source.Length && source[i + 1] is '(' or '{':
 						i = RazorBlockScanner.PastMatch(
-							source, i + 1,
+							source,
+							i + 1,
 							source[i + 1] == '(' ? SyntaxKind.OpenParenToken : SyntaxKind.OpenBraceToken,
-							source[i + 1] == '(' ? SyntaxKind.CloseParenToken : SyntaxKind.CloseBraceToken);
+							source[i + 1] == '(' ? SyntaxKind.CloseParenToken : SyntaxKind.CloseBraceToken
+						);
 						if (i < 0)
 							return -1;
 						continue;
@@ -847,9 +887,7 @@ public static class RazorMarkupIndenter
 		private bool ClosesTop(int content, int lineEnd)
 		{
 			var top = _stack[^1];
-			return top.Kind == FrameKind.Element
-				? StartsWithClosingTag(content, lineEnd, top.Name!)
-				: source[content] == '}';
+			return top.Kind == FrameKind.Element ? StartsWithClosingTag(content, lineEnd, top.Name!) : source[content] == '}';
 		}
 
 		private bool StartsWithClosingTag(int content, int lineEnd, string name) =>

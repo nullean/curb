@@ -62,8 +62,6 @@ internal static partial class Printers
 			if (links is null || (effectiveLinks < MinimumLinksToBreak && !SpansLines(node, context)))
 				return false;
 
-
-
 			var arena = context.Arena;
 
 			// The author's own layout wins: a chain they opened out stays opened out, at their dots.
@@ -111,8 +109,7 @@ internal static partial class Printers
 				// group would otherwise only take when the joined chain does not fit. Guarded the same way
 				// csharp_max_initializer_elements_on_line's count is: not for a chain sitting in a call's
 				// arguments, where the break is measured by whatever encloses it.
-				if (context.Options.MaxChainedMethodCallsOnLine is { } maxCalls
-					&& links.Count > maxCalls && !IsInsideArguments(node))
+				if (context.Options.MaxChainedMethodCallsOnLine is { } maxCalls && links.Count > maxCalls && !IsInsideArguments(node))
 					arena.BreakParent();
 
 				// csharp_wrap_after_dot_in_method_calls puts the dot on the tail of the line it follows
@@ -199,16 +196,15 @@ internal static partial class Printers
 					continue;
 
 				default:
-					receiverIsCallShaped = lastWasInvocationOrElementAccess
-						|| current is ObjectCreationExpressionSyntax { ArgumentList.Arguments.Count: > 0 }
-						|| current is ImplicitObjectCreationExpressionSyntax { ArgumentList.Arguments.Count: > 0 };
+					receiverIsCallShaped = lastWasInvocationOrElementAccess ||
+						current is ObjectCreationExpressionSyntax { ArgumentList.Arguments.Count: > 0 } ||
+						current is ImplicitObjectCreationExpressionSyntax { ArgumentList.Arguments.Count: > 0 };
 					return count;
 			}
 		}
 	}
 
-	private static int PreviousEnd(List<ChainLink> links, ExpressionSyntax receiver, int index) =>
-		index == 0 ? receiver.Span.End : links[index - 1].End;
+	private static int PreviousEnd(List<ChainLink> links, ExpressionSyntax receiver, int index) => index == 0 ? receiver.Span.End : links[index - 1].End;
 
 	/// <summary>
 	/// True when the author put a break before any link this printer is responsible for, or before
@@ -220,11 +216,7 @@ internal static partial class Printers
 	/// the previous line there, so the link read as unbroken and the whole chain was joined back up,
 	/// against the rule that nothing joins lines the author broke.
 	/// </remarks>
-	private static bool BreaksAnywhere(
-		List<ChainLink> links,
-		ExpressionSyntax receiver,
-		int from,
-		PrintContext context)
+	private static bool BreaksAnywhere(List<ChainLink> links, ExpressionSyntax receiver, int from, PrintContext context)
 	{
 		var buffer = context.TrailerBuffer;
 		for (var i = 0; i < links.Count; i++)
@@ -363,14 +355,13 @@ internal static partial class Printers
 		}
 	}
 
-	private static bool IsChainReceiverOf(SyntaxNode? parent, ExpressionSyntax node) =>
-		parent switch
-		{
-			MemberAccessExpressionSyntax access => access.Expression == node,
-			InvocationExpressionSyntax invocation => invocation.Expression == node,
-			ElementAccessExpressionSyntax elementAccess => elementAccess.Expression == node,
-			_ => false,
-		};
+	private static bool IsChainReceiverOf(SyntaxNode? parent, ExpressionSyntax node) => parent switch
+	{
+		MemberAccessExpressionSyntax access => access.Expression == node,
+		InvocationExpressionSyntax invocation => invocation.Expression == node,
+		ElementAccessExpressionSyntax elementAccess => elementAccess.Expression == node,
+		_ => false,
+	};
 
 	/// <summary>One <c>.Name(…)</c> step of a chain.</summary>
 	private readonly struct ChainLink(SyntaxToken dotToken, SimpleNameSyntax name, int trailersStart, int trailersCount, int end)

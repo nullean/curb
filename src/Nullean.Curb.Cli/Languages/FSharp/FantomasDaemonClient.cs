@@ -223,8 +223,12 @@ internal sealed class FantomasDaemonClient : IAsyncDisposable
 
 		if (!root.TryGetProperty("id", out var idElement) || idElement.ValueKind == JsonValueKind.Null)
 		{
-			if (root.TryGetProperty("method", out var method) && method.ValueEquals(ConfigurationWarningMethod)
-				&& root.TryGetProperty("params", out var parameters))
+			if (
+				root.TryGetProperty("method", out var method) && method.ValueEquals(ConfigurationWarningMethod) && root.TryGetProperty(
+					"params",
+					out var parameters
+				)
+			)
 			{
 				ReportConfigurationWarning(parameters);
 			}
@@ -263,13 +267,13 @@ internal sealed class FantomasDaemonClient : IAsyncDisposable
 		if (result.ValueKind == JsonValueKind.String)
 			return new FantomasReply(FantomasOutcome.Unchanged, null, result.GetString(), null);
 
-		if (result.ValueKind != JsonValueKind.Object
-			|| !result.TryGetProperty("Case", out var caseName) || caseName.ValueKind != JsonValueKind.String)
+		if (result.ValueKind != JsonValueKind.Object || !result.TryGetProperty("Case", out var caseName) || caseName.ValueKind != JsonValueKind.String)
 		{
 			throw new FantomasDaemonException("the daemon answered with something that is not a format result");
 		}
 
 		var fields = result.TryGetProperty("Fields", out var f) && f.ValueKind == JsonValueKind.Array ? f : default;
+
 		string? Field(int index) =>
 			fields.ValueKind == JsonValueKind.Array && fields.GetArrayLength() > index && fields[index].ValueKind == JsonValueKind.String
 				? fields[index].GetString()
@@ -279,7 +283,12 @@ internal sealed class FantomasDaemonClient : IAsyncDisposable
 		// check that the answer is for the file it asked about fails instead of passing vacuously.
 		var path = Field(0) ?? "";
 		if (caseName.ValueEquals("Formatted"))
-			return new FantomasReply(FantomasOutcome.Formatted, path, Field(1) ?? throw new FantomasDaemonException("Formatted arrived without its content"), null);
+			return new FantomasReply(
+				FantomasOutcome.Formatted,
+				path,
+				Field(1) ?? throw new FantomasDaemonException("Formatted arrived without its content"),
+				null
+			);
 		if (caseName.ValueEquals("Unchanged"))
 			return new FantomasReply(FantomasOutcome.Unchanged, path, null, null);
 		if (caseName.ValueEquals("Error"))
@@ -300,8 +309,7 @@ internal sealed class FantomasDaemonClient : IAsyncDisposable
 
 		// StreamJsonRpc sends positional parameters: an array holding the one warning.
 		var warning = parameters.ValueKind == JsonValueKind.Array && parameters.GetArrayLength() > 0 ? parameters[0] : parameters;
-		if (warning.ValueKind != JsonValueKind.Object
-			|| !warning.TryGetProperty("Problems", out var problems) || problems.ValueKind != JsonValueKind.Array)
+		if (warning.ValueKind != JsonValueKind.Object || !warning.TryGetProperty("Problems", out var problems) || problems.ValueKind != JsonValueKind.Array)
 		{
 			return;
 		}
@@ -316,9 +324,7 @@ internal sealed class FantomasDaemonClient : IAsyncDisposable
 			if (setting is null)
 				continue;
 
-			_warn(value is null
-				? $"Fantomas does not know the setting '{setting}'"
-				: $"Fantomas does not recognise '{value}' for '{setting}'");
+			_warn(value is null ? $"Fantomas does not know the setting '{setting}'" : $"Fantomas does not recognise '{value}' for '{setting}'");
 		}
 	}
 

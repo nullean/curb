@@ -29,7 +29,6 @@ internal sealed class ImplicitObjectCreation : ICleanupRule
 
 	public bool TryFix(CleanupContext context, in CleanupDiagnostic diagnostic, TextSpan span, ICollection<PlannedFix> into, out string? refusal)
 	{
-
 		var token = context.Root.FindToken(span.Start);
 
 		if (token.SpanStart != span.Start || !token.IsKind(SyntaxKind.NewKeyword))
@@ -102,7 +101,6 @@ internal sealed class ImplicitTypes : ICleanupRule
 
 	public bool TryFix(CleanupContext context, in CleanupDiagnostic diagnostic, TextSpan span, ICollection<PlannedFix> into, out string? refusal)
 	{
-
 		var token = context.Root.FindToken(span.Start);
 		if (token.SpanStart != span.Start)
 		{
@@ -204,13 +202,9 @@ internal sealed class ImplicitTypes : ICleanupRule
 
 	/// <summary>The initialiser a type belongs to, when it has one.</summary>
 	private static ExpressionSyntax? Initialiser(TypeSyntax type) =>
-		type.Parent is VariableDeclarationSyntax { Variables.Count: 1 } declaration
-			? declaration.Variables[0].Initializer?.Value
-			: null;
+		type.Parent is VariableDeclarationSyntax { Variables.Count: 1 } declaration ? declaration.Variables[0].Initializer?.Value : null;
 
 	/// <summary>True for an initialiser <c>var</c> cannot take its type from.</summary>
 	private static bool InfersNothing(ExpressionSyntax value) =>
-		value is DefaultExpressionSyntax
-			|| value.IsKind(SyntaxKind.DefaultLiteralExpression)
-			|| value.IsKind(SyntaxKind.NullLiteralExpression);
+		value is DefaultExpressionSyntax || value.IsKind(SyntaxKind.DefaultLiteralExpression) || value.IsKind(SyntaxKind.NullLiteralExpression);
 }

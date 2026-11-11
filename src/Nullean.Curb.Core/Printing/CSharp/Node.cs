@@ -40,9 +40,12 @@ internal static class Node
 		// reader draws the pragma around, and going finer would leave a construct half formatted.
 		//
 		// The null check carries every file that has no such pragma, which is nearly all of them.
-		if (context.Suppressed is { } suppressed
-			&& node is MemberDeclarationSyntax or StatementSyntax
-			&& FormattingSuppression.Covers(suppressed, node.FullSpan))
+		if (
+			context.Suppressed is { } suppressed && node is MemberDeclarationSyntax or StatementSyntax && FormattingSuppression.Covers(
+				suppressed,
+				node.FullSpan
+			)
+		)
 		{
 			Printers.PrintVerbatim(node, context);
 			context.Depth--;

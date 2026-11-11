@@ -16,8 +16,7 @@ internal sealed class DocArenaCorruptException(string message) : Exception(messa
 internal static class DocValidator
 {
 	/// <typeparam name="TLanguage">Whose <see cref="ILayoutLanguage.SyntheticTable"/> the synthetic ids must index.</typeparam>
-	public static void Validate<TLanguage>(DocArena arena, int sourceLength)
-		where TLanguage : struct, ILayoutLanguage
+	public static void Validate<TLanguage>(DocArena arena, int sourceLength) where TLanguage : struct, ILayoutLanguage
 	{
 		if (arena.Count == 0)
 			return;
@@ -36,13 +35,17 @@ internal static class DocValidator
 				throw new DocArenaCorruptException($"doc {i} ({doc.Kind}) has non-positive subtree length {doc.Length}; a scope was probably closed twice");
 
 			if (i + doc.Length > end)
-				throw new DocArenaCorruptException($"doc {i} ({doc.Kind}) claims a subtree of {doc.Length} slots, overrunning its parent which ends at {end}; a scope was probably left open");
+				throw new DocArenaCorruptException(
+					$"doc {i} ({doc.Kind}) claims a subtree of {doc.Length} slots, overrunning its parent which ends at {end}; a scope was probably left open"
+				);
 
 			switch (doc.Kind)
 			{
 				case DocKind.SrcText:
 					if (doc.A < 0 || doc.B < 0 || doc.A + doc.B > sourceLength)
-						throw new DocArenaCorruptException($"doc {i} references source [{doc.A}, {doc.A + doc.B}) which is outside the {sourceLength}-char source");
+						throw new DocArenaCorruptException(
+							$"doc {i} references source [{doc.A}, {doc.A + doc.B}) which is outside the {sourceLength}-char source"
+						);
 					if (doc.Length != 1)
 						throw new DocArenaCorruptException($"doc {i} is a text leaf but claims {doc.Length} slots");
 					break;

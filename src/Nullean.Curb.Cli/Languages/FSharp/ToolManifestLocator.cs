@@ -84,7 +84,10 @@ internal sealed class ToolManifestLocator(IFileSystem fileSystem)
 	{
 		found = null;
 		var isRoot = false;
-		foreach (var candidate in (ReadOnlySpan<string>)[fileSystem.Path.Combine(directory, ".config", "dotnet-tools.json"), fileSystem.Path.Combine(directory, "dotnet-tools.json")])
+		foreach (var candidate in (ReadOnlySpan<string>)[
+			fileSystem.Path.Combine(directory, ".config", "dotnet-tools.json"),
+			fileSystem.Path.Combine(directory, "dotnet-tools.json")
+		])
 		{
 			if (!fileSystem.File.Exists(candidate))
 				continue;
@@ -107,11 +110,10 @@ internal sealed class ToolManifestLocator(IFileSystem fileSystem)
 		isRoot = false;
 		try
 		{
-			using var document = JsonDocument.Parse(fileSystem.File.ReadAllBytes(path), new JsonDocumentOptions
-			{
-				AllowTrailingCommas = true,
-				CommentHandling = JsonCommentHandling.Skip,
-			});
+			using var document = JsonDocument.Parse(
+				fileSystem.File.ReadAllBytes(path),
+				new JsonDocumentOptions { AllowTrailingCommas = true, CommentHandling = JsonCommentHandling.Skip, }
+			);
 
 			var root = document.RootElement;
 			if (root.ValueKind != JsonValueKind.Object)
@@ -128,8 +130,10 @@ internal sealed class ToolManifestLocator(IFileSystem fileSystem)
 					if (!tool.Name.Equals(id, StringComparison.OrdinalIgnoreCase) || tool.Value.ValueKind != JsonValueKind.Object)
 						continue;
 
-					if (!tool.Value.TryGetProperty("version", out var version) || version.ValueKind != JsonValueKind.String
-						|| version.GetString() is not { Length: > 0 } pinned)
+					if (
+						!tool.Value.TryGetProperty("version", out var version) || version.ValueKind != JsonValueKind.String ||
+						version.GetString() is not { Length: > 0 } pinned
+					)
 					{
 						return new FantomasManifest(path, id, "", false, $"{path} declares '{tool.Name}' without a version, so it cannot be run");
 					}

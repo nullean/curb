@@ -85,9 +85,7 @@ public readonly record struct Compilation(string Id, string Group, string Label)
 	{
 		foreach (var known in (ReadOnlySpan<string>)["netstandard", "netcoreapp", "net"])
 		{
-			if (name.Length > known.Length
-				&& name.StartsWith(known, StringComparison.OrdinalIgnoreCase)
-				&& char.IsAsciiDigit(name[known.Length]))
+			if (name.Length > known.Length && name.StartsWith(known, StringComparison.OrdinalIgnoreCase) && char.IsAsciiDigit(name[known.Length]))
 			{
 				return true;
 			}
@@ -226,9 +224,12 @@ public sealed class TargetAgreement
 
 			var reported = string.Join(", ", by.Select(Label).Order(StringComparer.Ordinal));
 			var notReported = string.Join(", ", silent.Select(Label).Order(StringComparer.Ordinal));
-			declined.Add(new DeclinedSite(first,
-				$"{first.RuleId}: reported for {reported} but not for {notReported}, which compiles this file too, "
-				+ "so fixing it could break that build"));
+			declined.Add(
+				new DeclinedSite(
+					first,
+					$"{first.RuleId}: reported for {reported} but not for {notReported}, which compiles this file too, " + "so fixing it could break that build"
+				)
+			);
 		}
 
 		return new TargetVerdict(agreed, declined);
@@ -287,9 +288,7 @@ public sealed class TargetAgreement
 /// <summary>What <see cref="TargetAgreement.Resolve"/> decided.</summary>
 /// <param name="Agreed">Per file, one diagnostic per site every compilation that read the file reported.</param>
 /// <param name="Declined">Sites some of those compilations did not report, each with the reason.</param>
-public readonly record struct TargetVerdict(
-	IReadOnlyDictionary<string, List<CleanupDiagnostic>> Agreed,
-	IReadOnlyList<DeclinedSite> Declined);
+public readonly record struct TargetVerdict(IReadOnlyDictionary<string, List<CleanupDiagnostic>> Agreed, IReadOnlyList<DeclinedSite> Declined);
 
 /// <summary>A site left alone because the target frameworks disagreed about it.</summary>
 /// <param name="Diagnostic">The first report of the site.</param>

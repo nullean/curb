@@ -28,18 +28,8 @@ public enum BraceStyle : ushort
 	Types = 1 << 11,
 
 	/// <summary>Allman: every brace on its own line. The default.</summary>
-	All = Accessors
-		| AnonymousMethods
-		| AnonymousTypes
-		| ControlBlocks
-		| Events
-		| Indexers
-		| Lambdas
-		| LocalFunctions
-		| Methods
-		| ObjectCollectionArrayInitializers
-		| Properties
-		| Types,
+	All = Accessors | AnonymousMethods | AnonymousTypes | ControlBlocks | Events | Indexers | Lambdas | LocalFunctions | Methods |
+		ObjectCollectionArrayInitializers | Properties | Types,
 }
 
 /// <summary>Parses the value of <c>csharp_new_line_before_open_brace</c>.</summary>
@@ -72,8 +62,7 @@ public static class BraceStyleParser
 		if (style == BraceStyle.None)
 			return "none";
 
-		var set = Names[2..]
-			.Where((_, index) => (style & (BraceStyle)(1 << index)) != 0);
+		var set = Names[2..].Where((_, index) => (style & (BraceStyle)(1 << index)) != 0);
 
 		return string.Join(",", set);
 	}

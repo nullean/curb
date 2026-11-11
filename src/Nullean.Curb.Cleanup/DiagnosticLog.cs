@@ -55,8 +55,7 @@ public static class DiagnosticLog
 	/// <param name="contexts">Every project and target framework a console log names, whether or not it reported anything Curb owns.</param>
 	/// <param name="failure">Why the log could not be read, when it could not.</param>
 	/// <returns>False when the bytes looked like SARIF but could not be read.</returns>
-	public static bool TryRead(
-		ReadOnlySpan<byte> utf8, out List<LoggedDiagnostic> diagnostics, out HashSet<string> contexts, out string? failure)
+	public static bool TryRead(ReadOnlySpan<byte> utf8, out List<LoggedDiagnostic> diagnostics, out HashSet<string> contexts, out string? failure)
 	{
 		var seen = new HashSet<LoggedDiagnostic>();
 		diagnostics = [];
@@ -110,8 +109,7 @@ public static class DiagnosticLog
 	/// Adds to a list only what a set has not seen. A collection rather than a post-pass so the readers
 	/// stay free of any opinion about duplicates.
 	/// </summary>
-	private sealed class Deduplicating(HashSet<CleanupDiagnostic> seen, List<CleanupDiagnostic> target)
-		: ICollection<CleanupDiagnostic>
+	private sealed class Deduplicating(HashSet<CleanupDiagnostic> seen, List<CleanupDiagnostic> target) : ICollection<CleanupDiagnostic>
 	{
 		public void Add(CleanupDiagnostic item)
 		{

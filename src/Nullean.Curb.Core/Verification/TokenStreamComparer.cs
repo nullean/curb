@@ -50,7 +50,8 @@ internal static class TokenStreamComparer
 		bool namespaceUnwrapped = false,
 		IReadOnlyList<TextSpan>? dropped = null,
 		int arrowsAdded = 0,
-		IReadOnlyList<InsertedToken>? inserted = null)
+		IReadOnlyList<InsertedToken>? inserted = null
+	)
 	{
 		// Parse needs a string; reuse the caller's if it has one, otherwise materialize once.
 		formattedStr ??= formatted.ToString();
@@ -109,8 +110,7 @@ internal static class TokenStreamComparer
 
 			// The owed closing brace, when it is the last thing in the file and the output has already
 			// finished.
-			if (namespaceUnwrapped && namespaceBraceOwed && hasOriginal && !hasProduced
-				&& before.RawKind == (int)SyntaxKind.CloseBraceToken)
+			if (namespaceUnwrapped && namespaceBraceOwed && hasOriginal && !hasProduced && before.RawKind == (int)SyntaxKind.CloseBraceToken)
 			{
 				namespaceBraceOwed = false;
 				continue;
@@ -152,9 +152,12 @@ internal static class TokenStreamComparer
 			//
 			// The original token is carried forward rather than consumed, so it is still compared on the
 			// next turn — which is what keeps this an insertion rather than a substitution.
-			if (inserted is not null && nextInserted < inserted.Count && hasProduced
-				&& after.SpanStart == inserted[nextInserted].Offset
-				&& formattedText.Slice(after.Span.Start, after.Span.Length).SequenceEqual(inserted[nextInserted].Text))
+			if (
+				inserted is not null && nextInserted < inserted.Count && hasProduced && after.SpanStart == inserted[nextInserted].Offset && formattedText.Slice(
+					after.Span.Start,
+					after.Span.Length
+				).SequenceEqual(inserted[nextInserted].Text)
+			)
 			{
 				nextInserted++;
 				carryOriginal = hasOriginal;
@@ -163,8 +166,7 @@ internal static class TokenStreamComparer
 
 			// The tail of an added brace pair, settled by count for the same reason as in the content
 			// check: the added `}` matched the enclosing block's own and left this one over.
-			if (bracesAdded && !hasOriginal && hasProduced
-				&& after.RawKind == (int)SyntaxKind.CloseBraceToken && braceDebt > 0)
+			if (bracesAdded && !hasOriginal && hasProduced && after.RawKind == (int)SyntaxKind.CloseBraceToken && braceDebt > 0)
 			{
 				braceDebt--;
 				continue;
@@ -202,9 +204,7 @@ internal static class TokenStreamComparer
 				// Found on a 17,000-file corpus, reported as "']' became '('".
 				//
 				// The check is still exactly as strict: a span only ever excuses tokens that lie inside it.
-				if (nextDropped < dropped.Count
-					&& before.SpanStart >= dropped[nextDropped].Start
-					&& before.Span.End <= dropped[nextDropped].End)
+				if (nextDropped < dropped.Count && before.SpanStart >= dropped[nextDropped].Start && before.Span.End <= dropped[nextDropped].End)
 				{
 					carryProduced = hasProduced;
 					continue;
@@ -212,9 +212,10 @@ internal static class TokenStreamComparer
 			}
 
 			// The arrow that replaced a dropped block.
-			if (arrowsOwed > 0 && hasProduced
-				&& after.RawKind == (int)SyntaxKind.EqualsGreaterThanToken
-				&& (!hasOriginal || Mismatch(originalText, before, formattedText, after)))
+			if (
+				arrowsOwed > 0 && hasProduced && after.RawKind == (int)SyntaxKind.EqualsGreaterThanToken &&
+				(!hasOriginal || Mismatch(originalText, before, formattedText, after))
+			)
 			{
 				arrowsOwed--;
 				carryOriginal = true;
@@ -225,18 +226,14 @@ internal static class TokenStreamComparer
 			// once, so a brace lost anywhere else is still a lost brace.
 			if (namespaceUnwrapped && hasOriginal && hasProduced)
 			{
-				if (!namespaceBraceOwed
-					&& before.RawKind == (int)SyntaxKind.OpenBraceToken
-					&& after.RawKind == (int)SyntaxKind.SemicolonToken)
+				if (!namespaceBraceOwed && before.RawKind == (int)SyntaxKind.OpenBraceToken && after.RawKind == (int)SyntaxKind.SemicolonToken)
 				{
 					namespaceBraceOwed = true;
 					index++;
 					continue;
 				}
 
-				if (namespaceBraceOwed
-					&& before.RawKind == (int)SyntaxKind.CloseBraceToken
-					&& after.RawKind != (int)SyntaxKind.CloseBraceToken)
+				if (namespaceBraceOwed && before.RawKind == (int)SyntaxKind.CloseBraceToken && after.RawKind != (int)SyntaxKind.CloseBraceToken)
 				{
 					namespaceBraceOwed = false;
 					carryProduced = true;
@@ -266,15 +263,9 @@ internal static class TokenStreamComparer
 			// maximal run from each and comparing them as multisets is exact and needs no spans —
 			// `public static` against `static public` passes, `public static` against `public` does
 			// not. Modifiers are always parted by a space, so no boundary can move here.
-			if (modifiersReordered
-				&& Mismatch(originalText, before, formattedText, after)
-				&& IsModifier(before)
-				&& IsModifier(after))
+			if (modifiersReordered && Mismatch(originalText, before, formattedText, after) && IsModifier(before) && IsModifier(after))
 			{
-				if (!SameModifierRun(
-					original, originalText, ref before, ref carryOriginal,
-					produced, formattedText, ref after, ref carryProduced,
-					out failure))
+				if (!SameModifierRun(original, originalText, ref before, ref carryOriginal, produced, formattedText, ref after, ref carryProduced, out failure))
 					return false;
 
 				// Both runs are accounted for; whatever follows them is compared on the next turn.
@@ -303,9 +294,7 @@ internal static class TokenStreamComparer
 
 			if (isMismatch)
 			{
-				failure =
-					$"formatting changed token {index}: '{Text(originalText, before)}' became "
-					+ $"'{Text(formattedText, after)}'";
+				failure = $"formatting changed token {index}: '{Text(originalText, before)}' became " + $"'{Text(formattedText, after)}'";
 				return false;
 			}
 
@@ -329,8 +318,7 @@ internal static class TokenStreamComparer
 	/// legitimate. <c>var</c> parses as an identifier and is left alone: <c>var var = 1;</c> is legal.
 	/// </para>
 	/// </remarks>
-	private static bool NoDuplicatedKeyword(
-		SyntaxNode root, ReadOnlySpan<char> text, IReadOnlyList<InsertedToken> inserted, out string? failure)
+	private static bool NoDuplicatedKeyword(SyntaxNode root, ReadOnlySpan<char> text, IReadOnlyList<InsertedToken> inserted, out string? failure)
 	{
 		foreach (var insertion in inserted)
 		{
@@ -352,19 +340,13 @@ internal static class TokenStreamComparer
 			neighbour.RawKind == token.RawKind && Text(text, neighbour).SequenceEqual(Text(text, token));
 	}
 
-	private static bool Mismatch(
-		ReadOnlySpan<char> originalText,
-		SyntaxToken before,
-		ReadOnlySpan<char> formattedText,
-		SyntaxToken after) =>
-		before.RawKind != after.RawKind
-		|| !Text(originalText, before).SequenceEqual(Text(formattedText, after));
+	private static bool Mismatch(ReadOnlySpan<char> originalText, SyntaxToken before, ReadOnlySpan<char> formattedText, SyntaxToken after) =>
+		before.RawKind != after.RawKind || !Text(originalText, before).SequenceEqual(Text(formattedText, after));
 
 	private static bool IsComma(SyntaxToken token) => token.RawKind == (int)SyntaxKind.CommaToken;
 
 	/// <summary>The two closers the grammar permits a trailing comma before.</summary>
-	private static bool IsCloser(SyntaxToken token) =>
-		token.RawKind is (int)SyntaxKind.CloseBraceToken or (int)SyntaxKind.CloseBracketToken;
+	private static bool IsCloser(SyntaxToken token) => token.RawKind is (int)SyntaxKind.CloseBraceToken or (int)SyntaxKind.CloseBracketToken;
 
 	/// <summary>Pulls the next token.</summary>
 	private static bool Next(IEnumerator<SyntaxToken> tokens, out SyntaxToken token)
@@ -380,16 +362,29 @@ internal static class TokenStreamComparer
 	}
 
 	private static bool IsModifier(SyntaxToken token) =>
-		SyntaxFacts.IsAccessibilityModifier((SyntaxKind)token.RawKind)
-		|| ModifierKinds.Contains((SyntaxKind)token.RawKind);
+		SyntaxFacts.IsAccessibilityModifier((SyntaxKind)token.RawKind) || ModifierKinds.Contains((SyntaxKind)token.RawKind);
 
 	private static readonly HashSet<SyntaxKind> ModifierKinds =
 	[
-		SyntaxKind.StaticKeyword, SyntaxKind.ExternKeyword, SyntaxKind.NewKeyword, SyntaxKind.VirtualKeyword,
-		SyntaxKind.AbstractKeyword, SyntaxKind.SealedKeyword, SyntaxKind.OverrideKeyword, SyntaxKind.ReadOnlyKeyword,
-		SyntaxKind.UnsafeKeyword, SyntaxKind.VolatileKeyword, SyntaxKind.AsyncKeyword, SyntaxKind.PartialKeyword,
-		SyntaxKind.RequiredKeyword, SyntaxKind.FileKeyword, SyntaxKind.RefKeyword, SyntaxKind.ConstKeyword,
-		SyntaxKind.FixedKeyword, SyntaxKind.ExplicitKeyword, SyntaxKind.ImplicitKeyword,
+		SyntaxKind.StaticKeyword,
+		SyntaxKind.ExternKeyword,
+		SyntaxKind.NewKeyword,
+		SyntaxKind.VirtualKeyword,
+		SyntaxKind.AbstractKeyword,
+		SyntaxKind.SealedKeyword,
+		SyntaxKind.OverrideKeyword,
+		SyntaxKind.ReadOnlyKeyword,
+		SyntaxKind.UnsafeKeyword,
+		SyntaxKind.VolatileKeyword,
+		SyntaxKind.AsyncKeyword,
+		SyntaxKind.PartialKeyword,
+		SyntaxKind.RequiredKeyword,
+		SyntaxKind.FileKeyword,
+		SyntaxKind.RefKeyword,
+		SyntaxKind.ConstKeyword,
+		SyntaxKind.FixedKeyword,
+		SyntaxKind.ExplicitKeyword,
+		SyntaxKind.ImplicitKeyword,
 	];
 
 	/// <summary>
@@ -408,7 +403,8 @@ internal static class TokenStreamComparer
 		ReadOnlySpan<char> formattedText,
 		ref SyntaxToken after,
 		ref bool carryProduced,
-		out string? failure)
+		out string? failure
+	)
 	{
 		var expected = new List<string>();
 		var actual = new List<string>();
@@ -436,9 +432,7 @@ internal static class TokenStreamComparer
 
 		if (!expected.SequenceEqual(actual))
 		{
-			failure =
-				$"reordering modifiers changed them: '{string.Join(' ', expected)}' "
-				+ $"became '{string.Join(' ', actual)}'";
+			failure = $"reordering modifiers changed them: '{string.Join(' ', expected)}' " + $"became '{string.Join(' ', actual)}'";
 			return false;
 		}
 
@@ -501,9 +495,9 @@ internal static class TokenStreamComparer
 	private static bool MisplacesGlobalUsing(SyntaxNode root)
 	{
 		var seenLocal = false;
-		foreach (var directive in root
-			.DescendantNodes(descendIntoChildren: node => node is CompilationUnitSyntax or BaseNamespaceDeclarationSyntax)
-			.OfType<UsingDirectiveSyntax>())
+		foreach (var directive in root.DescendantNodes(
+			descendIntoChildren: node => node is CompilationUnitSyntax or BaseNamespaceDeclarationSyntax
+		).OfType<UsingDirectiveSyntax>())
 		{
 			var global = directive.GlobalKeyword.RawKind != 0;
 			if (directive.Parent is not CompilationUnitSyntax)
@@ -529,9 +523,12 @@ internal static class TokenStreamComparer
 	/// list cannot see, are held to the content check's multiset compare over the same region.
 	/// </remarks>
 	private static string[] Directives(SyntaxNode root) =>
-		[.. root.DescendantNodes(descendIntoChildren: node => node is CompilationUnitSyntax or BaseNamespaceDeclarationSyntax)
-			.OfType<UsingDirectiveSyntax>()
-			.Select(directive => string.Join(' ', directive.DescendantTokens().Select(token => token.Text)))];
+		[
+			.. root
+				.DescendantNodes(descendIntoChildren: node => node is CompilationUnitSyntax or BaseNamespaceDeclarationSyntax)
+				.OfType<UsingDirectiveSyntax>()
+				.Select(directive => string.Join(' ', directive.DescendantTokens().Select(token => token.Text)))
+		];
 
 	private static ReadOnlySpan<char> Text(ReadOnlySpan<char> source, SyntaxToken token)
 	{

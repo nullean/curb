@@ -161,15 +161,11 @@ internal static partial class Printers
 	/// <c>??</c> associates the other way, so its operands are left-hand children and every operator
 	/// came back empty. The content check caught it on one corpus file.
 	/// </remarks>
-	private static void Flatten(
-		BinaryExpressionSyntax node,
-		List<ExpressionSyntax> operands,
-		List<SyntaxToken> operators)
+	private static void Flatten(BinaryExpressionSyntax node, List<ExpressionSyntax> operands, List<SyntaxToken> operators)
 	{
 		void Walk(ExpressionSyntax expression)
 		{
-			if (expression is BinaryExpressionSyntax binary
-				&& binary.OperatorToken.RawKind == node.OperatorToken.RawKind)
+			if (expression is BinaryExpressionSyntax binary && binary.OperatorToken.RawKind == node.OperatorToken.RawKind)
 			{
 				Walk(binary.Left);
 				operators.Add(binary.OperatorToken);

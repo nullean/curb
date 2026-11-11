@@ -58,10 +58,10 @@ internal sealed class FormattingCache
 	/// printer while passing <c>--cache</c> can read stale results. The cache is opt-in, Curb's own build
 	/// never passes it, and `dotnet clean` removes it, which is as far as this is worth defending.
 	/// </remarks>
-	private static readonly string ToolVersion =
-		typeof(FormattingCache).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
-		?? typeof(FormattingCache).Assembly.GetName().Version?.ToString()
-		?? "unknown";
+	private static readonly string ToolVersion = typeof(FormattingCache).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? typeof(FormattingCache)
+		.Assembly
+		.GetName()
+		.Version?.ToString() ?? "unknown";
 
 	private readonly IFileSystem _fileSystem;
 	private readonly string _path;
@@ -128,8 +128,7 @@ internal sealed class FormattingCache
 	}
 
 	/// <summary>Records that the formatter produced these bytes back unchanged. Called from the worker threads.</summary>
-	internal void Record(string path, UInt128 content, UInt128 options) =>
-		_entries[path] = new Entry(content, options, _now);
+	internal void Record(string path, UInt128 content, UInt128 options) => _entries[path] = new Entry(content, options, _now);
 
 	/// <summary>Writes the cache back, merging what this run saw over what it loaded.</summary>
 	internal void Save()
@@ -147,10 +146,15 @@ internal sealed class FormattingCache
 			// diffs like anything else someone might want to read.
 			foreach (var (path, entry) in _entries.OrderBy(pair => pair.Key, StringComparer.Ordinal))
 			{
-				builder.Append(entry.Content.ToString("x32", CultureInfo.InvariantCulture)).Append('\t')
-					.Append(entry.Options.ToString("x32", CultureInfo.InvariantCulture)).Append('\t')
-					.Append(entry.LastSeen.ToString(CultureInfo.InvariantCulture)).Append('\t')
-					.Append(path).Append('\n');
+				builder
+					.Append(entry.Content.ToString("x32", CultureInfo.InvariantCulture))
+					.Append('\t')
+					.Append(entry.Options.ToString("x32", CultureInfo.InvariantCulture))
+					.Append('\t')
+					.Append(entry.LastSeen.ToString(CultureInfo.InvariantCulture))
+					.Append('\t')
+					.Append(path)
+					.Append('\n');
 			}
 
 			// Through a temporary file, so a run that dies half way through leaves the previous cache
@@ -168,8 +172,7 @@ internal sealed class FormattingCache
 		}
 	}
 
-	private static string Header() =>
-		string.Create(CultureInfo.InvariantCulture, $"{Marker} {FormatVersion} {ToolVersion}");
+	private static string Header() => string.Create(CultureInfo.InvariantCulture, $"{Marker} {FormatVersion} {ToolVersion}");
 
 	/// <summary>
 	/// Tab separated with the path last and split on the first three tabs, so a path containing a tab
@@ -185,9 +188,11 @@ internal sealed class FormattingCache
 		if (fields.Length != 4 || fields[3].Length == 0)
 			return false;
 
-		if (!UInt128.TryParse(fields[0], NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var content)
-			|| !UInt128.TryParse(fields[1], NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var options)
-			|| !long.TryParse(fields[2], NumberStyles.Integer, CultureInfo.InvariantCulture, out var lastSeen))
+		if (
+			!UInt128.TryParse(fields[0], NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var content) ||
+			!UInt128.TryParse(fields[1], NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var options) ||
+			!long.TryParse(fields[2], NumberStyles.Integer, CultureInfo.InvariantCulture, out var lastSeen)
+		)
 		{
 			return false;
 		}

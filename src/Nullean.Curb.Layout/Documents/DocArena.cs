@@ -51,8 +51,7 @@ internal sealed class DocArena
 	// ---- leaves ---------------------------------------------------------------------------------
 
 	/// <summary>Emits a span of the original source verbatim.</summary>
-	public void SourceText(int offset, int length, DocFlags flags = DocFlags.None) =>
-		Add(new Doc(DocKind.SrcText, a: offset, b: length, flags: flags));
+	public void SourceText(int offset, int length, DocFlags flags = DocFlags.None) => Add(new Doc(DocKind.SrcText, a: offset, b: length, flags: flags));
 
 	/// <summary>Emits one of the fixed <see cref="SyntheticText"/> strings.</summary>
 	public void Synthetic(int id) => Add(new Doc(DocKind.SynText, a: id));
@@ -91,15 +90,13 @@ internal sealed class DocArena
 	/// the next break, whoever emits it, is the same one: that break reuses the line and only
 	/// re-indents it.
 	/// </remarks>
-	public void LineCommentBreak() =>
-		Add(new Doc(DocKind.Line, a: (int)LineType.Hard, b: Doc.EndsLineComment));
+	public void LineCommentBreak() => Add(new Doc(DocKind.Line, a: (int)LineType.Hard, b: Doc.EndsLineComment));
 
 	/// <summary>
 	/// Keeps the text at <paramref name="sourceOffset"/> against what was just written, as the source
 	/// has it. See <see cref="SyntheticText.Glue"/>.
 	/// </summary>
-	public void GlueTo(int sourceOffset) =>
-		Add(new Doc(DocKind.SynText, a: SyntheticText.Glue, b: sourceOffset));
+	public void GlueTo(int sourceOffset) => Add(new Doc(DocKind.SynText, a: SyntheticText.Glue, b: sourceOffset));
 
 	/// <summary>Always a newline emitted at column 0, for content that must not be re-indented.</summary>
 	public void LiteralLine(DocFlags flags = DocFlags.None) => AddLine(LineType.Literal, flags);
@@ -112,8 +109,7 @@ internal sealed class DocArena
 	/// endings are content: rewriting them changes the string the program builds, and changes the
 	/// token's own text, which is why the re-parse comparer reports it as a changed token.
 	/// </remarks>
-	public void SourceLine(bool crLf) =>
-		Add(new Doc(DocKind.Line, a: (int)LineType.Literal, b: crLf ? Doc.CrLfEnding : Doc.LfEnding));
+	public void SourceLine(bool crLf) => Add(new Doc(DocKind.Line, a: (int)LineType.Literal, b: crLf ? Doc.CrLfEnding : Doc.LfEnding));
 
 	/// <summary>
 	/// A newline, but only when the group <paramref name="groupId"/> names ended up broken.
@@ -127,8 +123,7 @@ internal sealed class DocArena
 	/// Emitting nothing when the named group is flat is the point: this is the difference between
 	/// putting a brace on its own line and leaving it where it is.
 	/// </remarks>
-	public void LineIfBroken(ushort groupId, DocFlags flags = DocFlags.None) =>
-		AddLine(LineType.Hard, flags, groupId);
+	public void LineIfBroken(ushort groupId, DocFlags flags = DocFlags.None) => AddLine(LineType.Hard, flags, groupId);
 
 	/// <summary>Forces every enclosing group to break without emitting anything.</summary>
 	public void BreakParent() => Add(new Doc(DocKind.BreakParent));
@@ -136,8 +131,7 @@ internal sealed class DocArena
 	/// <summary>Trims trailing whitespace already written.</summary>
 	public void Trim() => Add(new Doc(DocKind.Trim));
 
-	private void AddLine(LineType type, DocFlags flags, ushort groupId = 0) =>
-		Add(new Doc(DocKind.Line, a: (int)type, flags: flags, groupId: groupId));
+	private void AddLine(LineType type, DocFlags flags, ushort groupId = 0) => Add(new Doc(DocKind.Line, a: (int)type, flags: flags, groupId: groupId));
 
 	// ---- scopes ---------------------------------------------------------------------------------
 
@@ -192,8 +186,7 @@ internal sealed class DocArena
 	/// The group has to be one the printer reaches first — a parameter list ahead of the arrow body
 	/// that hangs off it — since a mode is only known once its group has been entered.
 	/// </remarks>
-	public DocScope IndentIfBroken(ushort groupId, int levels = 1) =>
-		Open(new Doc(DocKind.Indent, b: levels, groupId: groupId));
+	public DocScope IndentIfBroken(ushort groupId, int levels = 1) => Open(new Doc(DocKind.Indent, b: levels, groupId: groupId));
 
 	/// <summary>Captures the current output column into <paramref name="register"/>.</summary>
 	public void Anchor(int register) => Add(new Doc(DocKind.Anchor, a: register, b: Doc.AnchorAtColumn));
@@ -217,15 +210,13 @@ internal sealed class DocArena
 	/// For a break that lands at the indent of the line an enclosing construct starts on, however
 	/// deep the scope it is printed from.
 	/// </remarks>
-	public void SourceLineAnchor(int register, int position) =>
-		Add(new Doc(DocKind.Anchor, a: register, b: Doc.AnchorAtSourceLine(position)));
+	public void SourceLineAnchor(int register, int position) => Add(new Doc(DocKind.Anchor, a: register, b: Doc.AnchorAtSourceLine(position)));
 
 	/// <summary>
 	/// Captures into <paramref name="register"/> the indent of the output line, already written, that holds
 	/// the source text at <paramref name="position"/> — see <see cref="Doc.AnchorAtContainingLine"/>.
 	/// </summary>
-	public void ContainingLineAnchor(int register, int position) =>
-		Add(new Doc(DocKind.Anchor, a: register, b: Doc.AnchorAtContainingLine(position)));
+	public void ContainingLineAnchor(int register, int position) => Add(new Doc(DocKind.Anchor, a: register, b: Doc.AnchorAtContainingLine(position)));
 
 	/// <summary>
 	/// A hard break that indents to a column captured by <see cref="Anchor"/>, shifted by
@@ -257,8 +248,7 @@ internal sealed class DocArena
 	/// that does not gets them under the <c>from</c>, which is where dotnet format puts them however
 	/// the break came about.
 	/// </remarks>
-	public void AlignedBreakOpportunity(int register) =>
-		Add(new Doc(DocKind.Line, a: (int)LineType.Normal, b: register, flags: DocFlags.AlignToAnchor));
+	public void AlignedBreakOpportunity(int register) => Add(new Doc(DocKind.Line, a: (int)LineType.Normal, b: register, flags: DocFlags.AlignToAnchor));
 
 	public DocScope ForceFlat() => Open(new Doc(DocKind.ForceFlat));
 

@@ -354,8 +354,7 @@ internal sealed class PrintContext(DocArena arena, SourceText text, string sourc
 	public Dictionary<int, int>? UnhandledByKind { get; init; }
 
 	/// <summary>Share of tokens that went through a real printer. The number M2 exists to drive up.</summary>
-	public double Coverage =>
-		PrintedTokens + VerbatimTokens == 0 ? 1 : (double)PrintedTokens / (PrintedTokens + VerbatimTokens);
+	public double Coverage => PrintedTokens + VerbatimTokens == 0 ? 1 : (double)PrintedTokens / (PrintedTokens + VerbatimTokens);
 
 	/// <summary>
 	/// True when the two positions sit on the same source line, whatever the configuration says.
@@ -389,8 +388,7 @@ internal sealed class PrintContext(DocArena arena, SourceText text, string sourc
 		}
 
 		var line = Text.Lines.GetLineFromPosition(start);
-		return end >= line.Start
-			&& (end < line.EndIncludingLineBreak || (end == line.End && line.End == line.EndIncludingLineBreak));
+		return end >= line.Start && (end < line.EndIncludingLineBreak || (end == line.End && line.End == line.EndIncludingLineBreak));
 	}
 
 	/// <summary>The longest gap <see cref="OnSameLine"/> scans for a line break instead of looking its lines up.</summary>
@@ -414,13 +412,11 @@ internal sealed class PrintContext(DocArena arena, SourceText text, string sourc
 	/// answer is true wants <see cref="AuthorJoined"/>.
 	/// </para>
 	/// </remarks>
-	public bool AuthorBroke(int start, int end) =>
-		Options.KeepExistingLinebreaks && !OnSameLine(start, end);
+	public bool AuthorBroke(int start, int end) => Options.KeepExistingLinebreaks && !OnSameLine(start, end);
 
 	/// <summary>The author kept these positions on one line, and Curb honours it.</summary>
 	/// <remarks>The other door; see <see cref="AuthorBroke"/>. Also false in deterministic mode.</remarks>
-	public bool AuthorJoined(int start, int end) =>
-		Options.KeepExistingLinebreaks && OnSameLine(start, end);
+	public bool AuthorJoined(int start, int end) => Options.KeepExistingLinebreaks && OnSameLine(start, end);
 
 	/// <summary>The columns one indent level occupies: a tab's width, or <c>indent_size</c> spaces.</summary>
 	public int LevelColumns => Options.UseTabs ? Math.Max(1, Options.TabWidth) : Options.IndentSize;

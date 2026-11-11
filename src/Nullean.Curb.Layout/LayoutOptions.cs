@@ -34,7 +34,6 @@ public enum EndOfLine : byte
 	Cr = 3,
 }
 
-
 /// <summary>
 /// The settings the layout printer reads, whatever the language: indentation, width, line endings and
 /// the byte-order mark.
@@ -55,7 +54,8 @@ public readonly record struct LayoutOptions
 	/// <summary>Value of <see cref="MaxLineLength"/> meaning "never reflow".</summary>
 	public const int Off = int.MaxValue;
 
-	public LayoutOptions() { }
+	public LayoutOptions()
+	{ }
 
 	/// <summary>Columns per indent level. <c>indent_size</c>.</summary>
 	public int IndentSize { get; init; } = 4;
@@ -103,12 +103,11 @@ public readonly record struct LayoutOptions
 	/// Resolves <see cref="EndOfLine.Auto"/> to <see cref="System.Environment.NewLine"/> — the same
 	/// fallback Roslyn's own <c>FormattingOptions2.NewLine</c> uses when <c>end_of_line</c> is unset.
 	/// </summary>
-	internal string ResolveEndOfLine() =>
-		EndOfLine switch
-		{
-			EndOfLine.Lf => "\n",
-			EndOfLine.CrLf => "\r\n",
-			EndOfLine.Cr => "\r",
-			_ => Environment.NewLine,
-		};
+	internal string ResolveEndOfLine() => EndOfLine switch
+	{
+		EndOfLine.Lf => "\n",
+		EndOfLine.CrLf => "\r\n",
+		EndOfLine.Cr => "\r",
+		_ => Environment.NewLine,
+	};
 }

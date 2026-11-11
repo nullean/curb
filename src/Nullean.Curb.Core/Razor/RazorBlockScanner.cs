@@ -64,7 +64,8 @@ public readonly record struct RazorBlock(
 	int InnerStart,
 	int InnerEnd,
 	int CloseBrace,
-	RazorBlockRefusal Refusal)
+	RazorBlockRefusal Refusal
+)
 {
 	/// <summary>True for <c>@functions</c>.</summary>
 	public bool IsFunctions => Kind == RazorBlockKind.Functions;
@@ -216,8 +217,10 @@ public static class RazorBlockScanner
 			return brace < 0 ? nameEnd : PastMatch(source, brace, SyntaxKind.OpenBraceToken, SyntaxKind.CloseBraceToken);
 		}
 
-		if (name is "if" or "for" or "foreach" or "while" or "switch" or "lock" or "try" or "do"
-			|| (name.SequenceEqual("using") && SkipBlanks(text, nameEnd) < text.Length && text[SkipBlanks(text, nameEnd)] == '('))
+		if (
+			name is "if" or "for" or "foreach" or "while" or "switch" or "lock" or "try" or "do" ||
+			(name.SequenceEqual("using") && SkipBlanks(text, nameEnd) < text.Length && text[SkipBlanks(text, nameEnd)] == '(')
+		)
 			return PastStatement(source, nameEnd, name.SequenceEqual("do"));
 
 		// An implicit expression: the name, then member accesses, calls and indexers with nothing between.
@@ -374,13 +377,7 @@ public static class RazorBlockScanner
 		return text[i] == '\n' ? i + 1 : -1;
 	}
 
-	private static bool TryMatch(
-		string source,
-		int lineStart,
-		int first,
-		bool component,
-		out RazorBlock block,
-		out int resume)
+	private static bool TryMatch(string source, int lineStart, int first, bool component, out RazorBlock block, out int resume)
 	{
 		block = default;
 		resume = 0;
@@ -449,8 +446,15 @@ public static class RazorBlockScanner
 			alone = false;
 
 		block = new RazorBlock(
-			lineStart, first, kind, brace, innerStart, closeLineStart, close,
-			alone ? RazorBlockRefusal.None : RazorBlockRefusal.CloseBraceNotAlone);
+			lineStart,
+			first,
+			kind,
+			brace,
+			innerStart,
+			closeLineStart,
+			close,
+			alone ? RazorBlockRefusal.None : RazorBlockRefusal.CloseBraceNotAlone
+		);
 		resume = close + 1;
 		return true;
 	}
@@ -461,8 +465,7 @@ public static class RazorBlockScanner
 	/// token is exactly what the C# parser will. Positions it reports are absolute in
 	/// <paramref name="source"/>.
 	/// </remarks>
-	internal static int FindClose(string source, int openBrace) =>
-		FindClose(source, openBrace, SyntaxKind.OpenBraceToken, SyntaxKind.CloseBraceToken);
+	internal static int FindClose(string source, int openBrace) => FindClose(source, openBrace, SyntaxKind.OpenBraceToken, SyntaxKind.CloseBraceToken);
 
 	/// <summary>The position of the token that closes the <paramref name="openKind"/> at <paramref name="open"/>, or -1.</summary>
 	private static int FindClose(string source, int open, SyntaxKind openKind, SyntaxKind closeKind)

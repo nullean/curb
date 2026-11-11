@@ -49,8 +49,9 @@ internal ref struct XmlLexer
 {
 	/// <summary>Characters XML 1.0 does not allow anywhere in a document, references aside.</summary>
 	private static readonly SearchValues<char> Forbidden = SearchValues.Create(
-		"\0\u0001\u0002\u0003\u0004\u0005\u0006\u0007\u0008\u000B\u000C\u000E\u000F"
-		+ "\u0010\u0011\u0012\u0013\u0014\u0015\u0016\u0017\u0018\u0019\u001A\u001B\u001C\u001D\u001E\u001F￾￿");
+		"\0\u0001\u0002\u0003\u0004\u0005\u0006\u0007\u0008\u000B\u000C\u000E\u000F" +
+			"\u0010\u0011\u0012\u0013\u0014\u0015\u0016\u0017\u0018\u0019\u001A\u001B\u001C\u001D\u001E\u001F￾￿"
+	);
 
 	private static readonly SearchValues<char> TextSpecials = SearchValues.Create("&]");
 	private static readonly SearchValues<char> ValueSpecials = SearchValues.Create("&<");
@@ -386,8 +387,11 @@ internal ref struct XmlLexer
 				var spaceStart = _position;
 				while (_position < _source.Length && IsWhitespace(_source[_position]))
 					_position++;
-				Add(XmlTokenKind.TagSpace, spaceStart,
-					_source[spaceStart.._position].IndexOfAny(LineBreaks) >= 0 ? XmlTokenFlags.HasNewLine : XmlTokenFlags.None);
+				Add(
+					XmlTokenKind.TagSpace,
+					spaceStart,
+					_source[spaceStart.._position].IndexOfAny(LineBreaks) >= 0 ? XmlTokenFlags.HasNewLine : XmlTokenFlags.None
+				);
 				separated = true;
 				continue;
 			}
@@ -437,8 +441,11 @@ internal ref struct XmlLexer
 		_position++;
 		while (_position < _source.Length && IsWhitespace(_source[_position]))
 			_position++;
-		Add(XmlTokenKind.AttributeEquals, equalsStart,
-			_source[equalsStart.._position].IndexOfAny(LineBreaks) >= 0 ? XmlTokenFlags.HasNewLine : XmlTokenFlags.None);
+		Add(
+			XmlTokenKind.AttributeEquals,
+			equalsStart,
+			_source[equalsStart.._position].IndexOfAny(LineBreaks) >= 0 ? XmlTokenFlags.HasNewLine : XmlTokenFlags.None
+		);
 
 		var valueStart = _position;
 		if (_position >= _source.Length || _source[_position] is not ('"' or '\''))
@@ -483,10 +490,7 @@ internal ref struct XmlLexer
 		return i;
 	}
 
-	private static bool IsNameStart(char c) =>
-		c < 0x80
-			? (c | 0x20) is >= 'a' and <= 'z' || c is '_' or ':'
-			: char.IsLetter(c) || char.IsSurrogate(c);
+	private static bool IsNameStart(char c) => c < 0x80 ? (c | 0x20) is >= 'a' and <= 'z' || c is '_' or ':' : char.IsLetter(c) || char.IsSurrogate(c);
 
 	private static bool IsNameChar(char c)
 	{
@@ -496,7 +500,8 @@ internal ref struct XmlLexer
 		if (char.IsLetterOrDigit(c) || char.IsSurrogate(c) || c == '·')
 			return true;
 
-		return CharUnicodeInfo.GetUnicodeCategory(c) is UnicodeCategory.NonSpacingMark or UnicodeCategory.SpacingCombiningMark
-			or UnicodeCategory.ConnectorPunctuation;
+		return CharUnicodeInfo.GetUnicodeCategory(
+			c
+		) is UnicodeCategory.NonSpacingMark or UnicodeCategory.SpacingCombiningMark or UnicodeCategory.ConnectorPunctuation;
 	}
 }

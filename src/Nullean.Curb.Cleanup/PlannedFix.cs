@@ -27,15 +27,10 @@ namespace Nullean.Curb.Cleanup;
 /// rather than a count so the verifiers permit precisely this word, once, here — not "extra content
 /// somewhere".
 /// </param>
-internal readonly record struct PlannedFix(
-	TextSpan Removed,
-	string Inserted,
-	IReadOnlyList<TextSpan> DroppedTokens,
-	IReadOnlyList<string> InsertedTokens)
+internal readonly record struct PlannedFix(TextSpan Removed, string Inserted, IReadOnlyList<TextSpan> DroppedTokens, IReadOnlyList<string> InsertedTokens)
 {
 	/// <summary>A deletion of whole tokens, which is what removing a declaration or a directive is.</summary>
-	public static PlannedFix Delete(TextSpan removed, IReadOnlyList<TextSpan> droppedTokens) =>
-		new(removed, "", droppedTokens, []);
+	public static PlannedFix Delete(TextSpan removed, IReadOnlyList<TextSpan> droppedTokens) => new(removed, "", droppedTokens, []);
 
 	/// <summary>
 	/// A keyword added at <paramref name="at"/>, which is what the modifier rules do.
@@ -45,8 +40,7 @@ internal readonly record struct PlannedFix(
 	/// separated from whatever follows it before the output is re-parsed, and the token-stream comparer
 	/// re-parses before any formatting happens.
 	/// </remarks>
-	public static PlannedFix InsertKeyword(int at, string keyword) =>
-		new(new TextSpan(at, 0), keyword + " ", [], [keyword]);
+	public static PlannedFix InsertKeyword(int at, string keyword) => new(new TextSpan(at, 0), keyword + " ", [], [keyword]);
 
 	/// <summary>Collects the span of every token in <paramref name="node"/>, for a fix that deletes it whole.</summary>
 	public static void CollectTokens(SyntaxNode node, List<TextSpan> into)

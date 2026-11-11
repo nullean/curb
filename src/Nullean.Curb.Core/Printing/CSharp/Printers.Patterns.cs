@@ -117,8 +117,10 @@ internal static partial class Printers
 	/// caller prints nothing ahead of it. See <see cref="BareRecursivePatternOwnsLeadingBrace"/>.
 	/// </summary>
 	private static bool PatternOwnsLeadingBrace(PatternSyntax pattern, PrintContext context) =>
-		pattern.GetFirstToken().Parent is PropertyPatternClauseSyntax { Parent: RecursivePatternSyntax first }
-		&& BareRecursivePatternOwnsLeadingBrace(first, context);
+		pattern.GetFirstToken().Parent is PropertyPatternClauseSyntax { Parent: RecursivePatternSyntax first } && BareRecursivePatternOwnsLeadingBrace(
+			first,
+			context
+		);
 
 	/// <summary>
 	/// True for the exact shape RecursivePattern defers its leading brace-line to: a property-only
@@ -646,8 +648,7 @@ internal static partial class Printers
 		TokenPrinter.Print(node.CloseParenToken, context);
 	}
 
-	public static void SimpleBaseType(SimpleBaseTypeSyntax node, PrintContext context) =>
-		Node.Print(node.Type, context);
+	public static void SimpleBaseType(SimpleBaseTypeSyntax node, PrintContext context) => Node.Print(node.Type, context);
 
 	public static void PrimaryConstructorBaseType(PrimaryConstructorBaseTypeSyntax node, PrintContext context)
 	{
@@ -655,8 +656,7 @@ internal static partial class Printers
 		Node.Print(node.ArgumentList, context);
 	}
 
-	public static void ImplicitElementAccess(ImplicitElementAccessSyntax node, PrintContext context) =>
-		Node.Print(node.ArgumentList, context);
+	public static void ImplicitElementAccess(ImplicitElementAccessSyntax node, PrintContext context) => Node.Print(node.ArgumentList, context);
 
 	public static void RangeExpression(RangeExpressionSyntax node, PrintContext context)
 	{
@@ -673,8 +673,7 @@ internal static partial class Printers
 		Node.Print(node.Expression, context);
 	}
 
-	public static void ExpressionElement(ExpressionElementSyntax node, PrintContext context) =>
-		Node.Print(node.Expression, context);
+	public static void ExpressionElement(ExpressionElementSyntax node, PrintContext context) => Node.Print(node.Expression, context);
 
 	public static void ArrayCreationExpression(ArrayCreationExpressionSyntax node, PrintContext context)
 	{
@@ -704,8 +703,7 @@ internal static partial class Printers
 		InitializerExpression(node.Initializer, context, leadingLine: true);
 	}
 
-	public static void ElementBindingExpression(ElementBindingExpressionSyntax node, PrintContext context) =>
-		Node.Print(node.ArgumentList, context);
+	public static void ElementBindingExpression(ElementBindingExpressionSyntax node, PrintContext context) => Node.Print(node.ArgumentList, context);
 
 	public static void VarPattern(VarPatternSyntax node, PrintContext context)
 	{
@@ -750,6 +748,5 @@ internal static partial class Printers
 	public static void WithElement(SyntaxNode node, PrintContext context) => Tokens(node, context);
 
 	/// <summary>The C# 14 <c>field</c> contextual keyword. A single token.</summary>
-	public static void FieldExpression(FieldExpressionSyntax node, PrintContext context) =>
-		TokenPrinter.Print(node.Token, context);
+	public static void FieldExpression(FieldExpressionSyntax node, PrintContext context) => TokenPrinter.Print(node.Token, context);
 }

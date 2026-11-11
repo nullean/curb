@@ -25,8 +25,11 @@ public static class XmlOptionsBinder
 	public static XmlOptions Bind(CurbEditorConfig editorConfig, string filePath, ICollection<CurbDiagnostic>? diagnostics = null) =>
 		Bind(editorConfig.For(filePath), editorConfig.ExplicitFor(filePath), diagnostics);
 
-	public static XmlOptions Bind(FileConfiguration configuration, IReadOnlyDictionary<string, string> explicitProperties, ICollection<CurbDiagnostic>? diagnostics = null) =>
-		Bind(configuration.Properties, explicitProperties, XmlOptions.ProfileFor(configuration.FileName), diagnostics);
+	public static XmlOptions Bind(
+		FileConfiguration configuration,
+		IReadOnlyDictionary<string, string> explicitProperties,
+		ICollection<CurbDiagnostic>? diagnostics = null
+	) => Bind(configuration.Properties, explicitProperties, XmlOptions.ProfileFor(configuration.FileName), diagnostics);
 
 	/// <param name="properties">Every key that applies to the file, from any section.</param>
 	/// <param name="explicitProperties">The keys that apply from explicit sections alone.</param>
@@ -36,7 +39,8 @@ public static class XmlOptionsBinder
 		IReadOnlyDictionary<string, string> properties,
 		IReadOnlyDictionary<string, string> explicitProperties,
 		XmlProfile profile,
-		ICollection<CurbDiagnostic>? diagnostics = null)
+		ICollection<CurbDiagnostic>? diagnostics = null
+	)
 	{
 		var options = new XmlOptions
 		{
@@ -77,7 +81,9 @@ public static class XmlOptionsBinder
 					options = options with { AttributeIndent = AttributeIndent.AlignByFirstAttribute };
 					break;
 				default:
-					diagnostics?.Add(CurbDiagnostic.UnrecognisedValue("xml_attribute_indent", attributeIndent, "single_indent, double_indent or align_by_first_attribute"));
+					diagnostics?.Add(
+						CurbDiagnostic.UnrecognisedValue("xml_attribute_indent", attributeIndent, "single_indent, double_indent or align_by_first_attribute")
+					);
 					break;
 			}
 		}
@@ -104,8 +110,13 @@ public static class XmlOptionsBinder
 				continue;
 			}
 
-			diagnostics?.Add(CurbDiagnostic.UnrecognisedValue(
-				"curb_xml_extensions", item, "a comma-separated list drawn from " + string.Join(", ", XmlOptions.OptInExtensions)));
+			diagnostics?.Add(
+				CurbDiagnostic.UnrecognisedValue(
+					"curb_xml_extensions",
+					item,
+					"a comma-separated list drawn from " + string.Join(", ", XmlOptions.OptInExtensions)
+				)
+			);
 		}
 
 		return [.. bound];

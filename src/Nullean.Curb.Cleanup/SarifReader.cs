@@ -78,9 +78,8 @@ public static class SarifReader
 			// the first document would quietly drop the rest — so it is refused with the cause named.
 			if (reader.Read())
 			{
-				failure = "the log holds more than one JSON document, which is what a single ErrorLog path "
-					+ "shared by the inner builds of a multi-targeting project produces. Give each target "
-					+ "framework its own path.";
+				failure = "the log holds more than one JSON document, which is what a single ErrorLog path " +
+					"shared by the inner builds of a multi-targeting project produces. Give each target " + "framework its own path.";
 				return false;
 			}
 
@@ -138,11 +137,13 @@ public static class SarifReader
 			if (reader.ValueTextEquals("level"))
 			{
 				reader.Read();
-				level = reader.TokenType != JsonTokenType.String ? DiagnosticLevel.Unknown
-					: reader.ValueTextEquals("error") ? DiagnosticLevel.Error
-					: reader.ValueTextEquals("warning") ? DiagnosticLevel.Warning
-					: reader.ValueTextEquals("note") ? DiagnosticLevel.Note
-					: DiagnosticLevel.Unknown;
+				level = reader.TokenType != JsonTokenType.String
+					? DiagnosticLevel.Unknown
+					: reader.ValueTextEquals("error")
+						? DiagnosticLevel.Error
+						: reader.ValueTextEquals("warning")
+							? DiagnosticLevel.Warning
+							: reader.ValueTextEquals("note") ? DiagnosticLevel.Note : DiagnosticLevel.Unknown;
 
 				continue;
 			}

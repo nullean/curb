@@ -34,22 +34,29 @@ internal static class Modifiers
 	/// </remarks>
 	private static readonly SyntaxKind[] Order =
 	[
-		SyntaxKind.PublicKeyword, SyntaxKind.PrivateKeyword, SyntaxKind.ProtectedKeyword,
-		SyntaxKind.InternalKeyword, SyntaxKind.FileKeyword, SyntaxKind.StaticKeyword,
-		SyntaxKind.ExternKeyword, SyntaxKind.NewKeyword, SyntaxKind.VirtualKeyword,
-		SyntaxKind.AbstractKeyword, SyntaxKind.SealedKeyword, SyntaxKind.OverrideKeyword,
-		SyntaxKind.ReadOnlyKeyword, SyntaxKind.UnsafeKeyword, SyntaxKind.RequiredKeyword,
-		SyntaxKind.VolatileKeyword, SyntaxKind.AsyncKeyword,
+		SyntaxKind.PublicKeyword,
+		SyntaxKind.PrivateKeyword,
+		SyntaxKind.ProtectedKeyword,
+		SyntaxKind.InternalKeyword,
+		SyntaxKind.FileKeyword,
+		SyntaxKind.StaticKeyword,
+		SyntaxKind.ExternKeyword,
+		SyntaxKind.NewKeyword,
+		SyntaxKind.VirtualKeyword,
+		SyntaxKind.AbstractKeyword,
+		SyntaxKind.SealedKeyword,
+		SyntaxKind.OverrideKeyword,
+		SyntaxKind.ReadOnlyKeyword,
+		SyntaxKind.UnsafeKeyword,
+		SyntaxKind.RequiredKeyword,
+		SyntaxKind.VolatileKeyword,
+		SyntaxKind.AsyncKeyword,
 	];
 
 	/// <summary>
 	/// Finds the member whose name sits at <paramref name="span"/>, or refuses.
 	/// </summary>
-	public static bool TryFindMember(
-		CleanupContext context,
-		TextSpan span,
-		out MemberDeclarationSyntax member,
-		out string? refusal)
+	public static bool TryFindMember(CleanupContext context, TextSpan span, out MemberDeclarationSyntax member, out string? refusal)
 	{
 		member = null!;
 
@@ -142,9 +149,7 @@ internal static class Modifiers
 
 		// Nothing already there belongs after the keyword, so it goes at the end of the list — in front of
 		// whatever the modifiers were qualifying, not in front of the list itself.
-		return member.Modifiers.Count > 0
-			? member.Modifiers[^1].GetNextToken().SpanStart
-			: AfterAttributes(member);
+		return member.Modifiers.Count > 0 ? member.Modifiers[^1].GetNextToken().SpanStart : AfterAttributes(member);
 	}
 
 	/// <summary>
@@ -190,7 +195,6 @@ internal sealed class ReadOnlyFields : ICleanupRule
 
 	public bool TryFix(CleanupContext context, in CleanupDiagnostic diagnostic, TextSpan span, ICollection<PlannedFix> into, out string? refusal)
 	{
-
 		if (!Modifiers.TryFindMember(context, span, out var member, out refusal))
 			return false;
 
@@ -245,14 +249,14 @@ internal sealed class AccessibilityModifiers : ICleanupRule
 
 	public bool TryFix(CleanupContext context, in CleanupDiagnostic diagnostic, TextSpan span, ICollection<PlannedFix> into, out string? refusal)
 	{
-
 		if (!Modifiers.TryFindMember(context, span, out var member, out refusal))
 			return false;
 
 		foreach (var modifier in member.Modifiers)
 		{
-			if (modifier.Kind() is SyntaxKind.PublicKeyword or SyntaxKind.PrivateKeyword
-				or SyntaxKind.ProtectedKeyword or SyntaxKind.InternalKeyword or SyntaxKind.FileKeyword)
+			if (
+				modifier.Kind() is SyntaxKind.PublicKeyword or SyntaxKind.PrivateKeyword or SyntaxKind.ProtectedKeyword or SyntaxKind.InternalKeyword or SyntaxKind.FileKeyword
+			)
 			{
 				refusal = "the declaration already states its accessibility, so the log describes a file that has changed";
 				return false;
@@ -294,9 +298,12 @@ internal sealed class AccessibilityModifiers : ICleanupRule
 		if (member is EnumMemberDeclarationSyntax)
 			return null;
 
-		if (member is MethodDeclarationSyntax { ExplicitInterfaceSpecifier: not null }
-			or PropertyDeclarationSyntax { ExplicitInterfaceSpecifier: not null }
-			or EventDeclarationSyntax { ExplicitInterfaceSpecifier: not null })
+		if (
+			member is MethodDeclarationSyntax { ExplicitInterfaceSpecifier: not null } or PropertyDeclarationSyntax
+			{
+				ExplicitInterfaceSpecifier: not null
+			} or EventDeclarationSyntax { ExplicitInterfaceSpecifier: not null }
+		)
 		{
 			return null;
 		}
@@ -402,9 +409,10 @@ internal sealed class ReadOnlyMembers : ICleanupRule
 
 		// Only inside a struct. On a class member `readonly` is an error, so a log that has drifted onto
 		// one must not be applied.
-		if (member.Parent is not TypeDeclarationSyntax parent
-			|| !(parent is StructDeclarationSyntax
-				|| (parent is RecordDeclarationSyntax record && record.ClassOrStructKeyword.IsKind(SyntaxKind.StructKeyword))))
+		if (
+			member.Parent is not TypeDeclarationSyntax parent ||
+			!(parent is StructDeclarationSyntax || (parent is RecordDeclarationSyntax record && record.ClassOrStructKeyword.IsKind(SyntaxKind.StructKeyword)))
+		)
 		{
 			refusal = "the member is not declared in a struct, where readonly would not compile";
 			return false;

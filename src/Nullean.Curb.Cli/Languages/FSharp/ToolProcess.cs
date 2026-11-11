@@ -46,7 +46,8 @@ internal sealed class ProcessLauncher : IToolLauncher
 {
 	public static ProcessLauncher Instance { get; } = new();
 
-	private ProcessLauncher() { }
+	private ProcessLauncher()
+	{ }
 
 	public IToolProcess Start(ToolCommand command)
 	{

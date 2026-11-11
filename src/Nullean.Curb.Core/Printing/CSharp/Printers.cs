@@ -1,10 +1,10 @@
 using System.Diagnostics;
-using Microsoft.CodeAnalysis.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Nullean.Curb.Options;
+using Microsoft.CodeAnalysis.Text;
 using Nullean.Curb.Documents;
+using Nullean.Curb.Options;
 
 namespace Nullean.Curb.Printing.CSharp;
 
@@ -45,9 +45,9 @@ internal static partial class Printers
 		var staying = moveInside ? UsingOrganiser.GlobalCount(node.Usings) : node.Usings.Count;
 		if (staying > 0)
 			PrintUsings(node, new UsingRange(node.Usings, 0, staying), context, ref previousEnd);
-		var nextAfterUsings = node.AttributeLists.Count > 0 ? NextStartsWithDirective(node.AttributeLists[0])
-			: node.Members.Count > 0 ? NextStartsWithDirective(node.Members[0])
-			: NextStartsWithDirective(node.EndOfFileToken);
+		var nextAfterUsings = node.AttributeLists.Count > 0
+			? NextStartsWithDirective(node.AttributeLists[0])
+			: node.Members.Count > 0 ? NextStartsWithDirective(node.Members[0]) : NextStartsWithDirective(node.EndOfFileToken);
 		AfterUsingList(context, ref previousEnd, staying > 0, nextAfterUsings);
 
 		foreach (var attributeList in node.AttributeLists)
@@ -145,8 +145,7 @@ internal static partial class Printers
 	}
 
 	/// <summary>True when the first non-trivial thing about to print is a directive, such as <c>#endregion</c>.</summary>
-	private static bool NextStartsWithDirective(SyntaxNode? next) =>
-		next is not null && NextStartsWithDirective(next.GetFirstToken(includeZeroWidth: true));
+	private static bool NextStartsWithDirective(SyntaxNode? next) => next is not null && NextStartsWithDirective(next.GetFirstToken(includeZeroWidth: true));
 
 	/// <summary>True when a token's own leading trivia starts with a directive, ignoring whitespace.</summary>
 	private static bool NextStartsWithDirective(SyntaxToken token)
@@ -245,12 +244,7 @@ internal static partial class Printers
 	/// declared the whole move as one permuted region, so it is not declared again here, and a banner
 	/// it kept at the top of the file (<see cref="UsingRange.HoistedBanner"/>) is not printed again.
 	/// </param>
-	private static void PrintUsings(
-		SyntaxNode container,
-		UsingRange usings,
-		PrintContext context,
-		ref int previousEnd,
-		bool moved = false)
+	private static void PrintUsings(SyntaxNode container, UsingRange usings, PrintContext context, ref int previousEnd, bool moved = false)
 	{
 		var ordered = UsingOrganiser.Order(container, usings, context.Options);
 		var firstInSource = usings.Count > 0 ? usings[0] : null;
@@ -297,8 +291,7 @@ internal static partial class Printers
 			else
 			{
 				arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
-				if (context.Options.SeparateImportDirectiveGroups
-					&& UsingOrganiser.StartsNewGroup(ordered[i - 1], directive))
+				if (context.Options.SeparateImportDirectiveGroups && UsingOrganiser.StartsNewGroup(ordered[i - 1], directive))
 					arena.HardLine();
 			}
 
@@ -317,8 +310,7 @@ internal static partial class Printers
 		context.UsingsReordered = true;
 	}
 
-	public static void UsingDirective(UsingDirectiveSyntax node, PrintContext context) =>
-		UsingDirective(node, context, leadingFrom: 0);
+	public static void UsingDirective(UsingDirectiveSyntax node, PrintContext context) => UsingDirective(node, context, leadingFrom: 0);
 
 	/// <param name="node">The directive.</param>
 	/// <param name="context">Per-file printing state.</param>
@@ -421,8 +413,7 @@ internal static partial class Printers
 		// members — so every such file was refused by the content verifier rather than formatted. None
 		// of the 1,196 corpus files puts a using there, which is why it went unnoticed.
 		PrintUsings(node, node.Usings, context, ref previousEnd);
-		AfterUsingList(context, ref previousEnd, moved.Count > 0 || node.Usings.Count > 0,
-			node.Members.Count > 0 && NextStartsWithDirective(node.Members[0]));
+		AfterUsingList(context, ref previousEnd, moved.Count > 0 || node.Usings.Count > 0, node.Members.Count > 0 && NextStartsWithDirective(node.Members[0]));
 
 		foreach (var member in node.Members)
 		{
@@ -527,12 +518,17 @@ internal static partial class Printers
 					// cap preservation every later member already uses, with BlankLinesInsideType as the
 					// floor instead of an exact count — the same shape the closing brace below always
 					// used, for the same reason (a region marker can legitimately sit there).
-					context.BlankLines(first
-						? context.Options.RemoveBlankLinesNearBracesInDeclarations
-							? context.Options.BlankLinesInsideType
-							: context.DeclarationSeparation(previousEnd, EffectiveStart(member), context.Options.BlankLinesInsideType)
-						: context.DeclarationSeparation(previousEnd, EffectiveStart(member),
-							NextStartsWithDirective(member) ? 0 : MinimumBlankLinesFor(member, context)));
+					context.BlankLines(
+						first
+							? context.Options.RemoveBlankLinesNearBracesInDeclarations
+								? context.Options.BlankLinesInsideType
+								: context.DeclarationSeparation(previousEnd, EffectiveStart(member), context.Options.BlankLinesInsideType)
+							: context.DeclarationSeparation(
+								previousEnd,
+								EffectiveStart(member),
+								NextStartsWithDirective(member) ? 0 : MinimumBlankLinesFor(member, context)
+							)
+					);
 				}
 				first = false;
 				PrintMember(member, context);
@@ -548,8 +544,9 @@ internal static partial class Printers
 				if (!NextStartsWithRegionBoundary(node.CloseBraceToken))
 				{
 					arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
-					context.BlankLines(context.DeclarationSeparation(
-						previousEnd, EffectiveTriviaStart(node.CloseBraceToken), context.Options.BlankLinesInsideType));
+					context.BlankLines(
+						context.DeclarationSeparation(previousEnd, EffectiveTriviaStart(node.CloseBraceToken), context.Options.BlankLinesInsideType)
+					);
 				}
 				TokenPrinter.PrintLeadingTrivia(node.CloseBraceToken, context, trailingBreak: false);
 			}
@@ -624,8 +621,7 @@ internal static partial class Printers
 		// and the group already decide the arrow's side of the break between them. It is the exemplar the
 		// layout note uses for a rule aimed at a group rather than at the source.
 		var hugs = HugsTheArrow(node.Expression);
-		var breakBeforeArrow = !hugs
-			&& context.AuthorBroke(node.ArrowToken.GetPreviousToken().Span.End, node.ArrowToken.SpanStart);
+		var breakBeforeArrow = !hugs && context.AuthorBroke(node.ArrowToken.GetPreviousToken().Span.End, node.ArrowToken.SpanStart);
 		var breakAfterArrow = context.AuthorBroke(node.ArrowToken.Span.End, node.Expression.SpanStart);
 
 		var arrowLeadsTheBody = !hugs && (context.Options.WrapBeforeArrowWithExpressions || breakBeforeArrow);
@@ -648,7 +644,8 @@ internal static partial class Printers
 			node.Expression,
 			breakBeforeArrow,
 			context.AuthorJoined(node.ArrowToken.Span.End, node.Expression.SpanStart),
-			context);
+			context
+		);
 	}
 
 	/// <summary>True for the bodies that hug an expression body's arrow rather than hang below it.</summary>
@@ -681,7 +678,8 @@ internal static partial class Printers
 		ExpressionSyntax expression,
 		bool breakBeforeArrow,
 		bool startsOnArrowLine,
-		PrintContext context)
+		PrintContext context
+	)
 	{
 		var arena = context.Arena;
 		var throws = throwKeyword.RawKind != 0;
@@ -734,9 +732,7 @@ internal static partial class Printers
 			// An object initializer's braces sit at the indent of the line the arrow landed on, as a switch's
 			// do above, and that line is a level deeper when the `)` hugs the last parameter. Printed at the
 			// member's level, dotnet format indented the braces and Curb took them back — issue #197.
-			using (BracesFollowTheArrowLine(expression, context)
-				? IndentToArrowLine(owner, context)
-				: arena.IndentIf(throws || HangsOnArrowLine(expression)))
+			using (BracesFollowTheArrowLine(expression, context) ? IndentToArrowLine(owner, context) : arena.IndentIf(throws || HangsOnArrowLine(expression)))
 				PrintArrowBody(throwKeyword, expression, context);
 			return;
 		}
@@ -787,27 +783,28 @@ internal static partial class Printers
 	/// <remarks>
 	/// Array and collection initializers are the exception: dotnet format leaves those where the author put them.
 	/// </remarks>
-	private static bool BracesFollowTheArrowLine(ExpressionSyntax body, PrintContext context) =>
-		body switch
-		{
-			BaseObjectCreationExpressionSyntax { Initializer: { } initializer } => initializer.IsKind(SyntaxKind.ObjectInitializerExpression),
-			AnonymousObjectCreationExpressionSyntax or WithExpressionSyntax => true,
-			IsPatternExpressionSyntax { Pattern: RecursivePatternSyntax { PropertyPatternClause: not null } } => true,
-			AssignmentExpressionSyntax assignment => BracesFollowTheArrowLine(assignment.Right, context),
-			AwaitExpressionSyntax awaited => BracesFollowTheArrowLine(awaited.Expression, context),
-			CastExpressionSyntax cast => BracesFollowTheArrowLine(cast.Expression, context),
-			ThrowExpressionSyntax thrown => BracesFollowTheArrowLine(thrown.Expression, context),
-			BinaryExpressionSyntax binary => context.AuthorJoined(binary.SpanStart, binary.Right.SpanStart)
-				&& BracesFollowTheArrowLine(binary.Right, context),
-			ConditionalExpressionSyntax conditional => context.AuthorJoined(conditional.SpanStart, conditional.WhenTrue.SpanStart)
-				&& (BracesFollowTheArrowLine(conditional.WhenTrue, context) || BracesFollowTheArrowLine(conditional.WhenFalse, context)),
-			MemberAccessExpressionSyntax access => BracesFollowTheArrowLine(access.Expression, context),
-			InvocationExpressionSyntax invocation => BracesFollowTheArrowLine(invocation.Expression, context)
-				|| (invocation.ArgumentList.Arguments is [.., var last]
-					&& context.AuthorJoined(invocation.SpanStart, last.SpanStart)
-					&& BracesFollowTheArrowLine(last.Expression, context)),
-			_ => false,
-		};
+	private static bool BracesFollowTheArrowLine(ExpressionSyntax body, PrintContext context) => body switch
+	{
+		BaseObjectCreationExpressionSyntax { Initializer: { } initializer } => initializer.IsKind(SyntaxKind.ObjectInitializerExpression),
+		AnonymousObjectCreationExpressionSyntax or WithExpressionSyntax => true,
+		IsPatternExpressionSyntax { Pattern: RecursivePatternSyntax { PropertyPatternClause: not null } } => true,
+		AssignmentExpressionSyntax assignment => BracesFollowTheArrowLine(assignment.Right, context),
+		AwaitExpressionSyntax awaited => BracesFollowTheArrowLine(awaited.Expression, context),
+		CastExpressionSyntax cast => BracesFollowTheArrowLine(cast.Expression, context),
+		ThrowExpressionSyntax thrown => BracesFollowTheArrowLine(thrown.Expression, context),
+		BinaryExpressionSyntax binary => context.AuthorJoined(binary.SpanStart, binary.Right.SpanStart) && BracesFollowTheArrowLine(binary.Right, context),
+		ConditionalExpressionSyntax conditional =>
+			context.AuthorJoined(conditional.SpanStart, conditional.WhenTrue.SpanStart) &&
+				(BracesFollowTheArrowLine(conditional.WhenTrue, context) || BracesFollowTheArrowLine(conditional.WhenFalse, context)),
+		MemberAccessExpressionSyntax access => BracesFollowTheArrowLine(access.Expression, context),
+		InvocationExpressionSyntax invocation =>
+			BracesFollowTheArrowLine(invocation.Expression, context) ||
+				(invocation.ArgumentList.Arguments is [.., var last] && context.AuthorJoined(invocation.SpanStart, last.SpanStart) && BracesFollowTheArrowLine(
+					last.Expression,
+					context
+				)),
+		_ => false,
+	};
 
 	/// <summary>The written arrow, or a synthesised one where <paramref name="arrow"/> is default.</summary>
 	private static void PrintArrow(SyntaxToken arrow, PrintContext context)
@@ -845,16 +842,15 @@ internal static partial class Printers
 		return context.AuthorJoined(parameters.Parameters[^1].Span.End, parameters.CloseParenToken.SpanStart);
 	}
 
-	private static ParameterListSyntax? ParameterListOf(SyntaxNode? owner) =>
-		owner switch
-		{
-			MethodDeclarationSyntax method => method.ParameterList,
-			LocalFunctionStatementSyntax local => local.ParameterList,
-			ConstructorDeclarationSyntax constructor => constructor.ParameterList,
-			OperatorDeclarationSyntax op => op.ParameterList,
-			ConversionOperatorDeclarationSyntax conversion => conversion.ParameterList,
-			_ => null,
-		};
+	private static ParameterListSyntax? ParameterListOf(SyntaxNode? owner) => owner switch
+	{
+		MethodDeclarationSyntax method => method.ParameterList,
+		LocalFunctionStatementSyntax local => local.ParameterList,
+		ConstructorDeclarationSyntax constructor => constructor.ParameterList,
+		OperatorDeclarationSyntax op => op.ParameterList,
+		ConversionOperatorDeclarationSyntax conversion => conversion.ParameterList,
+		_ => null,
+	};
 
 	/// <summary>A declaration's <c>&lt;T, U&gt;</c>.</summary>
 	/// <remarks>
@@ -937,8 +933,10 @@ internal static partial class Printers
 				// too many parameters rather than whether the line is too long, so it breaks the
 				// group outright instead of leaving it to fit measurement. chop_always is the same
 				// decision with no count to reach.
-				if (context.Options.WrapParametersStyle == WrapStyle.ChopAlways
-					|| (context.Options.MaxParametersOnLine is { } limit && node.Parameters.Count > limit))
+				if (
+					context.Options.WrapParametersStyle == WrapStyle.ChopAlways ||
+					(context.Options.MaxParametersOnLine is { } limit && node.Parameters.Count > limit)
+				)
 					arena.BreakParent();
 
 				using (arena.Indent())
@@ -1095,9 +1093,7 @@ internal static partial class Printers
 
 				// `int y = 1; int z = 2;` — two statements the author put on one line stay there
 				// under csharp_preserve_single_line_statements.
-				if (context.Options.PreserveSingleLineStatements
-					&& previousEnd != node.OpenBraceToken.Span.End
-					&& context.AuthorJoined(previousEnd, start))
+				if (context.Options.PreserveSingleLineStatements && previousEnd != node.OpenBraceToken.Span.End && context.AuthorJoined(previousEnd, start))
 				{
 					arena.Synthetic(SyntheticText.Space);
 					Node.Print(statement, context);
@@ -1120,8 +1116,10 @@ internal static partial class Printers
 				// starts with a `//` comment and csharp_blank_lines_before_single_line_comment is
 				// set — this floor (up to keep_blank_lines_in_code) would otherwise run ahead of
 				// TokenPrinter's own floor for the same gap and the two would stack.
-				if (!NextStartsWithRegionBoundary(statementFirstToken)
-					&& !(context.Options.BlankLinesBeforeSingleLineComment > 0 && NextStartsWithSingleLineComment(statementFirstToken)))
+				if (
+					!NextStartsWithRegionBoundary(statementFirstToken) &&
+					!(context.Options.BlankLinesBeforeSingleLineComment > 0 && NextStartsWithSingleLineComment(statementFirstToken))
+				)
 				{
 					// csharp_remove_blank_lines_near_braces_in_code: the very first statement's gap is
 					// forced to exactly zero by default, the same relationship BlankLinesInsideType has
@@ -1138,9 +1136,7 @@ internal static partial class Printers
 						// The statement-level minimum is skipped, not merely floored to it, when a comment
 						// sits in front — see NextStartsWithComment for why forcing one in there is unsafe
 						// regardless of what the comment turns out to be.
-						var minimum = NextStartsWithComment(statementFirstToken)
-							? 0
-							: StatementSeparationMinimum(previousStatement, statement, context);
+						var minimum = NextStartsWithComment(statementFirstToken) ? 0 : StatementSeparationMinimum(previousStatement, statement, context);
 						context.BlankLines(context.CodeSeparation(previousEnd, start, minimum));
 					}
 				}
@@ -1231,10 +1227,10 @@ internal static partial class Printers
 		//
 		// Both gaps lie between the parentheses, so a list kept on one line answers without reading the
 		// arguments' spans.
-		var hugs = node.Arguments.Count > 0
-			&& (!context.AuthorBroke(node.OpenParenToken.Span.End, node.CloseParenToken.SpanStart)
-				|| (!context.AuthorBroke(node.OpenParenToken.Span.End, node.Arguments[0].SpanStart)
-					&& !context.AuthorBroke(node.Arguments[^1].Span.End, node.CloseParenToken.SpanStart)));
+		var hugs = node.Arguments.Count > 0 &&
+			(!context.AuthorBroke(node.OpenParenToken.Span.End, node.CloseParenToken.SpanStart) ||
+				(!context.AuthorBroke(node.OpenParenToken.Span.End, node.Arguments[0].SpanStart) &&
+					!context.AuthorBroke(node.Arguments[^1].Span.End, node.CloseParenToken.SpanStart)));
 		var hugsOwnBlock = hugs && node.Arguments.Count == 1 && EndsWithOwnBlock(node.Arguments[0].Expression);
 
 		// Several arguments where the LAST is a genuinely block-bodied callback — `On("click", () =>
@@ -1248,7 +1244,9 @@ internal static partial class Printers
 
 		// Captured ahead of the `(`: a trailing `// note` on it ends the line, and an anchor after that
 		// would measure the next line, which nothing has been written to yet.
-		var lineShift = hugsOwnBlock || hugsCallback ? -1 : EnterArgumentLines(node.Arguments, node.OpenParenToken.Span.End, node.CloseParenToken.SpanStart, context);
+		var lineShift = hugsOwnBlock || hugsCallback
+			? -1
+			: EnterArgumentLines(node.Arguments, node.OpenParenToken.Span.End, node.CloseParenToken.SpanStart, context);
 		TokenPrinter.Print(node.OpenParenToken, context);
 
 		if (hugsOwnBlock)
@@ -1285,8 +1283,10 @@ internal static partial class Printers
 			{
 				// chop_always is the same decision as the count with no count to reach. Deterministic
 				// mode only — the binder drops it otherwise, and records why.
-				if (context.Options.WrapArgumentsStyle == WrapStyle.ChopAlways
-					|| (context.Options.MaxArgumentsOnLine is { } limit && node.Arguments.Count > limit))
+				if (
+					context.Options.WrapArgumentsStyle == WrapStyle.ChopAlways ||
+					(context.Options.MaxArgumentsOnLine is { } limit && node.Arguments.Count > limit)
+				)
 					arena.BreakParent();
 
 				using (arena.Indent())
@@ -1299,8 +1299,15 @@ internal static partial class Printers
 					else
 						Spacing.InsideCallParens(context);
 
-					PrintSeparated(node.Arguments, context, asWritten, node.OpenParenToken.Span.End,
-						fill: context.Options.WrapArgumentsStyle == WrapStyle.WrapIfLong, lineShift, offset);
+					PrintSeparated(
+						node.Arguments,
+						context,
+						asWritten,
+						node.OpenParenToken.Span.End,
+						fill: context.Options.WrapArgumentsStyle == WrapStyle.WrapIfLong,
+						lineShift,
+						offset
+					);
 				}
 
 				var rpar = context.Options.WrapBeforeInvocationRpar;
@@ -1483,12 +1490,7 @@ internal static partial class Printers
 	/// printer. Debug-only: the release path pays nothing.
 	/// </remarks>
 	[Conditional("DEBUG")]
-	private static void GuardAgainstWelding(
-		SyntaxNode node,
-		SyntaxToken token,
-		int previousEnd,
-		char previousLast,
-		PrintContext context)
+	private static void GuardAgainstWelding(SyntaxNode node, SyntaxToken token, int previousEnd, char previousLast, PrintContext context)
 	{
 		if (previousEnd < 0 || token.SpanStart <= previousEnd)
 			return;
@@ -1497,9 +1499,10 @@ internal static partial class Printers
 			return;
 
 		throw new InvalidOperationException(
-			$"Printers.Tokens would merge '{previousLast}' and '{context.Text[token.SpanStart]}' in a "
-			+ $"{node.Kind()}; it emits tokens with no separator and is only safe where the source had "
-			+ "none either. This node needs a printer of its own.");
+			$"Printers.Tokens would merge '{previousLast}' and '{context.Text[token.SpanStart]}' in a " +
+				$"{node.Kind()}; it emits tokens with no separator and is only safe where the source had " +
+				"none either. This node needs a printer of its own."
+		);
 	}
 
 	/// <summary>Emits attribute lists, each on its own line above the declaration.</summary>
@@ -1620,12 +1623,8 @@ internal static partial class Printers
 	/// </remarks>
 	private static AttributePlacement PlacementFor(SyntaxNode? owner, PrintContext context) => owner switch
 	{
-		MethodDeclarationSyntax
-			or LocalFunctionStatementSyntax
-			or ConstructorDeclarationSyntax
-			or DestructorDeclarationSyntax
-			or OperatorDeclarationSyntax
-			or ConversionOperatorDeclarationSyntax => context.Options.PlaceMethodAttributeOnSameLine,
+		MethodDeclarationSyntax or LocalFunctionStatementSyntax or ConstructorDeclarationSyntax or DestructorDeclarationSyntax or OperatorDeclarationSyntax or ConversionOperatorDeclarationSyntax =>
+			context.Options.PlaceMethodAttributeOnSameLine,
 		FieldDeclarationSyntax => context.Options.PlaceFieldAttributeOnSameLine,
 		PropertyDeclarationSyntax or IndexerDeclarationSyntax => context.Options.PlacePropertyAttributeOnSameLine,
 		EventFieldDeclarationSyntax or EventDeclarationSyntax => context.Options.PlaceEventAttributeOnSameLine,
@@ -1686,8 +1685,7 @@ internal static partial class Printers
 	}
 
 	/// <summary>True when <c>csharp_new_line_before_open_brace</c> puts this construct's brace on a line of its own.</summary>
-	internal static bool BraceOnOwnLine(BraceStyle construct, PrintContext context) =>
-		context.Options.NewLineBeforeOpenBrace.HasFlag(construct);
+	internal static bool BraceOnOwnLine(BraceStyle construct, PrintContext context) => context.Options.NewLineBeforeOpenBrace.HasFlag(construct);
 
 	/// <summary>
 	/// The source column of a block's opening brace when the author put it on a line of its own and
@@ -1704,9 +1702,7 @@ internal static partial class Printers
 			return -1;
 
 		var open = block.OpenBraceToken;
-		return context.AuthorBroke(open.GetPreviousToken().Span.End, open.SpanStart)
-			? context.SourceIndent(open.SpanStart)
-			: -1;
+		return context.AuthorBroke(open.GetPreviousToken().Span.End, open.SpanStart) ? context.SourceIndent(open.SpanStart) : -1;
 	}
 
 	/// <summary>
@@ -1751,9 +1747,7 @@ internal static partial class Printers
 	/// </remarks>
 	/// <summary>True when the author wrote this brace pair on a single line and asked to keep it.</summary>
 	internal static bool KeepsOneLine(SyntaxToken openBrace, SyntaxToken closeBrace, PrintContext context) =>
-		context.Options.PreserveSingleLineBlocks
-		&& openBrace.RawKind != 0
-		&& context.AuthorJoined(openBrace.SpanStart, closeBrace.Span.End);
+		context.Options.PreserveSingleLineBlocks && openBrace.RawKind != 0 && context.AuthorJoined(openBrace.SpanStart, closeBrace.Span.End);
 
 	/// <summary>The same question of a body, so every caller goes through one predicate.</summary>
 	/// <remarks>
@@ -1784,9 +1778,8 @@ internal static partial class Printers
 	/// which the verifier refused (issue #183). Such a block stays open, as dotnet format leaves it.
 	/// </remarks>
 	private static bool IsEmptyBraces(SyntaxNode body) =>
-		body is BlockSyntax { Statements.Count: 0 } block
-		&& !TokenPrinter.HasLeadingContent(block.CloseBraceToken)
-		&& !EndsWithLineComment(block.OpenBraceToken);
+		body is BlockSyntax { Statements.Count: 0 } block && !TokenPrinter.HasLeadingContent(block.CloseBraceToken) &&
+			!EndsWithLineComment(block.OpenBraceToken);
 
 	/// <summary>
 	/// True when an empty brace pair should print as <c>{ }</c> rather than opened out.
@@ -1920,7 +1913,8 @@ internal static partial class Printers
 			carried,
 			SynthesisedArrowBreaksBefore(body.OpenBraceToken.GetPreviousToken(), context),
 			context.AuthorJoined(keywordEnd, carried.SpanStart),
-			context);
+			context
+		);
 		context.ConvertedStatement = outerConverted;
 		TokenPrinter.Print(SemicolonOf(statement), context);
 
@@ -1944,22 +1938,16 @@ internal static partial class Printers
 	/// <c>get</c> keyword go as well, so it applies only where there is nothing else in the list to
 	/// keep — one accessor, a getter, no attributes and no modifiers on it.
 	/// </remarks>
-	internal static bool TryPrintExpressionProperty(
-		AccessorListSyntax? accessors,
-		ExpressionBodyStyle style,
-		PrintContext context)
+	internal static bool TryPrintExpressionProperty(AccessorListSyntax? accessors, ExpressionBodyStyle style, PrintContext context)
 	{
 		if (style == ExpressionBodyStyle.AsWritten || accessors is null || accessors.Accessors.Count != 1)
 			return false;
 
 		var accessor = accessors.Accessors[0];
-		if (!accessor.Keyword.IsKind(SyntaxKind.GetKeyword)
-			|| accessor.AttributeLists.Count > 0
-			|| accessor.Modifiers.Count > 0)
+		if (!accessor.Keyword.IsKind(SyntaxKind.GetKeyword) || accessor.AttributeLists.Count > 0 || accessor.Modifiers.Count > 0)
 			return false;
 
-		if (style == ExpressionBodyStyle.WhenOnSingleLine
-			&& !context.AuthorJoined(accessors.SpanStart, accessors.Span.End))
+		if (style == ExpressionBodyStyle.WhenOnSingleLine && !context.AuthorJoined(accessors.SpanStart, accessors.Span.End))
 			return false;
 
 		// Every shape of getter: one already using an arrow, a block that returns, and a block that
@@ -1991,18 +1979,14 @@ internal static partial class Printers
 		if (thrown is null && (value is null || semicolon.RawKind == 0))
 			return false;
 
-		if (HasAnyTrivia(accessors.OpenBraceToken)
-			|| HasAnyTrivia(accessors.CloseBraceToken)
-			|| HasAnyTrivia(accessor, context))
+		if (HasAnyTrivia(accessors.OpenBraceToken) || HasAnyTrivia(accessors.CloseBraceToken) || HasAnyTrivia(accessor, context))
 			return false;
 
 		// The third place an arrow is emitted, and it takes the same layout as the other two.
 		var expression = thrown is not null ? thrown.Expression! : value!;
 		var keywordEnd = accessor.ExpressionBody is { } written
 			? written.ArrowToken.Span.End
-			: returned is not null
-				? returned.ReturnKeyword.Span.End
-				: thrown!.ThrowKeyword.Span.End;
+			: returned is not null ? returned.ReturnKeyword.Span.End : thrown!.ThrowKeyword.Span.End;
 
 		context.Arena.Synthetic(SyntheticText.Space);
 		ArrowAndBody(
@@ -2012,7 +1996,8 @@ internal static partial class Printers
 			expression,
 			SynthesisedArrowBreaksBefore(accessors.OpenBraceToken.GetPreviousToken(), context),
 			context.AuthorJoined(keywordEnd, expression.SpanStart),
-			context);
+			context
+		);
 		TokenPrinter.Print(thrown is not null ? thrown.SemicolonToken : semicolon, context);
 
 		// A getter that already used an arrow carries its own across, so only the block forms add one.
@@ -2052,8 +2037,7 @@ internal static partial class Printers
 	};
 
 	/// <summary>True when a token carries a comment or directive on either side.</summary>
-	private static bool HasAnyTrivia(SyntaxToken token) =>
-		TokenPrinter.HasLeadingContent(token) || TokenPrinter.HasAnyContent(token);
+	private static bool HasAnyTrivia(SyntaxToken token) => TokenPrinter.HasLeadingContent(token) || TokenPrinter.HasAnyContent(token);
 
 	/// <summary>
 	/// True when anything under a node carries a comment or directive.
@@ -2101,12 +2085,7 @@ internal static partial class Printers
 	/// format writes `int a) { }` after a wrapped list too.
 	/// </param>
 	/// <param name="belowClause">A <c>where</c> clause has a line of its own above this body.</param>
-	internal static void PrintBody(
-		SyntaxNode body,
-		BraceStyle construct,
-		PrintContext context,
-		ushort ownerGroup = 0,
-		bool belowClause = false)
+	internal static void PrintBody(SyntaxNode body, BraceStyle construct, PrintContext context, ushort ownerGroup = 0, bool belowClause = false)
 	{
 		// A one-line body the author put on the line below its header stays there, as dotnet format leaves
 		// `void P()` then `{ }`; it was joined onto the signature (issue #146). The brace option still has
@@ -2116,11 +2095,13 @@ internal static partial class Printers
 		// A `where` clause on its own line sends a one-line body below it however it was written, the same
 		// as a type's, whether it stayed one line or csharp_empty_block_style collapsed it.
 		var keepsOneLine = KeepsOneLine(body, context);
-		if ((belowClause && (keepsOneLine || JoinsEmptyBracesToHeader(body, context)))
-			|| (keepsOneLine
-				&& !JoinsEmptyBracesToHeader(body, context)
-				&& body is BlockSyntax block
-				&& context.AuthorBroke(block.OpenBraceToken.GetPreviousToken().Span.End, block.OpenBraceToken.SpanStart)))
+		if (
+			(belowClause && (keepsOneLine || JoinsEmptyBracesToHeader(body, context))) ||
+			(keepsOneLine && !JoinsEmptyBracesToHeader(body, context) && body is BlockSyntax block && context.AuthorBroke(
+				block.OpenBraceToken.GetPreviousToken().Span.End,
+				block.OpenBraceToken.SpanStart
+			))
+		)
 		{
 			BeforeOpenBrace(construct, context);
 			using (context.Arena.ForceFlat())
@@ -2142,8 +2123,7 @@ internal static partial class Printers
 				using (ifBreak.Branch())
 					arena.Synthetic(SyntheticText.Space);
 				using (ifBreak.Branch())
-				{
-				}
+				{ }
 			}
 			else
 				arena.Synthetic(SyntheticText.Space);
@@ -2189,10 +2169,8 @@ internal static partial class Printers
 	/// comment or directive anywhere between the braces that collapsing would otherwise have to eat.
 	/// </summary>
 	private static bool IsCollapsibleSimpleBody(BlockSyntax block) =>
-		block.Statements.Count == 1
-		&& !TokenPrinter.HasAnyContent(block.OpenBraceToken)
-		&& !TokenPrinter.HasLeadingContent(block.Statements[0].GetFirstToken())
-		&& !TokenPrinter.HasLeadingContent(block.CloseBraceToken);
+		block.Statements.Count == 1 && !TokenPrinter.HasAnyContent(block.OpenBraceToken) &&
+			!TokenPrinter.HasLeadingContent(block.Statements[0].GetFirstToken()) && !TokenPrinter.HasLeadingContent(block.CloseBraceToken);
 
 	/// <summary>
 	/// Emits <paramref name="block"/>'s single statement flat on the brace line when it fits, falling
@@ -2252,11 +2230,7 @@ internal static partial class Printers
 	/// when the body is not empty, and when <c>csharp_empty_block_style</c> is set — an explicit opinion
 	/// beats an implicit one.
 	/// </param>
-	internal static void PrintStatementBody(
-		SyntaxNode body,
-		BraceStyle construct,
-		PrintContext context,
-		bool alwaysJoinsEmpty = false)
+	internal static void PrintStatementBody(SyntaxNode body, BraceStyle construct, PrintContext context, bool alwaysJoinsEmpty = false)
 	{
 		var forcesEmptyJoin = alwaysJoinsEmpty && context.Options.EmptyBlockStyle is null && IsEmptyBraces(body);
 		var joinsHeader = (forcesEmptyJoin || JoinsEmptyBracesToHeader(body, context)) && HeaderJoinSurvives(body, context);
@@ -2350,7 +2324,6 @@ internal static partial class Printers
 		else
 			context.Arena.Synthetic(SyntheticText.Space);
 	}
-
 
 	/// <summary>
 	/// Emits a construct exactly as the author wrote it, for the two <c>= ignore</c> settings.
@@ -2604,8 +2577,8 @@ internal static partial class Printers
 		int anchorEnd = -1,
 		bool fill = false,
 		int lineShift = -1,
-		int offset = int.MinValue)
-		where T : SyntaxNode
+		int offset = int.MinValue
+	) where T : SyntaxNode
 	{
 		var arena = context.Arena;
 
@@ -3045,10 +3018,10 @@ internal static partial class Printers
 	/// </remarks>
 	private static bool MovesUsingsInside(CompilationUnitSyntax node, PrintContext context)
 	{
-		if (context.Options.UsingPlacement != UsingPlacement.InsideNamespace
-			|| node.AttributeLists.Count != 0
-			|| node.Members is not [BaseNamespaceDeclarationSyntax only]
-			|| (only.Usings.Count > 0 && context.Options.SortUsings != UsingOrder.AsWritten))
+		if (
+			context.Options.UsingPlacement != UsingPlacement.InsideNamespace || node.AttributeLists.Count != 0 ||
+			node.Members is not [BaseNamespaceDeclarationSyntax only] || (only.Usings.Count > 0 && context.Options.SortUsings != UsingOrder.AsWritten)
+		)
 			return false;
 
 		var globals = UsingOrganiser.GlobalCount(node.Usings);
@@ -3095,10 +3068,7 @@ internal static partial class Printers
 	/// Reads the same answers the clauses print from, none of which this run's output changes: an option,
 	/// or a break Curb reproduces.
 	/// </remarks>
-	private static bool HeaderWasBroken(
-		BaseListSyntax? baseList,
-		SyntaxList<TypeParameterConstraintClauseSyntax> constraints,
-		PrintContext context)
+	private static bool HeaderWasBroken(BaseListSyntax? baseList, SyntaxList<TypeParameterConstraintClauseSyntax> constraints, PrintContext context)
 	{
 		if (baseList is not null && ClauseOnOwnLine(baseList.ColonToken, context.Options.WrapBeforeExtendsColon, context))
 			return true;
@@ -3203,10 +3173,9 @@ internal static partial class Printers
 		{
 			BaseNamespaceDeclarationSyntax => options.BlankLinesAroundNamespace,
 			BaseTypeDeclarationSyntax or DelegateDeclarationSyntax => options.BlankLinesAroundType,
-			MethodDeclarationSyntax or ConstructorDeclarationSyntax or DestructorDeclarationSyntax
-				or OperatorDeclarationSyntax or ConversionOperatorDeclarationSyntax => options.BlankLinesAroundInvocable,
-			PropertyDeclarationSyntax or IndexerDeclarationSyntax or EventDeclarationSyntax
-				or EventFieldDeclarationSyntax => options.BlankLinesAroundProperty,
+			MethodDeclarationSyntax or ConstructorDeclarationSyntax or DestructorDeclarationSyntax or OperatorDeclarationSyntax or ConversionOperatorDeclarationSyntax =>
+				options.BlankLinesAroundInvocable,
+			PropertyDeclarationSyntax or IndexerDeclarationSyntax or EventDeclarationSyntax or EventFieldDeclarationSyntax => options.BlankLinesAroundProperty,
 			FieldDeclarationSyntax => options.BlankLinesAroundField,
 			_ => 0,
 		};
@@ -3303,28 +3272,26 @@ internal static partial class Printers
 	/// the next pass's floor-and-cap treatment to keep).
 	/// </summary>
 	private static bool LocalFunctionRendersOnOneLine(StatementSyntax statement, PrintContext context) =>
-		RendersOnOneLine(statement, context)
-		|| (context.Options.PlaceSimpleDeclarationBlocksOnSingleLine
-			&& statement is LocalFunctionStatementSyntax { Body: BlockSyntax block }
-			&& IsCollapsibleSimpleBody(block));
+		RendersOnOneLine(statement, context) ||
+			(context.Options.PlaceSimpleDeclarationBlocksOnSingleLine &&
+				statement is LocalFunctionStatementSyntax { Body: BlockSyntax block } && IsCollapsibleSimpleBody(block));
 
 	/// <summary>True when a block/control-transfer statement's own governed body is a <c>{ }</c> block.</summary>
-	private static bool HasBlockBody(StatementSyntax statement) =>
-		statement switch
-		{
-			IfStatementSyntax s => s.Statement is BlockSyntax,
-			WhileStatementSyntax s => s.Statement is BlockSyntax,
-			ForStatementSyntax s => s.Statement is BlockSyntax,
-			CommonForEachStatementSyntax s => s.Statement is BlockSyntax,
-			DoStatementSyntax s => s.Statement is BlockSyntax,
-			LockStatementSyntax s => s.Statement is BlockSyntax,
-			UsingStatementSyntax s => s.Statement is BlockSyntax,
-			FixedStatementSyntax s => s.Statement is BlockSyntax,
-			// switch/try/checked/unsafe have no braceless form at all — always block-shaped — and every
-			// other statement kind (including the control-transfer ones) has no nested body to ask
-			// about, so PreserveSingleLineBlocks is simply irrelevant to it either way.
-			_ => true,
-		};
+	private static bool HasBlockBody(StatementSyntax statement) => statement switch
+	{
+		IfStatementSyntax s => s.Statement is BlockSyntax,
+		WhileStatementSyntax s => s.Statement is BlockSyntax,
+		ForStatementSyntax s => s.Statement is BlockSyntax,
+		CommonForEachStatementSyntax s => s.Statement is BlockSyntax,
+		DoStatementSyntax s => s.Statement is BlockSyntax,
+		LockStatementSyntax s => s.Statement is BlockSyntax,
+		UsingStatementSyntax s => s.Statement is BlockSyntax,
+		FixedStatementSyntax s => s.Statement is BlockSyntax,
+		// switch/try/checked/unsafe have no braceless form at all — always block-shaped — and every
+		// other statement kind (including the control-transfer ones) has no nested body to ask
+		// about, so PreserveSingleLineBlocks is simply irrelevant to it either way.
+		_ => true,
+	};
 
 	/// <summary>
 	/// The compound control-flow statements <c>csharp_blank_lines_before/after_block_statements</c>
@@ -3332,18 +3299,14 @@ internal static partial class Printers
 	/// opposed to a single simple statement.
 	/// </summary>
 	private static bool IsBlockStatement(StatementSyntax statement) =>
-		statement is IfStatementSyntax or WhileStatementSyntax or ForStatementSyntax
-			or CommonForEachStatementSyntax or DoStatementSyntax or SwitchStatementSyntax
-			or UsingStatementSyntax or LockStatementSyntax or TryStatementSyntax
-			or FixedStatementSyntax or CheckedStatementSyntax or UnsafeStatementSyntax;
+		statement is IfStatementSyntax or WhileStatementSyntax or ForStatementSyntax or CommonForEachStatementSyntax or DoStatementSyntax or SwitchStatementSyntax or UsingStatementSyntax or LockStatementSyntax or TryStatementSyntax or FixedStatementSyntax or CheckedStatementSyntax or UnsafeStatementSyntax;
 
 	/// <summary>
 	/// The statements <c>csharp_blank_lines_before/after_control_transfer_statements</c> govern —
 	/// every statement kind that unconditionally leaves the block it sits in.
 	/// </summary>
 	private static bool IsControlTransferStatement(StatementSyntax statement) =>
-		statement is ReturnStatementSyntax or ThrowStatementSyntax or BreakStatementSyntax
-			or ContinueStatementSyntax or GotoStatementSyntax or YieldStatementSyntax;
+		statement is ReturnStatementSyntax or ThrowStatementSyntax or BreakStatementSyntax or ContinueStatementSyntax or GotoStatementSyntax or YieldStatementSyntax;
 
 	/// <summary>
 	/// True when a trailing <c>// comment</c> already ends <paramref name="previous"/>'s line, so an arrow a
@@ -3420,12 +3383,9 @@ internal static partial class Printers
 	/// opinion is the wrong trade. Nine files in the corpus take this path.
 	/// </para>
 	/// </remarks>
-	internal static bool RewritesTrailingComma<T>(SeparatedSyntaxList<T> list, SyntaxToken closer, PrintContext context)
-		where T : SyntaxNode =>
-		context.Options.RewritesTrailingCommas
-		&& list.Count > 0
-		&& !TokenPrinter.HasLeadingContent(closer)
-		&& (list.SeparatorCount < list.Count || !TokenPrinter.HasAnyContent(list.GetSeparator(list.Count - 1)));
+	internal static bool RewritesTrailingComma<T>(SeparatedSyntaxList<T> list, SyntaxToken closer, PrintContext context) where T : SyntaxNode =>
+		context.Options.RewritesTrailingCommas && list.Count > 0 && !TokenPrinter.HasLeadingContent(closer) &&
+			(list.SeparatorCount < list.Count || !TokenPrinter.HasAnyContent(list.GetSeparator(list.Count - 1)));
 
 	/// <summary>
 	/// Emits the trailing comma for a list <see cref="RewritesTrailingComma{T}"/> accepted.
@@ -3492,29 +3452,25 @@ internal static partial class Printers
 	/// anchors it — to the line the statement began on — rather than gaining a level for every call
 	/// it happens to be nested inside.
 	/// </remarks>
-	internal static bool EndsWithOwnBlock(ExpressionSyntax expression) =>
-		expression switch
-		{
-			InvocationExpressionSyntax invocation => LastArgumentEndsWithOwnBlock(invocation.ArgumentList),
+	internal static bool EndsWithOwnBlock(ExpressionSyntax expression) => expression switch
+	{
+		InvocationExpressionSyntax invocation => LastArgumentEndsWithOwnBlock(invocation.ArgumentList),
 
-			// A creation with an initializer of its own already answers true through BringsOwnBlock;
-			// these are the ones carrying only arguments, such as `new(new Limiter(new Options { … }))`.
-			ObjectCreationExpressionSyntax { Initializer: null, ArgumentList: { } arguments } =>
-				LastArgumentEndsWithOwnBlock(arguments),
-			ImplicitObjectCreationExpressionSyntax { Initializer: null } implicitCreation =>
-				LastArgumentEndsWithOwnBlock(implicitCreation.ArgumentList),
+		// A creation with an initializer of its own already answers true through BringsOwnBlock;
+		// these are the ones carrying only arguments, such as `new(new Limiter(new Options { … }))`.
+		ObjectCreationExpressionSyntax { Initializer: null, ArgumentList: { } arguments } => LastArgumentEndsWithOwnBlock(arguments),
+		ImplicitObjectCreationExpressionSyntax { Initializer: null } implicitCreation => LastArgumentEndsWithOwnBlock(implicitCreation.ArgumentList),
 
-			// An expression-bodied lambda whose tail is itself a callback ending in a block — `builder
-			// => builder.Add(x => { … })` — hugs exactly like a block-bodied one once that block opens.
-			// Delegates to the stricter EndsWithBlockBodiedCallback rather than recursing back through
-			// this switch's BringsOwnBlock fallback: a `with` or object initializer at the tail can
-			// still print flat, and unlike an actual block its own group cannot supply the break a long
-			// preceding member chain needs once the outer one is skipped.
-			AnonymousFunctionExpressionSyntax { Block: null } lambda =>
-				EndsWithBlockBodiedCallback(lambda),
+		// An expression-bodied lambda whose tail is itself a callback ending in a block — `builder
+		// => builder.Add(x => { … })` — hugs exactly like a block-bodied one once that block opens.
+		// Delegates to the stricter EndsWithBlockBodiedCallback rather than recursing back through
+		// this switch's BringsOwnBlock fallback: a `with` or object initializer at the tail can
+		// still print flat, and unlike an actual block its own group cannot supply the break a long
+		// preceding member chain needs once the outer one is skipped.
+		AnonymousFunctionExpressionSyntax { Block: null } lambda => EndsWithBlockBodiedCallback(lambda),
 
-			_ => BringsOwnBlock(expression),
-		};
+		_ => BringsOwnBlock(expression),
+	};
 
 	/// <summary>
 	/// True for an argument whose own layout indents its continuation lines a level in from where it
@@ -3527,22 +3483,16 @@ internal static partial class Printers
 	/// one level in, and taking the list's level back off would put <c>Foo(a &amp;&amp;</c> /
 	/// <c>b)</c> at the statement's own indent.
 	/// </remarks>
-	private static bool IndentsOwnContinuation(ExpressionSyntax expression) =>
-		expression switch
-		{
-			InvocationExpressionSyntax
-				or ObjectCreationExpressionSyntax
-				or ImplicitObjectCreationExpressionSyntax
-				or MemberAccessExpressionSyntax
-				or ElementAccessExpressionSyntax
-				or ConditionalAccessExpressionSyntax
-				or ConditionalExpressionSyntax => true,
-			AnonymousFunctionExpressionSyntax { ExpressionBody: not null } => true,
-			AwaitExpressionSyntax awaitExpression => IndentsOwnContinuation(awaitExpression.Expression),
-			PrefixUnaryExpressionSyntax prefix => IndentsOwnContinuation(prefix.Operand),
-			CastExpressionSyntax cast => IndentsOwnContinuation(cast.Expression),
-			_ => false,
-		};
+	private static bool IndentsOwnContinuation(ExpressionSyntax expression) => expression switch
+	{
+		InvocationExpressionSyntax or ObjectCreationExpressionSyntax or ImplicitObjectCreationExpressionSyntax or MemberAccessExpressionSyntax or ElementAccessExpressionSyntax or ConditionalAccessExpressionSyntax or ConditionalExpressionSyntax =>
+			true,
+		AnonymousFunctionExpressionSyntax { ExpressionBody: not null } => true,
+		AwaitExpressionSyntax awaitExpression => IndentsOwnContinuation(awaitExpression.Expression),
+		PrefixUnaryExpressionSyntax prefix => IndentsOwnContinuation(prefix.Operand),
+		CastExpressionSyntax cast => IndentsOwnContinuation(cast.Expression),
+		_ => false,
+	};
 
 	/// <summary>
 	/// How many levels into <paramref name="element"/> its first continuation line sits: two for a lambda
@@ -3566,11 +3516,10 @@ internal static partial class Printers
 		if (value is not null && value != element && ValueBelowComment(element, value, context))
 			return 0;
 
-		return value is LambdaExpressionSyntax { ExpressionBody: { } body } lambda
-			&& context.AuthorJoined(lambda.ArrowToken.Span.End, body.SpanStart)
-			&& HangsOnArrowLine(body)
-				? 2
-				: 1;
+		return value is LambdaExpressionSyntax { ExpressionBody: { } body } lambda && context.AuthorJoined(
+			lambda.ArrowToken.Span.End,
+			body.SpanStart
+		) && HangsOnArrowLine(body) ? 2 : 1;
 	}
 
 	/// <summary>
@@ -3646,10 +3595,7 @@ internal static partial class Printers
 			if (OpensBraceLineAbove(node, token, line.Start, context))
 				return -1;
 
-			return token.Kind() is SyntaxKind.OpenBraceToken
-				or SyntaxKind.CloseBraceToken
-				or SyntaxKind.CloseParenToken
-				or SyntaxKind.CloseBracketToken
+			return token.Kind() is SyntaxKind.OpenBraceToken or SyntaxKind.CloseBraceToken or SyntaxKind.CloseParenToken or SyntaxKind.CloseBracketToken
 				? -1
 				: context.SourceIndent(first);
 		}
@@ -3675,22 +3621,17 @@ internal static partial class Printers
 		{
 			switch (current)
 			{
-				case InitializerExpressionSyntax initializer
-					when initializer.OpenBraceToken.SpanStart < lineStart
-						&& initializer.Parent is BaseObjectCreationExpressionSyntax
-							or ArrayCreationExpressionSyntax
-							or ImplicitArrayCreationExpressionSyntax
-						&& options.NewLineBeforeMembersInObjectInitializers
-						&& initializer.IsKind(SyntaxKind.ObjectInitializerExpression)
-						&& BraceOnOwnLine(BraceStyle.ObjectCollectionArrayInitializers, context)
-						&& SpansLines(initializer, context):
+				case InitializerExpressionSyntax initializer when initializer.OpenBraceToken.SpanStart < lineStart &&
+					initializer.Parent is BaseObjectCreationExpressionSyntax or ArrayCreationExpressionSyntax or ImplicitArrayCreationExpressionSyntax && options.NewLineBeforeMembersInObjectInitializers && initializer.IsKind(
+					SyntaxKind.ObjectInitializerExpression
+				) && BraceOnOwnLine(BraceStyle.ObjectCollectionArrayInitializers, context) && SpansLines(initializer, context):
 					return true;
 
-				case AnonymousObjectCreationExpressionSyntax anonymous
-					when anonymous.OpenBraceToken.SpanStart < lineStart
-						&& (options.NewLineBeforeMembersInAnonymousTypes || options.NewLineBeforeMembersInObjectInitializers)
-						&& BraceOnOwnLine(BraceStyle.AnonymousTypes, context)
-						&& SpansLines(anonymous, context):
+				case AnonymousObjectCreationExpressionSyntax anonymous when anonymous.OpenBraceToken.SpanStart < lineStart &&
+					(options.NewLineBeforeMembersInAnonymousTypes || options.NewLineBeforeMembersInObjectInitializers) && BraceOnOwnLine(
+					BraceStyle.AnonymousTypes,
+					context
+				) && SpansLines(anonymous, context):
 					return true;
 			}
 		}
@@ -3699,8 +3640,7 @@ internal static partial class Printers
 	}
 
 	private static bool LastArgumentEndsWithOwnBlock(BaseArgumentListSyntax? arguments) =>
-		arguments is { Arguments.Count: > 0 }
-		&& EndsWithOwnBlock(arguments.Arguments[^1].Expression);
+		arguments is { Arguments.Count: > 0 } && EndsWithOwnBlock(arguments.Arguments[^1].Expression);
 
 	/// <summary>
 	/// True when an expression, followed strictly through calls and creations, resolves to a
@@ -3710,24 +3650,18 @@ internal static partial class Printers
 	/// so treating it the same way here would let a caller skip a breakable group that a long chain
 	/// in front of it still needs.
 	/// </summary>
-	internal static bool EndsWithBlockBodiedCallback(ExpressionSyntax expression) =>
-		expression switch
-		{
-			InvocationExpressionSyntax invocation =>
-				LastArgumentEndsWithBlockBodiedCallback(invocation.ArgumentList),
-			ObjectCreationExpressionSyntax { Initializer: null, ArgumentList: { } arguments } =>
-				LastArgumentEndsWithBlockBodiedCallback(arguments),
-			ImplicitObjectCreationExpressionSyntax { Initializer: null } implicitCreation =>
-				LastArgumentEndsWithBlockBodiedCallback(implicitCreation.ArgumentList),
-			AnonymousFunctionExpressionSyntax { Block: null, ExpressionBody: { } body } =>
-				EndsWithBlockBodiedCallback(body),
-			AnonymousFunctionExpressionSyntax function => function.Block is not null,
-			_ => false,
-		};
+	internal static bool EndsWithBlockBodiedCallback(ExpressionSyntax expression) => expression switch
+	{
+		InvocationExpressionSyntax invocation => LastArgumentEndsWithBlockBodiedCallback(invocation.ArgumentList),
+		ObjectCreationExpressionSyntax { Initializer: null, ArgumentList: { } arguments } => LastArgumentEndsWithBlockBodiedCallback(arguments),
+		ImplicitObjectCreationExpressionSyntax { Initializer: null } implicitCreation => LastArgumentEndsWithBlockBodiedCallback(implicitCreation.ArgumentList),
+		AnonymousFunctionExpressionSyntax { Block: null, ExpressionBody: { } body } => EndsWithBlockBodiedCallback(body),
+		AnonymousFunctionExpressionSyntax function => function.Block is not null,
+		_ => false,
+	};
 
 	private static bool LastArgumentEndsWithBlockBodiedCallback(BaseArgumentListSyntax? arguments) =>
-		arguments is { Arguments.Count: > 0 }
-		&& EndsWithBlockBodiedCallback(arguments.Arguments[^1].Expression);
+		arguments is { Arguments.Count: > 0 } && EndsWithBlockBodiedCallback(arguments.Arguments[^1].Expression);
 
 	/// <summary>Emits the separator between two top-level items, preserving at most one blank line.</summary>
 	private static void Separate(PrintContext context, ref int previousEnd, SyntaxNode next)
@@ -3755,8 +3689,7 @@ internal static partial class Printers
 		// fix, and why).
 		if (!NextStartsWithRegionBoundary(next.GetFirstToken(includeZeroWidth: true)))
 		{
-			var minimum = next is MemberDeclarationSyntax member && !NextStartsWithDirective(next)
-				? MinimumBlankLinesFor(member, context) : 0;
+			var minimum = next is MemberDeclarationSyntax member && !NextStartsWithDirective(next) ? MinimumBlankLinesFor(member, context) : 0;
 			context.BlankLines(context.DeclarationSeparation(previousEnd, EffectiveStart(next), minimum));
 		}
 
@@ -3779,6 +3712,5 @@ internal static partial class Printers
 		return token.SpanStart;
 	}
 
-	private static int EffectiveStart(SyntaxNode node) =>
-		EffectiveTriviaStart(node.GetFirstToken());
+	private static int EffectiveStart(SyntaxNode node) => EffectiveTriviaStart(node.GetFirstToken());
 }

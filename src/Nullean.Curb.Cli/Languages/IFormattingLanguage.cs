@@ -132,13 +132,7 @@ internal interface ILanguageWorker : IDisposable
 	/// <param name="produceText">False for <c>check</c>, which only needs to know whether anything would change.</param>
 	/// <param name="expandUnhandled">Benchmark-only cost model; a language without one ignores it.</param>
 	/// <param name="verifyRoundTrip">Re-parse the output where the printer put a token boundary at risk.</param>
-	FormatResult Format(
-		string source,
-		LanguageOptions options,
-		string fileName,
-		bool produceText,
-		bool expandUnhandled,
-		bool verifyRoundTrip);
+	FormatResult Format(string source, LanguageOptions options, string fileName, bool produceText, bool expandUnhandled, bool verifyRoundTrip);
 
 	/// <summary>How many files this worker re-parsed to verify, for the summary.</summary>
 	int RoundTripsChecked { get; }

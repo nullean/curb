@@ -24,8 +24,7 @@ internal static partial class Printers
 			PrintBaseList(node.BaseList, context);
 		}
 
-		var oneLine = KeepsOneLine(node.OpenBraceToken, node.CloseBraceToken, context)
-			&& context.Options.PlaceSimpleEnumOnSingleLine;
+		var oneLine = KeepsOneLine(node.OpenBraceToken, node.CloseBraceToken, context) && context.Options.PlaceSimpleEnumOnSingleLine;
 		if (!oneLine || HeaderWasBroken(node.BaseList, default, context))
 			BeforeOpenBrace(BraceStyle.Types, context);
 		else
@@ -368,8 +367,7 @@ internal static partial class Printers
 		}
 
 		PrintUsings(node, node.Usings, context, ref previousEnd);
-		AfterUsingList(context, ref previousEnd, moved.Count > 0 && !braceComments,
-			node.Members.Count > 0 && NextStartsWithDirective(node.Members[0]));
+		AfterUsingList(context, ref previousEnd, moved.Count > 0 && !braceComments, node.Members.Count > 0 && NextStartsWithDirective(node.Members[0]));
 
 		foreach (var member in node.Members)
 		{
@@ -437,9 +435,7 @@ internal static partial class Printers
 
 			PrintUsings(node, node.Usings, context, ref previousEnd);
 			var hadUsings = moved.Count > 0 || node.Usings.Count > 0;
-			var nextAfterUsings = node.Members.Count > 0
-				? NextStartsWithDirective(node.Members[0])
-				: NextStartsWithDirective(node.CloseBraceToken);
+			var nextAfterUsings = node.Members.Count > 0 ? NextStartsWithDirective(node.Members[0]) : NextStartsWithDirective(node.CloseBraceToken);
 			AfterUsingList(context, ref previousEnd, hadUsings, nextAfterUsings);
 
 			// The first member is separated from the brace above it by csharp_blank_lines_inside_
@@ -457,9 +453,11 @@ internal static partial class Printers
 					// Same RemoveBlankLinesNearBracesInDeclarations gate as PrintTypeBody's first
 					// member: forced exactly by default, or floored (with BlankLinesInsideNamespace
 					// as the floor) when the caller asked to preserve whatever the author wrote.
-					context.BlankLines(context.Options.RemoveBlankLinesNearBracesInDeclarations
-						? context.Options.BlankLinesInsideNamespace
-						: context.DeclarationSeparation(previousEnd, EffectiveStart(member), context.Options.BlankLinesInsideNamespace));
+					context.BlankLines(
+						context.Options.RemoveBlankLinesNearBracesInDeclarations
+							? context.Options.BlankLinesInsideNamespace
+							: context.DeclarationSeparation(previousEnd, EffectiveStart(member), context.Options.BlankLinesInsideNamespace)
+					);
 				}
 				else if (!first && !NextStartsWithRegionBoundary(member.GetFirstToken(includeZeroWidth: true)))
 				{
