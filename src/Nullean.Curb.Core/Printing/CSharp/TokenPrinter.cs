@@ -593,7 +593,7 @@ internal static class TokenPrinter
 
 				case SyntaxKind.SingleLineCommentTrivia:
 				case SyntaxKind.MultiLineCommentTrivia:
-					if (separated && trivia.IsKind(SyntaxKind.MultiLineCommentTrivia) && KeepsSpacing(trailing[i - 1], context))
+					if (separated && KeepsSpacing(trailing[i - 1], context))
 						context.Arena.SourceText(trailing[i - 1].Span);
 					else if (separated)
 						context.Arena.Synthetic(SyntheticText.Space);
@@ -669,13 +669,19 @@ internal static class TokenPrinter
 	}
 
 	/// <summary>
-	/// True when the whitespace beside an inline <c>/* */</c> comment is wider than the one space the
-	/// printer would write, and is written as it stands.
+	/// True when the whitespace beside a comment is wider than the one space the printer would write,
+	/// and is written as it stands.
 	/// </summary>
 	/// <remarks>
-	/// dotnet format leaves `x =   /* c */   1` as written, and cutting each gap to one space was churn it
-	/// never asked for (issue #148). Spaces only: it rewrites a tab there into spaces of its own choosing.
-	/// Preservation mode only, where the author owns the layout; deterministic layout keeps one space.
+	/// dotnet format leaves `x =   /* c */   1` and `Run();      // why` as written, and cutting each gap
+	/// to one space was churn it never asked for, which also lost hand-aligned comment columns (issues
+	/// #148 and #236). The gap is kept even when the code in front of it moves, as dotnet format keeps it.
+	///
+	/// Spaces only: dotnet format rewrites a tab there into spaces of its own choosing whenever it re-lays
+	/// the line, so a tab still becomes one space, which it leaves alone.
+	///
+	/// Preservation mode only, where the author owns the layout. Deterministic layout keeps one space, so
+	/// a line's text stays a function of its tokens and the width.
 	/// </remarks>
 	private static bool KeepsSpacing(SyntaxTrivia whitespace, PrintContext context)
 	{

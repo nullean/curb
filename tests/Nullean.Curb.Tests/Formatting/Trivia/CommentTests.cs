@@ -50,26 +50,135 @@ public class CommentTests : FormattingTest
 		}
 		""");
 
+	/// <summary>
+	/// The spaces in front of a trailing <c>//</c> comment stay as written, so hand-aligned comment
+	/// columns survive, as <c>dotnet format</c> leaves them. See
+	/// <see href="https://github.com/nullean/curb/issues/236">issue #236</see>.
+	/// </summary>
 	[Test]
-	public Task Trailing_comment_gets_exactly_one_space_before_it() => Formats(
+	public Task Several_spaces_before_a_trailing_line_comment_are_kept() => Unchanged(
+		"""
+		public class C
+		{
+		    private int _a;     // a
+		    private int _bb;    // bb
+
+		    public bool M(int x)
+		    {
+		        Run("a");      // first
+		        Run("long");   // second
+		        return x switch
+		        {
+		            0 => true,      // zero
+		            100 => true,    // hundred
+		            _ => false,
+		        };
+		    }
+
+		    void Run(string s) { }
+		}
+		""");
+
+	[Test]
+	public Task Several_spaces_before_a_trailing_line_comment_are_kept_with_a_width_when_linebreaks_are_kept() => Unchanged(
 		"""
 		public class C
 		{
 		    public void M()
 		    {
-		        Call();     // why we call
+		        Run("a");      // first
+		        Run("long");   // second
 		    }
+
+		    void Run(string s) { }
+		}
+		""",
+		editorConfig: "max_line_length = 120\ncsharp_keep_existing_linebreaks = true");
+
+	[Test]
+	public Task The_gap_before_a_trailing_line_comment_is_kept_when_the_code_in_front_of_it_moves() => Formats(
+		// dotnet format re-spaces the code and re-indents the line, but writes the gap as it stands, and
+		// aligns the comment below under the trailing one where it now starts.
+		"""
+		public class C
+		{
+		    public void M(int x)
+		    {
+		          var y = Foo( x );      // call
+		                                   // under
+		    }
+
+		    int Foo(int q) => q;
 		}
 		""",
 		"""
 		public class C
 		{
-		    public void M()
+		    public void M(int x)
 		    {
-		        Call(); // why we call
+		        var y = Foo(x);      // call
+		                             // under
 		    }
+
+		    int Foo(int q) => q;
 		}
 		""");
+
+	[Test]
+	public Task A_tab_before_a_trailing_line_comment_becomes_one_space() => Formats(
+		// dotnet format keeps a tab there only while it leaves the line alone, and otherwise rewrites it into
+		// spaces counted from where the comment lands. One space is a fixed point of both.
+		"public class C\n{\n    public void M()\n    {\n        Call();\t\t// tabs\n        Call(); \t // mixed\n    }\n\n    void Call() { }\n}",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        Call(); // tabs
+		        Call(); // mixed
+		    }
+
+		    void Call() { }
+		}
+		""");
+
+	[Test]
+	public Task Deterministic_layout_puts_one_space_before_a_trailing_line_comment() => Formats(
+		// With a width, a line's text is a function of its tokens and the width, not of the source's spacing.
+		"""
+		public class C
+		{
+		    public bool M(int x)
+		    {
+		        Call();     // why we call
+		        return x switch
+		        {
+		            0 => true,      // zero
+		            _ => false,
+		        };
+		    }
+
+		    void Call() { }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public bool M(int x)
+		    {
+		        Call(); // why we call
+		        return x switch
+		        {
+		            0 => true, // zero
+		            _ => false,
+		        };
+		    }
+
+		    void Call()
+		    { }
+		}
+		""",
+		editorConfig: "max_line_length = 120");
 
 	[Test]
 	public Task Comment_above_a_closing_brace_stays_with_the_block() => Unchanged(
@@ -613,7 +722,7 @@ public class CommentTests : FormattingTest
 	// label's comment broke the line at the label's column, the comment stayed there, and the next
 	// run read it as out of shape and moved it under the label's comment.
 	[Test]
-	public Task A_comment_under_a_case_labels_trailing_comment_stays_at_the_statement_column() => Formats(
+	public Task A_comment_under_a_case_labels_trailing_comment_stays_at_the_statement_column() => Unchanged(
 		"""
 		public class C
 		{
@@ -623,25 +732,6 @@ public class CommentTests : FormattingTest
 		        {
 		            case 1: // one
 		            case 2:     // two
-		                // shared
-		                return 1;
-		            case 3: // three
-		                    // under three
-		                return 3;
-		        }
-		        return 0;
-		    }
-		}
-		""",
-		"""
-		public class C
-		{
-		    int M(int k)
-		    {
-		        switch (k)
-		        {
-		            case 1: // one
-		            case 2: // two
 		                // shared
 		                return 1;
 		            case 3: // three
