@@ -66,6 +66,8 @@
 
   <ItemGroup>
     <!-- Build script dependencies -->
+    <!-- under Central Package Management the F# SDK adds no implicit FSharp.Core; the build references it itself -->
+    <PackageVersion Include="FSharp.Core" Version="11.0.101" />
     <PackageVersion Include="Argu" Version="6.2.5" />
     <PackageVersion Include="Bullseye" Version="6.1.0" />
     <PackageVersion Include="Proc" Version="0.14.0" />
