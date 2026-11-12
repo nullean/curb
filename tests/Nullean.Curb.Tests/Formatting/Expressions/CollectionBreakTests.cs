@@ -962,4 +962,270 @@ public class CollectionBreakTests : FormattingTest
 		    }
 		}
 		""");
+
+	// Issue #306: dotnet format leaves a comma the author put first on its line where it is, in a tuple
+	// and a collection as in an argument list (#269), and moves it only as far as the line the list starts
+	// on moved.
+	[Test]
+	public Task A_leading_comma_stays_first_on_its_line_in_a_tuple_or_collection() => Unchanged(
+		"""
+		using System.Collections.Generic;
+
+		public class C
+		{
+		    void M()
+		    {
+		        var t = (1
+		          , 2
+		          , 3);
+		        var t2 = (1 // one
+		          , 2);
+		        var t3 = (
+		            1
+		          , 2
+		        );
+		        var l = new List<int> { 1
+		          , 2 };
+		        int[] a = { 1 // one
+		          , 2 };
+		        var b = new[] { 1
+		                      , 2 };
+		        var l2 = new List<int>
+		        {
+		            1
+		          , 2
+		              // two
+		          , 3
+
+		          , 4
+		        };
+		        List<int> e = [1
+		          , 2];
+		        List<int> e2 =
+		        [
+		            1
+		          , 2 // two
+		                // under two
+		          , 3
+		        ];
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_leading_comma_in_a_tuple_or_collection_moves_with_its_line() => Formats(
+		"""
+		using System.Collections.Generic;
+
+		public class C
+		{
+		  void M()
+		  {
+		      var t = (1
+		        , 2);
+		      List<int> l = new() { 1
+		        , 2 };
+		      int[] e =
+		      [
+		          1,
+		            // one
+		          2
+		        , 3,
+		      ];
+		  }
+		}
+		""",
+		"""
+		using System.Collections.Generic;
+
+		public class C
+		{
+		    void M()
+		    {
+		        var t = (1
+		          , 2);
+		        List<int> l = new() { 1
+		          , 2 };
+		        int[] e =
+		        [
+		            1,
+		              // one
+		            2
+		          , 3,
+		        ];
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_width_still_joins_a_comma_first_tuple_or_collection() => Formats(
+		"""
+		using System.Collections.Generic;
+
+		public class C
+		{
+		    void M()
+		    {
+		        var t = (1
+		          , 2);
+		        var l = new List<int> { 1
+		          , 2 };
+		        List<int> e = [1
+		          , 2];
+		    }
+		}
+		""",
+		"""
+		using System.Collections.Generic;
+
+		public class C
+		{
+		    void M()
+		    {
+		        var t = (1, 2);
+		        var l = new List<int> { 1, 2 };
+		        List<int> e = [1, 2];
+		    }
+		}
+		""",
+		editorConfig: "max_line_length = 120");
+
+	/// <summary>
+	/// Issue #307: <c>dotnet format</c> leaves a comment on its own line in a collection initializer, an
+	/// array initializer or a collection expression at the column the author gave it, as it leaves the
+	/// elements. In an object initializer and a tuple it moves the comment to the element's column.
+	/// </summary>
+	[Test]
+	public Task A_comment_between_collection_elements_keeps_its_column() => Unchanged(
+		"""
+		using System.Collections.Generic;
+
+		public class C
+		{
+		    void M()
+		    {
+		        var l = new List<int>
+		        {
+		                // first
+		            1,
+		        // one
+		            2, // two
+		               // under two
+		            3,
+		                // before close
+		        };
+		        int[] a =
+		        {
+		            1,
+		          /* one */
+		            2,
+		        };
+		        var n = new List<C>
+		        {
+		            new C(),
+		                // between
+		            new C { X = 1 },
+		        };
+		        var m = new C
+		        {
+		            X = 1,
+		            L =
+		            {
+		                1,
+		                  // between
+		                2,
+		            },
+		        };
+		        List<int> e =
+		        [
+		              // first
+		            1,
+		              // one
+		            2,
+		          // before close
+		        ];
+		    }
+
+		    int X;
+		    List<int> L;
+		}
+		""");
+
+	[Test]
+	public Task A_comment_between_object_initializer_or_tuple_elements_takes_the_element_column() => Formats(
+		"""
+		public class C
+		{
+		    void M()
+		    {
+		        var o = new C
+		        {
+		            X = 1,
+		         // between
+		            Y = 2,
+		        };
+		        var t = (1,
+		              // between
+		            2);
+		    }
+
+		    int X, Y;
+		}
+		""",
+		"""
+		public class C
+		{
+		    void M()
+		    {
+		        var o = new C
+		        {
+		            X = 1,
+		            // between
+		            Y = 2,
+		        };
+		        var t = (1,
+		            // between
+		            2);
+		    }
+
+		    int X, Y;
+		}
+		""");
+
+	[Test]
+	public Task A_comment_between_collection_elements_moves_with_its_line() => Formats(
+		"""
+		using System.Collections.Generic;
+
+		public class C
+		{
+		  void M()
+		  {
+		      var l = new List<int>
+		      {
+		          1,
+		        // one
+		          2,
+		              // close
+		      };
+		  }
+		}
+		""",
+		"""
+		using System.Collections.Generic;
+
+		public class C
+		{
+		    void M()
+		    {
+		        var l = new List<int>
+		        {
+		            1,
+		          // one
+		            2,
+		                // close
+		        };
+		    }
+		}
+		""");
 }
