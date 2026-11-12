@@ -764,7 +764,7 @@ public sealed record OptionDescriptor(string Key, OptionGroup Group, string[] Va
 				OptionGroup.ExpressionBodies,
 				["false", "true", "when_on_single_line"],
 				"false",
-				"Convert eligible block-bodied methods to expression bodies. IDE0022.",
+				"Convert eligible block-bodied methods to expression bodies. IDE0022. Skipped where the project compiles below C# 6, or below C# 7 for a body that only throws.",
 				"expression_body"
 			),
 			new(
@@ -772,7 +772,7 @@ public sealed record OptionDescriptor(string Key, OptionGroup Group, string[] Va
 				OptionGroup.ExpressionBodies,
 				["false", "true", "when_on_single_line"],
 				"false",
-				"Convert eligible block-bodied constructors to expression bodies. IDE0021.",
+				"Convert eligible block-bodied constructors to expression bodies. IDE0021. Skipped where the project compiles below C# 7.",
 				"constructor_expr"
 			),
 			new(
@@ -780,7 +780,7 @@ public sealed record OptionDescriptor(string Key, OptionGroup Group, string[] Va
 				OptionGroup.ExpressionBodies,
 				["false", "true", "when_on_single_line"],
 				"false",
-				"Convert eligible block-bodied operators. IDE0023/IDE0024.",
+				"Convert eligible block-bodied operators. IDE0023/IDE0024. Skipped where the project compiles below C# 6, or below C# 7 for a body that only throws.",
 				"expression_body"
 			),
 			new(
@@ -796,7 +796,7 @@ public sealed record OptionDescriptor(string Key, OptionGroup Group, string[] Va
 				OptionGroup.ExpressionBodies,
 				["false", "true", "when_on_single_line"],
 				"false",
-				"Convert eligible block-bodied accessors. IDE0027.",
+				"Convert eligible block-bodied accessors. IDE0027. Skipped where the project compiles below C# 7.",
 				"property"
 			),
 			new(
@@ -804,7 +804,7 @@ public sealed record OptionDescriptor(string Key, OptionGroup Group, string[] Va
 				OptionGroup.ExpressionBodies,
 				["false", "true", "when_on_single_line"],
 				"false",
-				"Convert an eligible single-getter property to an expression body. IDE0025.",
+				"Convert an eligible single-getter property to an expression body. IDE0025. Skipped where the project compiles below C# 6, or below C# 7 for a body that only throws.",
 				"property"
 			),
 			new(
@@ -812,7 +812,7 @@ public sealed record OptionDescriptor(string Key, OptionGroup Group, string[] Va
 				OptionGroup.ExpressionBodies,
 				["false", "true", "when_on_single_line"],
 				"false",
-				"Convert eligible block-bodied indexers. IDE0026.",
+				"Convert eligible block-bodied indexers. IDE0026. Skipped where the project compiles below C# 6, or below C# 7 for a body that only throws.",
 				"indexer"
 			),
 			// ---- Usings (3) ---------------------------------------------------------------------
@@ -855,7 +855,7 @@ public sealed record OptionDescriptor(string Key, OptionGroup Group, string[] Va
 				OptionGroup.ModifiersAndBraces,
 				["block_scoped", "file_scoped"],
 				"(as written)",
-				"Convert block namespaces to file-scoped. IDE0161. Applied without a compilation.",
+				"Convert block namespaces to file-scoped. IDE0161. Applied without a compilation, and skipped where the project compiles below C# 10.",
 				"namespace_block"
 			),
 			// ---- TrailingCommas (2) -------------------------------------------------------------

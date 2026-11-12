@@ -126,13 +126,13 @@ Use the filter above to search by name. Each group below links to its own index.
 
 ## [Expression Bodies](expression-bodies/index.md)
 
-- [csharp_style_expression_bodied_methods](expression-bodies/csharp_style_expression_bodied_methods.md) — Convert eligible block-bodied methods to expression bodies. IDE0022.
-- [csharp_style_expression_bodied_constructors](expression-bodies/csharp_style_expression_bodied_constructors.md) — Convert eligible block-bodied constructors to expression bodies. IDE0021.
-- [csharp_style_expression_bodied_operators](expression-bodies/csharp_style_expression_bodied_operators.md) — Convert eligible block-bodied operators. IDE0023/IDE0024.
+- [csharp_style_expression_bodied_methods](expression-bodies/csharp_style_expression_bodied_methods.md) — Convert eligible block-bodied methods to expression bodies. IDE0022. Skipped where the project compiles below C# 6, or below C# 7 for a body that only throws.
+- [csharp_style_expression_bodied_constructors](expression-bodies/csharp_style_expression_bodied_constructors.md) — Convert eligible block-bodied constructors to expression bodies. IDE0021. Skipped where the project compiles below C# 7.
+- [csharp_style_expression_bodied_operators](expression-bodies/csharp_style_expression_bodied_operators.md) — Convert eligible block-bodied operators. IDE0023/IDE0024. Skipped where the project compiles below C# 6, or below C# 7 for a body that only throws.
 - [csharp_style_expression_bodied_local_functions](expression-bodies/csharp_style_expression_bodied_local_functions.md) — Convert eligible block-bodied local functions. IDE0061.
-- [csharp_style_expression_bodied_accessors](expression-bodies/csharp_style_expression_bodied_accessors.md) — Convert eligible block-bodied accessors. IDE0027.
-- [csharp_style_expression_bodied_properties](expression-bodies/csharp_style_expression_bodied_properties.md) — Convert an eligible single-getter property to an expression body. IDE0025.
-- [csharp_style_expression_bodied_indexers](expression-bodies/csharp_style_expression_bodied_indexers.md) — Convert eligible block-bodied indexers. IDE0026.
+- [csharp_style_expression_bodied_accessors](expression-bodies/csharp_style_expression_bodied_accessors.md) — Convert eligible block-bodied accessors. IDE0027. Skipped where the project compiles below C# 7.
+- [csharp_style_expression_bodied_properties](expression-bodies/csharp_style_expression_bodied_properties.md) — Convert an eligible single-getter property to an expression body. IDE0025. Skipped where the project compiles below C# 6, or below C# 7 for a body that only throws.
+- [csharp_style_expression_bodied_indexers](expression-bodies/csharp_style_expression_bodied_indexers.md) — Convert eligible block-bodied indexers. IDE0026. Skipped where the project compiles below C# 6, or below C# 7 for a body that only throws.
 
 ## [Usings](usings/index.md)
 
@@ -144,7 +144,7 @@ Use the filter above to search by name. Each group below links to its own index.
 
 - [csharp_preferred_modifier_order](modifiers-and-braces/csharp_preferred_modifier_order.md) — Reorder modifiers to the specified preference. IDE0036. Applied without a compilation.
 - [csharp_prefer_braces](modifiers-and-braces/csharp_prefer_braces.md) — Add braces to unbraced control-flow bodies. IDE0011. Applied without a compilation.
-- [csharp_style_namespace_declarations](modifiers-and-braces/csharp_style_namespace_declarations.md) — Convert block namespaces to file-scoped. IDE0161. Applied without a compilation.
+- [csharp_style_namespace_declarations](modifiers-and-braces/csharp_style_namespace_declarations.md) — Convert block namespaces to file-scoped. IDE0161. Applied without a compilation, and skipped where the project compiles below C# 10.
 
 ## [Trailing Commas](trailing-commas/index.md)
 

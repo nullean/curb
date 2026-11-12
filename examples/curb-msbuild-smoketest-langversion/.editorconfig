@@ -1,0 +1,9 @@
+root = true
+
+[*.cs]
+indent_style = space
+indent_size = 4
+max_line_length = off
+end_of_line = lf
+csharp_style_namespace_declarations = file_scoped
+csharp_style_expression_bodied_methods = true

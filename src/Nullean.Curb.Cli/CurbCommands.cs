@@ -36,15 +36,22 @@ internal sealed class CurbCommands
 	/// integration's F# target passes, so a project's compile set reaches only the formatter for its
 	/// language. <c>razor</c> still formats only files whose <c>.editorconfig</c> opts in.
 	/// </param>
+	/// <param name="langVersion">
+	/// The C# version the files compile as, such as <c>7.3</c>: a rewrite that would need a newer one is
+	/// skipped. Any value the compiler's <c>-langversion</c> accepts. Given more than once, the lowest
+	/// applies, which is what the MSBuild integration passes for a multi-targeting project. Without it,
+	/// nothing is capped.
+	/// </param>
 	public int Format(
 		[Argument] string path = ".",
 		List<FileInfo>? files = null,
 		[Existing] FileInfo? msbuildListFile = null,
 		string? cache = null,
 		bool noVerify = false,
-		string? language = null
+		string? language = null,
+		List<string>? langVersion = null
 	) =>
-		LanguagesFor(msbuildListFile, language) is { } languages
+		LanguagesFor(msbuildListFile, language, langVersion) is { } languages
 			? FormattingRun.Execute(
 				_fileSystem,
 				path,
@@ -77,6 +84,12 @@ internal sealed class CurbCommands
 	/// integration's F# target passes, so a project's compile set reaches only the formatter for its
 	/// language. <c>razor</c> still formats only files whose <c>.editorconfig</c> opts in.
 	/// </param>
+	/// <param name="langVersion">
+	/// The C# version the files compile as, such as <c>7.3</c>: a rewrite that would need a newer one is
+	/// skipped. Any value the compiler's <c>-langversion</c> accepts. Given more than once, the lowest
+	/// applies, which is what the MSBuild integration passes for a multi-targeting project. Without it,
+	/// nothing is capped.
+	/// </param>
 	public int Check(
 		[Argument] string path = ".",
 		List<FileInfo>? files = null,
@@ -86,9 +99,10 @@ internal sealed class CurbCommands
 		bool expandUnhandled = false,
 		bool coverage = false,
 		FileInfo? unformattedListFile = null,
-		string? language = null
+		string? language = null,
+		List<string>? langVersion = null
 	) =>
-		LanguagesFor(msbuildListFile, language) is { } languages
+		LanguagesFor(msbuildListFile, language, langVersion) is { } languages
 			? FormattingRun.Execute(
 				_fileSystem,
 				path,
@@ -311,16 +325,21 @@ internal sealed class CurbCommands
 	/// <summary>
 	/// The one language asked for; else C# alone when the MSBuild integration is calling, which must never
 	/// format the project files a build is reading; every language otherwise. Null, after saying why, for a
-	/// language Curb does not know.
+	/// language Curb does not know, or a <paramref name="langVersion"/> that is not a C# version.
 	/// </summary>
-	private LanguageRegistry? LanguagesFor(FileInfo? msbuildListFile, string? language)
+	private LanguageRegistry? LanguagesFor(FileInfo? msbuildListFile, string? language, List<string>? langVersion)
 	{
+		if (!CSharpLanguage.TryResolveLanguageVersion(langVersion, out var version))
+			return null;
+
+		var csharp = CSharpLanguage.For(version);
+
 		switch (language?.ToLowerInvariant())
 		{
 			case null:
-				return msbuildListFile is null ? LanguageRegistry.Default(_fileSystem) : LanguageRegistry.CSharpOnly;
+				return msbuildListFile is null ? LanguageRegistry.Default(_fileSystem, csharp: csharp) : LanguageRegistry.CSharpOnlyFor(csharp);
 			case "csharp":
-				return LanguageRegistry.CSharpOnly;
+				return LanguageRegistry.CSharpOnlyFor(csharp);
 			case "xml":
 				return new LanguageRegistry(Languages.Xml.XmlLanguage.Instance);
 			case "fsharp":
