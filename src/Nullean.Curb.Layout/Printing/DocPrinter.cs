@@ -266,6 +266,8 @@ internal sealed class DocPrinter<TLanguage> where TLanguage : struct, ILayoutLan
 						Array.Resize(ref _anchors, Math.Max(doc.A + 1, _anchors.Length * 2));
 					if (doc.B == Doc.AnchorAtColumn)
 						_anchors[doc.A] = OutputColumn();
+					else if (doc.B == Doc.AnchorAtSourceColumn)
+						_anchors[doc.A] = 0;
 					else if (doc.B < 0)
 						_anchors[doc.A] = IndentOfLineStartingAt(Doc.SourceLinePosition(doc.B));
 					else if (doc.B > Doc.AnchorAtLineShift)

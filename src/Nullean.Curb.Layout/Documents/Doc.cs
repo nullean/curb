@@ -212,6 +212,16 @@ internal readonly struct Doc
 	/// </remarks>
 	public static int AnchorAtContainingLine(int position) => 2 + position;
 
+	/// <summary>
+	/// <c>B</c> on a <see cref="DocKind.Anchor"/> for <see cref="DocArena.SourceColumnAnchor"/>: capture a shift
+	/// of zero, so a source indent read back against it lands on that source column whatever the line moved.
+	/// </summary>
+	/// <remarks>
+	/// <see cref="int.MinValue"/>, which <see cref="AnchorAtSourceLine"/> would only produce for a position no
+	/// source reaches.
+	/// </remarks>
+	public const int AnchorAtSourceColumn = int.MinValue;
+
 	/// <summary>The source position an <see cref="AnchorAtContainingLine"/> mode names.</summary>
 	public static int ContainingLinePosition(int mode) => mode - 2;
 
