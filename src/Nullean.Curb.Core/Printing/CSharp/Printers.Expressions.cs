@@ -1518,11 +1518,17 @@ internal static partial class Printers
 				_ => false,
 			};
 
+			// csharp_indent_braces does not move a lambda's brace in dotnet format, wherever it is, and indents
+			// what it holds a level in from it, as without the option. An anonymous method's brace stays where
+			// the author put it on a line of its own too; one moved down from `delegate` takes the option's
+			// level, and its contents and closing brace go a level in from it. So the brace is never indented
+			// from its own line: a moved anonymous method's block is shifted whole instead.
 			var column = OwnLineBraceColumn(block, construct, context);
 			if (column < 0)
 			{
 				CommentsAboveBlock(block.OpenBraceToken, context);
-				PrintBody(block, construct, context, belowClause: belowParameters);
+				using (context.Arena.IndentIf(construct == BraceStyle.AnonymousMethods && IndentsOpenBrace(construct, context)))
+					PrintBody(block, construct, context, belowClause: belowParameters, indentsBrace: false);
 			}
 			else
 			{
@@ -1530,7 +1536,7 @@ internal static partial class Printers
 				context.Arena.LineShiftAnchor(register);
 				CommentsAboveBlock(block.OpenBraceToken, context);
 				using (context.Arena.AlignedIndent(register, column))
-					PrintBody(block, construct, context, belowClause: belowParameters);
+					PrintBody(block, construct, context, belowClause: belowParameters, indentsBrace: false);
 				context.ExitContinuation();
 			}
 		}

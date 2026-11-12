@@ -1161,7 +1161,9 @@ internal static partial class Printers
 			}
 		}
 
-		using (arena.IndentIf(context.Options.IndentBraces))
+		// A lambda's closing brace lines up with its opening one under csharp_indent_braces as well: dotnet
+		// format does not apply the option to a lambda's block at all. An anonymous method's still takes it.
+		using (arena.IndentIf(context.Options.IndentBraces && node.Parent is not LambdaExpressionSyntax))
 		{
 			arena.HardLine(DocFlags.Reindent);
 			TokenPrinter.PrintWithoutLeadingTrivia(node.CloseBraceToken, context);
@@ -1647,7 +1649,8 @@ internal static partial class Printers
 	/// the space a brace kept on the header's line takes; see <see cref="SpaceBeforeBody"/>. And for the
 	/// one header whose line break the option does not own; see <see cref="KeepsBraceBelowEmptyForHeader"/>.
 	/// </param>
-	internal static void BeforeOpenBrace(BraceStyle construct, PrintContext context, SyntaxNode? body = null)
+	/// <param name="indentsBrace">False when the caller already put the block where its brace belongs.</param>
+	internal static void BeforeOpenBrace(BraceStyle construct, PrintContext context, SyntaxNode? body = null, bool indentsBrace = true)
 	{
 		if (!context.Options.NewLineBeforeOpenBrace.HasFlag(construct) && !KeepsBraceBelowEmptyForHeader(body, context))
 		{
@@ -1660,7 +1663,7 @@ internal static partial class Printers
 
 		// The brace lands wherever this break leaves the cursor, so csharp_indent_braces is applied
 		// by emitting the break from a deeper scope rather than by moving the token afterwards.
-		using (context.Arena.IndentIf(context.Options.IndentBraces))
+		using (context.Arena.IndentIf(indentsBrace && context.Options.IndentBraces))
 			context.Arena.HardLine();
 	}
 
@@ -1692,13 +1695,12 @@ internal static partial class Printers
 	/// <see cref="BeforeOpenBrace"/> will too, or -1.
 	/// </summary>
 	/// <remarks>
-	/// -1 under <c>csharp_indent_braces</c>: that break comes from a level deeper than the block, so a
-	/// column read for the block would land the brace a level right of where the author had it, and
-	/// further right on every run.
+	/// Under <c>csharp_indent_braces</c> the caller must print the brace without the option's level, or the
+	/// brace lands a level right of where the author had it, and further right on every run.
 	/// </remarks>
 	internal static int OwnLineBraceColumn(BlockSyntax block, BraceStyle construct, PrintContext context)
 	{
-		if (!context.Options.NewLineBeforeOpenBrace.HasFlag(construct) || context.Options.IndentBraces)
+		if (!context.Options.NewLineBeforeOpenBrace.HasFlag(construct))
 			return -1;
 
 		var open = block.OpenBraceToken;
@@ -2089,13 +2091,18 @@ internal static partial class Printers
 	/// The caller found the body held on one line by something other than csharp_preserve_single_line_blocks:
 	/// a constructor's initializer written on the body's line.
 	/// </param>
+	/// <param name="indentsBrace">
+	/// False when the caller has already placed the block where its brace goes, so the brace's own line
+	/// must not add <c>csharp_indent_braces</c>' level on top; see <see cref="PrintAnonymousFunctionBody"/>.
+	/// </param>
 	internal static void PrintBody(
 		SyntaxNode body,
 		BraceStyle construct,
 		PrintContext context,
 		ushort ownerGroup = 0,
 		bool belowClause = false,
-		bool keepsOneLine = false
+		bool keepsOneLine = false,
+		bool indentsBrace = true
 	)
 	{
 		// A one-line body the author put on the line below its header stays there, as dotnet format leaves
@@ -2114,7 +2121,7 @@ internal static partial class Printers
 			))
 		)
 		{
-			BeforeOpenBrace(construct, context);
+			BeforeOpenBrace(construct, context, indentsBrace: indentsBrace);
 			using (context.Arena.ForceFlat())
 				Node.Print(body, context);
 			return;
@@ -2169,7 +2176,7 @@ internal static partial class Printers
 		}
 
 		// The brace still goes wherever csharp_new_line_before_open_brace puts it; only the pair collapses.
-		BeforeOpenBrace(construct, context);
+		BeforeOpenBrace(construct, context, indentsBrace: indentsBrace);
 		using (context.Arena.ForceFlatIf(CollapsesEmptyBraces(body, context)))
 			Node.Print(body, context);
 	}
