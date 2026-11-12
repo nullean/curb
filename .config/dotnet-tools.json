@@ -3,30 +3,30 @@
   "isRoot": true,
   "tools": {
     "minver-cli": {
-      "version": "7.0.0",
+      "version": "8.0.0",
       "commands": [
         "minver"
       ],
       "rollForward": false
     },
-    "nupkg-validator": {
-      "version": "0.10.1",
+    "jetbrains.resharper.globaltools": {
+      "version": "2026.3.0",
       "commands": [
-        "nupkg-validator"
+        "jb"
       ],
       "rollForward": false
     },
     "assembly-differ": {
-      "version": "0.16.0",
+      "version": "0.18.2",
       "commands": [
         "assembly-differ"
       ],
       "rollForward": false
     },
-    "jetbrains.resharper.globaltools": {
-      "version": "2026.2.1",
+    "nupkg-validator": {
+      "version": "0.11.5",
       "commands": [
-        "jb"
+        "nupkg-validator"
       ],
       "rollForward": false
     }

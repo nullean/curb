@@ -2253,7 +2253,7 @@ let validatePackages () =
     let version = currentVersionInformational.Value
     shell {
         for p in nugetPackages do
-            sh $"dotnet nupkg-validator {p} -v {version} -k {Paths.SignKey} -t {output}"
+            sh $"dotnet nupkg-validator validate {p} -v {version} -k {Paths.SignKey} -t {output}"
     }
 
 let generateApiChanges () =
@@ -2273,9 +2273,9 @@ let generateApiChanges () =
         // Values, so the `|` in them stays inside its argument rather than piping
         let previous = sprintf "previous-nuget|%s|%s|%s" p currentVersion tfm
         let current = sprintf "directory|.artifacts/bin/%s/release" folder
-        printfn "dotnet %A" [ "assembly-differ"; previous; current; "-a"; "true"; "--target"; p; "-f"; "github-comment"; "--output"; outputFile ]
+        printfn "dotnet %A" [ "assembly-differ"; "diff"; previous; current; "-a"; "--target"; p; "-f"; "github-comment"; "--output"; outputFile ]
         shell {
-            sh $"dotnet assembly-differ {previous} {current} -a true --target {p} -f github-comment --output {outputFile}"
+            sh $"dotnet assembly-differ diff {previous} {current} -a --target {p} -f github-comment --output {outputFile}"
         }
     )
 
