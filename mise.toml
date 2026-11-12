@@ -1,6 +1,7 @@
 # Bootstraps the toolchain and is the one entry point: `mise run <task>`, the same task names in every nullean repo.
 # The .NET SDK version lives only in global.json: the first dotnet entry reads it from there (sdk.version is the first
-# "version" key). Curb and its tests target net11.0, whose runtime that SDK carries, so no other runtime is listed.
+# "version" key). Curb and its tests run on net11.0, whose runtime that SDK carries, so no other runtime is listed (the
+# net10.0 build the MSBuild package also carries needs only a targeting pack, which NuGet supplies).
 
 [env]
 DOTNET_NOLOGO = "1"
@@ -28,12 +29,12 @@ run = "dotnet run --project build/scripts -- test"
 
 [tasks.format]
 description = "Format Curb's own source with Curb, built from this checkout"
-run = "dotnet run --project src/Nullean.Curb.Cli -c Release -- format src tools tests"
+run = "dotnet run --project src/Nullean.Curb.Cli -c Release -f net11.0 -- format src tools tests"
 
 [tasks.check]
 description = "Fail on unformatted source (Curb, built from this checkout) and on workflow findings (zizmor)"
 run = [
-  "dotnet run --project src/Nullean.Curb.Cli -c Release -- check src tools tests",
+  "dotnet run --project src/Nullean.Curb.Cli -c Release -f net11.0 -- check src tools tests",
   "zizmor --min-severity medium .",
 ]
 

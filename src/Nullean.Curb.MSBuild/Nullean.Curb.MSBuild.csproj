@@ -43,20 +43,32 @@
     </TargetsForTfmSpecificContentInPackage>
   </PropertyGroup>
 
+  <!-- Once per framework the CLI targets: curb.targets runs the net11.0 build on a .NET 11 or later SDK and the
+       net10.0 one on a .NET 10 SDK, so a consumer needs no runtime beyond the one its SDK carries. -->
+  <ItemGroup>
+    <CurbCliFramework Include="net10.0;net11.0" />
+  </ItemGroup>
+
   <Target Name="PackCliPayload">
     <!-- Built here rather than declared as a wildcard, because a wildcard is expanded when the
          project is evaluated and these files do not exist until this runs. -->
+    <!-- Restored here: the tool packs restore the CLI for net11.0 alone (see its project), and this needs both.
+         A fresh session id, so restore does not reuse an evaluation from earlier in the same build. -->
+    <MSBuild Projects="../Nullean.Curb.Cli/Nullean.Curb.Cli.csproj"
+             Targets="Restore"
+             Properties="Configuration=$(Configuration);MSBuildRestoreSessionId=$([System.Guid]::NewGuid())" />
     <MSBuild Projects="../Nullean.Curb.Cli/Nullean.Curb.Cli.csproj"
              Targets="Publish"
-             Properties="Configuration=$(Configuration);TargetFramework=net11.0;PublishDir=$(BaseIntermediateOutputPath)cli/;RuntimeIdentifier=;PublishAot=false;SelfContained=false;PublishSelfContained=false" />
+             Properties="Configuration=$(Configuration);TargetFramework=%(CurbCliFramework.Identity);PublishDir=$(BaseIntermediateOutputPath)cli/%(CurbCliFramework.Identity)/;RuntimeIdentifier=;PublishAot=false;SelfContained=false;PublishSelfContained=false" />
 
     <ItemGroup>
-      <TfmSpecificPackageFile Include="$(BaseIntermediateOutputPath)cli/**/*" Exclude="$(BaseIntermediateOutputPath)cli/**/*.pdb">
-        <PackagePath>tools/net11.0/</PackagePath>
+      <TfmSpecificPackageFile Include="$(BaseIntermediateOutputPath)cli/%(CurbCliFramework.Identity)/**/*"
+                              Exclude="$(BaseIntermediateOutputPath)cli/%(CurbCliFramework.Identity)/**/*.pdb">
+        <PackagePath>tools/%(CurbCliFramework.Identity)/</PackagePath>
       </TfmSpecificPackageFile>
     </ItemGroup>
 
-    <Error Condition="'@(TfmSpecificPackageFile)' == ''"
+    <Error Condition="!Exists('$(BaseIntermediateOutputPath)cli/net10.0/curb.dll') or !Exists('$(BaseIntermediateOutputPath)cli/net11.0/curb.dll')"
            Text="The CLI payload is missing, so the package would install a formatter it cannot run." />
   </Target>
 

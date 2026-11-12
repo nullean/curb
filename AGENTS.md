@@ -6,7 +6,7 @@ width-aware reflow. It ships as a native-AOT `dotnet tool`.
 ## Build and test
 
 `mise install` provides the toolchain: the .NET 11 SDK pinned in `global.json`, which carries the net11.0 runtime Curb
-and its tests target. The everyday tasks have the same names as in every nullean repository:
+and its tests run on. The CLI and its libraries also build for net10.0, so the MSBuild package runs on a .NET 10 SDK. The everyday tasks have the same names as in every nullean repository:
 
 ```sh
 mise run build            # build the solution

@@ -17,9 +17,22 @@
 
     <!-- Native-AOT tool packaging: one package per RID plus an 'any' framework-dependent fallback.
          The root package's DotnetToolSettings.xml (v2) maps each RID to its per-RID package.
-         Installing requires the .NET 10 SDK. -->
+         A native package installs with the .NET 10 SDK or later; the portable one, net11.0, needs .NET 11. -->
     <RuntimeIdentifiers>linux-x64;linux-arm64;win-x64;win-arm64;osx-arm64;any</RuntimeIdentifiers>
     <RollForward>Major</RollForward>
+  </PropertyGroup>
+
+  <!-- Directory.Build.props gives the CLI net10.0 and net11.0 so the MSBuild package can carry a build for
+       each runtime. The tool packages are net11.0 alone: the SDK's RID-specific tool packing writes one
+       tools/any/any/DotnetToolSettings.xml for the root package and cannot hold two frameworks, and a native
+       binary needs no runtime anyway. So a RID-specific build (dotnet publish/pack -r <rid>, which also keeps
+       the publish path's release_<rid> shape) and the root and portable packs (generatePackages passes
+       CurbToolPack=true) compile for net11.0 only. -->
+  <PropertyGroup Condition="'$(CurbToolPack)' == 'true' or ('$(RuntimeIdentifier)' != '' and '$(RuntimeIdentifier)' != 'any')">
+    <!-- TargetFramework rather than a one-item TargetFrameworks, which would still be an outer build that
+         cannot publish (NETSDK1129). -->
+    <TargetFrameworks></TargetFrameworks>
+    <TargetFramework>net11.0</TargetFramework>
   </PropertyGroup>
 
   <!-- AOT settings apply only when a specific RID is targeted (dotnet pack -r <rid>). Without this

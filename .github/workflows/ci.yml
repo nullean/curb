@@ -534,7 +534,7 @@ jobs:
 
       # Curb formats its own source: the build above produced the CLI this checks with, from this commit.
       - name: Curb formats its own source
-        run: dotnet run --project src/Nullean.Curb.Cli -c Release --no-build -- check src tools tests
+        run: dotnet run --project src/Nullean.Curb.Cli -c Release -f net11.0 --no-build -- check src tools tests
 
       # The tests that run the real Fantomas, through its daemon and its command line, skip where it is not
       # restored. Here it is, from the fixture manifest that pins the version they expect, and they fail
