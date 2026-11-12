@@ -2164,7 +2164,13 @@ internal static partial class Printers
 		{
 			var arena = context.Arena;
 
-			if (ownerGroup != 0 && BraceOnOwnLine(construct, context))
+			// A trailing `//` comment has already ended the header's line. Its break was printed in the scope
+			// the header's last token was, which for a constructor initializer is a level in, and the body
+			// followed it there; dotnet format puts it at the member's column (issue #330). This break merges
+			// into the comment's and places the body from here.
+			if (EndsWithLineComment(body.GetFirstToken().GetPreviousToken()))
+				arena.HardLine();
+			else if (ownerGroup != 0 && BraceOnOwnLine(construct, context))
 			{
 				arena.LineIfBroken(ownerGroup);
 
