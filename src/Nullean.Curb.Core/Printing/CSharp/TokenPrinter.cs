@@ -132,7 +132,7 @@ internal static class TokenPrinter
 
 		// The first token of a continuation line in a broken binary chain: its comments sit at its
 		// column, where dotnet format puts them, rather than at the ambient indent.
-		var aligned = context.TryTakeLeadingTriviaAlignment(token, out var alignRegister, out var alignOffset, out var alignElement);
+		var aligned = context.TryTakeLeadingTriviaAlignment(token, out var alignRegister, out var alignOffset, out var alignElement, out var alignAsWritten);
 
 		// Where dotnet format measures that continuation line's comments from: the line the statement,
 		// member or element holding the token starts on. Found at the first comment, since most tokens
@@ -290,10 +290,18 @@ internal static class TokenPrinter
 					var startsAligned = isLineComment && !emittedAnything && !blankLineBefore && !separated &&
 						!(aligned && alignElement) && AlignsUnderTrailingComment(token, trivia, shapeBase, unshaped, context);
 
+					// Between a collection's elements the comment keeps its own column, not the element's.
+					var commentOffset = aligned && alignAsWritten ? context.SourceIndent(trivia.SpanStart) : alignOffset;
+
 					if (startsAligned || (alignedRun && isLineComment && priorNewLines <= 1))
 					{
 						arena.AlignedLine(TrailingCommentAnchor);
 						alignedRun = true;
+					}
+					else if (aligned && alignAsWritten)
+					{
+						arena.AlignedLine(alignRegister, commentOffset);
+						alignedRun = false;
 					}
 					else if (keepsAtBase)
 					{
@@ -317,7 +325,7 @@ internal static class TokenPrinter
 
 					if (trivia.IsKind(SyntaxKind.SingleLineDocumentationCommentTrivia))
 					{
-						pendingNewLines = EmitDocumentationLines(trivia, context, aligned, alignRegister, alignOffset);
+						pendingNewLines = EmitDocumentationLines(trivia, context, aligned, alignRegister, commentOffset);
 						if (trailingBreak)
 							arena.HardLine();
 					}

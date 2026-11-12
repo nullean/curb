@@ -570,13 +570,18 @@ internal static partial class Printers
 			if (i >= arguments.SeparatorCount)
 				continue;
 
-			Spacing.BeforeComma(context);
-			TokenPrinter.Print(arguments.GetSeparator(i), context);
+			var separator = arguments.GetSeparator(i);
+			var commaLine = SeparatorAsWritten(arguments[i].Span.End, separator, anchor, context);
+			var from = commaLine == int.MinValue ? arguments[i].Span.End : separator.Span.End;
 
-			if (anchor >= 0 && context.AuthorBroke(arguments[i].Span.End, arguments[i + 1].SpanStart))
-				offset = MemberContinuationLine(arguments[i].Span.End, arguments[i + 1], anchor, context);
+			if (anchor >= 0 && context.AuthorBroke(from, arguments[i + 1].SpanStart))
+				offset = MemberContinuationLine(from, arguments[i + 1], anchor, context);
 			else
+			{
 				Spacing.AfterComma(context);
+				if (commaLine != int.MinValue)
+					offset = commaLine;
+			}
 		}
 
 		if (anchor >= 0 && arguments.Count > 0 && context.AuthorBroke(arguments[^1].Span.End, node.CloseParenToken.SpanStart))

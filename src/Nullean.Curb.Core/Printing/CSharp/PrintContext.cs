@@ -269,6 +269,7 @@ internal sealed class PrintContext(DocArena arena, SourceText text, string sourc
 	private int _alignedTriviaRegister;
 	private int _alignedTriviaOffset;
 	private bool _alignedTriviaElement;
+	private bool _alignedTriviaAsWritten;
 
 	/// <summary>
 	/// Lines the comments ahead of <paramref name="token"/> up with it, on the continuation line an
@@ -285,20 +286,27 @@ internal sealed class PrintContext(DocArena arena, SourceText text, string sourc
 	/// The token starts a collection or initializer element. dotnet format leaves a comment there on the
 	/// element's line even directly under a trailing comment, which it aligns under elsewhere.
 	/// </param>
-	public void AlignLeadingTrivia(SyntaxToken token, int register, int offset, bool element = false)
+	/// <param name="asWritten">
+	/// Each comment keeps the column the author gave it rather than taking the token's, moved as far as the
+	/// line <paramref name="register"/> reads moved: dotnet format leaves a comment between the elements of a
+	/// collection or array initializer, or of a collection expression, where it was (issue #307).
+	/// </param>
+	public void AlignLeadingTrivia(SyntaxToken token, int register, int offset, bool element = false, bool asWritten = false)
 	{
 		_alignedTriviaPosition = token.SpanStart;
 		_alignedTriviaRegister = register;
 		_alignedTriviaOffset = offset;
-		_alignedTriviaElement = element;
+		_alignedTriviaElement = element || asWritten;
+		_alignedTriviaAsWritten = asWritten;
 	}
 
 	/// <summary>Consumes what <see cref="AlignLeadingTrivia"/> recorded, if it was for <paramref name="token"/>.</summary>
-	public bool TryTakeLeadingTriviaAlignment(SyntaxToken token, out int register, out int offset, out bool element)
+	public bool TryTakeLeadingTriviaAlignment(SyntaxToken token, out int register, out int offset, out bool element, out bool asWritten)
 	{
 		register = _alignedTriviaRegister;
 		offset = _alignedTriviaOffset;
 		element = _alignedTriviaElement;
+		asWritten = _alignedTriviaAsWritten;
 		if (_alignedTriviaPosition != token.SpanStart)
 			return false;
 

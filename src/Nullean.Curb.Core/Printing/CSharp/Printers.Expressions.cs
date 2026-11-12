@@ -177,14 +177,15 @@ internal static partial class Printers
 	/// <remarks>
 	/// A comment ahead of <paramref name="next"/> goes on the same column, as dotnet format puts it,
 	/// rather than at the ambient indent with the operand stranded to its right (issue #115). A
-	/// conditional-compilation directive still goes to column 0.
+	/// conditional-compilation directive still goes to column 0. Between the elements of a collection that
+	/// keeps its comments <paramref name="asWritten"/>, each comment keeps its own column instead.
 	/// </remarks>
-	private static int ContinuationLine(SyntaxToken next, int anchor, PrintContext context, bool element = false)
+	private static int ContinuationLine(SyntaxToken next, int anchor, PrintContext context, bool element = false, bool asWritten = false)
 	{
 		var offset = context.SourceIndent(next.SpanStart);
 		context.Arena.AlignedLine(anchor, offset);
 		if (TokenPrinter.HasLeadingContent(next))
-			context.AlignLeadingTrivia(next, anchor, offset, element);
+			context.AlignLeadingTrivia(next, anchor, offset, element, asWritten);
 		return offset;
 	}
 
@@ -251,11 +252,40 @@ internal static partial class Printers
 	/// The members are a collection's or an initializer's, between which dotnet format leaves a comment on
 	/// the member's line. Between arguments it aligns one under a trailing comment as it does anywhere.
 	/// </param>
-	private static int MemberContinuationLine(int previousEnd, SyntaxNode next, int anchor, PrintContext context, bool element = true)
+	/// <param name="asWritten">The comments ahead of <paramref name="next"/> keep their own columns; see <see cref="ContinuationLine"/>.</param>
+	private static int MemberContinuationLine(int previousEnd, SyntaxNode next, int anchor, PrintContext context, bool element = true, bool asWritten = false)
 	{
 		var first = next.GetFirstToken();
 		BreakBeforeFirstToken(previousEnd, first, context);
-		return ContinuationLine(first, anchor, context, element);
+		return ContinuationLine(first, anchor, context, element, asWritten);
+	}
+
+	/// <summary>
+	/// Prints the separator after a list element, first on a line of its own where the author put it there,
+	/// at the column they gave it, and returns the offset of that line, or <see cref="int.MinValue"/>.
+	/// </summary>
+	/// <remarks>
+	/// dotnet format leaves a comma-first list as it is, and moving each comma to the end of the line above
+	/// rewrote it; past a trailing comment it left the comma alone on a line (issues #269, #306).
+	/// </remarks>
+	/// <param name="previousEnd">Where the element before the separator ends.</param>
+	/// <param name="separator">The separator.</param>
+	/// <param name="anchor">The register the list's broken lines read, or -1 when it keeps none.</param>
+	/// <param name="context">Per-file printing state.</param>
+	/// <param name="asWritten">The comments ahead of the separator keep their own columns; see <see cref="ContinuationLine"/>.</param>
+	private static int SeparatorAsWritten(int previousEnd, SyntaxToken separator, int anchor, PrintContext context, bool asWritten = false)
+	{
+		var offset = int.MinValue;
+		if (anchor >= 0 && context.AuthorBroke(previousEnd, separator.SpanStart))
+		{
+			BreakBeforeFirstToken(previousEnd, separator, context);
+			offset = ContinuationLine(separator, anchor, context, asWritten: asWritten);
+		}
+		else
+			Spacing.BeforeComma(context);
+
+		TokenPrinter.Print(separator, context);
+		return offset;
 	}
 
 	public static void AssignmentExpression(AssignmentExpressionSyntax node, PrintContext context)
@@ -864,12 +894,17 @@ internal static partial class Printers
 						if (rewritesComma && i == node.Expressions.Count - 1)
 							continue;
 
-						Spacing.BeforeComma(context);
-						TokenPrinter.Print(node.Expressions.GetSeparator(i), context);
+						var separator = node.Expressions.GetSeparator(i);
+						var commaLine = SeparatorAsWritten(node.Expressions[i].Span.End, separator, anchor, context, asWritten: true);
+						var from = commaLine == int.MinValue ? node.Expressions[i].Span.End : separator.Span.End;
 
 						// A trailing separator is followed by the closing line, not by another one.
 						if (i < node.Expressions.Count - 1)
-							offset = Separator(node.Expressions[i].Span.End, node.Expressions[i + 1]);
+						{
+							offset = Separator(from, node.Expressions[i + 1]);
+							if (offset == int.MinValue)
+								offset = commaLine;
+						}
 					}
 
 					if (rewritesComma)
@@ -886,6 +921,10 @@ internal static partial class Printers
 					if (TokenPrinter.HasLeadingContent(node.CloseBraceToken))
 					{
 						arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
+
+						// One that keeps its breaks keeps the comments' columns too, as between its elements.
+						if (anchor >= 0)
+							context.AlignLeadingTrivia(node.CloseBraceToken, anchor, 0, asWritten: true);
 						TokenPrinter.PrintLeadingTrivia(node.CloseBraceToken, context, trailingBreak: false);
 						trailingTrivia = true;
 					}
@@ -935,7 +974,7 @@ internal static partial class Printers
 		int Separator(int from, ExpressionSyntax next)
 		{
 			if (exactly && context.AuthorBroke(from, next.SpanStart))
-				return MemberContinuationLine(from, next, anchor, context);
+				return MemberContinuationLine(from, next, anchor, context, asWritten: true);
 
 			if (openItOut || (asWritten && context.AuthorBroke(from, next.SpanStart)))
 				BreakBetweenMembers(from, next, context);
@@ -951,7 +990,7 @@ internal static partial class Printers
 		int InsideBrace(int from, SyntaxToken next)
 		{
 			if (exactly && context.AuthorBroke(from, next.SpanStart))
-				return ContinuationLine(next, anchor, context, element: true);
+				return ContinuationLine(next, anchor, context, asWritten: true);
 
 			if (openItOut || (asWritten && context.AuthorBroke(from, next.SpanStart)))
 				arena.HardLine();
@@ -1255,8 +1294,9 @@ internal static partial class Printers
 					if (rewritesComma && i == node.Elements.Count - 1)
 						continue;
 
-					Spacing.BeforeComma(context);
-					TokenPrinter.Print(node.Elements.GetSeparator(i), context);
+					var separator = node.Elements.GetSeparator(i);
+					var commaLine = SeparatorAsWritten(node.Elements[i].Span.End, separator, anchor, context, asWritten: true);
+					var from = commaLine == int.MinValue ? node.Elements[i].Span.End : separator.Span.End;
 
 					// A trailing comma runs straight into the closing bracket, not `, ]`.
 					if (i >= node.Elements.Count - 1)
@@ -1264,10 +1304,13 @@ internal static partial class Printers
 
 					if (!asWritten)
 						Spacing.AfterCommaBreakable(context);
-					else if (context.AuthorJoined(node.Elements[i].Span.End, node.Elements[i + 1].SpanStart))
+					else if (context.AuthorJoined(from, node.Elements[i + 1].SpanStart))
+					{
 						Spacing.AfterComma(context);
+						offset = commaLine;
+					}
 					else
-						offset = MemberContinuationLine(node.Elements[i].Span.End, node.Elements[i + 1], anchor, context);
+						offset = MemberContinuationLine(from, node.Elements[i + 1], anchor, context, asWritten: true);
 				}
 
 				if (rewritesComma)
@@ -1297,7 +1340,7 @@ internal static partial class Printers
 			if (!asWritten)
 				Spacing.InsideBracketsBreakable(context);
 			else if (context.AuthorBroke(from, next.SpanStart))
-				return ContinuationLine(next, anchor, context, element: true);
+				return ContinuationLine(next, anchor, context, asWritten: true);
 			else
 				Spacing.InsideBrackets(context);
 
