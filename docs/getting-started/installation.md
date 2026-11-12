@@ -11,7 +11,7 @@ description: Install Curb as a global dotnet tool, an MSBuild package, or a nati
 dotnet tool install -g curb-cli
 ```
 
-Installs the `curb` command globally. Requires the .NET 10 SDK. After this, `curb format ./src` and `curb check ./src` work from any directory.
+Installs the `curb` command globally. Requires the .NET 10 SDK or later on the platforms below; the portable fallback for any other platform needs .NET 11. After this, `curb format ./src` and `curb check ./src` work from any directory.
 
 The tool ships as a native-AOT binary per platform — about 11 MB, about 10 ms to start — with a portable managed fallback for platforms not in the list.
 

@@ -1,6 +1,6 @@
 <Project>
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
+    <TargetFramework>net11.0</TargetFramework>
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -31,6 +31,14 @@
     <RepositoryType>git</RepositoryType>
     <PackageIcon>nuget-icon.png</PackageIcon>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <!-- The CLI and the libraries it is built from target net10.0 as well as net11.0: the curb MSBuild package
+       runs the CLI on the dotnet doing the consumer's build, which may be a .NET 10 SDK. The MSBuild package
+       itself sets its own netstandard2.0. A native-AOT build of the CLI picks one framework; see its project. -->
+  <PropertyGroup Condition="$(MSBuildProjectDirectory.Replace('\','/').Contains('/src/')) and '$(MSBuildProjectName)' != 'Nullean.Curb.MSBuild'">
+    <TargetFramework></TargetFramework>
+    <TargetFrameworks>net10.0;net11.0</TargetFrameworks>
   </PropertyGroup>
 
   <!-- tests/ projects -->

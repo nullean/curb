@@ -46,7 +46,7 @@ let private prebuiltCurb =
 let private curb (args: string list) =
     match prebuiltCurb.Value with
     | Some exe -> sh $"{exe} {args}"
-    | None -> sh $"dotnet run --project src/Nullean.Curb.Cli -c Release -- {args}"
+    | None -> sh $"dotnet run --project src/Nullean.Curb.Cli -c Release -f net11.0 -- {args}"
 
 /// Runs the CLI with `args`, echoing its output as it arrives, and returns the exit code and the output lines.
 ///
@@ -355,7 +355,7 @@ let perf () =
         failwithf "allocated %.1fx the source size, above the permitted %.1fx" ratio ceiling
     | _ -> printfn "allocated %.1fx the source size" ratio
 
-/// The language-version half (issue #298): a net10.0;netstandard2.0 project whose .editorconfig asks for
+/// The language-version half (issue #298): a net11.0;netstandard2.0 project whose .editorconfig asks for
 /// file-scoped namespaces (C# 10) and expression-bodied methods (C# 6). netstandard2.0 compiles as C# 7.3, so
 /// the build passes only when every inner build applied the lowest framework's version: the method gains its
 /// arrow, the namespace keeps its braces. The second build lifts the cap through Curb_LangVersion and has to
@@ -1118,7 +1118,7 @@ let cleanupSmoketest () =
     // Deliberately not CURB_EXE's native binary: this is the one smoke test that runs the framework-dependent
     // curb.dll, through Curb_Dll, which is what the MSBuild package invokes by default.
     shell {
-        sh $"dotnet publish src/Nullean.Curb.Cli -c Release -o .artifacts/cleanup-smoketest/curb -p:PublishAot=false -p:SelfContained=false"
+        sh $"dotnet publish src/Nullean.Curb.Cli -c Release -f net11.0 -o .artifacts/cleanup-smoketest/curb -p:PublishAot=false -p:SelfContained=false"
     }
 
     let curbDll = Path.GetFullPath(Path.Combine(".artifacts", "cleanup-smoketest", "curb", "curb.dll"))
@@ -2260,10 +2260,11 @@ let generatePackages () =
     // native AOT can only compile for the machine it runs on, so those per-RID outputs are
     // self-contained MANAGED builds, silently missing the AOT compilation. We therefore keep only
     // the root and the portable 'any' fallback here, and take the real per-RID packages from the
-    // CI matrix, where each is compiled on a matching runner.
+    // CI matrix, where each is compiled on a matching runner. CurbToolPack makes them net11.0 only (see the
+    // CLI's project); the net10.0 build exists for the MSBuild package, packed above.
     let staging = DirectoryInfo(Path.Combine(Paths.Output.FullName, "..", "cli-staging")).FullName
     if Directory.Exists staging then Directory.Delete(staging, true)
-    shell { sh $"dotnet pack src/Nullean.Curb.Cli/Nullean.Curb.Cli.csproj -c Release -o {Paths.RootRelative staging}" }
+    shell { sh $"dotnet pack src/Nullean.Curb.Cli/Nullean.Curb.Cli.csproj -c Release -p:CurbToolPack=true -o {Paths.RootRelative staging}" }
 
     let ridSuffixes = Paths.AotRuntimeIdentifiers |> List.map (sprintf "curb-cli.%s.")
     DirectoryInfo(staging).GetFiles("*.nupkg")

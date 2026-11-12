@@ -120,8 +120,16 @@
 
       <!-- The framework-dependent build that ships in this package, run on the SDK doing the build.
            See the package project for why this is not a per-RID native binary. Curb_Exe overrides it
-           with a native one, which starts in about a hundredth of the time. -->
-      <Curb_Dll Condition="'$(Curb_Dll)' == ''">$(MSBuildThisFileDirectory)../tools/net10.0/curb.dll</Curb_Dll>
+           with a native one, which starts in about a hundredth of the time.
+
+           The package carries a net10.0 and a net11.0 build. The one picked is the one the running dotnet
+           has a runtime for: BundledNETCoreAppPackageVersion is the runtime that SDK ships (11.0.0, or
+           11.0.0-rc.2.… for a preview, hence the split on '.' rather than a version parse), so a .NET 10 SDK
+           needs no .NET 11 runtime. A later SDK runs the net11.0 build; nothing below 10 is supported. -->
+      <_CurbRuntimeMajor>$(BundledNETCoreAppPackageVersion.Split('.')[0])</_CurbRuntimeMajor>
+      <_CurbCliFramework>net10.0</_CurbCliFramework>
+      <_CurbCliFramework Condition="'$(_CurbRuntimeMajor)' != '' and $(_CurbRuntimeMajor) &gt;= 11">net11.0</_CurbCliFramework>
+      <Curb_Dll Condition="'$(Curb_Dll)' == ''">$(MSBuildThisFileDirectory)../tools/$(_CurbCliFramework)/curb.dll</Curb_Dll>
     </PropertyGroup>
   </Target>
 

@@ -62,7 +62,7 @@ dotnet build -p:Curb_Check=true               # check without rewriting
 | `Curb_UnformattedAsWarnings` | `false` | Report CURB0001 as a warning instead of an error. Off by default, because a check that does not fail the build is a check nobody notices. |
 | `Curb_LogLevel` | `low` | MSBuild message importance for {{product}}'s own output: `high`, `normal` or `low`. Errors and warnings are raised as diagnostics regardless. |
 | `Curb_Exe` | *unset* | Path to a native {{product}} binary. Roughly a hundred times faster to start than the framework-dependent build the package carries. |
-| `Curb_Dll` | the bundled CLI | The framework-dependent build shipped in the package, run on the SDK doing the build. |
+| `Curb_Dll` | the bundled CLI | The framework-dependent build shipped in the package, run on the SDK doing the build: the net10.0 build on a .NET 10 SDK, the net11.0 build on .NET 11 or later. |
 | `Curb_StampFile` | `$(IntermediateOutputPath)curb.stamp` | Incrementality stamp. |
 | `Curb_Cache` | `true` | Reuse the previous run's verdict for files that have not changed. Set `false` to build without a cache. |
 | `Curb_CacheFile` | `$(IntermediateOutputPath)curb.cache` | Where that cache lives. |

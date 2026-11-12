@@ -31,7 +31,7 @@
     <!-- 0.18.0 fixes handler exit codes (nullean/argh#65), an illink crash under TreatWarningsAsErrors
          (nullean/argh#67), and drops a ~1 MB System.Text.Json dependency (nullean/argh#66). Reference
          Nullean.Argh, not Nullean.Argh.Hosting — see Nullean.Curb.Cli.csproj. -->
-    <PackageVersion Include="Nullean.Argh" Version="0.28.0" />
+    <PackageVersion Include="Nullean.Argh" Version="0.30.0" />
 
     <!-- Fingerprints the file content and the resolved options behind the `cache` flag. XxHash128 rather
          than SHA-256 out of System.Security.Cryptography, and the reason is native AOT rather than speed:
@@ -69,10 +69,10 @@
     <!-- under Central Package Management the F# SDK adds no implicit FSharp.Core; the build references it itself -->
     <PackageVersion Include="FSharp.Core" Version="11.0.101" />
     <!-- brings Nullean.Make, and Proc.Fs 0.21 with Proc -->
-    <PackageVersion Include="Nullean.Make.Fs" Version="0.28.0" />
+    <PackageVersion Include="Nullean.Make.Fs" Version="0.30.0" />
     <!-- referenced directly because the build's own commands are Proc.Fs `sh` lines, and the gates that run
          commands in parallel (verifycleanupexpectations, xmlsafety) need Cmd.quiet (0.18.0+) to collect a
          command's output without printing any of it -->
-    <PackageVersion Include="Proc.Fs" Version="0.21.0" />
+    <PackageVersion Include="Proc.Fs" Version="0.22.1" />
   </ItemGroup>
 </Project>

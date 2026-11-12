@@ -3,7 +3,7 @@
   <!--
     Proves Curb never writes syntax a project's C# version cannot compile (issue #298). The
     .editorconfig asks for file-scoped namespaces, which need C# 10, and expression-bodied methods,
-    which need C# 6. netstandard2.0 compiles as C# 7.3 by default and net10.0 as C# 14, so the build
+    which need C# 6. netstandard2.0 compiles as C# 7.3 by default and net11.0 as C# 15, so the build
     only succeeds if Curb applied the lowest of the two: the method gains its arrow and the namespace
     keeps its braces.
 
@@ -16,7 +16,7 @@
          single-targeting project, and LangVersion to latest. Both cleared, so each framework compiles
          at the default it implies, which is the case the issue is about. -->
     <TargetFramework></TargetFramework>
-    <TargetFrameworks>net10.0;netstandard2.0</TargetFrameworks>
+    <TargetFrameworks>net11.0;netstandard2.0</TargetFrameworks>
     <LangVersion></LangVersion>
     <Nullable>disable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
