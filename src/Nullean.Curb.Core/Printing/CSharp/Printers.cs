@@ -747,6 +747,29 @@ internal static partial class Printers
 			return;
 		}
 
+		// An arrow the author put on a line of its own stays as far in from the member's line as they put it.
+		// dotnet format leaves it at the member's column, one level in or anywhere else, and moves it only as
+		// far as that line moves, as it does a `where` clause; breaking to one level in moved it (issue #329).
+		// An arrow a conversion synthesises has no column to keep and takes the level below.
+		if (breakBeforeArrow && arrow.RawKind != 0 && context.AuthorBroke(arrow.GetPreviousToken().Span.End, arrow.SpanStart))
+		{
+			// A trailing comment's own break lands at the ambient indent, and the aligned line keeps it, so the
+			// ambient indent answers there: a level in for an arrow the author put further in than the line above,
+			// the member's level otherwise.
+			var previous = arrow.GetPreviousToken();
+			using (arena.Group())
+			using (arena.IndentIf(context.SourceIndent(arrow.SpanStart) > context.SourceIndent(previous.SpanStart)))
+			using (AuthorClauseLine(arrow, context))
+			{
+				PrintArrow(arrow, context);
+				arena.Synthetic(SyntheticText.Space);
+				PrintArrowBody(throwKeyword, expression, context);
+			}
+
+			context.ExitContinuation();
+			return;
+		}
+
 		using (arena.Group())
 		using (arena.Indent())
 		{

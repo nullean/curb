@@ -856,6 +856,69 @@ public class ContinuationIndentTests : FormattingTest
 		""");
 
 	[Test]
+	public Task An_arrow_on_its_own_line_keeps_the_column_the_author_gave_it() => Unchanged(
+		// dotnet format leaves the arrow at the member's column, a level in, or further, and the comment
+		// above it with it (issue #329).
+		"""
+		public class C
+		{
+		    int Q()
+		    // c
+		    => 1;
+
+		    int R
+		    => 1;
+
+		    int S()
+		            => 1;
+
+		    int T()
+		            // c
+		            => 1;
+
+		    int U() // c
+		    => 1;
+
+		    int V(int a,
+		        int b)
+		    => a
+		        + b;
+
+		    int this[int i]
+		    => i;
+
+		    void W()
+		    {
+		        int L()
+		                => 1;
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_reindented_member_takes_its_own_line_arrow_along() => Formats(
+		"""
+		public class C
+		{
+		  int Q()
+		  => 1;
+
+		  int S()
+		          => 1;
+		}
+		""",
+		"""
+		public class C
+		{
+		    int Q()
+		    => 1;
+
+		    int S()
+		            => 1;
+		}
+		""");
+
+	[Test]
 	public Task A_reindented_member_takes_the_body_below_its_arrow_along() => Formats(
 		"""
 		public class C
