@@ -525,6 +525,191 @@ public class IndentationTests : FormattingTest
 		csharp_new_line_before_open_brace = none
 		""");
 
+	// dotnet format does not apply csharp_indent_braces to a lambda's block: the brace stays where the
+	// author put it and what it holds goes a level in from it, as without the option.
+	[Test]
+	public Task A_lambda_block_indents_its_statements_from_its_brace() => Formats(
+		"""
+		class C
+		    {
+		    void M()
+		        {
+		        Action<int> a = x =>
+		            {
+		            switch (x)
+		                {
+		                case 1:
+		                    break;
+		                }
+		            };
+		        Run(x =>
+		        {
+		        Foo(x);
+		        });
+		        }
+		    }
+		""",
+		"""
+		class C
+		    {
+		    void M()
+		        {
+		        Action<int> a = x =>
+		            {
+		                switch (x)
+		                    {
+		                    case 1:
+		                        break;
+		                    }
+		            };
+		        Run(x =>
+		        {
+		            Foo(x);
+		        });
+		        }
+		    }
+		""",
+		editorConfig: "csharp_indent_braces = true");
+
+	// Under a width the brace's column is Curb's to choose: a lambda's goes to the statement's indent and an
+	// anonymous method's a level in, where dotnet format puts one it moves down.
+	[Test]
+	public Task A_lambda_block_takes_a_fixed_shape_under_a_width() => Formats(
+		"""
+		class C
+		    {
+		    void M()
+		        {
+		        Run(x =>
+		            {
+		            Foo(x);
+		            });
+		        Run(delegate
+		        {
+		        Foo();
+		        });
+		        }
+		    }
+		""",
+		"""
+		class C
+		    {
+		    void M()
+		        {
+		        Run(x =>
+		        {
+		            Foo(x);
+		        });
+		        Run(delegate
+		            {
+		                Foo();
+		                });
+		        }
+		    }
+		""",
+		editorConfig: """
+		csharp_indent_braces = true
+		max_line_length = 100
+		""");
+
+	// A brace moved down from the arrow lands at the statement's indent, not a level in.
+	[Test]
+	public Task A_lambda_brace_moved_off_the_arrow_is_not_indented() => Formats(
+		"""
+		class C
+		    {
+		    void M()
+		        {
+		        Run(() => {
+		            Foo();
+		            });
+		        }
+		    }
+		""",
+		"""
+		class C
+		    {
+		    void M()
+		        {
+		        Run(() =>
+		        {
+		            Foo();
+		        });
+		        }
+		    }
+		""",
+		editorConfig: "csharp_indent_braces = true");
+
+	// An anonymous method's brace keeps its column too, but its closing brace sits a level in from it, with
+	// the statements. One moved down from `delegate` takes the option's level, and the rest follows it.
+	[Test]
+	public Task An_anonymous_method_closes_level_with_its_statements() => Formats(
+		"""
+		class C
+		    {
+		    void M()
+		        {
+		        Run(delegate
+		        {
+		        Foo();
+		        });
+		        Run(delegate {
+		            Foo();
+		            });
+		        }
+		    }
+		""",
+		"""
+		class C
+		    {
+		    void M()
+		        {
+		        Run(delegate
+		        {
+		            Foo();
+		            });
+		        Run(delegate
+		            {
+		                Foo();
+		                });
+		        }
+		    }
+		""",
+		editorConfig: "csharp_indent_braces = true");
+
+	// With the brace beside the arrow the option still leaves a lambda's closing brace at the statement's
+	// indent, and still moves an anonymous method's a level in.
+	[Test]
+	public Task A_lambda_brace_on_the_arrow_closes_at_the_statement() => Formats(
+		"""
+		class C {
+		    void M() {
+		        Run(() => {
+		            Foo();
+		            });
+		        Run(delegate {
+		            Foo();
+		        });
+		        }
+		    }
+		""",
+		"""
+		class C {
+		    void M() {
+		        Run(() => {
+		            Foo();
+		        });
+		        Run(delegate {
+		            Foo();
+		            });
+		        }
+		    }
+		""",
+		editorConfig: """
+		csharp_indent_braces = true
+		csharp_new_line_before_open_brace = none
+		""");
+
 	// ---- csharp_indent_labels ---------------------------------------------------------------------
 
 	[Test]
