@@ -1382,16 +1382,95 @@ public class InitializerTests : FormattingTest
 		    public R M(R r)
 		    {
 		        var e = r
-		        /* why */
-		        with
+		            /* why */
+		            with
 		        { A = 1 };
 		        var f = r // why
-		        with
+		            with
 		        { A = 1, B = 2 };
-		        var g = r with
+		        var g = r
+		            with
 		        { A = 1 };
 		        return g;
 		    }
+		}
+		""");
+
+	[Test]
+	public Task A_with_the_author_broke_onto_its_own_line_stays_there() => Formats(
+		// dotnet format leaves the `with` line where the author put it, at any column, and only moves the `{`
+		// below it. Curb joined `with` onto the line above, or pulled it back to the statement's indent (issue
+		// #305). A statement Curb re-indents takes its `with` line along with it.
+		"""
+		public record R(int A, int B);
+
+		public class C
+		{
+		    public R M(R r)
+		    {
+		        var a = r
+		                with { A = 1 };
+		          var b = r
+		              with { A = 1 };
+		        var c = r
+		            with
+		            {
+		                A = 1,
+		                B = 2,
+		            };
+		        Take(r
+		            with { A = 1 });
+		        Take(
+		            r
+		                with { B = 2 });
+		        return r
+		            with { };
+		    }
+
+		    public R N(R r) =>
+		        r
+		            with { A = 2 };
+
+		    void Take(R r) { }
+		}
+		""",
+		"""
+		public record R(int A, int B);
+
+		public class C
+		{
+		    public R M(R r)
+		    {
+		        var a = r
+		                with
+		        { A = 1 };
+		        var b = r
+		            with
+		        { A = 1 };
+		        var c = r
+		            with
+		        {
+		            A = 1,
+		            B = 2,
+		        };
+		        Take(r
+		            with
+		        { A = 1 });
+		        Take(
+		            r
+		                with
+		            { B = 2 });
+		        return r
+		            with
+		        { };
+		    }
+
+		    public R N(R r) =>
+		        r
+		            with
+		        { A = 2 };
+
+		    void Take(R r) { }
 		}
 		""");
 }

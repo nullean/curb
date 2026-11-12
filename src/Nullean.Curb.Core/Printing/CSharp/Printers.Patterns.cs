@@ -620,6 +620,17 @@ internal static partial class Printers
 		// `X.CreateContext(a, b) with { … }` is the same shape as a creation with a trailing initializer,
 		// and dotnet format treats it the same way: once the call has opened out, the `{` takes its own
 		// line. So the initializer aims at the call's argument list, not at the source.
+		//
+		// A `with` the author put on a line of its own stays there, at the column they gave it moved as far as the
+		// expression's first line moved: dotnet format leaves that line alone, comments ahead of it included. Joined
+		// onto the line above, or pulled back to the statement's indent, it was not a fixed point of it.
+		var register = -1;
+		if (context.AuthorBroke(node.Expression.Span.End, node.WithKeyword.SpanStart))
+		{
+			register = context.EnterContinuation();
+			context.Arena.LineShiftAnchor(register);
+		}
+
 		context.ArgumentListGroup = 0;
 		Node.Print(node.Expression, context);
 		var ownerGroup = context.ArgumentListGroup;
@@ -628,9 +639,19 @@ internal static partial class Printers
 		// of its own too, in either layout mode (issue #275).
 		var withStartsLine = TokenPrinter.HasLeadingContent(node.WithKeyword) || EndsWithLineComment(node.WithKeyword.GetPreviousToken());
 
-		context.Arena.Synthetic(SyntheticText.Space);
+		if (register >= 0)
+		{
+			ContinuationLine(node.WithKeyword, register, context);
+			withStartsLine = true;
+		}
+		else
+			context.Arena.Synthetic(SyntheticText.Space);
+
 		TokenPrinter.Print(node.WithKeyword, context);
 		InitializerExpression(node.Initializer, context, leadingLine: true, ownerGroup: ownerGroup, ownerBroke: withStartsLine);
+
+		if (register >= 0)
+			context.ExitContinuation();
 	}
 
 	public static void ThrowExpression(ThrowExpressionSyntax node, PrintContext context)
