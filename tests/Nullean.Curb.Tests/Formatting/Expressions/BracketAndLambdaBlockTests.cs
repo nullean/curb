@@ -4,8 +4,9 @@ namespace Nullean.Curb.Tests.Formatting.Expressions;
 /// Breaks in a bracketed argument list, the <c>:</c> after a block lambda in a ternary, and a lambda
 /// block's offset stay where <c>dotnet format whitespace</c> leaves them. See
 /// <see href="https://github.com/nullean/curb/issues/124">issue #124</see>,
-/// <see href="https://github.com/nullean/curb/issues/134">issue #134</see> and
-/// <see href="https://github.com/nullean/curb/issues/135">issue #135</see>.
+/// <see href="https://github.com/nullean/curb/issues/134">issue #134</see>,
+/// <see href="https://github.com/nullean/curb/issues/135">issue #135</see> and, for the <c>)</c> after a
+/// block lambda that ends a tuple, <see href="https://github.com/nullean/curb/issues/299">issue #299</see>.
 /// </summary>
 public class BracketAndLambdaBlockTests : FormattingTest
 {
@@ -1142,4 +1143,166 @@ public class BracketAndLambdaBlockTests : FormattingTest
 		}
 		""",
 		editorConfig: "csharp_empty_block_style = together_same_line");
+
+	// Issue #299: a tuple whose last element is a block lambda gets its `)` on a line of its own, at the
+	// indent of the line the enclosing statement, lambda or member starts on, as the ternary's `:` above.
+
+	[Test]
+	public Task The_paren_after_a_block_lambda_ending_a_tuple_goes_to_the_statement() => Formats(
+		"""
+		public class C
+		{
+		    public object M(string dir)
+		    {
+		        Run(() =>
+		        {
+		            var t = (dir, () =>
+		            {
+		                Use(dir);
+		            });
+		        });
+		        var u = Wrap(
+		            Wrap((dir, async () =>
+		            {
+		                Use(dir);
+		            })));
+		        var v = (dir, () =>
+		        {
+		            Use(dir);
+		        }
+		                    );
+		        var w = (dir, delegate
+		        {
+		            Use(dir);
+		        }).Item1;
+		        return (dir, () =>
+		        {
+		            Use(dir);
+		        });
+		    }
+
+		    public object P => (1, x =>
+		    {
+		        Use(x);
+		    });
+		}
+		""",
+		"""
+		public class C
+		{
+		    public object M(string dir)
+		    {
+		        Run(() =>
+		        {
+		            var t = (dir, () =>
+		            {
+		                Use(dir);
+		            }
+		            );
+		        });
+		        var u = Wrap(
+		            Wrap((dir, async () =>
+		            {
+		                Use(dir);
+		            }
+		        )));
+		        var v = (dir, () =>
+		        {
+		            Use(dir);
+		        }
+		        );
+		        var w = (dir, delegate
+		        {
+		            Use(dir);
+		        }
+		        ).Item1;
+		        return (dir, () =>
+		        {
+		            Use(dir);
+		        }
+		        );
+		    }
+
+		    public object P => (1, x =>
+		    {
+		        Use(x);
+		    }
+		    );
+		}
+		""");
+
+	[Test]
+	public Task The_paren_after_a_block_lambda_ending_a_tuple_goes_to_the_statement_with_tabs() => Formats(
+		"public class C\n{\n\tpublic object M(string dir)\n\t{\n\t\treturn (dir, () =>\n\t\t{\n\t\t\tUse(dir);\n\t\t});\n\t}\n}",
+		"public class C\n{\n\tpublic object M(string dir)\n\t{\n\t\treturn (dir, () =>\n\t\t{\n\t\t\tUse(dir);\n\t\t}\n\t\t);\n\t}\n}",
+		editorConfig: "indent_style = tab");
+
+	[Test]
+	public Task A_block_lambda_that_does_not_end_a_tuple_keeps_what_follows_its_brace() => Unchanged(
+		// dotnet format leaves a call's `)` after the `}`, a tuple's `,`, a parenthesized expression's
+		// `)`, a lambda kept on one line, and a tuple ending in a call that takes the lambda.
+		"""
+		public class C
+		{
+		    public object M(string dir)
+		    {
+		        Run(dir, () =>
+		        {
+		            Use(dir);
+		        });
+		        var a = (() =>
+		        {
+		            Use(dir);
+		        }, dir);
+		        var b = (Action)(() =>
+		        {
+		            Use(dir);
+		        });
+		        var c = (dir, Wrap(() =>
+		        {
+		            Use(dir);
+		        }));
+		        return (dir, x => { Use(x); });
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Under_a_width_the_paren_after_a_block_lambda_ending_a_tuple_goes_to_the_statement() => Formats(
+		"""
+		public class C
+		{
+		    public object M(string dir)
+		    {
+		        Use(1,
+		            (dir, () =>
+		            {
+		                Use(dir);
+		            }));
+		        return (dir, x => { Use(x); });
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public object M(string dir)
+		    {
+		        Use(
+		            1,
+		            (dir, () =>
+		            {
+		                Use(dir);
+		            }
+		        )
+		        );
+		        return (dir, x =>
+		        {
+		            Use(x);
+		        }
+		        );
+		    }
+		}
+		""",
+		editorConfig: "max_line_length = 120");
 }
