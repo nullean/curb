@@ -885,9 +885,10 @@ internal static partial class Printers
 					firstLabel = false;
 				}
 
-				// A braced body answers to csharp_indent_case_contents_when_block and everything else
-				// to csharp_indent_case_contents, so the two are decided per statement rather than
-				// once for the section — a section may hold both.
+				// dotnet format decides once for the section, from its first statement: a section that opens
+				// with a block answers to csharp_indent_case_contents_when_block, statements after the block
+				// included, and any other to csharp_indent_case_contents, blocks included (issue #326).
+				var indented = SectionIndented(section, context);
 				var firstStatement = true;
 				foreach (var statement in section.Statements)
 				{
@@ -901,8 +902,6 @@ internal static partial class Printers
 						firstStatement = false;
 						continue;
 					}
-
-					var indented = statement is BlockSyntax ? context.Options.IndentCaseContentsWhenBlock : context.Options.IndentCaseContents;
 
 					using (arena.Indent(indented ? 1 : 0))
 					{
@@ -966,10 +965,9 @@ internal static partial class Printers
 
 	/// <summary>The levels in from a switch's braces that a comment above its closing brace sits.</summary>
 	/// <remarks>
-	/// The indent of the last section's statements: <c>csharp_indent_case_contents_when_block</c> when the
-	/// last statement is a block, <c>csharp_indent_case_contents</c> otherwise, including for a section with
-	/// no statements. With no sections, the labels' indent, and so for an <c>#endregion</c>, which dotnet format
-	/// lines up with the labels it closes over.
+	/// The indent of the last section's statements; see <see cref="SectionIndented"/>. With no sections, the
+	/// labels' indent, and so for an <c>#endregion</c>, which dotnet format lines up with the labels it closes
+	/// over.
 	/// </remarks>
 	private static int SwitchClosingCommentIndent(SwitchStatementSyntax node, PrintContext context)
 	{
@@ -977,10 +975,17 @@ internal static partial class Printers
 		if (node.Sections.Count == 0 || NextStartsWithRegionBoundary(node.CloseBraceToken))
 			return levels;
 
-		var statements = node.Sections[^1].Statements;
-		var indented = statements.Count > 0 && statements[^1] is BlockSyntax ? context.Options.IndentCaseContentsWhenBlock : context.Options.IndentCaseContents;
-		return indented ? levels + 1 : levels;
+		return SectionIndented(node.Sections[^1], context) ? levels + 1 : levels;
 	}
+
+	/// <summary>Whether a switch section's statements sit a level in from its labels.</summary>
+	/// <remarks>
+	/// <c>csharp_indent_case_contents_when_block</c> when the section's first statement is a block,
+	/// <c>csharp_indent_case_contents</c> otherwise, including for a section with no statements. The answer
+	/// holds for every statement in the section, as in dotnet format.
+	/// </remarks>
+	private static bool SectionIndented(SwitchSectionSyntax section, PrintContext context) =>
+		section.Statements.Count > 0 && section.Statements[0] is BlockSyntax ? context.Options.IndentCaseContentsWhenBlock : context.Options.IndentCaseContents;
 
 	public static void ThrowStatement(ThrowStatementSyntax node, PrintContext context)
 	{
