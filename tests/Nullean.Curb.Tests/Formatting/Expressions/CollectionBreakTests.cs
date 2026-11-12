@@ -236,8 +236,10 @@ public class CollectionBreakTests : FormattingTest
 		}
 		""");
 
+	// Issue #357: dotnet format moves the line a collection starts on, and the line just inside its `[`, but
+	// leaves every line after a comma where the author put it, a `]` after a trailing comma included.
 	[Test]
-	public Task A_reindented_statement_takes_its_collection_lines_along() => Formats(
+	public Task A_reindented_statement_leaves_its_collection_lines_after_a_comma() => Formats(
 		"""
 		public class C
 		{
@@ -258,11 +260,11 @@ public class CollectionBreakTests : FormattingTest
 		    public void M()
 		    {
 		        int[] a = [1,
-		                   2];
+		                     2];
 		        int[] b =
 		            [
 		                1,
-		            ];
+		        ];
 		    }
 		}
 		""");
@@ -1012,8 +1014,10 @@ public class CollectionBreakTests : FormattingTest
 		}
 		""");
 
+	// A tuple's comma line moves with the line the tuple starts on. A collection's stays at the column the
+	// author gave it, as dotnet format leaves it (issue #357).
 	[Test]
-	public Task A_leading_comma_in_a_tuple_or_collection_moves_with_its_line() => Formats(
+	public Task A_leading_comma_moves_with_its_line_in_a_tuple_but_not_in_a_collection() => Formats(
 		"""
 		using System.Collections.Generic;
 
@@ -1045,14 +1049,14 @@ public class CollectionBreakTests : FormattingTest
 		        var t = (1
 		          , 2);
 		        List<int> l = new() { 1
-		          , 2 };
+		        , 2 };
 		        int[] e =
 		        [
 		            1,
-		              // one
-		            2
-		          , 3,
-		        ];
+		            // one
+		          2
+		        , 3,
+		      ];
 		    }
 		}
 		""");
@@ -1192,8 +1196,10 @@ public class CollectionBreakTests : FormattingTest
 		}
 		""");
 
+	// The statement moves, and the initializer's brace, elements and comments stay at the columns the author
+	// gave them, as dotnet format leaves them (issue #357).
 	[Test]
-	public Task A_comment_between_collection_elements_moves_with_its_line() => Formats(
+	public Task A_comment_between_collection_elements_stays_when_its_statement_moves() => Formats(
 		"""
 		using System.Collections.Generic;
 
@@ -1219,13 +1225,174 @@ public class CollectionBreakTests : FormattingTest
 		    void M()
 		    {
 		        var l = new List<int>
-		        {
-		            1,
-		          // one
-		            2,
-		                // close
-		        };
+		      {
+		          1,
+		        // one
+		          2,
+		              // close
+		      };
 		    }
 		}
 		""");
+
+	/// <summary>
+	/// Issue #357: when the line an array creation starts on moves, dotnet format moves that line and leaves
+	/// the element lines the author broke inside the braces at the columns they gave them.
+	/// </summary>
+	[Test]
+	public Task A_moved_array_creation_leaves_its_element_lines_where_they_were() => Formats(
+		"""
+		public class C
+		{
+		      public void M()
+		      {
+		            int[] h =
+		                    new[] { 1,
+		                        2 };
+		            int[] k = new[] { 1,
+		                2 };
+		            int[] g =
+		                    new[] { 1, 2 };
+		      }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        int[] h =
+		                new[] { 1,
+		                        2 };
+		        int[] k = new[] { 1,
+		                2 };
+		        int[] g =
+		                new[] { 1, 2 };
+		    }
+		}
+		""");
+
+	/// <summary>
+	/// The rest of issue #357, form by form, as dotnet format leaves each in a statement that moves. Element,
+	/// comma and comment lines stay in every array and collection initializer. A brace on a line of its own
+	/// moves, except a collection initializer's. The closing brace stays, except an array creation's below
+	/// a brace of its own, which moves with it and takes the comment above it along. In a collection expression
+	/// the line just inside the `[` moves, and so does the `]` unless a trailing comma comes before it.
+	/// </summary>
+	[Test]
+	public Task Initializer_lines_stay_where_dotnet_format_leaves_them_when_their_statement_moves() => Formats(
+		"""
+		using System;
+		using System.Collections.Generic;
+
+		public class C
+		{
+		      public unsafe void M()
+		      {
+		            int[] a = new int[]
+		            {
+		                1,
+		                2
+		                // last
+		            };
+		            int[] b = new[]
+		            {
+		                1,
+		                2
+		            };
+		            int[] c =
+		            {
+		                1, 2
+		            };
+		            Span<int> s = stackalloc int[]
+		            {
+		                1,
+		                2
+		            };
+		            List<int> l = new List<int>
+		            {
+		                1,
+		                2
+		            };
+		            List<int> n = new() {
+		                1, // one
+		                2 // two
+		            };
+		            int[] d = new int[] { 1,
+		                /* two */ 2,
+		                // three
+		                3,
+		            };
+		            int[] e =
+		            [
+		                1,
+		                2
+		            ];
+		            int[] f = [
+		                1,
+		                2,
+		            ];
+		      }
+		}
+		""",
+		"""
+		using System;
+		using System.Collections.Generic;
+
+		public class C
+		{
+		    public unsafe void M()
+		    {
+		        int[] a = new int[]
+		        {
+		                1,
+		                2
+		            // last
+		        };
+		        int[] b = new[]
+		        {
+		                1,
+		                2
+		            };
+		        int[] c =
+		        {
+		                1, 2
+		            };
+		        Span<int> s = stackalloc int[]
+		        {
+		                1,
+		                2
+		            };
+		        List<int> l = new List<int>
+		            {
+		                1,
+		                2
+		            };
+		        List<int> n = new() {
+		                1, // one
+		                2 // two
+		            };
+		        int[] d = new int[] { 1,
+		                /* two */ 2,
+		                // three
+		                3,
+		            };
+		        int[] e =
+		        [
+		            1,
+		                2
+		        ];
+		        int[] f = [
+		            1,
+		                2,
+		            ];
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Initializer_lines_that_stay_keep_their_column_with_tabs() => Formats(
+		"public class C\n{\n\t\tpublic void M()\n\t\t{\n\t\t\t\tint[] h =\n\t\t\t\t\t\tnew[] { 1,\n\t\t\t\t\t\t    2 };\n\t\t\t\tint[] k = [1,\n                  2];\n\t\t\t\tvar l = new System.Collections.Generic.List<int>\n\t\t\t\t{\n\t\t\t\t\t1,\n\t\t\t\t      2\n\t\t\t\t};\n\t\t}\n}",
+		"public class C\n{\n\tpublic void M()\n\t{\n\t\tint[] h =\n\t\t\t\tnew[] { 1,\n\t\t\t\t\t\t\t2 };\n\t\tint[] k = [1,\n\t\t\t\t  2];\n\t\tvar l = new System.Collections.Generic.List<int>\n\t\t\t\t{\n\t\t\t\t\t1,\n\t\t\t\t\t  2\n\t\t\t\t};\n\t}\n}",
+		editorConfig: "indent_style = tab");
 }

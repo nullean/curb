@@ -203,6 +203,16 @@ internal sealed class DocArena
 	public void LineShiftAnchor(int register) => Add(new Doc(DocKind.Anchor, a: register, b: Doc.AnchorAtLineShift));
 
 	/// <summary>
+	/// Captures into <paramref name="register"/> a shift of zero — see <see cref="Doc.AnchorAtSourceColumn"/>.
+	/// </summary>
+	/// <remarks>
+	/// For lines <c>dotnet format</c> leaves at the column the author gave them however far the line above
+	/// moved: an <see cref="AlignedLine"/> reading the register with a line's source indent as its offset
+	/// writes that indent back.
+	/// </remarks>
+	public void SourceColumnAnchor(int register) => Add(new Doc(DocKind.Anchor, a: register, b: Doc.AnchorAtSourceColumn));
+
+	/// <summary>
 	/// Captures into <paramref name="register"/> the indent of the output line, already written, that
 	/// starts with the source text at <paramref name="position"/> — see <see cref="Doc.AnchorAtSourceLine"/>.
 	/// </summary>
