@@ -870,4 +870,72 @@ public class SwitchTests : FormattingTest
 		    }
 		}
 		""");
+
+	// A break just inside the parentheses stays, as an `if` condition's does, and a `)` on a line of its own
+	// keeps its column. Curb joined both (issue #338).
+	[Test]
+	public Task A_break_inside_the_switch_parentheses_is_kept() => Formats(
+		"""
+		public class C
+		{
+		      public void M(int x)
+		      {
+		            switch (x
+		                  )
+		            {
+		                  default:
+		                        break;
+		            }
+		            switch (
+		                x)
+		            {
+		            }
+		      }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M(int x)
+		    {
+		        switch (x
+		              )
+		        {
+		            default:
+		                break;
+		        }
+		        switch (
+		            x)
+		        {
+		        }
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_switch_header_is_joined_under_a_width() => Formats(
+		"""
+		public class C
+		{
+		    public void M(int x)
+		    {
+		        switch (x
+		            )
+		        {
+		        }
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M(int x)
+		    {
+		        switch (x)
+		        {
+		        }
+		    }
+		}
+		""",
+		editorConfig: "max_line_length = 120");
 }

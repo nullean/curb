@@ -782,16 +782,9 @@ internal static partial class Printers
 		EmbeddedStatement(node.Statement, node.CloseParenToken.Span.End, context);
 	}
 
-	public static void SwitchStatement(SwitchStatementSyntax node, PrintContext context)
+	/// <summary>A <c>switch</c> statement's keyword and its governing expression, kept on one line.</summary>
+	private static void SwitchHeader(SwitchStatementSyntax node, PrintContext context)
 	{
-		var arena = context.Arena;
-
-		// A case label is not a statement, so dotnet format moves its continuation lines as far as the
-		// line `switch` starts on moved, not as far as the label itself moved — see CaseLabelContinuation.
-		var labelAnchor = HasBrokenPatternLabel(node, context) ? context.EnterContinuation() : -1;
-		if (labelAnchor >= 0)
-			arena.LineShiftAnchor(labelAnchor);
-
 		TokenPrinter.Print(node.SwitchKeyword, context);
 		Spacing.AfterControlFlowKeyword(context);
 
@@ -807,6 +800,28 @@ internal static partial class Printers
 		{
 			Node.Print(node.Expression, context);
 		}
+	}
+
+	public static void SwitchStatement(SwitchStatementSyntax node, PrintContext context)
+	{
+		var arena = context.Arena;
+
+		// A case label is not a statement, so dotnet format moves its continuation lines as far as the
+		// line `switch` starts on moved, not as far as the label itself moved — see CaseLabelContinuation.
+		var labelAnchor = HasBrokenPatternLabel(node, context) ? context.EnterContinuation() : -1;
+		if (labelAnchor >= 0)
+			arena.LineShiftAnchor(labelAnchor);
+
+		// A break the author put just inside the parentheses stays, as an `if` condition's does: dotnet format
+		// keeps both, and Curb joined them (issue #338). Only then, so a header written on one line, and every
+		// header under deterministic layout, prints exactly as before.
+		var parens = node.OpenParenToken.RawKind != 0;
+		var brokeAfterOpen = parens && context.AuthorBroke(node.OpenParenToken.Span.End, node.Expression.SpanStart);
+		var brokeBeforeClose = parens && context.AuthorBroke(node.Expression.Span.End, node.CloseParenToken.SpanStart);
+		if (brokeAfterOpen || brokeBeforeClose)
+			ConditionHeader(node.SwitchKeyword, node.OpenParenToken, node.Expression, node.CloseParenToken, context);
+		else
+			SwitchHeader(node, context);
 
 		// A switch on one line necessarily has each statement on its label's line, which is
 		// csharp_preserve_single_line_statements' business rather than the block option's — so
