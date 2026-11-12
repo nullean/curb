@@ -471,7 +471,7 @@ internal static partial class Printers
 		// which is what dotnet format writes and what two corpus files caught. Safe to ask here because a
 		// clause's break is forced by its option or reproduced from the author's, never decided by this run.
 		var oneLine = KeepsOneLine(node.OpenBraceToken, node.CloseBraceToken, context);
-		var commented = CommentsBelowConstraints(node.OpenBraceToken, context);
+		var commented = CommentsBelowConstraints(node.OpenBraceToken, context) || (oneLine && CommentsAboveFlatBrace(node.OpenBraceToken, context));
 		if (!oneLine || commented || HeaderWasBroken(node.BaseList, node.ConstraintClauses, context))
 			BeforeOpenBrace(BraceStyle.Types, context);
 		else
@@ -2146,6 +2146,13 @@ internal static partial class Printers
 		// A `where` clause on its own line sends a one-line body below it however it was written, the same
 		// as a type's, whether it stayed one line or csharp_empty_block_style collapsed it.
 		keepsOneLine = KeepsOneLine(body, context) || (keepsOneLine && !(context.Options.EmptyBlockStyle is not null && IsEmptyBraces(body)));
+
+		// A comment on a line of its own ahead of a body that prints flat keeps the body below it.
+		if (
+			(keepsOneLine || JoinsEmptyBracesToHeader(body, context) || CollapsesEmptyBraces(body, context)) &&
+			body is BlockSyntax braced && CommentsAboveFlatBrace(braced.OpenBraceToken, context)
+		)
+			belowClause = true;
 		if (
 			(belowClause && (keepsOneLine || JoinsEmptyBracesToHeader(body, context))) ||
 			(keepsOneLine && !JoinsEmptyBracesToHeader(body, context) && body is BlockSyntax block && context.AuthorBroke(
@@ -3323,6 +3330,34 @@ internal static partial class Printers
 		}
 
 		return comment;
+	}
+
+	/// <summary>
+	/// Prints the comments ahead of a brace that is about to print flat, on lines of their own at the indent
+	/// the brace would give them, before the brace is placed. True when it printed any.
+	/// </summary>
+	/// <remarks>
+	/// Printed with the brace inside the flat scope, the break after the last comment was lost: a one-line
+	/// <c>{ }</c> below <c>// c</c> was joined onto the comment's line, and the comment swallowed the brace,
+	/// which the verifier refused. Under a width an empty body collapsed the same way, and a <c>/* */</c>
+	/// comment kept the pair on its line, which dotnet format moves back (issue #327). The brace's own call
+	/// then skips what was printed here, as <see cref="CommentsAboveBlock"/> does; comments a caller has
+	/// already printed that way are left to it.
+	/// </remarks>
+	private static bool CommentsAboveFlatBrace(SyntaxToken brace, PrintContext context)
+	{
+		if (context.HeaderSkipCount > 0 && context.HeaderSkipTokenPosition == brace.SpanStart)
+			return false;
+		if (!OnlyComments(brace.LeadingTrivia))
+			return false;
+
+		using (context.Arena.IndentIf(context.Options.IndentBraces))
+			TokenPrinter.PrintLeadingTrivia(brace, context, trailingBreak: false);
+
+		context.Arena.LineCommentBreak();
+		context.HeaderSkipTokenPosition = brace.SpanStart;
+		context.HeaderSkipCount = brace.LeadingTrivia.Count;
+		return true;
 	}
 
 	private static int MinimumBlankLinesFor(MemberDeclarationSyntax member, PrintContext context)

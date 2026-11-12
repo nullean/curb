@@ -2119,4 +2119,91 @@ public class CommentTests : FormattingTest
 		}
 		""",
 		editorConfig: "csharp_new_line_between_query_expression_clauses = true");
+
+	// A one-line body below a comment on a line of its own stays below it: printed flat with the brace, the
+	// comment swallowed the brace and the verifier refused the file (issue #327).
+	[Test]
+	public Task A_one_line_body_below_a_comment_stays_below_it() => Unchanged(
+		"""
+		public class C
+		{
+		    void M()
+		    // c
+		    { }
+
+		    void N()
+		    /* c */
+		    { }
+
+		    void O()
+		    // c
+
+		    { }
+		}
+
+		public class D
+		// c
+		{ }
+		""");
+
+	[Test]
+	public Task An_empty_body_below_a_comment_collapses_below_it_under_a_width() => Formats(
+		"""
+		public class C
+		{
+		    void M()
+		    // c
+		    {
+		    }
+
+		    void N()
+		    /* c */
+		    {
+		    }
+
+		    public C(int a)
+		        : base()
+		    // c
+		    {
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    void M()
+		    // c
+		    { }
+
+		    void N()
+		    /* c */
+		    { }
+
+		    public C(int a) : base()
+		    // c
+		    { }
+		}
+		""",
+		editorConfig: "max_line_length = 120");
+
+	[Test]
+	public Task Together_same_line_leaves_an_empty_body_below_a_comment() => Formats(
+		"""
+		public class C
+		{
+		    void M()
+		    // c
+		    {
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    void M()
+		    // c
+		    { }
+		}
+		""",
+		editorConfig: "csharp_empty_block_style = together_same_line");
 }
