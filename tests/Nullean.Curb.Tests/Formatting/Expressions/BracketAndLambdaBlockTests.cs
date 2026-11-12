@@ -920,6 +920,59 @@ public class BracketAndLambdaBlockTests : FormattingTest
 		}
 		""");
 
+	// A `//` comment after the arrow leaves the brace where the author put it, as without the comment, and
+	// moves it as far as the statement's line moved. Curb moved it to the statement's indent (issue #323).
+	[Test]
+	public Task A_trailing_comment_after_the_arrow_leaves_the_brace_where_it_was() => Formats(
+		"""
+		using System;
+
+		public class C
+		{
+		      public void M()
+		      {
+		            Use(x => // why
+		                {
+		                    M();
+		                });
+		            Action<int> a = x => // why
+		      {
+		          M();
+		      };
+		            Use(delegate (int x) // why
+		                    {
+		                    M();
+		                    });
+		      }
+
+		      private void Use(Action<int> a) { }
+		}
+		""",
+		"""
+		using System;
+
+		public class C
+		{
+		    public void M()
+		    {
+		        Use(x => // why
+		            {
+		                M();
+		            });
+		        Action<int> a = x => // why
+		  {
+		      M();
+		  };
+		        Use(delegate (int x) // why
+		                {
+		                    M();
+		                });
+		    }
+
+		    private void Use(Action<int> a) { }
+		}
+		""");
+
 	[Test]
 	public Task A_comment_above_a_lambda_block_goes_to_the_statement_indent_with_a_width() => Formats(
 		"""

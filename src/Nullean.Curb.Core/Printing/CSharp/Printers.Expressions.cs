@@ -1532,8 +1532,18 @@ internal static partial class Printers
 			}
 			else
 			{
+				// A `//` comment after `=>` has already ended the line, and a line-shift anchor taken on the next
+				// one, before anything is written to it, has nothing to measure: the brace fell back to the
+				// statement's indent. The line holding the token before the brace is the one to measure from.
 				var register = context.EnterContinuation();
-				context.Arena.LineShiftAnchor(register);
+				var previous = block.OpenBraceToken.GetPreviousToken();
+				if (EndsWithLineComment(previous))
+				{
+					context.Arena.ContainingLineAnchor(register, previous.SpanStart);
+					column -= context.SourceIndent(previous.SpanStart);
+				}
+				else
+					context.Arena.LineShiftAnchor(register);
 				CommentsAboveBlock(block.OpenBraceToken, context);
 				using (context.Arena.AlignedIndent(register, column))
 					PrintBody(block, construct, context, belowClause: belowParameters, indentsBrace: false);
