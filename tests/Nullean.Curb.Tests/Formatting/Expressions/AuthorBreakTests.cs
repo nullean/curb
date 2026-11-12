@@ -1418,4 +1418,73 @@ public class AuthorBreakTests : FormattingTest
 		}
 		""",
 		editorConfig: "csharp_new_line_before_open_brace = none");
+
+	// A closing bracket on a line of its own stays at the column the author gave it, moved as far as the
+	// statement's line moved, as dotnet format leaves it. Curb put it at the statement's indent (issue #324).
+	[Test]
+	public Task A_closing_bracket_on_its_own_line_keeps_its_column() => Formats(
+		"""
+		using System;
+
+		public class C
+		{
+		      public void M(int[] a)
+		      {
+		            Use(x =>
+		                {
+		                    M(a);
+		                }
+		                );
+		            Call(1,
+		                2
+		                    );
+		            M(a
+		                // why
+		                );
+		            Call(a[0
+		                ], 1
+		            );
+		            if (a.Length > 1
+		                )
+		            {
+		            }
+		      }
+
+		      private void Use(Action<int> a) { }
+
+		      private void Call(int x, int y) { }
+		}
+		""",
+		"""
+		using System;
+
+		public class C
+		{
+		    public void M(int[] a)
+		    {
+		        Use(x =>
+		            {
+		                M(a);
+		            }
+		            );
+		        Call(1,
+		            2
+		                );
+		        M(a
+		            // why
+		            );
+		        Call(a[0
+		            ], 1
+		        );
+		        if (a.Length > 1
+		            )
+		        {
+		        }
+		    }
+
+		    private void Use(Action<int> a) { }
+
+		    private void Call(int x, int y) { }
+		}
+		""");
 }

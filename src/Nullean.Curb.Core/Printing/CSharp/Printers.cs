@@ -1328,7 +1328,7 @@ internal static partial class Printers
 				else if (rpar == false)
 					Spacing.InsideCallParens(context);
 				else if (context.AuthorBroke(node.Arguments[^1].Span.End, node.Span.End))
-					arena.HardLine();
+					ContinuationLine(node.CloseParenToken, lineShift, context);
 				else
 					Spacing.InsideCallParens(context);
 			}
@@ -2730,14 +2730,15 @@ internal static partial class Printers
 
 	/// <summary>
 	/// Claims a register for <see cref="PrintSeparated{T}"/>'s <c>lineShift</c> and captures how far the
-	/// line an argument list starts on moved, when the author broke before one of its arguments;
-	/// otherwise -1.
+	/// line an argument list starts on moved, when the author broke before one of its arguments or before
+	/// its closing bracket; otherwise -1.
 	/// </summary>
 	/// <remarks>
 	/// dotnet format leaves each argument line at the offset the author gave it from the line the list
 	/// starts on, one level in, two or a hand-aligned column, and moves it as far as that line moves.
-	/// Breaking to the list's level pulled the deeper ones back — issue #143. A caller given a register
-	/// releases it with <see cref="PrintContext.ExitContinuation"/>.
+	/// Breaking to the list's level pulled the deeper ones back — issue #143. A closing bracket on a line
+	/// of its own stays at its column the same way (issue #324). A caller given a register releases it
+	/// with <see cref="PrintContext.ExitContinuation"/>.
 	/// </remarks>
 	private static int EnterArgumentLines(SeparatedSyntaxList<ArgumentSyntax> arguments, int openEnd, int closeStart, PrintContext context)
 	{
@@ -2758,6 +2759,13 @@ internal static partial class Printers
 			}
 
 			previousEnd = span.End;
+		}
+
+		if (arguments.Count > 0 && context.AuthorBroke(previousEnd, closeStart))
+		{
+			var register = context.EnterContinuation();
+			context.Arena.LineShiftAnchor(register);
+			return register;
 		}
 
 		return -1;
