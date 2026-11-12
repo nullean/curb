@@ -1487,4 +1487,88 @@ public class AuthorBreakTests : FormattingTest
 		    private void Call(int x, int y) { }
 		}
 		""");
+
+	// A condition the author put below its `(` keeps their column, moved as far as the keyword's line moved, and
+	// its own continuation lines keep their offset from it, in an `if`, `while`, `switch` or `lock` alike.
+	// Curb moved it one level in from the keyword (issue #340).
+	[Test]
+	public Task A_condition_below_its_open_parenthesis_keeps_its_column() => Formats(
+		"""
+		public class C
+		{
+		      public void M(int x, int y)
+		      {
+		            if (
+		                  x == 1)
+		            {
+		            }
+		            while (
+		                    x == 1 &&
+		                        y == 2)
+		            {
+		            }
+		            switch (
+		                      x)
+		            {
+		            }
+		            lock (
+		                  this)
+		            {
+		            }
+		      }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M(int x, int y)
+		    {
+		        if (
+		              x == 1)
+		        {
+		        }
+		        while (
+		                x == 1 &&
+		                    y == 2)
+		        {
+		        }
+		        switch (
+		                  x)
+		        {
+		        }
+		        lock (
+		              this)
+		        {
+		        }
+		    }
+		}
+		""");
+
+	// Where Curb moved the header to a line of its own there is no source line to measure from, and the
+	// condition goes a level in from the keyword, as before.
+	[Test]
+	public Task A_condition_below_the_open_parenthesis_of_a_moved_header_goes_a_level_in() => Formats(
+		"""
+		public class C
+		{
+		    public void M(bool a, bool b)
+		    {
+		        if (a) if (
+		              b) M(a, b);
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M(bool a, bool b)
+		    {
+		        if (a)
+		            if (
+		                b)
+		                M(a, b);
+		    }
+		}
+		""",
+		editorConfig: "csharp_preserve_single_line_statements = false");
 }
