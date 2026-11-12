@@ -371,6 +371,98 @@ public class WrapBeforeClauseTests : FormattingTest
 		""");
 
 	[Test]
+	public Task A_comment_between_a_constraint_and_the_brace_sits_a_level_in() => Formats(
+		// dotnet format indents it with the clause, on the clause's line or its own, and leaves the brace
+		// where it is (issue #315). Under a trailing comment it aligns, as it does elsewhere.
+		"""
+		public class C<T>
+		    where T : class
+		// c
+		{
+		    void M<U>() where U : struct
+		    // c
+		    /* d */
+		    {
+		        void L<V>()
+		            where V : class
+		                // c
+		        {
+		        }
+		    }
+
+		    void N<U>() where U : struct // t
+		    // c
+		    {
+		    }
+		}
+		""",
+		"""
+		public class C<T>
+		    where T : class
+		    // c
+		{
+		    void M<U>() where U : struct
+		        // c
+		        /* d */
+		    {
+		        void L<V>()
+		            where V : class
+		            // c
+		        {
+		        }
+		    }
+
+		    void N<U>() where U : struct // t
+		                                 // c
+		    {
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_comment_a_level_in_from_the_brace_stays_without_a_constraint() => Unchanged(
+		"""
+		public class C : System.Object
+		// c
+		{
+		    void M()
+		    // c
+		    {
+		        M();
+		    }
+
+		    public class D<T>
+		        where T : class
+		        // c
+		    {
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_one_line_body_below_a_comment_after_a_constraint_stays_below_it() => Formats(
+		// With a width the clause joins the header, and the comment still ends the line before the body.
+		"""
+		public class C
+		{
+		    void M<U>()
+		        where U : struct
+		    // c
+		    {
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    void M<U>() where U : struct
+		        // c
+		    { }
+		}
+		""",
+		editorConfig: "max_line_length = 120\ncsharp_empty_block_style = together_same_line");
+
+	[Test]
 	public Task A_one_line_type_body_follows_a_clause_the_author_broke() => Formats(
 		// The brace follows the clause down, as it does when the option moved it: measured.
 		"""
