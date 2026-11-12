@@ -355,7 +355,7 @@ let perf () =
         failwithf "allocated %.1fx the source size, above the permitted %.1fx" ratio ceiling
     | _ -> printfn "allocated %.1fx the source size" ratio
 
-/// The language-version half (issue #298): a net10.0;netstandard2.0 project whose .editorconfig asks for
+/// The language-version half (issue #298): a net11.0;netstandard2.0 project whose .editorconfig asks for
 /// file-scoped namespaces (C# 10) and expression-bodied methods (C# 6). netstandard2.0 compiles as C# 7.3, so
 /// the build passes only when every inner build applied the lowest framework's version: the method gains its
 /// arrow, the namespace keeps its braces. The second build lifts the cap through Curb_LangVersion and has to

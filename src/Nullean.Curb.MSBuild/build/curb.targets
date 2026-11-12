@@ -121,7 +121,7 @@
       <!-- The framework-dependent build that ships in this package, run on the SDK doing the build.
            See the package project for why this is not a per-RID native binary. Curb_Exe overrides it
            with a native one, which starts in about a hundredth of the time. -->
-      <Curb_Dll Condition="'$(Curb_Dll)' == ''">$(MSBuildThisFileDirectory)../tools/net10.0/curb.dll</Curb_Dll>
+      <Curb_Dll Condition="'$(Curb_Dll)' == ''">$(MSBuildThisFileDirectory)../tools/net11.0/curb.dll</Curb_Dll>
     </PropertyGroup>
   </Target>
 

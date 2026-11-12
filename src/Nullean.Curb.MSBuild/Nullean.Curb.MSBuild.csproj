@@ -48,11 +48,11 @@
          project is evaluated and these files do not exist until this runs. -->
     <MSBuild Projects="../Nullean.Curb.Cli/Nullean.Curb.Cli.csproj"
              Targets="Publish"
-             Properties="Configuration=$(Configuration);TargetFramework=net10.0;PublishDir=$(BaseIntermediateOutputPath)cli/;RuntimeIdentifier=;PublishAot=false;SelfContained=false;PublishSelfContained=false" />
+             Properties="Configuration=$(Configuration);TargetFramework=net11.0;PublishDir=$(BaseIntermediateOutputPath)cli/;RuntimeIdentifier=;PublishAot=false;SelfContained=false;PublishSelfContained=false" />
 
     <ItemGroup>
       <TfmSpecificPackageFile Include="$(BaseIntermediateOutputPath)cli/**/*" Exclude="$(BaseIntermediateOutputPath)cli/**/*.pdb">
-        <PackagePath>tools/net10.0/</PackagePath>
+        <PackagePath>tools/net11.0/</PackagePath>
       </TfmSpecificPackageFile>
     </ItemGroup>
 

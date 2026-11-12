@@ -14,7 +14,7 @@ dotnet tool install -g curb-cli
 ```
 
 Ships as a native-AOT binary for `linux-x64`, `linux-arm64`, `win-x64`, `win-arm64` and `osx-arm64`,
-with a portable fallback for everything else. About 10 ms to start. Installing requires the .NET 10 SDK.
+with a portable fallback for everything else. About 10 ms to start. Installing requires the .NET 11 SDK.
 
 To have your build do the formatting instead — which is usually what you want — see
 [the build integration](../workflow/msbuild.md).

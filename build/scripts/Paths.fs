@@ -5,7 +5,7 @@ open System.IO
 
 let ToolName = "curb"
 let Repository = sprintf "nullean/%s" ToolName
-let MainTFM = "net10.0"
+let MainTFM = "net11.0"
 let SignKey = "b04a6ff7fe029dc7"
 
 let IncludeGitHashInInformational = true

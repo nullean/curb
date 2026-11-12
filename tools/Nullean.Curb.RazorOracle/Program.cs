@@ -126,19 +126,21 @@ return failed == 0 ? 0 : 1;
 static List<MetadataReference> ReferencePacks()
 {
 	var dotnetRoot = Path.GetDirectoryName(Path.GetDirectoryName(Path.GetDirectoryName(Path.GetDirectoryName(typeof(object).Assembly.Location))))!;
+	// The packs that match the framework this process runs on: the SDK that runs it ships them.
+	var major = Environment.Version.Major;
 	var references = new List<MetadataReference>();
 	foreach (var pack in new[] { "Microsoft.NETCore.App.Ref", "Microsoft.AspNetCore.App.Ref" })
 	{
 		var versions = Directory
 			.GetDirectories(Path.Combine(dotnetRoot, "packs", pack))
-			.Where(d => Path.GetFileName(d).StartsWith("10.", StringComparison.Ordinal))
+			.Where(d => Path.GetFileName(d).StartsWith($"{major}.", StringComparison.Ordinal))
 			.ToArray();
 		if (versions.Length == 0)
 		{
-			throw new InvalidOperationException($"no 10.x {pack} under {dotnetRoot}/packs");
+			throw new InvalidOperationException($"no {major}.x {pack} under {dotnetRoot}/packs");
 		}
 
-		foreach (var dll in Directory.GetFiles(Path.Combine(versions.Max(StringComparer.Ordinal)!, "ref", "net10.0"), "*.dll"))
+		foreach (var dll in Directory.GetFiles(Path.Combine(versions.Max(StringComparer.Ordinal)!, "ref", $"net{major}.0"), "*.dll"))
 		{
 			references.Add(MetadataReference.CreateFromFile(dll));
 		}
