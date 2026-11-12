@@ -876,6 +876,7 @@ internal static partial class Printers
 		// The aligned scope sits inside the group rather than around it: a group measures what trails it
 		// only as far as the scope enclosing it ends, so wrapped around the group it hid the `; // note`
 		// after the brace, and an initializer that fitted only without it was joined.
+		var closeBelowOwner = false;
 		using (aligned)
 		using (arena.Group(group))
 		using (ownerLine >= 0 ? arena.AlignedIndent(ownerLine, 0) : default)
@@ -1001,13 +1002,37 @@ internal static partial class Printers
 				using (arena.IndentIf(context.Options.IndentBraces))
 					arena.HardLine(DocFlags.Reindent);
 			}
+			else if (context.AuthorBroke(node.OpenBraceToken.Span.End, node.CloseBraceToken.SpanStart))
+			{
+				// `new C` / `{` / `}`: an empty initializer the author opened out stays opened out, as dotnet
+				// format leaves it. Joined to `{ }`, dotnet format opened it out again under
+				// csharp_preserve_single_line_blocks = false (issue #356).
+				using (arena.IndentIf(context.Options.IndentBraces))
+					InsideBrace(node.OpenBraceToken.Span.End, node.CloseBraceToken);
+			}
 			else
 			{
-				// `{ }` — nothing to break around, so the brace pair just gets air between it.
-				arena.Synthetic(SyntheticText.Space);
+				// `{ }`, or `{` / `}` when the brace went to a line of its own, as an anonymous type's does:
+				// dotnet format opens out a `{ }` there under csharp_preserve_single_line_blocks = false. The
+				// brace moves when this group breaks, or when the owner's argument list did, from outside it.
+				// The second is a line aimed at that list, and it has to sit outside this group too: inside a
+				// group that stayed flat, an aimed line prints a space (issue #356).
+				using (arena.IndentIf(context.Options.IndentBraces))
+					arena.Line();
+				closeBelowOwner = leadingLine && !openItOut && elementBrace < 0 && !ownerSpansLines && ownerGroup != 0;
 			}
 
-			TokenPrinter.PrintWithoutLeadingTrivia(node.CloseBraceToken, context);
+			if (!closeBelowOwner)
+				TokenPrinter.PrintWithoutLeadingTrivia(node.CloseBraceToken, context);
+		}
+
+		if (closeBelowOwner)
+		{
+			using (ownerLine >= 0 ? arena.AlignedIndent(ownerLine, 0) : default)
+			{
+				BeforeOpenBraceWhenOwnerBroke(BraceStyle.ObjectCollectionArrayInitializers, ownerGroup, context, DocFlags.OnlyIfNotAtLineStart);
+				TokenPrinter.PrintWithoutLeadingTrivia(node.CloseBraceToken, context);
+			}
 		}
 
 		if (ownerLine >= 0)
@@ -1269,7 +1294,20 @@ internal static partial class Printers
 
 		if (node.Elements.Count == 0)
 		{
+			// `[` / `]` the author opened out stays so, the closing bracket at the offset they gave it, as
+			// dotnet format leaves it (issue #356).
+			var opened = context.AuthorBroke(node.OpenBracketToken.Span.End, node.CloseBracketToken.SpanStart) && !EndsWithLineComment(node.OpenBracketToken);
+			var register = opened ? context.EnterContinuation() : -1;
+			if (opened)
+				arena.LineShiftAnchor(register);
+
 			TokenPrinter.Print(node.OpenBracketToken, context);
+			if (opened)
+			{
+				ContinuationLine(node.CloseBracketToken, register, context, asWritten: true);
+				context.ExitContinuation();
+			}
+
 			TokenPrinter.Print(node.CloseBracketToken, context);
 			return;
 		}

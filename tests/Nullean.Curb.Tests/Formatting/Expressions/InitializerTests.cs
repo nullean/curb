@@ -1473,4 +1473,213 @@ public class InitializerTests : FormattingTest
 		    void Take(R r) { }
 		}
 		""");
+
+	// ---- empty initializers (issue #356) -------------------------------------------------------
+
+	// An empty initializer or collection the author opened out stays opened out, wherever they put its
+	// brace, as dotnet format leaves it. Joined to `{ }`, it was opened out again by dotnet format under
+	// csharp_preserve_single_line_blocks = false, so the output depended on running Curb last.
+	private const string OpenedOutEmptyInitializers =
+		"""
+		using System.Collections.Generic;
+
+		public record R(int X);
+
+		public class C
+		{
+		    public void M(R r)
+		    {
+		        var c = new C
+		        {
+		        };
+		        var l = new List<int>
+		        {
+		        };
+		        var a = new int[]
+		        {
+		        };
+		        var b = new int[] {
+		        };
+		        var o = new
+		        {
+		        };
+		        var d = r with
+		        {
+		        };
+		        C e = new()
+		        {
+		        };
+		        int[] x =
+		        [
+		        ];
+		        int[] y = [
+		        ];
+		        Use(new C
+		        {
+		        });
+		    }
+		}
+		""";
+
+	[Test]
+	public Task Issue_356_an_empty_initializer_the_author_opened_out_stays_opened_out() => Unchanged(OpenedOutEmptyInitializers);
+
+	[Test]
+	public Task Issue_356_an_empty_initializer_the_author_opened_out_stays_opened_out_without_single_line_blocks() => Unchanged(
+		OpenedOutEmptyInitializers,
+		editorConfig: "csharp_preserve_single_line_blocks = false");
+
+	// dotnet format moves the brace of an opened-out object or collection initializer below the `new`, and
+	// leaves an array's where it is.
+	[Test]
+	public Task Issue_356_an_empty_initializer_opened_out_on_the_new_line_takes_its_brace_below() => Formats(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        var c = new C {
+		        };
+		        var l = new List<int> {
+		        };
+		        var a = new int[] {
+		        };
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        var c = new C
+		        {
+		        };
+		        var l = new List<int>
+		        {
+		        };
+		        var a = new int[] {
+		        };
+		    }
+		}
+		""");
+
+	// The closing bracket of an opened-out empty collection keeps the offset the author gave it, and a
+	// comment inside keeps its own, as dotnet format leaves both.
+	[Test]
+	public Task Issue_356_an_empty_collection_expression_keeps_its_lines_as_written() => Unchanged(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        int[] x = [
+		            ];
+		        int[] y =
+		        [
+		            // none yet
+		        ];
+		    }
+		}
+		""");
+
+	// Under a width, an empty initializer whose brace has to go to a line of its own opens out, as an
+	// anonymous type's does: dotnet format opens out a `{ }` on a line of its own under
+	// csharp_preserve_single_line_blocks = false. One that fits stays `{ }`.
+	[Test]
+	public Task Issue_356_an_empty_initializer_moved_below_its_creation_opens_out_at_a_width() => WithAndWithout(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        var l = new List<int> { };
+		        var c = new C { };
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        var l = new List<int>
+		        {
+		        };
+		        var c = new C { };
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        var l = new List<int>
+		        {
+		        };
+		        var c = new C { };
+		    }
+		}
+		""",
+		"csharp_preserve_single_line_blocks = false",
+		editorConfig: "max_line_length = 30");
+
+	// The brace goes below the creation because its argument list opened out, from outside the
+	// initializer's own group, which stays flat. The line inside the braces is aimed at that list too, so
+	// the `}` follows the brace down rather than leaving `{ }` for dotnet format to open out.
+	[Test]
+	public Task Issue_356_an_empty_initializer_below_opened_out_arguments_opens_out_at_a_width() => WithAndWithout(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        var c = new Container(firstArgument, secondArgument) { };
+		        Container d = new(firstArgument, secondArgument) { };
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        var c = new Container(
+		            firstArgument,
+		            secondArgument
+		        )
+		        {
+		        };
+		        Container d = new(
+		            firstArgument,
+		            secondArgument
+		        )
+		        {
+		        };
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        var c = new Container(
+		            firstArgument,
+		            secondArgument
+		        )
+		        {
+		        };
+		        Container d = new(
+		            firstArgument,
+		            secondArgument
+		        )
+		        {
+		        };
+		    }
+		}
+		""",
+		"csharp_preserve_single_line_blocks = false",
+		editorConfig: "max_line_length = 30");
 }
