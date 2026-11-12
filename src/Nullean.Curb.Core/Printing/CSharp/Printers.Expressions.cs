@@ -385,7 +385,7 @@ internal static partial class Printers
 
 			if (colonAfterBlock)
 			{
-				ColonAfterBlockLine(node, context);
+				LineAfterBlock(node, context);
 				TokenPrinter.Print(node.ColonToken, context);
 				using (arena.IndentIf(indented && context.AuthorBroke(node.ColonToken.Span.End, node.WhenFalse.SpanStart)))
 				{
@@ -434,7 +434,7 @@ internal static partial class Printers
 
 		if (colonFollowsBlock)
 		{
-			ColonAfterBlockLine(node, context);
+			LineAfterBlock(node, context);
 			TokenPrinter.Print(node.ColonToken, context);
 			if (spaced)
 				arena.Synthetic(SyntheticText.Space);
@@ -465,16 +465,17 @@ internal static partial class Printers
 	}
 
 	/// <summary>
-	/// Breaks before the <c>:</c> that follows a block lambda, to the indent of the line the ternary's
-	/// enclosing statement, lambda, member, switch arm or initializer element starts on.
+	/// Breaks before the token that follows a block lambda inside <paramref name="node"/>, a ternary's
+	/// <c>:</c> or a tuple's <c>)</c>, to the indent of the line the enclosing statement, lambda, member,
+	/// switch arm or initializer element starts on.
 	/// </summary>
 	/// <remarks>
-	/// That is where dotnet format puts it, however deep the ternary sits: an argument list adds no
+	/// That is where dotnet format puts it, however deep the expression sits: an argument list adds no
 	/// level of its own, so a ternary on a later argument line still has its <c>:</c> at the
 	/// statement's indent rather than the argument's — issue #134. Where that construct starts
-	/// mid-line there is no such line, and the break goes to the ternary's own indent instead.
+	/// mid-line there is no such line, and the break goes to the expression's own indent instead.
 	/// </remarks>
-	private static void ColonAfterBlockLine(ConditionalExpressionSyntax node, PrintContext context)
+	private static void LineAfterBlock(ExpressionSyntax node, PrintContext context)
 	{
 		var start = IndentationContextStart(node, context);
 		if (start < 0)
