@@ -3102,10 +3102,39 @@ internal static partial class Printers
 
 	/// <summary>
 	/// Whether a header clause starting at <paramref name="first"/> gets a line of its own: what its
-	/// <paramref name="option"/> says when it is set, otherwise where the author put it.
+	/// <paramref name="option"/> says when it is set, otherwise where the author put it. A comment that
+	/// already ends the line ahead of the clause answers yes whatever either says.
 	/// </summary>
+	/// <remarks>
+	/// The comment's own line break is printed either way, so answering no left the clause on a line of
+	/// its own at the declaration's column, and a one-line body on the clause's line, which dotnet format
+	/// then moves below it (issue #310).
+	/// </remarks>
 	private static bool ClauseOnOwnLine(SyntaxToken first, bool? option, PrintContext context) =>
-		option ?? context.AuthorBroke(first.GetPreviousToken().Span.End, first.SpanStart);
+		CommentBreaksBefore(first) || (option ?? context.AuthorBroke(first.GetPreviousToken().Span.End, first.SpanStart));
+
+	/// <summary>
+	/// True when a comment ahead of <paramref name="first"/> ends its line: a <c>//</c> comment, or a
+	/// <c>/* */</c> comment with a line break after it.
+	/// </summary>
+	private static bool CommentBreaksBefore(SyntaxToken first)
+	{
+		if (EndsWithLineComment(first.GetPreviousToken()))
+			return true;
+
+		var afterComment = false;
+		foreach (var trivia in first.LeadingTrivia)
+		{
+			if (trivia.IsKind(SyntaxKind.SingleLineCommentTrivia))
+				return true;
+			if (trivia.IsKind(SyntaxKind.MultiLineCommentTrivia))
+				afterComment = true;
+			else if (afterComment && trivia.IsKind(SyntaxKind.EndOfLineTrivia))
+				return true;
+		}
+
+		return false;
+	}
 
 	/// <summary>
 	/// Breaks ahead of a header clause the author put on its own line, as far in from the line above as

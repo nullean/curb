@@ -263,6 +263,103 @@ public class WrapBeforeClauseTests : FormattingTest
 		""");
 
 	[Test]
+	public Task A_comment_ahead_of_a_clause_keeps_it_on_its_own_line_under_a_width() => Formats(
+		// A width joins a clause the author broke, but a comment that ends the line ahead of it has
+		// already broken it, so the clause takes a line of its own one level in (issue #310).
+		"""
+		public class C<T>
+		    // c
+		    where T : class
+		{
+		    void M<U>()
+		        // c
+		        where U : struct
+		    {
+		    }
+
+		    void N<U>() // c
+		        where U : struct
+		    {
+		    }
+
+		    void O<U>()
+		        /* c */
+		        where U : struct
+		    {
+		    }
+		}
+
+		public class D
+		    // c
+		    : System.Object
+		{
+		}
+		""",
+		"""
+		public class C<T>
+		    // c
+		    where T : class
+		{
+		    void M<U>()
+		        // c
+		        where U : struct
+		    { }
+
+		    void N<U>() // c
+		        where U : struct
+		    { }
+
+		    void O<U>()
+		        /* c */
+		        where U : struct
+		    { }
+		}
+
+		public class D
+		    // c
+		    : System.Object
+		{
+		}
+		""",
+		editorConfig: "max_line_length = 120");
+
+	[Test]
+	public Task A_one_line_body_follows_a_clause_a_comment_broke() => Formats(
+		// The `{ }` goes below the clause, as below one the author broke: dotnet format moves it there.
+		"""
+		public class C
+		{
+		    void M<T>()
+		        // c
+		        where T : class
+		    {
+		    }
+
+		    void N<T, U>()
+		        where T : class
+		        // c
+		        where U : struct
+		    {
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    void M<T>()
+		        // c
+		        where T : class
+		    { }
+
+		    void N<T, U>() where T : class
+		        // c
+		        where U : struct
+		    { }
+		}
+		""",
+		editorConfig: "max_line_length = 120\ncsharp_empty_block_style = together_same_line");
+
+	[Test]
 	public Task A_directive_ahead_of_a_clause_stays_at_the_margin() => Unchanged(
 		"""
 		public class C
