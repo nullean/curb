@@ -230,7 +230,19 @@ internal static partial class Printers
 	};
 
 	/// <summary>Emits <c>keyword (expression)</c>, the shape every control-flow header shares.</summary>
-	private static void ConditionHeader(SyntaxToken keyword, SyntaxToken openParen, SyntaxNode? condition, SyntaxToken closeParen, PrintContext context)
+	/// <remarks>
+	/// A <c>foreach</c> header holds more than one node. It passes the first (the variable's type, or the
+	/// deconstruction) as <paramref name="condition"/> and itself as <paramref name="forEach"/>, which prints
+	/// the contents; they end at its collection.
+	/// </remarks>
+	private static void ConditionHeader(
+		SyntaxToken keyword,
+		SyntaxToken openParen,
+		SyntaxNode? condition,
+		SyntaxToken closeParen,
+		PrintContext context,
+		CommonForEachStatementSyntax? forEach = null
+	)
 	{
 		var arena = context.Arena;
 
@@ -247,7 +259,8 @@ internal static partial class Printers
 		// Safe to read from the source because it asks about exactly the two positions this printer
 		// reproduces: if Curb does break after the `(`, the next run sees that break and keeps it.
 		var breakAfterOpen = condition is not null && context.AuthorBroke(openParen.Span.End, condition.SpanStart);
-		var breakBeforeClose = condition is not null && context.AuthorBroke(condition.Span.End, closeParen.SpanStart);
+		var last = forEach?.Expression ?? condition;
+		var breakBeforeClose = last is not null && context.AuthorBroke(last.Span.End, closeParen.SpanStart);
 
 		// A condition below its `(` and a `)` on a line of its own stay at the columns the author gave them,
 		// moved as far as the keyword's line moved, as dotnet format leaves them (issues #340 and #324).
@@ -283,9 +296,14 @@ internal static partial class Printers
 
 				// Told to a binary chain the condition might be, so it does not indent a second time
 				// on top of this one — see PrintContext.IndentedCondition.
-				context.IndentedCondition = condition;
+				context.IndentedCondition = forEach is null ? condition : null;
 				using (breakAfterOpen ? arena.AlignedIndent(lines, offset) : default)
-					Node.Print(condition, context);
+				{
+					if (forEach is null)
+						Node.Print(condition, context);
+					else
+						ForEachContents(forEach, context);
+				}
 			}
 
 			if (breakBeforeClose)
@@ -496,7 +514,16 @@ internal static partial class Printers
 		Spacing.InsideControlFlowParens(context);
 	}
 
-	public static void ForEachStatement(ForEachStatementSyntax node, PrintContext context)
+	public static void ForEachStatement(ForEachStatementSyntax node, PrintContext context) => CommonForEachStatement(node, node.Type, context);
+
+	public static void ForEachVariableStatement(ForEachVariableStatementSyntax node, PrintContext context) =>
+		CommonForEachStatement(node, node.Variable, context);
+
+	/// <summary>
+	/// <c>foreach</c> and <c>await foreach</c>, over a variable or a deconstruction. <paramref name="first"/> is
+	/// the node the parentheses open on: the variable's type, or the deconstruction.
+	/// </summary>
+	private static void CommonForEachStatement(CommonForEachStatementSyntax node, SyntaxNode first, PrintContext context)
 	{
 		var arena = context.Arena;
 
@@ -504,47 +531,53 @@ internal static partial class Printers
 		if (node.AwaitKeyword.RawKind != 0)
 			arena.Synthetic(SyntheticText.Space);
 
-		TokenPrinter.Print(node.ForEachKeyword, context);
-		Spacing.AfterControlFlowKeyword(context);
-		TokenPrinter.Print(node.OpenParenToken, context);
-		Spacing.InsideControlFlowParens(context);
+		// A break the author put just inside the parentheses stays, as an `if` condition's does (issue #346).
+		if (BrokeInsideParens(node.OpenParenToken, first, node.Expression, node.CloseParenToken, context))
+		{
+			ConditionHeader(node.ForEachKeyword, node.OpenParenToken, first, node.CloseParenToken, context, node);
+		}
+		else
+		{
+			TokenPrinter.Print(node.ForEachKeyword, context);
+			Spacing.AfterControlFlowKeyword(context);
+			TokenPrinter.Print(node.OpenParenToken, context);
+			Spacing.InsideControlFlowParens(context);
+			ForEachContents(node, context);
+			Spacing.InsideControlFlowParens(context);
+			TokenPrinter.Print(node.CloseParenToken, context);
+		}
 
-		Node.Print(node.Type, context);
-		arena.Synthetic(SyntheticText.Space);
-		TokenPrinter.Print(node.Identifier, context);
-		arena.Synthetic(SyntheticText.Space);
-		TokenPrinter.Print(node.InKeyword, context);
-		arena.Synthetic(SyntheticText.Space);
-		Node.Print(node.Expression, context);
-
-		Spacing.InsideControlFlowParens(context);
-		TokenPrinter.Print(node.CloseParenToken, context);
 		EmbeddedStatement(node.Statement, node.CloseParenToken.Span.End, context);
 	}
 
-	public static void ForEachVariableStatement(ForEachVariableStatementSyntax node, PrintContext context)
+	/// <summary>What a <c>foreach</c> holds between its parentheses: <c>var x in xs</c>.</summary>
+	private static void ForEachContents(CommonForEachStatementSyntax node, PrintContext context)
 	{
 		var arena = context.Arena;
-
-		TokenPrinter.PrintIfPresent(node.AwaitKeyword, context);
-		if (node.AwaitKeyword.RawKind != 0)
+		if (node is ForEachStatementSyntax single)
+		{
+			Node.Print(single.Type, context);
 			arena.Synthetic(SyntheticText.Space);
+			TokenPrinter.Print(single.Identifier, context);
+		}
+		else
+		{
+			Node.Print(((ForEachVariableStatementSyntax)node).Variable, context);
+		}
 
-		TokenPrinter.Print(node.ForEachKeyword, context);
-		Spacing.AfterControlFlowKeyword(context);
-		TokenPrinter.Print(node.OpenParenToken, context);
-		Spacing.InsideControlFlowParens(context);
-
-		Node.Print(node.Variable, context);
 		arena.Synthetic(SyntheticText.Space);
 		TokenPrinter.Print(node.InKeyword, context);
 		arena.Synthetic(SyntheticText.Space);
 		Node.Print(node.Expression, context);
-
-		Spacing.InsideControlFlowParens(context);
-		TokenPrinter.Print(node.CloseParenToken, context);
-		EmbeddedStatement(node.Statement, node.CloseParenToken.Span.End, context);
 	}
+
+	/// <summary>
+	/// True when the author broke the line just after <paramref name="openParen"/> or just before
+	/// <paramref name="closeParen"/>, around contents running from <paramref name="first"/> to
+	/// <paramref name="last"/>. False under deterministic layout.
+	/// </summary>
+	private static bool BrokeInsideParens(SyntaxToken openParen, SyntaxNode first, SyntaxNode last, SyntaxToken closeParen, PrintContext context) =>
+		context.AuthorBroke(openParen.Span.End, first.SpanStart) || context.AuthorBroke(last.Span.End, closeParen.SpanStart);
 
 	public static void TryStatement(TryStatementSyntax node, PrintContext context)
 	{
@@ -656,14 +689,23 @@ internal static partial class Printers
 		if (node.AwaitKeyword.RawKind != 0)
 			arena.Synthetic(SyntheticText.Space);
 
-		TokenPrinter.Print(node.UsingKeyword, context);
-		Spacing.AfterControlFlowKeyword(context);
-		TokenPrinter.Print(node.OpenParenToken, context);
-		Spacing.InsideControlFlowParens(context);
-		Node.Print(node.Declaration, context);
-		Node.Print(node.Expression, context);
-		Spacing.InsideControlFlowParens(context);
-		TokenPrinter.Print(node.CloseParenToken, context);
+		// A break the author put just inside the parentheses stays, as an `if` condition's does (issue #346).
+		SyntaxNode? resource = node.Declaration is null ? node.Expression : node.Declaration;
+		if (resource is not null && BrokeInsideParens(node.OpenParenToken, resource, resource, node.CloseParenToken, context))
+		{
+			ConditionHeader(node.UsingKeyword, node.OpenParenToken, resource, node.CloseParenToken, context);
+		}
+		else
+		{
+			TokenPrinter.Print(node.UsingKeyword, context);
+			Spacing.AfterControlFlowKeyword(context);
+			TokenPrinter.Print(node.OpenParenToken, context);
+			Spacing.InsideControlFlowParens(context);
+			Node.Print(node.Declaration, context);
+			Node.Print(node.Expression, context);
+			Spacing.InsideControlFlowParens(context);
+			TokenPrinter.Print(node.CloseParenToken, context);
+		}
 
 		// Chained `using (a) using (b) { }` is a sequence, not a nesting: every using in the chain guards the
 		// same block, and none of them is the body of the one before it. So each takes its own line at the
@@ -733,13 +775,22 @@ internal static partial class Printers
 
 	public static void FixedStatement(FixedStatementSyntax node, PrintContext context)
 	{
-		TokenPrinter.Print(node.FixedKeyword, context);
-		Spacing.AfterControlFlowKeyword(context);
-		TokenPrinter.Print(node.OpenParenToken, context);
-		Spacing.InsideControlFlowParens(context);
-		Node.Print(node.Declaration, context);
-		Spacing.InsideControlFlowParens(context);
-		TokenPrinter.Print(node.CloseParenToken, context);
+		// A break the author put just inside the parentheses stays, as an `if` condition's does (issue #346).
+		if (BrokeInsideParens(node.OpenParenToken, node.Declaration, node.Declaration, node.CloseParenToken, context))
+		{
+			ConditionHeader(node.FixedKeyword, node.OpenParenToken, node.Declaration, node.CloseParenToken, context);
+		}
+		else
+		{
+			TokenPrinter.Print(node.FixedKeyword, context);
+			Spacing.AfterControlFlowKeyword(context);
+			TokenPrinter.Print(node.OpenParenToken, context);
+			Spacing.InsideControlFlowParens(context);
+			Node.Print(node.Declaration, context);
+			Spacing.InsideControlFlowParens(context);
+			TokenPrinter.Print(node.CloseParenToken, context);
+		}
+
 		EmbeddedStatement(node.Statement, node.CloseParenToken.Span.End, context);
 	}
 
