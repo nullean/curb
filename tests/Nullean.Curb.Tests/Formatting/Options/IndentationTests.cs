@@ -7,8 +7,8 @@ namespace Nullean.Curb.Tests.Formatting.Options;
 /// <remarks>
 /// The three switch options compose: <c>_switch_labels</c> decides where the labels sit inside the
 /// braces, and the contents are then placed relative to the label by whichever of the other two
-/// applies — <c>_case_contents_when_block</c> for a braced body, <c>_case_contents</c> for anything
-/// else. A section holding both takes both decisions.
+/// applies — <c>_case_contents_when_block</c> for a section that opens with a braced body,
+/// <c>_case_contents</c> for anything else. The first statement decides for the whole section.
 /// </remarks>
 public class IndentationTests : FormattingTest
 {
@@ -146,6 +146,105 @@ public class IndentationTests : FormattingTest
 		}
 		""",
 		editorConfig: "csharp_indent_case_contents_when_block = false");
+
+	// dotnet format picks a section's indent from its first statement and holds it for the rest: a `break`
+	// after a leading block goes where the block went, and a block after a leading statement goes with the
+	// statement. So does a comment above the switch's brace, from the last section (issue #326).
+	[Test]
+	public Task A_section_opening_with_a_block_takes_the_block_indent() => Formats(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        switch (a)
+		        {
+		            case 1:
+		                {
+		                    Call();
+		                }
+		                break;
+		            case 2:
+		                Call();
+		                {
+		                    Call();
+		                }
+		                // tail
+		        }
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        switch (a)
+		        {
+		            case 1:
+		            {
+		                Call();
+		            }
+		            break;
+		            case 2:
+		                Call();
+		                {
+		                    Call();
+		                }
+		                // tail
+		        }
+		    }
+		}
+		""",
+		editorConfig: "csharp_indent_case_contents_when_block = false");
+
+	[Test]
+	public Task A_section_opening_with_a_statement_takes_the_contents_indent() => Formats(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        switch (a)
+		        {
+		            case 1:
+		                {
+		                    Call();
+		                }
+		                break;
+		            case 2:
+		                Call();
+		                {
+		                    Call();
+		                }
+		                // tail
+		        }
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        switch (a)
+		        {
+		            case 1:
+		                {
+		                    Call();
+		                }
+		                break;
+		            case 2:
+		            Call();
+		            {
+		                Call();
+		            }
+		            // tail
+		        }
+		    }
+		}
+		""",
+		editorConfig: "csharp_indent_case_contents = false");
 
 	// ---- csharp_indent_switch_labels --------------------------------------------------------------
 
