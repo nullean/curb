@@ -60,31 +60,19 @@ public class Widget
 {
     public bool Small(int a, int b)
     {
-        return a
-            > 0
-            && b
-                > 0;
+        return a > 0
+            && b > 0;
     }
 
     public bool Check(int a, int b, int c)
     {
-        return a
-            > 0
-            && b
-                > 0
-            && c
-                > 0
-            && a
-                + b
-                > c
-            && a
-                + c
-                > b
-            && b
-                + c
-                > a
-            && a
-                != b;
+        return a > 0
+            && b > 0
+            && c > 0
+            && a + b > c
+            && a + c > b
+            && b + c > a
+            && a != b;
     }
 }
 ```

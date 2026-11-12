@@ -694,6 +694,64 @@ public class ClosingParenthesisTests : FormattingTest
 		editorConfig: "max_line_length = 120\ncsharp_wrap_chained_binary_expressions = chop_always");
 
 	/// <summary>
+	/// <c>chop_always</c> forced the break on every binary operator the chain printer flattens, not only
+	/// the logical chain the key documents, so each comparison inside an <c>&amp;&amp;</c> chain came
+	/// apart — <c>a</c> on one line, <c>&gt; 0</c> on the next. The operands keep the ordinary fit test.
+	/// See <see href="https://github.com/nullean/curb/issues/308">issue #308</see>.
+	/// </summary>
+	[Test]
+	public Task Chop_always_breaks_at_the_logical_operators_and_leaves_each_comparison_whole() => Formats(
+		"""
+		public class C
+		{
+		    public bool Small(int a, int b)
+		    {
+		        return a > 0 && b > 0;
+		    }
+
+		    public bool Check(int a, int b, int c)
+		    {
+		        return a > 0 && b > 0 && a + b > c && a != b;
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public bool Small(int a, int b)
+		    {
+		        return a > 0
+		            && b > 0;
+		    }
+
+		    public bool Check(int a, int b, int c)
+		    {
+		        return a > 0
+		            && b > 0
+		            && a + b > c
+		            && a != b;
+		    }
+		}
+		""",
+		editorConfig: "max_line_length = 80\ncsharp_wrap_chained_binary_expressions = chop_always");
+
+	[Test]
+	public Task Chop_always_leaves_a_binary_expression_that_is_not_a_logical_chain_alone() => Unchanged(
+		"""
+		public class C
+		{
+		    public object M(int a, int b, int c, string s, string t, object o)
+		    {
+		        var positive = a > 0;
+		        var sum = a + b + c;
+		        var name = s ?? t ?? "";
+		        return o as string;
+		    }
+		}
+		""",
+		editorConfig: "max_line_length = 80\ncsharp_wrap_chained_binary_expressions = chop_always");
+
+	/// <summary>
 	/// A first operand that carries its own multi-line layout — an object initializer here — used to
 	/// print one indent level deeper than it belongs, because the chain opened its indent scope before
 	/// printing that operand even though the operand itself never actually moved down a line. Roslyn's

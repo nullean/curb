@@ -1,4 +1,5 @@
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Nullean.Curb.Documents;
 
@@ -118,7 +119,12 @@ internal static partial class Printers
 			// A count, not a fit measurement: chop_always is the same decision
 			// csharp_wrap_arguments_style's chop_always makes, forcing the break outright instead
 			// of leaving it to whether the chain fits.
-			if (context.Options.WrapChainedBinaryExpressions == WrapStyle.ChopAlways)
+			//
+			// Only for a logical chain, the one the key documents. Every other binary operator flattens
+			// through here too — `a > 0`, `a + b`, `x as T` — so forcing the break on all of them chopped
+			// each comparison inside an `&&` chain apart, `a` on one line and `> 0` on the next. Those
+			// keep the group's ordinary fit test, the same as chop_if_long.
+			if (context.Options.WrapChainedBinaryExpressions == WrapStyle.ChopAlways && IsLogicalChain(node))
 				arena.BreakParent();
 
 			// See the WrapIfLong branch above for why operand 0 prints before the indent opens.
@@ -136,6 +142,9 @@ internal static partial class Printers
 
 		return true;
 	}
+
+	/// <summary>True for a chain of <c>&amp;&amp;</c> or of <c>||</c>.</summary>
+	private static bool IsLogicalChain(BinaryExpressionSyntax node) => node.Kind() is SyntaxKind.LogicalAndExpression or SyntaxKind.LogicalOrExpression;
 
 	/// <summary>True when an expression sits inside an argument list or a lambda's body.</summary>
 	private static bool IsInsideArguments(SyntaxNode node)
