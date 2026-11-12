@@ -1571,4 +1571,139 @@ public class AuthorBreakTests : FormattingTest
 		}
 		""",
 		editorConfig: "csharp_preserve_single_line_statements = false");
+
+	// The `using`, `fixed` and `foreach` headers keep a break just inside their parentheses as an `if` does: what
+	// the author put below the `(` keeps their column, moved as far as the keyword's line moved, and a `)` on a
+	// line of its own keeps its column. Curb joined them (issue #346).
+	[Test]
+	public Task A_break_inside_using_fixed_and_foreach_parentheses_is_kept() => Formats(
+		"""
+		public class C
+		{
+		      public async unsafe void M(int[] xs, System.IDisposable d, System.IAsyncDisposable ad)
+		      {
+		            using (
+		                  var z = new D())
+		            {
+		            }
+		            using (d
+		                  )
+		            {
+		            }
+		            await using (
+		                    ad)
+		            {
+		            }
+		            fixed (
+		                  int* p = xs)
+		            {
+		            }
+		            fixed (int* p = xs
+		                  )
+		            {
+		            }
+		            foreach (
+		                  var x in xs
+		                      .Where(y => y > 0))
+		            {
+		            }
+		            foreach (var x in xs
+		                  )
+		            {
+		            }
+		            await foreach (
+		                  var (a, b) in Pairs())
+		            {
+		            }
+		      }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public async unsafe void M(int[] xs, System.IDisposable d, System.IAsyncDisposable ad)
+		    {
+		        using (
+		              var z = new D())
+		        {
+		        }
+		        using (d
+		              )
+		        {
+		        }
+		        await using (
+		                ad)
+		        {
+		        }
+		        fixed (
+		              int* p = xs)
+		        {
+		        }
+		        fixed (int* p = xs
+		              )
+		        {
+		        }
+		        foreach (
+		              var x in xs
+		                  .Where(y => y > 0))
+		        {
+		        }
+		        foreach (var x in xs
+		              )
+		        {
+		        }
+		        await foreach (
+		              var (a, b) in Pairs())
+		        {
+		        }
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Using_fixed_and_foreach_headers_are_joined_under_a_width() => Formats(
+		"""
+		public class C
+		{
+		    public unsafe void M(int[] xs, System.IDisposable d)
+		    {
+		        using (
+		            d)
+		        {
+		            M(xs, d);
+		        }
+		        fixed (int* p = xs
+		            )
+		        {
+		            M(xs, d);
+		        }
+		        foreach (
+		            var x in xs)
+		        {
+		            M(xs, d);
+		        }
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public unsafe void M(int[] xs, System.IDisposable d)
+		    {
+		        using (d)
+		        {
+		            M(xs, d);
+		        }
+		        fixed (int* p = xs)
+		        {
+		            M(xs, d);
+		        }
+		        foreach (var x in xs)
+		        {
+		            M(xs, d);
+		        }
+		    }
+		}
+		""",
+		editorConfig: "max_line_length = 120");
 }
