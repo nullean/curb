@@ -249,6 +249,15 @@ internal static partial class Printers
 		var breakAfterOpen = condition is not null && context.AuthorBroke(openParen.Span.End, condition.SpanStart);
 		var breakBeforeClose = condition is not null && context.AuthorBroke(condition.Span.End, closeParen.SpanStart);
 
+		// A `)` on a line of its own stays at the column the author gave it, moved as far as the keyword's
+		// line moved, as dotnet format leaves it (issue #324).
+		var closeLine = -1;
+		if (breakBeforeClose)
+		{
+			closeLine = context.EnterContinuation();
+			arena.LineShiftAnchor(closeLine);
+		}
+
 		TokenPrinter.Print(keyword, context);
 		Spacing.AfterControlFlowKeyword(context);
 		TokenPrinter.Print(openParen, context);
@@ -277,12 +286,15 @@ internal static partial class Printers
 			}
 
 			if (breakBeforeClose)
-				arena.HardLine();
+				ContinuationLine(closeParen, closeLine, context);
 			else if (hugsTheParens)
 				Spacing.InsideControlFlowParens(context);
 			else
 				Spacing.InsideControlFlowParensBreakable(context);
 		}
+
+		if (closeLine >= 0)
+			context.ExitContinuation();
 
 		TokenPrinter.Print(closeParen, context);
 	}

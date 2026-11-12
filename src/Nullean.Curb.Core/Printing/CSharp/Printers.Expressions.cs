@@ -1754,13 +1754,13 @@ internal static partial class Printers
 				PrintSeparated(arguments, context, asWritten: true, node.OpenBracketToken.Span.End, lineShift: lineShift, offset: offset);
 			}
 
-			if (lineShift >= 0)
-				context.ExitContinuation();
-
 			if (context.AuthorBroke(arguments[^1].Span.End, node.CloseBracketToken.SpanStart))
-				context.Arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
+				ContinuationLine(node.CloseBracketToken, lineShift, context);
 			else
 				Spacing.InsideBrackets(context);
+
+			if (lineShift >= 0)
+				context.ExitContinuation();
 
 			TokenPrinter.Print(node.CloseBracketToken, context);
 			return;
