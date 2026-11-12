@@ -870,6 +870,75 @@ public class PreserveSingleLineTests : FormattingTest
 		csharp_preserve_single_line_statements = false
 		""");
 
+	// Issue #309: dotnet format never wraps anything from a constructor initializer's `:` to the body's `}`
+	// that the author wrote on one line, so with blocks and statements off only the constructor without an
+	// initializer opens out. An initializer on a line of its own counts too, as long as its body shares it.
+	[Test]
+	public Task A_constructor_body_on_its_initializers_line_stays_there_with_blocks_off() => Formats(
+		"""
+		public class C : B
+		{
+		    public C() { }
+
+		    public C(int x) : base(x) { }
+
+		    public C(int x, int y) : base(x) { Init(); Other(); }
+
+		    public C(int x, int y, int z)
+		        : base(x) { }
+
+		    public C(long l) : base(l)
+		    { }
+		}
+		""",
+		"""
+		public class C : B
+		{
+		    public C()
+		    {
+		    }
+
+		    public C(int x) : base(x) { }
+
+		    public C(int x, int y) : base(x) { Init(); Other(); }
+
+		    public C(int x, int y, int z)
+		        : base(x) { }
+
+		    public C(long l) : base(l)
+		    {
+		    }
+		}
+		""",
+		editorConfig: """
+		csharp_preserve_single_line_blocks = false
+		csharp_preserve_single_line_statements = false
+		""");
+
+	// Issue #309, with a width: the rule reads the author's layout, so deterministic layout opens the body out
+	// as it does any other, and dotnet format accepts that too.
+	[Test]
+	public Task A_constructor_body_on_its_initializers_line_opens_out_at_a_width_with_blocks_off() => Formats(
+		"""
+		public class C : B
+		{
+		    public C(int x) : base(x) { Init(); }
+		}
+		""",
+		"""
+		public class C : B
+		{
+		    public C(int x) : base(x)
+		    {
+		        Init();
+		    }
+		}
+		""",
+		editorConfig: """
+		max_line_length = 120
+		csharp_preserve_single_line_blocks = false
+		""");
+
 	// ---- the options are what make output input-dependent -------------------------------------------
 
 	[Test]

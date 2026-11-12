@@ -437,7 +437,15 @@ internal static partial class Printers
 		if (node.Body is not null)
 		{
 			if (!TryPrintExpressionBody(node.Body, context.Options.ExpressionBodiedConstructors, context))
-				PrintBody(node.Body, BraceStyle.Methods, context, context.ParameterListGroup);
+			{
+				// dotnet format never wraps anything from an initializer's `:` to the body's `}` that the author
+				// wrote on one line, whatever csharp_preserve_single_line_blocks says (issue #309).
+				var joinedToInitializer = node.Initializer is not null && context.AuthorJoined(
+					node.Initializer.ColonToken.SpanStart,
+					node.Body.CloseBraceToken.Span.End
+				);
+				PrintBody(node.Body, BraceStyle.Methods, context, context.ParameterListGroup, keepsOneLine: joinedToInitializer);
+			}
 			return;
 		}
 

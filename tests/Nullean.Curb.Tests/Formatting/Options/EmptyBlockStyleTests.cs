@@ -392,4 +392,27 @@ public class EmptyBlockStyleTests : FormattingTest
 		max_line_length = 120
 		csharp_empty_block_style = together_same_line
 		""");
+
+	// Issue #309 keeps a constructor body on its initializer's line whatever csharp_preserve_single_line_blocks
+	// says; an empty one still answers to this key first.
+	[Test]
+	public Task Multiline_opens_an_empty_constructor_body_on_its_initializers_line() => Formats(
+		"""
+		public class C : B
+		{
+		    public C(int x) : base(x) { }
+		}
+		""",
+		"""
+		public class C : B
+		{
+		    public C(int x) : base(x)
+		    {
+		    }
+		}
+		""",
+		editorConfig: """
+		csharp_preserve_single_line_blocks = false
+		csharp_empty_block_style = multiline
+		""");
 }
