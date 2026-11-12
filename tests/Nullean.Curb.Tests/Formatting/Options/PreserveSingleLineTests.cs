@@ -625,6 +625,66 @@ public class PreserveSingleLineTests : FormattingTest
 		""",
 		editorConfig: "csharp_preserve_single_line_blocks = false");
 
+	/// <summary>
+	/// A block that is a statement of a switch section stays on its line too, and opens out with blocks off,
+	/// as a bare block does. See <see href="https://github.com/nullean/curb/issues/325">issue #325</see>.
+	/// </summary>
+	[Test]
+	public Task A_one_line_block_in_a_switch_section_stays_there() => WithAndWithout(
+		"""
+		public class C
+		{
+		    public void M(int x)
+		    {
+		        switch (x)
+		        {
+		            case 1:
+		                { M(2); break; }
+		            case 2:
+		                { }
+		                break;
+		        }
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M(int x)
+		    {
+		        switch (x)
+		        {
+		            case 1:
+		                { M(2); break; }
+		            case 2:
+		                { }
+		                break;
+		        }
+		    }
+		}
+		""",
+		// Checked against dotnet format, which writes exactly this.
+		"""
+		public class C
+		{
+		    public void M(int x)
+		    {
+		        switch (x)
+		        {
+		            case 1:
+		                {
+		                    M(2); break;
+		                }
+		            case 2:
+		                {
+		                }
+		                break;
+		        }
+		    }
+		}
+		""",
+		opinionConfig: "csharp_preserve_single_line_blocks = false");
+
 	[Test]
 	public Task A_catch_after_a_broken_try_still_takes_its_own_line() => Formats(
 		"""

@@ -744,7 +744,8 @@ internal static partial class Printers
 	/// <remarks>
 	/// <c>{ }</c> or <c>{ a++; }</c> written on one line stays there under
 	/// <c>csharp_preserve_single_line_blocks</c>, as dotnet format leaves it; Curb opened it out (issue
-	/// #152). A body never comes here: its owner decides, through <see cref="PrintStatementBody"/>.
+	/// #152), and in a switch section too (issue #325). A body never comes here: its owner decides, through
+	/// <see cref="PrintStatementBody"/>.
 	/// </remarks>
 	public static void BareBlock(BlockSyntax node, PrintContext context)
 	{

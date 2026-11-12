@@ -185,7 +185,7 @@ internal static class Node
 				Printers.Parameter((ParameterSyntax)node, context);
 				break;
 
-			case SyntaxKind.Block when node.Parent is BlockSyntax:
+			case SyntaxKind.Block when node.Parent is BlockSyntax or SwitchSectionSyntax:
 				Printers.BareBlock((BlockSyntax)node, context);
 				break;
 
