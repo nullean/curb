@@ -839,14 +839,15 @@ internal static class TokenPrinter
 	/// the trailing comment.
 	///
 	/// A label one less than the current indent is the exception: its comments belong a level in,
-	/// where the statements are (see <see cref="Printers.LabeledStatement"/>).
+	/// where the statements are (see <see cref="Printers.LabeledStatement"/>). So is the brace of a
+	/// declaration with a <c>where</c> clause, whose comments sit a level in, with the clause.
 	/// </remarks>
 	private static bool CommentsSitAtTokenColumn(SyntaxToken token, SyntaxToken shapeBase, PrintContext context)
 	{
 		var lines = context.Text.Lines;
 		var tokenStart = token.SpanStart;
 		var tokenColumn = shapeBase.RawKind != 0 ? LineIndentColumn(shapeBase.SpanStart, context) : tokenStart - lines.GetLineFromPosition(tokenStart).Start;
-		if (Printers.LabelCommentsSitALevelIn(token, context))
+		if (Printers.LabelCommentsSitALevelIn(token, context) || Printers.BraceCommentsSitALevelIn(token, context))
 			tokenColumn += context.Options.IndentSize;
 
 		foreach (var trivia in token.LeadingTrivia)

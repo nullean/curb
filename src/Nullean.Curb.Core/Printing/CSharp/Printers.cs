@@ -471,7 +471,8 @@ internal static partial class Printers
 		// which is what dotnet format writes and what two corpus files caught. Safe to ask here because a
 		// clause's break is forced by its option or reproduced from the author's, never decided by this run.
 		var oneLine = KeepsOneLine(node.OpenBraceToken, node.CloseBraceToken, context);
-		if (!oneLine || HeaderWasBroken(node.BaseList, node.ConstraintClauses, context))
+		var commented = CommentsBelowConstraints(node.OpenBraceToken, context);
+		if (!oneLine || commented || HeaderWasBroken(node.BaseList, node.ConstraintClauses, context))
 			BeforeOpenBrace(BraceStyle.Types, context);
 		else
 			arena.Synthetic(SyntheticText.Space);
@@ -588,7 +589,16 @@ internal static partial class Printers
 		if (node.Body is not null)
 		{
 			if (!TryPrintExpressionBody(node.Body, context.Options.ExpressionBodiedMethods, context))
-				PrintBody(node.Body, BraceStyle.Methods, context, context.ParameterListGroup, HeaderWasBroken(null, node.ConstraintClauses, context));
+			{
+				var commented = CommentsBelowConstraints(node.Body.OpenBraceToken, context);
+				PrintBody(
+					node.Body,
+					BraceStyle.Methods,
+					context,
+					context.ParameterListGroup,
+					commented || HeaderWasBroken(null, node.ConstraintClauses, context)
+				);
+			}
 			return;
 		}
 
@@ -3210,6 +3220,72 @@ internal static partial class Printers
 			context.Arena.HardLine();
 			Node.Print(clause, context);
 		}
+	}
+
+	/// <summary>
+	/// Prints the comments between a declaration's last <c>where</c> clause and its brace one level in from
+	/// the declaration, before the brace is placed. True when it printed any.
+	/// </summary>
+	/// <remarks>
+	/// dotnet format indents those lines as it indents the clauses, whether the clause has a line of its own
+	/// or not, and leaves the brace at the declaration's column. Printed with the brace, they went to the
+	/// brace's column (issue #315). Without a clause, dotnet format leaves them at the declaration's column,
+	/// as the brace prints them. Only for a brace on a line of its own: that is what was measured. The brace's
+	/// own call then skips what was printed here, as <see cref="CommentsAboveBlock"/> does.
+	/// </remarks>
+	private static bool CommentsBelowConstraints(SyntaxToken brace, PrintContext context)
+	{
+		if (!BraceCommentsSitALevelIn(brace, context) || !OnlyComments(brace.LeadingTrivia))
+			return false;
+
+		using (context.Arena.Indent())
+			TokenPrinter.PrintLeadingTrivia(brace, context, trailingBreak: false);
+
+		context.Arena.LineCommentBreak();
+		context.HeaderSkipTokenPosition = brace.SpanStart;
+		context.HeaderSkipCount = brace.LeadingTrivia.Count;
+		return true;
+	}
+
+	/// <summary>
+	/// True when <paramref name="brace"/> opens the body of a declaration with a <c>where</c> clause and has a
+	/// line of its own, so the comments ahead of it sit a level in from it.
+	/// </summary>
+	internal static bool BraceCommentsSitALevelIn(SyntaxToken brace, PrintContext context)
+	{
+		if (!brace.IsKind(SyntaxKind.OpenBraceToken) || context.Options.IndentBraces)
+			return false;
+
+		return brace.Parent switch
+		{
+			TypeDeclarationSyntax type => type.ConstraintClauses.Count > 0 && BraceOnOwnLine(BraceStyle.Types, context),
+			BlockSyntax { Parent: MethodDeclarationSyntax method } => method.ConstraintClauses.Count > 0 && BraceOnOwnLine(BraceStyle.Methods, context),
+			BlockSyntax { Parent: LocalFunctionStatementSyntax local } => local.ConstraintClauses.Count > 0 && BraceOnOwnLine(BraceStyle.Methods, context),
+			_ => false,
+		};
+	}
+
+	/// <summary>True when <paramref name="trivia"/> holds a comment and nothing but comments, spaces and line breaks.</summary>
+	private static bool OnlyComments(SyntaxTriviaList trivia)
+	{
+		var comment = false;
+		foreach (var item in trivia)
+		{
+			switch (item.Kind())
+			{
+				case SyntaxKind.SingleLineCommentTrivia:
+				case SyntaxKind.MultiLineCommentTrivia:
+					comment = true;
+					break;
+				case SyntaxKind.WhitespaceTrivia:
+				case SyntaxKind.EndOfLineTrivia:
+					break;
+				default:
+					return false;
+			}
+		}
+
+		return comment;
 	}
 
 	private static int MinimumBlankLinesFor(MemberDeclarationSyntax member, PrintContext context)
