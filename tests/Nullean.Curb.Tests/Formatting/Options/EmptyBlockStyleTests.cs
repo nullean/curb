@@ -485,4 +485,32 @@ public class EmptyBlockStyleTests : FormattingTest
 		max_line_length = 120
 		csharp_empty_block_style = together_same_line
 		""");
+
+	// The key lays out empty bodies. A block statement is not one, so every value leaves it as without the
+	// key: kept on one line under csharp_preserve_single_line_blocks. together and together_same_line
+	// opened it out (issue #337).
+	[Test]
+	public Task An_empty_block_statement_is_not_a_body_under_together_same_line() =>
+		Unchanged(EmptyBlockStatements, editorConfig: "csharp_empty_block_style = together_same_line");
+
+	[Test]
+	public Task An_empty_block_statement_is_not_a_body_under_together() =>
+		Unchanged(EmptyBlockStatements, editorConfig: "csharp_empty_block_style = together");
+
+	[Test]
+	public Task An_empty_block_statement_is_not_a_body_under_multiline() =>
+		Unchanged(EmptyBlockStatements, editorConfig: "csharp_empty_block_style = multiline");
+
+	private const string EmptyBlockStatements = """
+		public class C
+		{
+		    public void M()
+		    {
+		        { }
+		        {
+		        }
+		        M();
+		    }
+		}
+		""";
 }
