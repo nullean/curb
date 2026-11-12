@@ -59,19 +59,65 @@ internal static partial class Printers
 		TokenPrinter.Print(node.SemicolonToken, context);
 	}
 
+	/// <summary>A declaration's type and its declarators: <c>int a = 1, b = 2</c>.</summary>
+	/// <remarks>
+	/// A line the author broke between two declarators, after the comma or before it, stays broken at the
+	/// column they gave it, moved as far as the declaration's first line moved, as dotnet format leaves it.
+	/// Curb joined it (issue #350).
+	/// </remarks>
 	public static void VariableDeclaration(VariableDeclarationSyntax node, PrintContext context)
 	{
+		var variables = node.Variables;
+		var register = BrokeBetweenDeclarators(variables, context) ? ClaimLinesAsWritten(node, context) : -1;
+
 		Node.Print(node.Type, context);
 		context.Arena.Synthetic(SyntheticText.Space);
 
-		for (var i = 0; i < node.Variables.Count; i++)
+		// The broken lines sit inside a level of indent, which an aligned line ignores. It is where they go
+		// when Curb moved the declaration's first line, which leaves the register no source line to measure.
+		for (var i = 0; i < variables.Count; i++)
 		{
-			Node.Print(node.Variables[i], context);
-			if (i >= node.Variables.SeparatorCount)
+			var variable = variables[i];
+			var previousEnd = i > 0 ? variables.GetSeparator(i - 1).Span.End : 0;
+			if (register >= 0 && i > 0 && context.AuthorBroke(previousEnd, variable.SpanStart))
+			{
+				using (context.Arena.Indent())
+				{
+					// With the blank line the author left there, as dotnet format keeps it.
+					var offset = MemberContinuationLine(previousEnd, variable, register, context, element: false);
+					using (context.Arena.AlignedIndent(register, offset))
+						Node.Print(variable, context);
+				}
+			}
+			else
+			{
+				if (i > 0)
+					context.Arena.Synthetic(SyntheticText.Space);
+				Node.Print(variable, context);
+			}
+
+			if (i >= variables.SeparatorCount)
 				continue;
-			TokenPrinter.Print(node.Variables.GetSeparator(i), context);
-			context.Arena.Synthetic(SyntheticText.Space);
+			var separator = variables.GetSeparator(i);
+			using (register >= 0 ? context.Arena.Indent() : default)
+				LineAsWritten(variable.Span.End, separator, register, context);
+			TokenPrinter.Print(separator, context);
 		}
+
+		ReleaseLinesAsWritten(register, context);
+	}
+
+	/// <summary>True when the author broke a line next to a comma between two declarators. False under deterministic layout.</summary>
+	private static bool BrokeBetweenDeclarators(SeparatedSyntaxList<VariableDeclaratorSyntax> variables, PrintContext context)
+	{
+		for (var i = 0; i < variables.SeparatorCount; i++)
+		{
+			var separator = variables.GetSeparator(i);
+			if (context.AuthorBroke(variables[i].Span.End, separator.SpanStart) || context.AuthorBroke(separator.Span.End, variables[i + 1].SpanStart))
+				return true;
+		}
+
+		return false;
 	}
 
 	public static void VariableDeclarator(VariableDeclaratorSyntax node, PrintContext context)

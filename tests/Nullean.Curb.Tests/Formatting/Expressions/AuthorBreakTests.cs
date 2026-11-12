@@ -1706,4 +1706,156 @@ public class AuthorBreakTests : FormattingTest
 		}
 		""",
 		editorConfig: "max_line_length = 120");
+
+	// A line the author broke between two declarators, after the comma or before it, keeps their column, moved
+	// as far as the declaration's first line moved, with any comment or blank line they left there. In a field,
+	// an event field, a constant, a local, a `using`, a `for` and a `fixed` alike. Curb joined it (issue #350).
+	[Test]
+	public Task A_declaration_broken_between_its_declarators_keeps_its_lines() => Formats(
+		"""
+		public class C
+		{
+		      private int _a = 1,
+		          _b = 2;
+		      private event System.Action A,
+		            B;
+		      const int X = 1,
+		                Y = 2;
+
+		      public unsafe void M(int[] xs)
+		      {
+		            var c = 1,
+		                e = 2;
+		            int f = 1
+		                , g = 2;
+		            int h = 1, // one
+		                // two
+		                i = 2,
+
+		                j = Call(1,
+		                    2);
+		            using D k = new D(),
+		                l = new D();
+		            using (D m = new D(),
+		                n = new D())
+		            {
+		            }
+		            for (int o = 0,
+		                     p = 0; o < p; o++)
+		            {
+		            }
+		            fixed (int* q = xs,
+		                   r = xs)
+		            {
+		            }
+		      }
+
+		      static int Call(int a, int b) => a;
+		}
+		""",
+		"""
+		public class C
+		{
+		    private int _a = 1,
+		        _b = 2;
+		    private event System.Action A,
+		          B;
+		    const int X = 1,
+		              Y = 2;
+
+		    public unsafe void M(int[] xs)
+		    {
+		        var c = 1,
+		            e = 2;
+		        int f = 1
+		            , g = 2;
+		        int h = 1, // one
+		                   // two
+		            i = 2,
+
+		            j = Call(1,
+		                2);
+		        using D k = new D(),
+		            l = new D();
+		        using (D m = new D(),
+		            n = new D())
+		        {
+		        }
+		        for (int o = 0,
+		                 p = 0; o < p; o++)
+		        {
+		        }
+		        fixed (int* q = xs,
+		               r = xs)
+		        {
+		        }
+		    }
+
+		    static int Call(int a, int b) => a;
+		}
+		""");
+
+	// Where Curb moved the declaration to a line of its own there is no source line to measure from, and the
+	// next declarator goes a level in, as dotnet format leaves it.
+	[Test]
+	public Task A_declarator_below_a_moved_declaration_goes_a_level_in() => Formats(
+		"""
+		public class C
+		{
+		    public void M(int x)
+		    {
+		        M(x); int o = 1,
+		            p = 2;
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M(int x)
+		    {
+		        M(x);
+		        int o = 1,
+		            p = 2;
+		    }
+		}
+		""",
+		editorConfig: "csharp_preserve_single_line_statements = false");
+
+	[Test]
+	public Task A_declaration_broken_between_its_declarators_is_joined_under_a_width() => Formats(
+		"""
+		public class C
+		{
+		    private int _a = 1,
+		        _b = 2;
+
+		    public void M()
+		    {
+		        int f = 1
+		            , g = 2;
+		        for (int o = 0,
+		                 p = 0; o < p; o++)
+		        {
+		            M();
+		        }
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    private int _a = 1, _b = 2;
+
+		    public void M()
+		    {
+		        int f = 1, g = 2;
+		        for (int o = 0, p = 0; o < p; o++)
+		        {
+		            M();
+		        }
+		    }
+		}
+		""",
+		editorConfig: "max_line_length = 120");
 }
