@@ -2085,7 +2085,18 @@ internal static partial class Printers
 	/// format writes `int a) { }` after a wrapped list too.
 	/// </param>
 	/// <param name="belowClause">A <c>where</c> clause has a line of its own above this body.</param>
-	internal static void PrintBody(SyntaxNode body, BraceStyle construct, PrintContext context, ushort ownerGroup = 0, bool belowClause = false)
+	/// <param name="keepsOneLine">
+	/// The caller found the body held on one line by something other than csharp_preserve_single_line_blocks:
+	/// a constructor's initializer written on the body's line.
+	/// </param>
+	internal static void PrintBody(
+		SyntaxNode body,
+		BraceStyle construct,
+		PrintContext context,
+		ushort ownerGroup = 0,
+		bool belowClause = false,
+		bool keepsOneLine = false
+	)
 	{
 		// A one-line body the author put on the line below its header stays there, as dotnet format leaves
 		// `void P()` then `{ }`; it was joined onto the signature (issue #146). The brace option still has
@@ -2094,7 +2105,7 @@ internal static partial class Printers
 		//
 		// A `where` clause on its own line sends a one-line body below it however it was written, the same
 		// as a type's, whether it stayed one line or csharp_empty_block_style collapsed it.
-		var keepsOneLine = KeepsOneLine(body, context);
+		keepsOneLine = KeepsOneLine(body, context) || (keepsOneLine && !(context.Options.EmptyBlockStyle is not null && IsEmptyBraces(body)));
 		if (
 			(belowClause && (keepsOneLine || JoinsEmptyBracesToHeader(body, context))) ||
 			(keepsOneLine && !JoinsEmptyBracesToHeader(body, context) && body is BlockSyntax block && context.AuthorBroke(
