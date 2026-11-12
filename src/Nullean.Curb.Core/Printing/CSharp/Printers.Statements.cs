@@ -430,14 +430,41 @@ internal static partial class Printers
 
 	public static void ForStatement(ForStatementSyntax node, PrintContext context)
 	{
+		var arena = context.Arena;
+
+		// A line the author broke in the header, just inside the parentheses or next to a semicolon or a comma,
+		// stays at the column they gave it, moved as far as the keyword's line moved, as dotnet format leaves it.
+		// Curb joined it (issue #355). Under deterministic layout nothing is broken as written.
+		var lines = -1;
+		if (context.AuthorBroke(node.OpenParenToken.Span.End, node.CloseParenToken.SpanStart))
+		{
+			lines = context.EnterContinuation();
+			arena.LineShiftAnchor(lines);
+		}
+
 		TokenPrinter.Print(node.ForKeyword, context);
 		Spacing.AfterControlFlowKeyword(context);
 		TokenPrinter.Print(node.OpenParenToken, context);
 
-		if (IsEmptyForHeader(node))
-			PrintEmptyForHeader(node, context);
-		else
-			PrintForHeader(node, context);
+		// The broken lines sit inside a level of indent, which an aligned line ignores. It is where they go when
+		// Curb moved the keyword's line, which leaves the register no source line to measure.
+		using (lines >= 0 ? arena.Indent() : default)
+		{
+			if (IsEmptyForHeader(node))
+				PrintEmptyForHeader(node, lines, context);
+			else
+				PrintForHeader(node, lines, context);
+		}
+
+		var beforeClose = lines >= 0 ? ForHeaderLine(node.CloseParenToken.GetPreviousToken().Span.End, node.CloseParenToken, lines, context) : int.MinValue;
+		// `for (;;)` spaces its `)` by the semicolon option, as PrintEmptyForHeader says.
+		if (beforeClose == int.MinValue && IsEmptyForHeader(node))
+			Spacing.AfterForSemicolon(context);
+		else if (beforeClose == int.MinValue)
+			Spacing.InsideControlFlowParens(context);
+
+		if (lines >= 0)
+			context.ExitContinuation();
 
 		TokenPrinter.Print(node.CloseParenToken, context);
 		EmbeddedStatement(node.Statement, node.CloseParenToken.Span.End, context);
@@ -448,70 +475,138 @@ internal static partial class Printers
 		node is { Declaration: null, Initializers.Count: 0, Condition: null, Incrementors.Count: 0 };
 
 	/// <summary>
-	/// Emits the inside of <c>for (;;)</c>: <c>for (; ; )</c> by default.
+	/// Breaks before <paramref name="next"/> where the author broke the line ahead of it in a <c>for</c> header, and
+	/// returns the offset of that line, or <see cref="int.MinValue"/> where it did not. A blank line the author left
+	/// there stays, as dotnet format keeps it.
+	/// </summary>
+	private static int ForHeaderLine(int previousEnd, SyntaxToken next, int lines, PrintContext context)
+	{
+		if (lines < 0 || !context.AuthorBroke(previousEnd, next.SpanStart))
+			return int.MinValue;
+
+		BreakBeforeFirstToken(previousEnd, next, context);
+		return ContinuationLine(next, lines, context);
+	}
+
+	/// <summary>
+	/// Emits the inside of <c>for (;;)</c>, up to the space before its <c>)</c>: <c>for (; ; )</c> by default.
 	/// </summary>
 	/// <remarks>
 	/// The parenthesis option plays no part: Roslyn's empty-header rule comes before it and reads only
 	/// the two semicolon options, so <c>(</c> takes the before-semicolon space and <c>)</c> the
 	/// after-semicolon one.
 	/// </remarks>
-	private static void PrintEmptyForHeader(ForStatementSyntax node, PrintContext context)
+	private static void PrintEmptyForHeader(ForStatementSyntax node, int lines, PrintContext context)
 	{
-		Spacing.BeforeForSemicolon(context);
+		if (ForHeaderLine(node.OpenParenToken.Span.End, node.FirstSemicolonToken, lines, context) == int.MinValue)
+			Spacing.BeforeForSemicolon(context);
 		TokenPrinter.Print(node.FirstSemicolonToken, context);
 		Spacing.BetweenEmptyForSemicolons(context);
 		TokenPrinter.Print(node.SecondSemicolonToken, context);
-		Spacing.AfterForSemicolon(context);
 	}
 
-	/// <summary>Emits the inside of a <c>for</c> header with at least one clause.</summary>
+	/// <summary>Emits the inside of a <c>for</c> header with at least one clause, up to the space before its <c>)</c>.</summary>
 	/// <remarks>
 	/// A space before a semicolon belongs to the clause in front of it, and an empty clause has none:
 	/// <c>(</c> or the previous semicolon meets it directly. After a semicolon the space is written
 	/// even when the next clause is empty, except before <c>)</c>, which only the parenthesis option
 	/// spaces. That is how dotnet format writes <c>for (; a;)</c> and <c>for (var i = 0; ;)</c>.
+	/// Each clause below a line the author broke keeps its own continuation lines at their offset from
+	/// that line, the last one broken.
 	/// </remarks>
-	private static void PrintForHeader(ForStatementSyntax node, PrintContext context)
+	private static void PrintForHeader(ForStatementSyntax node, int lines, PrintContext context)
 	{
-		Spacing.InsideControlFlowParens(context);
+		var arena = context.Arena;
+		var offset = int.MinValue;
+
+		var first = lines >= 0 ? ForHeaderLine(node.OpenParenToken.Span.End, node.OpenParenToken.GetNextToken(), lines, context) : int.MinValue;
+		if (first == int.MinValue)
+			Spacing.InsideControlFlowParens(context);
+		else
+			offset = first;
 
 		// The separators are printed here, as the incrementors' are below: an initializer list is a bare
 		// separated list with no node of its own to print them, so `for (i = 0, j = 10; …)` lost its
 		// comma and verification refused the file (issue #150). A declaration's declarators print theirs.
-		Node.Print(node.Declaration, context);
-		for (var i = 0; i < node.Initializers.Count; i++)
+		if (node.Declaration is not null)
 		{
-			Node.Print(node.Initializers[i], context);
-			if (i >= node.Initializers.SeparatorCount)
-				continue;
-			TokenPrinter.Print(node.Initializers.GetSeparator(i), context);
-			context.Arena.Synthetic(SyntheticText.Space);
+			using (offset != int.MinValue ? arena.AlignedIndent(lines, offset) : default)
+				Node.Print(node.Declaration, context);
 		}
+		PrintForClauseList(node.Initializers, lines, ref offset, context);
 
 		if (node.Declaration is not null || node.Initializers.Count > 0)
-			Spacing.BeforeForSemicolon(context);
-		TokenPrinter.Print(node.FirstSemicolonToken, context);
-		Spacing.AfterForSemicolon(context);
+		{
+			var initializersEnd = node.Initializers.Count > 0 ? node.Initializers[^1].Span.End : node.Declaration!.Span.End;
+			ForHeaderSemicolon(initializersEnd, node.FirstSemicolonToken, lines, ref offset, context);
+		}
+		else
+			TokenPrinter.Print(node.FirstSemicolonToken, context);
+
+		var afterFirst = lines >= 0
+			? ForHeaderLine(node.FirstSemicolonToken.Span.End, node.Condition?.GetFirstToken() ?? node.SecondSemicolonToken, lines, context)
+			: int.MinValue;
+		if (afterFirst == int.MinValue)
+			Spacing.AfterForSemicolon(context);
+		else
+			offset = afterFirst;
 
 		if (node.Condition is not null)
 		{
-			Node.Print(node.Condition, context);
-			Spacing.BeforeForSemicolon(context);
+			using (offset != int.MinValue ? arena.AlignedIndent(lines, offset) : default)
+				Node.Print(node.Condition, context);
+			ForHeaderSemicolon(node.Condition.Span.End, node.SecondSemicolonToken, lines, ref offset, context);
 		}
-		TokenPrinter.Print(node.SecondSemicolonToken, context);
+		else
+			TokenPrinter.Print(node.SecondSemicolonToken, context);
 
 		if (node.Incrementors.Count > 0)
-			Spacing.AfterForSemicolon(context);
-		for (var i = 0; i < node.Incrementors.Count; i++)
 		{
-			Node.Print(node.Incrementors[i], context);
-			if (i >= node.Incrementors.SeparatorCount)
-				continue;
-			TokenPrinter.Print(node.Incrementors.GetSeparator(i), context);
-			context.Arena.Synthetic(SyntheticText.Space);
+			var afterSecond = lines >= 0
+				? ForHeaderLine(node.SecondSemicolonToken.Span.End, node.Incrementors[0].GetFirstToken(), lines, context)
+				: int.MinValue;
+			if (afterSecond == int.MinValue)
+				Spacing.AfterForSemicolon(context);
+			else
+				offset = afterSecond;
 		}
+		PrintForClauseList(node.Incrementors, lines, ref offset, context);
+	}
 
-		Spacing.InsideControlFlowParens(context);
+	/// <summary>A semicolon of a <c>for</c> header that follows a clause, on a line of its own where the author put it there.</summary>
+	private static void ForHeaderSemicolon(int previousEnd, SyntaxToken semicolon, int lines, ref int offset, PrintContext context)
+	{
+		var line = ForHeaderLine(previousEnd, semicolon, lines, context);
+		if (line == int.MinValue)
+			Spacing.BeforeForSemicolon(context);
+		else
+			offset = line;
+		TokenPrinter.Print(semicolon, context);
+	}
+
+	/// <summary>A <c>for</c> header's initializers or incrementors, with the lines the author broke next to their commas.</summary>
+	private static void PrintForClauseList(SeparatedSyntaxList<ExpressionSyntax> list, int lines, ref int offset, PrintContext context)
+	{
+		var arena = context.Arena;
+		for (var i = 0; i < list.Count; i++)
+		{
+			using (offset != int.MinValue ? arena.AlignedIndent(lines, offset) : default)
+				Node.Print(list[i], context);
+			if (i >= list.SeparatorCount)
+				continue;
+
+			var separator = list.GetSeparator(i);
+			var before = ForHeaderLine(list[i].Span.End, separator, lines, context);
+			if (before != int.MinValue)
+				offset = before;
+			TokenPrinter.Print(separator, context);
+
+			var after = lines >= 0 ? ForHeaderLine(separator.Span.End, list[i + 1].GetFirstToken(), lines, context) : int.MinValue;
+			if (after == int.MinValue)
+				arena.Synthetic(SyntheticText.Space);
+			else
+				offset = after;
+		}
 	}
 
 	public static void ForEachStatement(ForEachStatementSyntax node, PrintContext context) => CommonForEachStatement(node, node.Type, context);
