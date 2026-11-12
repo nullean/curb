@@ -745,11 +745,12 @@ internal static partial class Printers
 	/// <c>{ }</c> or <c>{ a++; }</c> written on one line stays there under
 	/// <c>csharp_preserve_single_line_blocks</c>, as dotnet format leaves it; Curb opened it out (issue
 	/// #152), and in a switch section too (issue #325). A body never comes here: its owner decides, through
-	/// <see cref="PrintStatementBody"/>.
+	/// <see cref="PrintStatementBody"/>. Asked of the braces rather than of the body, so
+	/// <c>csharp_empty_block_style</c>, which lays out empty bodies, leaves an empty one as it is (issue #337).
 	/// </remarks>
 	public static void BareBlock(BlockSyntax node, PrintContext context)
 	{
-		using (context.Arena.ForceFlatIf(KeepsOneLine(node, context)))
+		using (context.Arena.ForceFlatIf(KeepsOneLine(node.OpenBraceToken, node.CloseBraceToken, context)))
 			Block(node, context);
 	}
 
