@@ -19,8 +19,8 @@ let main argv =
               if Paths.Output.Exists then Paths.Output.Delete(true)
               sh $"dotnet clean -c Release" }
         | Build -> command {
-              composes [Clean]
-              executes (shell { sh $"dotnet build -c Release" }) }
+              composes [Clean] }
+                   |> executes { sh $"dotnet build -c Release" }
         // TUnit runs on Microsoft.Testing.Platform; `dotnet run` avoids the deprecated VSTest path.
         | Test -> target [Build] { sh $"dotnet run --project tests/Nullean.Curb.Tests -c Release" }
         | Benchmark -> target [Build] { sh $"dotnet run --project tests/Nullean.Curb.Benchmarks -c Release" }
