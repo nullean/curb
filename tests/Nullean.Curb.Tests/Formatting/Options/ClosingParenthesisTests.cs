@@ -752,6 +752,70 @@ public class ClosingParenthesisTests : FormattingTest
 		editorConfig: "max_line_length = 80\ncsharp_wrap_chained_binary_expressions = chop_always");
 
 	/// <summary>
+	/// <c>a &amp;&amp; b || c</c> binds as <c>(a &amp;&amp; b) || c</c>, and a nested chain shows that by
+	/// sitting one level in from the chain around it. As the first operand of a <c>return</c> or an
+	/// assignment it printed ahead of the outer chain's indent and opened its own at the same level, so
+	/// <c>&amp;&amp; b</c> and <c>|| c</c> lined up as one flat chain. The other positions already nested.
+	/// See <see href="https://github.com/nullean/curb/issues/319">issue #319</see>.
+	/// </summary>
+	[Test]
+	public Task A_nested_chain_sits_one_level_in_from_the_chain_around_it() => Formats(
+		"""
+		public class C
+		{
+		    public bool Mixed(bool a, bool b, bool c)
+		    {
+		        var ok = a && b || c;
+		        return a && b || c;
+		    }
+
+		    public bool Right(bool a, bool b, bool c)
+		    {
+		        return c || a && b;
+		    }
+
+		    public void If(bool a, bool b, bool c)
+		    {
+		        if (a && b || c)
+		        {
+		        }
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public bool Mixed(bool a, bool b, bool c)
+		    {
+		        var ok = a
+		                && b
+		            || c;
+		        return a
+		                && b
+		            || c;
+		    }
+
+		    public bool Right(bool a, bool b, bool c)
+		    {
+		        return c
+		            || a
+		                && b;
+		    }
+
+		    public void If(bool a, bool b, bool c)
+		    {
+		        if (
+		            a
+		                && b
+		            || c
+		        )
+		        { }
+		    }
+		}
+		""",
+		editorConfig: "max_line_length = 80\ncsharp_wrap_chained_binary_expressions = chop_always");
+
+	/// <summary>
 	/// A first operand that carries its own multi-line layout — an object initializer here — used to
 	/// print one indent level deeper than it belongs, because the chain opened its indent scope before
 	/// printing that operand even though the operand itself never actually moved down a line. Roslyn's
