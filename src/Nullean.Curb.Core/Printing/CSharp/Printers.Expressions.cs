@@ -1008,7 +1008,7 @@ internal static partial class Printers
 				// format leaves it. Joined to `{ }`, dotnet format opened it out again under
 				// csharp_preserve_single_line_blocks = false (issue #356).
 				using (arena.IndentIf(context.Options.IndentBraces))
-					InsideBrace(node.OpenBraceToken.Span.End, node.CloseBraceToken);
+					InsideBrace(node.OpenBraceToken.Span.End, node.CloseBraceToken, closeRegister);
 			}
 			else
 			{
