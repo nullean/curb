@@ -5,8 +5,11 @@ namespace Nullean.Curb.Tests.Formatting.Expressions;
 /// block's offset stay where <c>dotnet format whitespace</c> leaves them. See
 /// <see href="https://github.com/nullean/curb/issues/124">issue #124</see>,
 /// <see href="https://github.com/nullean/curb/issues/134">issue #134</see>,
-/// <see href="https://github.com/nullean/curb/issues/135">issue #135</see> and, for the <c>)</c> after a
-/// block lambda that ends a tuple, <see href="https://github.com/nullean/curb/issues/299">issue #299</see>.
+/// <see href="https://github.com/nullean/curb/issues/135">issue #135</see> and, for the <c>)</c> or <c>]</c>
+/// after a block lambda that ends a tuple or an element access,
+/// <see href="https://github.com/nullean/curb/issues/299">issue #299</see>,
+/// <see href="https://github.com/nullean/curb/issues/351">issue #351</see> and
+/// <see href="https://github.com/nullean/curb/issues/352">issue #352</see>.
 /// </summary>
 public class BracketAndLambdaBlockTests : FormattingTest
 {
@@ -1301,6 +1304,212 @@ public class BracketAndLambdaBlockTests : FormattingTest
 		            Use(x);
 		        }
 		        );
+		    }
+		}
+		""",
+		editorConfig: "max_line_length = 120");
+
+	// Issue #351: an element access whose last argument is a block lambda gets its `]` on a line of its own,
+	// at the same indent as a tuple's `)`.
+
+	[Test]
+	public Task The_bracket_after_a_block_lambda_ending_an_element_access_goes_to_the_statement() => Formats(
+		"""
+		public class C
+		{
+		    public object M(string dir)
+		    {
+		        var h = this[() =>
+		        {
+		            Use(dir);
+		        }];
+		        var i = this[dir, () =>
+		        {
+		            Use(dir);
+		        }].ToString();
+		        Use(1,
+		            this?[delegate
+		            {
+		                Use(dir);
+		            }]);
+		        return this[() =>
+		        {
+		            Use(dir);
+		        }
+		                    ];
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public object M(string dir)
+		    {
+		        var h = this[() =>
+		        {
+		            Use(dir);
+		        }
+		        ];
+		        var i = this[dir, () =>
+		        {
+		            Use(dir);
+		        }
+		        ].ToString();
+		        Use(1,
+		            this?[delegate
+		            {
+		                Use(dir);
+		            }
+		        ]);
+		        return this[() =>
+		        {
+		            Use(dir);
+		        }
+		        ];
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_block_lambda_that_does_not_end_an_element_access_keeps_its_bracket() => Unchanged(
+		"""
+		public class C
+		{
+		    public object M(string dir)
+		    {
+		        var a = this[() =>
+		        {
+		            Use(dir);
+		        }, dir];
+		        var b = this[Wrap(() =>
+		        {
+		            Use(dir);
+		        })];
+		        return this[x => { Use(x); }];
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Under_a_width_the_bracket_after_a_block_lambda_goes_to_the_statement() => Formats(
+		"""
+		public class C
+		{
+		    public object M(string dir)
+		    {
+		        return this[x => { Use(x); }];
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public object M(string dir)
+		    {
+		        return this[x =>
+		        {
+		            Use(x);
+		        }
+		        ];
+		    }
+		}
+		""",
+		editorConfig: "max_line_length = 120");
+
+	// Issue #352: a block held on one line below its `=>` ends its line as an opened-out one does, so the
+	// tuple's `)`, the ternary's `:` and the element access's `]` after it go to the statement too.
+
+	[Test]
+	public Task A_one_line_block_below_its_arrow_ends_its_line() => Formats(
+		"""
+		public class C
+		{
+		    public object M(bool enabled, string dir)
+		    {
+		        var t = (dir, () =>
+		        { });
+		        var u = (dir, () =>
+		        { Use(dir); });
+		        Action a = enabled ? () =>
+		        { } : null;
+		        Action b = enabled ? () =>
+		        { Use(dir); } : null;
+		        return this[() =>
+		        { }];
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public object M(bool enabled, string dir)
+		    {
+		        var t = (dir, () =>
+		        { }
+		        );
+		        var u = (dir, () =>
+		        { Use(dir); }
+		        );
+		        Action a = enabled ? () =>
+		        { }
+		        : null;
+		        Action b = enabled ? () =>
+		        { Use(dir); }
+		        : null;
+		        return this[() =>
+		        { }
+		        ];
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_lambda_on_one_line_keeps_what_follows_its_brace() => Unchanged(
+		"""
+		public class C
+		{
+		    public object M(bool enabled, string dir)
+		    {
+		        var t = (dir, () => { });
+		        Action a = enabled ? () => { Use(dir); } : null;
+		        return this[() => { }];
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Under_a_width_an_empty_block_below_its_arrow_ends_its_line() => Formats(
+		"""
+		public class C
+		{
+		    public object M(bool enabled, string dir)
+		    {
+		        var t = (dir, () =>
+		        {
+		        });
+		        Action a = enabled ? () => { } : null;
+		        return this[() =>
+		        {
+		        }];
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public object M(bool enabled, string dir)
+		    {
+		        var t =
+		            (dir, () =>
+		            { }
+		        );
+		        Action a = enabled
+		            ? () =>
+		            { }
+		        : null;
+		        return this[() =>
+		        { }
+		        ];
 		    }
 		}
 		""",

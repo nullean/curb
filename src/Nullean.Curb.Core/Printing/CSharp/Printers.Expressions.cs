@@ -349,7 +349,7 @@ internal static partial class Printers
 		// ternary nor moves the block a level right of the line the lambda starts on.
 		if (SpansLines(node, context))
 		{
-			var colonAfterBlock = OpensOutBlock(node.WhenTrue, context);
+			var colonAfterBlock = EndsBelowItsStart(node.WhenTrue, context);
 			var broken = context.AuthorBroke(node.Condition.Span.End, node.QuestionToken.SpanStart) || context.AuthorBroke(
 				node.QuestionToken.Span.End,
 				node.WhenTrue.SpanStart
@@ -403,7 +403,7 @@ internal static partial class Printers
 		// The same `:` after an opened-out block lambda as above: dotnet format moves it to the indent of
 		// the enclosing statement's line whatever the layout, so it does not take the group's break under
 		// the `?` (issue #205). The block breaks the group anyway, so the `?` still starts a line.
-		var colonFollowsBlock = OpensOutBlock(node.WhenTrue, context);
+		var colonFollowsBlock = EndsBelowItsStart(node.WhenTrue, context);
 
 		using (arena.Group())
 		using (arena.Indent())
@@ -466,7 +466,7 @@ internal static partial class Printers
 
 	/// <summary>
 	/// Breaks before the token that follows a block lambda inside <paramref name="node"/>, a ternary's
-	/// <c>:</c> or a tuple's <c>)</c>, to the indent of the line the enclosing statement, lambda, member,
+	/// <c>:</c>, a tuple's <c>)</c> or an element access's <c>]</c>, to the indent of the line the enclosing statement, lambda, member,
 	/// switch arm or initializer element starts on.
 	/// </summary>
 	/// <remarks>
@@ -475,7 +475,7 @@ internal static partial class Printers
 	/// statement's indent rather than the argument's — issue #134. Where that construct starts
 	/// mid-line there is no such line, and the break goes to the expression's own indent instead.
 	/// </remarks>
-	private static void LineAfterBlock(ExpressionSyntax node, PrintContext context)
+	private static void LineAfterBlock(SyntaxNode node, PrintContext context)
 	{
 		var start = IndentationContextStart(node, context);
 		if (start < 0)
@@ -532,6 +532,35 @@ internal static partial class Printers
 	private static bool OpensOutBlock(ExpressionSyntax expression, PrintContext context) =>
 		expression is AnonymousFunctionExpressionSyntax { Block: { } block } && !KeepsOneLine(block, context) && !CollapsesEmptyBraces(block, context) &&
 			!JoinsEmptyBracesToHeader(block, context) && !context.Options.CollapsesSimpleBlocks;
+
+	/// <summary>
+	/// True for a lambda or anonymous method whose block's <c>}</c> prints on a later line than the one the
+	/// function starts on: a block that <see cref="OpensOutBlock"/>, or one held on one line below its
+	/// <c>=&gt;</c>.
+	/// </summary>
+	/// <remarks>
+	/// dotnet format ends the line after such a <c>}</c>, ahead of a ternary's <c>:</c>, a tuple's <c>)</c>
+	/// or an element access's <c>]</c>, and leaves the token beside it when the whole function is on one
+	/// line. A block kept to <c>{ }</c> or <c>{ x(); }</c> below the arrow ends its line too: it stayed
+	/// beside the token, and the next run moved it (issue #352). Where that one-line block goes is
+	/// <see cref="PrintBody"/>'s lambda branches, asked the same questions in the same order; a comment
+	/// ahead of the brace has already ended the arrow's line (<see cref="CommentsAboveBlock"/>).
+	/// </remarks>
+	private static bool EndsBelowItsStart(ExpressionSyntax expression, PrintContext context)
+	{
+		if (expression is not AnonymousFunctionExpressionSyntax { Block: { } block } || context.Options.CollapsesSimpleBlocks)
+			return false;
+		if (OpensOutBlock(expression, context) || TokenPrinter.HasLeadingContent(block.OpenBraceToken))
+			return true;
+
+		var keepsOneLine = KeepsOneLine(block, context);
+		var joinsEmpty = JoinsEmptyBracesToHeader(block, context);
+		var belowArrow = keepsOneLine && !joinsEmpty && context.AuthorBroke(block.OpenBraceToken.GetPreviousToken().Span.End, block.OpenBraceToken.SpanStart);
+		if ((keepsOneLine || joinsEmpty) && !belowArrow && !BlockBelowParameters(block, context))
+			return false;
+
+		return BraceOnOwnLine(expression is AnonymousMethodExpressionSyntax ? BraceStyle.AnonymousMethods : BraceStyle.Lambdas, context);
+	}
 
 	/// <summary>
 	/// The break or space between two parts of a ternary the author broke, returning the offset of the
@@ -1499,6 +1528,21 @@ internal static partial class Printers
 	/// it back — issue #135. The block's statements and closing brace follow the opening brace, as they
 	/// would from the indent.
 	/// </remarks>
+	/// <summary>
+	/// True when a one-line block goes below the parameter list of the lambda or anonymous method it belongs to.
+	/// </summary>
+	/// <remarks>
+	/// dotnet format moves a one-line block below the arrow of a lambda whose parameter list the author broke,
+	/// as it moves a one-line body below a <c>where</c> clause (issue #274). An anonymous method's goes below
+	/// its <c>)</c> the same way, and stays beside a <c>)</c> on the <c>delegate</c> line (#271).
+	/// </remarks>
+	private static bool BlockBelowParameters(BlockSyntax block, PrintContext context) => block.Parent switch
+	{
+		ParenthesizedLambdaExpressionSyntax lambda => context.AuthorBroke(lambda.ParameterList.SpanStart, lambda.ArrowToken.SpanStart),
+		AnonymousMethodExpressionSyntax { ParameterList: { } parameters } => SpansLines(parameters, context),
+		_ => false,
+	};
+
 	private static void PrintAnonymousFunctionBody(BlockSyntax block, BraceStyle construct, PrintContext context)
 	{
 		// Named and published on the way out, for the creation a hugged argument list belongs to:
@@ -1509,15 +1553,7 @@ internal static partial class Printers
 		var group = context.Arena.NextGroupId();
 		using (context.Arena.Group(group))
 		{
-			// dotnet format moves a one-line block below the arrow of a lambda whose parameter list the
-			// author broke, as it moves a one-line body below a `where` clause (issue #274). An anonymous
-			// method's goes below its `)` the same way, and stays beside a `)` on the `delegate` line (#271).
-			var belowParameters = block.Parent switch
-			{
-				ParenthesizedLambdaExpressionSyntax lambda => context.AuthorBroke(lambda.ParameterList.SpanStart, lambda.ArrowToken.SpanStart),
-				AnonymousMethodExpressionSyntax { ParameterList: { } parameters } => SpansLines(parameters, context),
-				_ => false,
-			};
+			var belowParameters = BlockBelowParameters(block, context);
 
 			// csharp_indent_braces does not move a lambda's brace in dotnet format, wherever it is, and indents
 			// what it holds a level in from it, as without the option. An anonymous method's brace stays where
@@ -1755,7 +1791,9 @@ internal static partial class Printers
 				PrintSeparated(arguments, context, asWritten: true, node.OpenBracketToken.Span.End, lineShift: lineShift, offset: offset);
 			}
 
-			if (context.AuthorBroke(arguments[^1].Span.End, node.CloseBracketToken.SpanStart))
+			if (BracketAfterBlock(node, context))
+				LineAfterBlock(node, context);
+			else if (context.AuthorBroke(arguments[^1].Span.End, node.CloseBracketToken.SpanStart))
 				ContinuationLine(node.CloseBracketToken, lineShift, context);
 			else
 				Spacing.InsideBrackets(context);
@@ -1779,9 +1817,19 @@ internal static partial class Printers
 			Spacing.AfterComma(context);
 		}
 
-		Spacing.InsideBrackets(context);
+		if (BracketAfterBlock(node, context))
+			LineAfterBlock(node, context);
+		else
+			Spacing.InsideBrackets(context);
 		TokenPrinter.Print(node.CloseBracketToken, context);
 	}
+
+	/// <summary>
+	/// True when the last argument of an element access is a block lambda that ends its line, which puts the
+	/// <c>]</c> on a line of its own at the enclosing statement's indent, as a tuple's <c>)</c> (issue #351).
+	/// </summary>
+	private static bool BracketAfterBlock(BracketedArgumentListSyntax node, PrintContext context) =>
+		node.Arguments.Count > 0 && EndsBelowItsStart(node.Arguments[^1].Expression, context) && !TokenPrinter.HasLeadingContent(node.CloseBracketToken);
 
 	public static void ConditionalAccessExpression(ConditionalAccessExpressionSyntax node, PrintContext context)
 	{
