@@ -355,6 +355,42 @@ let perf () =
         failwithf "allocated %.1fx the source size, above the permitted %.1fx" ratio ceiling
     | _ -> printfn "allocated %.1fx the source size" ratio
 
+/// The language-version half (issue #298): a net10.0;netstandard2.0 project whose .editorconfig asks for
+/// file-scoped namespaces (C# 10) and expression-bodied methods (C# 6). netstandard2.0 compiles as C# 7.3, so
+/// the build passes only when every inner build applied the lowest framework's version: the method gains its
+/// arrow, the namespace keeps its braces. The second build lifts the cap through Curb_LangVersion and has to
+/// fail on the namespace, which is what makes the first one prove anything.
+let private langVersionSmoketest (binary: string) =
+    let sample = Path.Combine("examples", "curb-msbuild-smoketest-langversion")
+    let source = Path.Combine(sample, "Library.cs")
+    let pristine = Path.Combine(sample, "Library.unformatted")
+
+    let build (extra: string list) =
+        File.Copy(pristine, source, true)
+        File.SetLastWriteTimeUtc(source, DateTime.UtcNow)
+        sh $"dotnet build {sample} -c Debug --nologo -p:Curb_Exe={binary} {extra}" |> captured |> Cmd.get
+
+    printfn "building the multi-targeting sample with Curb"
+    let code, output = build []
+    if code <> 0 then
+        failwithf "the netstandard2.0 build must compile what Curb wrote, but it failed:\n%s" output
+    let formatted = File.ReadAllText source
+    if not (formatted.Contains "public static int Twice(int x) => x + x;") then
+        failwithf "Curb did not apply the rewrite C# 7.3 allows:\n%s" formatted
+    if not (formatted.Contains "namespace Smoke\n{") then
+        failwithf "Curb wrote a file-scoped namespace into a project that compiles as C# 7.3:\n%s" formatted
+
+    printfn "building it again with the cap lifted, which netstandard2.0 must reject"
+    let liftedCode, liftedOutput = build ["-p:Curb_LangVersion=latest"]
+    if liftedCode = 0 then
+        failwith "the sample built with a file-scoped namespace under C# 7.3, so the first build proves nothing"
+    if not (liftedOutput.Contains "CS8370") then
+        failwithf "expected CS8370 from the netstandard2.0 build, got:\n%s" liftedOutput
+
+    File.Copy(pristine, source, true)
+    printfn ""
+    printfn "MSBuild integration verified: a multi-targeting project is formatted at its lowest framework's C# version"
+
 /// Proves the MSBuild integration does the one thing it exists for: format before the compiler.
 ///
 /// The assertion is deliberately two-sided. Building the sample with Curb must succeed even though
@@ -409,6 +445,9 @@ let msbuildSmoketest () =
     File.Copy(pristine, source, true)
     printfn ""
     printfn "MSBuild integration verified: formatted before CoreCompile, cached on the way back, and IDE0055 fails without it"
+    printfn ""
+    langVersionSmoketest binary
+
 
 /// The F# half of the MSBuild smoke test. There is no IDE0055 for F#, so the two directions are read off the
 /// file itself: built with Curb, Program.fs comes out as Fantomas formats it; built with Curb bypassed, it

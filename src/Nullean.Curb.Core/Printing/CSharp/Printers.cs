@@ -1911,6 +1911,9 @@ internal static partial class Printers
 		var statement = body.Statements[0];
 		var throws = statement is ThrowStatementSyntax { Expression: not null };
 
+		if (!context.Options.LanguageAllows(ExpressionBodyNeeds(body.Parent, throws)))
+			return false;
+
 		ExpressionSyntax? value = statement switch
 		{
 			ReturnStatementSyntax { Expression: { } returned } => returned,
@@ -1965,6 +1968,19 @@ internal static partial class Printers
 	}
 
 	/// <summary>
+	/// The C# version that compiles an expression body on <paramref name="member"/>.
+	/// </summary>
+	/// <remarks>
+	/// C# 6 brought them to methods, operators and get-only properties and indexers; C# 7 extended them
+	/// to constructors, finalizers and accessors, and added the throw expression a body that only throws
+	/// becomes. Local functions are C# 7 themselves, so the cap can never decline one.
+	/// </remarks>
+	private static LanguageVersion ExpressionBodyNeeds(SyntaxNode? member, bool throws) =>
+		throws || member is ConstructorDeclarationSyntax or DestructorDeclarationSyntax or AccessorDeclarationSyntax or LocalFunctionStatementSyntax
+			? LanguageVersion.CSharp7
+			: LanguageVersion.CSharp6;
+
+	/// <summary>
 	/// Emits a whole accessor list as an expression body, for a property or indexer that is only a
 	/// getter.
 	/// </summary>
@@ -2015,6 +2031,9 @@ internal static partial class Printers
 			return false;
 
 		if (HasAnyTrivia(accessors.OpenBraceToken) || HasAnyTrivia(accessors.CloseBraceToken) || HasAnyTrivia(accessor, context))
+			return false;
+
+		if (!context.Options.LanguageAllows(ExpressionBodyNeeds(accessors.Parent, thrown is not null)))
 			return false;
 
 		// The third place an arrow is emitted, and it takes the same layout as the other two.

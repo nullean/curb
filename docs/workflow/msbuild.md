@@ -67,8 +67,30 @@ dotnet build -p:Curb_Check=true               # check without rewriting
 | `Curb_Cache` | `true` | Reuse the previous run's verdict for files that have not changed. Set `false` to build without a cache. |
 | `Curb_CacheFile` | `$(IntermediateOutputPath)curb.cache` | Where that cache lives. |
 | `Curb_FileList` | `$(IntermediateOutputPath)curb.files` | The compile set handed to the CLI. Whenever {{product}} writes `curb.sarif`, it also writes the compile set to `curb.files` beside it, whatever this property says, so `curb cleanup` can tell which target frameworks compiled a file (see [Cleanup](cleanup.md#target-frameworks-must-agree)). |
+| `Curb_LangVersion` | *unset* | The C# version {{product}} caps its rewrites at, overriding the one it reads from the project. See [Language version](#language-version). |
 | `Curb_FSharp` | `true` | Format F# projects through the Fantomas their tool manifest pins. Set `false` to leave them alone; the C# target is unaffected. See [F#](fsharp.md). |
 | `Curb_UnformattedFile` | `$(IntermediateOutputPath)curb.unformatted` | The paths `check` reports back as unformatted, one per line — what the target reads to attach CURB0001 to each of them. |
+
+## Language version
+
+The build tells {{product}} which C# version the project compiles as, so a rewrite never writes syntax the
+compiler rejects. A project that targets `netstandard2.0` or .NET Framework compiles as C# 7.3 unless it sets
+`LangVersion`, and C# 7.3 has no file-scoped namespaces: converting one fails the build with CS8370.
+
+| Rewrite | Needs |
+|---|---|
+| `csharp_style_namespace_declarations = file_scoped` | C# 10 |
+| Expression bodies on methods, operators, and get-only properties and indexers | C# 6 |
+| Expression bodies on constructors and accessors, and any body that only throws | C# 7 |
+
+Below that version the rewrite is skipped and the rest of the file is formatted as usual. The target reads
+`$(LangVersion)`, which the SDK has already filled in from the target framework when the project left it
+unset, and passes it to the CLI as `--lang-version`.
+
+A multi-targeting project compiles each file once per framework, so every inner build passes the version of
+each framework and {{product}} applies the lowest. A `net8.0;netstandard2.0` project is formatted for C# 7.3
+in both builds. Set `LangVersion` (to `latest`, say) to lift the cap, or `Curb_LangVersion` to give
+{{product}} a version of its own.
 
 ## Diagnostics
 

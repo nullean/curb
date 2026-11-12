@@ -33,8 +33,13 @@ internal sealed class LanguageRegistry
 	/// <param name="fileSystem">What F# reads manifests and ignore files through.</param>
 	/// <param name="launcher">Starts Fantomas; the real one when absent.</param>
 	/// <param name="environment">Where the SDK keeps its caches; this process's when absent.</param>
-	public static LanguageRegistry Default(IFileSystem fileSystem, IToolLauncher? launcher = null, ToolEnvironment? environment = null) =>
-		new(CSharpLanguage.Instance, XmlLanguage.Instance, FSharp(fileSystem, launcher, environment), RazorLanguage.Instance);
+	/// <param name="csharp">C# as <c>--lang-version</c> configured it; <see cref="CSharpLanguage.Instance"/> when absent.</param>
+	public static LanguageRegistry Default(
+		IFileSystem fileSystem,
+		IToolLauncher? launcher = null,
+		ToolEnvironment? environment = null,
+		CSharpLanguage? csharp = null
+	) => new(csharp ?? CSharpLanguage.Instance, XmlLanguage.Instance, FSharp(fileSystem, launcher, environment), RazorLanguage.Instance);
 
 	/// <summary>F# alone, for the MSBuild integration's F# target.</summary>
 	public static LanguageRegistry FSharpOnly(IFileSystem fileSystem, IToolLauncher? launcher = null, ToolEnvironment? environment = null) =>
@@ -51,6 +56,9 @@ internal sealed class LanguageRegistry
 	/// files driving it.
 	/// </summary>
 	public static LanguageRegistry CSharpOnly { get; } = new(CSharpLanguage.Instance);
+
+	/// <summary><see cref="CSharpOnly"/>, for C# as <c>--lang-version</c> configured it.</summary>
+	public static LanguageRegistry CSharpOnlyFor(CSharpLanguage csharp) => ReferenceEquals(csharp, CSharpLanguage.Instance) ? CSharpOnly : new(csharp);
 
 	private readonly IFormattingLanguage[] _languages;
 

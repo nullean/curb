@@ -290,6 +290,10 @@ internal static partial class Printers
 		if (context.Options.NamespaceStyle != NamespaceStyle.FileScoped)
 			return false;
 
+		// A project that compiles as C# 9 or older rejects a file-scoped namespace (issue #298).
+		if (!context.Options.LanguageAllows(LanguageVersion.CSharp10))
+			return false;
+
 		// Not the only thing in the file, so whatever sits beside it would be swallowed.
 		if (node.Parent is not CompilationUnitSyntax unit || unit.Members.Count != 1)
 			return false;

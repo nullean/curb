@@ -93,6 +93,7 @@ resolved per file, not per directory, because a section can discriminate on file
 | `-f`, `--files <path>` | `format`, `check` | Work on only these files, instead of walking a directory. Repeatable. |
 | `--msbuild-list-file <path>` | `format`, `check` | Work on the paths listed in this file, one per line, instead of walking a directory. What the build integration passes, since a compile set can be too long for a command line. |
 | `-c`, `--cache <path>` | `format`, `check` | Skip files a previous run watched format to themselves. The caller names the path — there is no ambient cache. The build integration uses `obj/curb.cache`; a pre-commit hook uses `.git/curb.cache`. Ignored with `--coverage`. |
+| `--lang-version <version>` | `format`, `check` | The C# version the files compile as, such as `7.3`. A rewrite that needs a newer one (a file-scoped namespace needs C# 10) is skipped. Takes any value `LangVersion` does. Repeatable; the lowest applies. The build integration passes it for you, see [Language version](../workflow/msbuild.md#language-version). |
 | `--coverage` | `check` | Report which syntax kinds are still emitted verbatim, and how often. |
 | `--no-verify` | `format`, `check` | Skip re-parsing the output to prove the token stream is unchanged. Not recommended — see [Safety](../design-principles/safety.md). |
 

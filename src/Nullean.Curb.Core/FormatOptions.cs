@@ -1,3 +1,4 @@
+using Microsoft.CodeAnalysis.CSharp;
 using Nullean.Curb.Options;
 
 namespace Nullean.Curb;
@@ -629,6 +630,28 @@ public readonly record struct FormatOptions
 	/// </para>
 	/// </remarks>
 	public NamespaceStyle NamespaceStyle { get; init; }
+
+	/// <summary>
+	/// The C# version the file compiles as, which caps the syntax a rewrite may introduce.
+	/// </summary>
+	/// <remarks>
+	/// <para>
+	/// Not an <c>.editorconfig</c> key: a project decides it, through <c>LangVersion</c> or the default
+	/// its target framework implies, so it reaches Curb from the MSBuild integration or from
+	/// <c>--lang-version</c>. <see cref="LanguageVersion.Default"/> (the default) and every value that
+	/// means "latest" leave every rewrite available, which is how Curb behaved before it knew.
+	/// </para>
+	/// <para>
+	/// Parsing is unaffected: Curb still parses at <see cref="LanguageVersion.Preview"/>, so a file is
+	/// never rejected for using syntax newer than this. Only the rewrites read it, through
+	/// <see cref="LanguageAllows"/>: a file-scoped namespace needs C# 10, an expression body C# 6, and
+	/// one on a constructor or accessor, or one that throws, C# 7.
+	/// </para>
+	/// </remarks>
+	public LanguageVersion LanguageVersion { get; init; }
+
+	/// <summary>True when <see cref="LanguageVersion"/> compiles syntax that first appeared in <paramref name="feature"/>.</summary>
+	public bool LanguageAllows(LanguageVersion feature) => LanguageVersion.MapSpecifiedToEffectiveVersion() >= feature;
 
 	/// <summary>
 	/// <c>csharp_style_expression_bodied_methods</c>, code style rule IDE0022.

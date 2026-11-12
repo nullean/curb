@@ -189,7 +189,42 @@
       <_CurbUnformattedArg Condition="'$(_CurbCommand)' == 'check'">--unformatted-list-file &quot;$(Curb_UnformattedFile)&quot;</_CurbUnformattedArg>
     </PropertyGroup>
 
-    <Exec Command="$(_CurbInvocation) $(_CurbCommand) --msbuild-list-file &quot;$(Curb_FileList)&quot; $(_CurbCacheArg) $(_CurbUnformattedArg)"
+    <!--
+      The C# version the files compile as, so Curb never writes syntax the compiler would reject: a
+      file-scoped namespace in a project that compiles as C# 7.3 fails with CS8370 (issue #298).
+      $(LangVersion) is the effective value by now. A project that never set it has the default its
+      target framework implies (7.3 for .NET Framework and netstandard2.0, 12.0 for net8.0), which the
+      compiler targets fill in at evaluation.
+
+      A multi-targeting project compiles every file once per framework, and each inner build runs this
+      target, so each one asks every framework for its version and passes them all; Curb applies the
+      lowest. Passing only its own would let the net8.0 build write a file-scoped namespace that the
+      netstandard2.0 build then fails on. The question is a target that returns a property, asked of
+      the project instances the outer build already evaluated, and only when this target runs at all.
+
+      Curb_LangVersion overrides all of it with one value.
+    -->
+    <ItemGroup Condition="'$(Curb_LangVersion)' == '' and '$(TargetFrameworks)' != ''">
+      <_CurbTargetFramework Include="$(TargetFrameworks)" />
+    </ItemGroup>
+
+    <MSBuild Condition="'@(_CurbTargetFramework)' != ''"
+             Projects="$(MSBuildProjectFullPath)"
+             Targets="_CurbLanguageVersion"
+             Properties="TargetFramework=%(_CurbTargetFramework.Identity)">
+      <Output TaskParameter="TargetOutputs" ItemName="_CurbLanguageVersions" />
+    </MSBuild>
+
+    <ItemGroup>
+      <_CurbLanguageVersions Condition="'$(Curb_LangVersion)' != ''" Include="$(Curb_LangVersion)" />
+      <_CurbLanguageVersions Condition="'$(Curb_LangVersion)' == '' and '$(TargetFrameworks)' == '' and '$(LangVersion)' != ''" Include="$(LangVersion)" />
+    </ItemGroup>
+
+    <PropertyGroup>
+      <_CurbLangVersionArg Condition="'@(_CurbLanguageVersions)' != ''">@(_CurbLanguageVersions->'--lang-version &quot;%(Identity)&quot;', ' ')</_CurbLangVersionArg>
+    </PropertyGroup>
+
+    <Exec Command="$(_CurbInvocation) $(_CurbCommand) --msbuild-list-file &quot;$(Curb_FileList)&quot; $(_CurbCacheArg) $(_CurbUnformattedArg) $(_CurbLangVersionArg)"
           StandardOutputImportance="$(Curb_LogLevel)"
           ContinueOnError="true"
           IgnoreExitCode="true">
@@ -243,6 +278,9 @@
       <FileWrites Include="$(Curb_StampFile);$(Curb_FileList);$(Curb_CacheFile);$(Curb_UnformattedFile)" />
     </ItemGroup>
   </Target>
+
+  <!-- One inner build's C# version, which the Curb target above collects from every target framework. -->
+  <Target Name="_CurbLanguageVersion" Returns="$(LangVersion)" />
 
   <!--
     F#, through Fantomas. A target of its own rather than a branch of the one above, so the C# target stays

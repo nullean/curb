@@ -48,6 +48,7 @@ changed are reformatted.
 | `Curb_Bypass` | `false` | Skip Curb entirely. |
 | `Curb_UnformattedAsWarnings` | `false` | Report CURB0001 as a warning instead of an error. |
 | `Curb_Exe` | unset | Path to a native Curb binary, much faster to start than the bundled framework-dependent build. |
+| `Curb_LangVersion` | unset | The C# version to cap rewrites at. By default the project's own `LangVersion`, the lowest across its target frameworks. |
 | `Curb_FSharp` | `true` | Format F# projects through the Fantomas their tool manifest pins. |
 
 ## Learn more
