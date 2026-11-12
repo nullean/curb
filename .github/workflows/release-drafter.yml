@@ -9,7 +9,7 @@ permissions: {}
 
 jobs:
   draft:
-    uses: nullean/.github/.github/workflows/release-drafter.yml@09af1fa16762b8ae42d899d45430a4267df5300c # v1.2.0
+    uses: nullean/.github/.github/workflows/release-drafter.yml@d850ce6eee9efa9f81b410d15fcd480409518d19 # v1.5.0
     permissions:
       contents: write
       pull-requests: read

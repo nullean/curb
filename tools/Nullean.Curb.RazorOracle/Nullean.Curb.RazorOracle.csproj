@@ -14,7 +14,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.CodeAnalysis.Razor.DotNetFormat" Version="11.2.0-preview.26553.101" />
+    <PackageReference Include="Microsoft.CodeAnalysis.Razor.DotNetFormat" Version="11.2.0-preview.26561.116" />
   </ItemGroup>
 
 </Project>

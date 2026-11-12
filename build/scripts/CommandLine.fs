@@ -64,8 +64,7 @@ let app = MakeApp<Target>("./build.sh", None)
 
 // The spellings are the ones the Argu build accepted (Argu dropped the case's capitals rather than hyphenating
 // them), because those are what CI passes: `--maxallocationratio`, `--corpussource`, `--corpussize`, `--noserve`.
-// `-s` (`--single-target`) belongs to Make.Fs itself; it is a flag now, and the `-s true` CI and mise.toml pass
-// still works, since a target without a typed payload ignores the `true` left over.
+// `-s` (`--single-target`) belongs to Make.Fs itself, and is a switch that takes no value.
 
 let corpus = app.Option<string option>("--corpus", desc = "path to a checkout (or a directory of checkouts for compare)", defaultValue = None)
 let minimum = app.Option<float option>("--minimum", desc = "fail if conformance falls below this percentage", defaultValue = None)

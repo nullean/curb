@@ -8,7 +8,7 @@ namespace Nullean.Curb.Tests.Cli.FSharp;
 
 /// <summary>
 /// The one place the real Fantomas is run: the wire format and the CLI report are Fantomas's to change, and
-/// only this notices when they do. Skipped, with the reason, where Fantomas 8.1.0 is not restored:
+/// only this notices when they do. Skipped, with the reason, where Fantomas 8.1.1 is not restored:
 /// <c>dotnet tool restore --tool-manifest tests/Nullean.Curb.Tests/Cli/FSharp/Fixture/dotnet-tools.json</c>
 /// restores it. On CI, where the build job does exactly that, a missing Fantomas fails instead of skipping,
 /// so these cannot quietly stop running.
@@ -16,7 +16,7 @@ namespace Nullean.Curb.Tests.Cli.FSharp;
 public class RealFantomasTests
 {
 	/// <summary>The version <c>Fixture/dotnet-tools.json</c> pins.</summary>
-	private const string Version = "8.1.0";
+	private const string Version = "8.1.1";
 
 	private static (FileSystem Fs, string Root) Workspace()
 	{
