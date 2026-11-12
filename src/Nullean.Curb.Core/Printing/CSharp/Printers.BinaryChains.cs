@@ -128,7 +128,13 @@ internal static partial class Printers
 				arena.BreakParent();
 
 			// See the WrapIfLong branch above for why operand 0 prints before the indent opens.
-			Node.Print(operands[0], context);
+			//
+			// Except a first operand that is a binary expression of its own, `a && b` in `a && b || c`.
+			// It binds tighter than this chain, so its continuation lines belong one level in from this
+			// chain's. Printed ahead of the indent it opened its own at the same level, and `&& b` and
+			// `|| c` came out aligned, reading as one flat chain. Its first line does not move either way.
+			using (arena.IndentIf(!callerAlreadyIndented && operands[0] is BinaryExpressionSyntax))
+				Node.Print(operands[0], context);
 
 			using (arena.IndentIf(!callerAlreadyIndented))
 			{
