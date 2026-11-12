@@ -403,6 +403,76 @@ public class IndentationTests : FormattingTest
 		""",
 		editorConfig: "csharp_indent_braces = true");
 
+	// A section's block goes a level in like any other: its `{` sits level with what it holds and its `}`,
+	// not with the label's statements. A comment above the brace stays at the statements' indent.
+	[Test]
+	public Task Indented_braces_move_a_case_block_brace_in() => WithAndWithout(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        switch (a)
+		        {
+		            case 1:
+		                // first
+		                {
+		                    Call();
+		                    break;
+		                }
+		            default:
+		            {
+		                break;
+		            }
+		        }
+		    }
+		}
+		""",
+		"""
+		public class C
+		    {
+		    public void M()
+		        {
+		        switch (a)
+		            {
+		            case 1:
+		                // first
+		                    {
+		                    Call();
+		                    break;
+		                    }
+		            default:
+		                    {
+		                    break;
+		                    }
+		            }
+		        }
+		    }
+		""",
+		"""
+		public class C
+		    {
+		    public void M()
+		        {
+		        switch (a)
+		            {
+		            case 1:
+		            // first
+		                {
+		                Call();
+		                break;
+		                }
+		            default:
+		                {
+		                break;
+		                }
+		            }
+		        }
+		    }
+		""",
+		opinionConfig: "csharp_indent_case_contents_when_block = false",
+		editorConfig: "csharp_indent_braces = true");
+
 	[Test]
 	public Task Indented_braces_leave_brackets_alone() => Formats(
 		"""

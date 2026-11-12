@@ -904,6 +904,16 @@ internal static partial class Printers
 						// gap, not statement-to-statement within it.
 						var minimum = firstStatement ? context.Options.BlankLinesAfterCase : 0;
 						context.BlankLines(context.CodeSeparation(labelEnd, EffectiveStart(statement), minimum));
+
+						// csharp_indent_braces puts a section's block's `{` a level in, level with what the block
+						// holds and its `}`, in dotnet format; a comment above the brace stays where it was.
+						if (context.Options.IndentBraces && statement is BlockSyntax block)
+						{
+							CommentsAboveBlock(block.OpenBraceToken, context);
+							using (arena.Indent())
+								arena.HardLine(DocFlags.Reindent);
+						}
+
 						Node.Print(statement, context);
 					}
 
