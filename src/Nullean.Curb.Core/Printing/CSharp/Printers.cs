@@ -2382,13 +2382,13 @@ internal static partial class Printers
 	/// this cannot force the list it is asking about to break.
 	/// </para>
 	/// </remarks>
-	internal static void BeforeOpenBraceWhenOwnerBroke(BraceStyle construct, ushort ownerGroup, PrintContext context)
+	internal static void BeforeOpenBraceWhenOwnerBroke(BraceStyle construct, ushort ownerGroup, PrintContext context, DocFlags flags = DocFlags.None)
 	{
 		if (ownerGroup == 0 || !context.Options.NewLineBeforeOpenBrace.HasFlag(construct))
 			return;
 
 		using (context.Arena.IndentIf(context.Options.IndentBraces))
-			context.Arena.LineIfBroken(ownerGroup);
+			context.Arena.LineIfBroken(ownerGroup, flags);
 	}
 
 	/// <summary>
