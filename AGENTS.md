@@ -47,8 +47,12 @@ Microsoft.Testing.Platform, so they are launched with `dotnet run`, not `dotnet 
 
 release-drafter keeps a draft release current from the labels of merged pull requests; every pull request carries
 exactly one release label (`pr-labels.yml` enforces it). **Publishing the draft** releases: it creates the tag and runs
-`ci.yml` on it with every gate (`CURB_FULL_GATES`), and only then does the `release` job push the container image and
-the packages and append the public API changes to the notes. Pushing a tag on its own does nothing. In 0.x a
+`ci.yml` on it, whose `main-green` job waits for main's push run of `ci.yml` on the released commit and fails unless it
+passed. Only then are the AOT packages built (osx-arm64 is the one macOS job a release runs) and packed, and the
+`release` job pushes the container image and the packages and appends the public API changes to the notes. A release
+runs no tests or corpus gates of its own, and main's push run does not set `CURB_FULL_GATES`: for the full gates on the
+commit being released, run `ci.yml` by workflow_dispatch on main first. macOS runs only on pushes to main. Pushing a
+tag on its own does nothing. In 0.x a
 `breaking` label bumps the minor version; 1.0 is the maintainer's call. See the
 [releasing](.claude/skills/releasing/SKILL.md) and [breaking-changes](.claude/skills/breaking-changes/SKILL.md)
 skills, and `mise run release` for the current draft.
