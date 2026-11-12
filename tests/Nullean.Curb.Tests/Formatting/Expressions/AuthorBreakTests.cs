@@ -1858,4 +1858,217 @@ public class AuthorBreakTests : FormattingTest
 		}
 		""",
 		editorConfig: "max_line_length = 120");
+
+	// A `for` header keeps the lines the author broke in it as the other headers do: just inside its
+	// parentheses, next to either semicolon, and next to a comma between initializers or incrementors. Each
+	// keeps its column, moved as far as the keyword's line moved, and `for (;;)` keeps its own spacing.
+	// Curb joined them (issue #355).
+	[Test]
+	public Task A_break_inside_a_for_header_is_kept() => Formats(
+		"""
+		public class C
+		{
+		      public void M(int n, int i, int j)
+		      {
+		            for (
+		                var k = 0; k < n; k++)
+		            {
+		            }
+		            for (var k = 0; k < n; k++
+		                )
+		            {
+		            }
+		            for (var k = 0;
+		                 k < n;
+		                 k++)
+		            {
+		            }
+		            for (
+		                  var k = 0;
+
+		                  k < n;
+		                  k++
+		            )
+		            {
+		            }
+		            for (i = 0, j = 0;
+		                 i < n; i++,
+		                 j++)
+		            {
+		            }
+		            for (var k = 0
+		                 , l = 1
+		                 ; k < n
+		                 ; k++)
+		            {
+		            }
+		            for (; i < n;
+		                 i++)
+		            {
+		            }
+		            for (var k = 0; // start
+		                 k < n;
+		                 M(() =>
+		                 {
+		                     M(n, i, j);
+		                 }))
+		            {
+		            }
+		            for (
+		                  ;;)
+		            {
+		            }
+		      }
+
+		      void M(System.Action a) { }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M(int n, int i, int j)
+		    {
+		        for (
+		            var k = 0; k < n; k++)
+		        {
+		        }
+		        for (var k = 0; k < n; k++
+		            )
+		        {
+		        }
+		        for (var k = 0;
+		             k < n;
+		             k++)
+		        {
+		        }
+		        for (
+		              var k = 0;
+
+		              k < n;
+		              k++
+		        )
+		        {
+		        }
+		        for (i = 0, j = 0;
+		             i < n; i++,
+		             j++)
+		        {
+		        }
+		        for (var k = 0
+		             , l = 1
+		             ; k < n
+		             ; k++)
+		        {
+		        }
+		        for (; i < n;
+		             i++)
+		        {
+		        }
+		        for (var k = 0; // start
+		             k < n;
+		             M(() =>
+		             {
+		                 M(n, i, j);
+		             }))
+		        {
+		        }
+		        for (
+		              ; ; )
+		        {
+		        }
+		    }
+
+		    void M(System.Action a) { }
+		}
+		""");
+
+	// Where Curb moved the `for` to a line of its own there is no source line to measure from, and what the
+	// author put below its `(` goes a level in, as dotnet format leaves it. The semicolon options still space
+	// the header.
+	[Test]
+	public Task A_break_inside_a_moved_for_header_goes_a_level_in() => Formats(
+		"""
+		public class C
+		{
+		    public void M(int n)
+		    {
+		        M(n); for (
+		            var i = 0; i < n;
+		            i++
+		        )
+		        {
+		        }
+		        for (var i = 0
+		             ; i < n; i++)
+		        {
+		        }
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M(int n)
+		    {
+		        M(n);
+		        for (
+		            var i = 0 ;i < n ;
+		            i++
+		        )
+		        {
+		        }
+		        for (var i = 0
+		             ;i < n ;i++)
+		        {
+		        }
+		    }
+		}
+		""",
+		editorConfig: """
+			csharp_preserve_single_line_statements = false
+			csharp_space_after_semicolon_in_for_statement = false
+			csharp_space_before_semicolon_in_for_statement = true
+			""");
+
+	[Test]
+	public Task A_for_header_is_joined_under_a_width() => Formats(
+		"""
+		public class C
+		{
+		    public void M(int n, int j)
+		    {
+		        for (
+		            var i = 0;
+		            i < n;
+		            i++,
+		            j++
+		        )
+		        {
+		            M(n, j);
+		        }
+		        for (
+		            ;;)
+		        {
+		            M(n, j);
+		        }
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M(int n, int j)
+		    {
+		        for (var i = 0; i < n; i++, j++)
+		        {
+		            M(n, j);
+		        }
+		        for (; ; )
+		        {
+		            M(n, j);
+		        }
+		    }
+		}
+		""",
+		editorConfig: "max_line_length = 120");
 }
