@@ -249,13 +249,13 @@ internal static partial class Printers
 		var breakAfterOpen = condition is not null && context.AuthorBroke(openParen.Span.End, condition.SpanStart);
 		var breakBeforeClose = condition is not null && context.AuthorBroke(condition.Span.End, closeParen.SpanStart);
 
-		// A `)` on a line of its own stays at the column the author gave it, moved as far as the keyword's
-		// line moved, as dotnet format leaves it (issue #324).
-		var closeLine = -1;
-		if (breakBeforeClose)
+		// A condition below its `(` and a `)` on a line of its own stay at the columns the author gave them,
+		// moved as far as the keyword's line moved, as dotnet format leaves them (issues #340 and #324).
+		var lines = -1;
+		if (breakAfterOpen || breakBeforeClose)
 		{
-			closeLine = context.EnterContinuation();
-			arena.LineShiftAnchor(closeLine);
+			lines = context.EnterContinuation();
+			arena.LineShiftAnchor(lines);
 		}
 
 		TokenPrinter.Print(keyword, context);
@@ -272,28 +272,31 @@ internal static partial class Printers
 		{
 			using (arena.Indent())
 			{
-				if (breakAfterOpen)
-					arena.HardLine();
-				else if (hugsTheParens)
+				// Below the `(`, the condition keeps the column the author gave it, and its own continuation
+				// lines their offset from it. A level in, as before, where the keyword's line has no source
+				// line to measure because Curb moved it.
+				var offset = breakAfterOpen ? ContinuationLine(condition!.GetFirstToken(), lines, context) : 0;
+				if (!breakAfterOpen && hugsTheParens)
 					Spacing.InsideControlFlowParens(context);
-				else
+				else if (!breakAfterOpen)
 					Spacing.InsideControlFlowParensBreakable(context);
 
 				// Told to a binary chain the condition might be, so it does not indent a second time
 				// on top of this one — see PrintContext.IndentedCondition.
 				context.IndentedCondition = condition;
-				Node.Print(condition, context);
+				using (breakAfterOpen ? arena.AlignedIndent(lines, offset) : default)
+					Node.Print(condition, context);
 			}
 
 			if (breakBeforeClose)
-				ContinuationLine(closeParen, closeLine, context);
+				ContinuationLine(closeParen, lines, context);
 			else if (hugsTheParens)
 				Spacing.InsideControlFlowParens(context);
 			else
 				Spacing.InsideControlFlowParensBreakable(context);
 		}
 
-		if (closeLine >= 0)
+		if (lines >= 0)
 			context.ExitContinuation();
 
 		TokenPrinter.Print(closeParen, context);
