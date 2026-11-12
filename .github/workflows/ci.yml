@@ -1,7 +1,7 @@
 name: Always be deploying
 
 on:
-  # Weekly full run — all five AOT legs and every corpus gate. Sunday 04:00 UTC, quiet time.
+  # Weekly full run — every corpus gate, and the four AOT legs that do not need macOS. Sunday 04:00 UTC, quiet time.
   schedule:
     - cron: '0 4 * * 0'
   # Manual trigger for the same. Also lets you force a full run on a branch before tagging.
@@ -10,7 +10,8 @@ on:
   push:
     branches:
       - main
-  # Publishing the release-drafter draft releases: every gate below runs on the released commit first.
+  # Publishing the release-drafter draft releases: it waits for main's run of this workflow on the released commit
+  # to have passed (main-green), then only packs and publishes.
   release:
     types: [published]
 
@@ -27,11 +28,14 @@ permissions:
 # time on a pull request, and fewer jobs queued for the organisation's concurrent runners.
 #
 #   1. The AOT matrix. On pull requests only linux-x64 runs (AOT must link and execute; that is proved);
-#      the other four RIDs get the same proof on every push to main, where packages are produced.
+#      the other four RIDs get the same proof on every push to main, where packages are produced. macOS
+#      runners are severely constrained, so osx-arm64 runs only on a push to main and on a release, where it
+#      is the one macOS job left: macOS AOT only compiles on macOS. The schedule and workflow_dispatch run the
+#      other four.
 #
-#   2. The corpus gates. The fast ones run on every trigger, in "Corpus and conformance" (the required
-#      check). The rest are correct and belong in CI, but do not need to run on every commit: they run on
-#      a published release, the weekly schedule and workflow_dispatch (CURB_FULL_GATES). Run one after another in a
+#   2. The corpus gates. The fast ones run on every trigger but a release, in "Corpus and conformance" (the
+#      required check). The rest are correct and belong in CI, but do not need to run on every commit: they run
+#      on the weekly schedule and workflow_dispatch (CURB_FULL_GATES). Run one after another in a
 #      single job they took 54 minutes; split into parallel jobs a full run takes ~17 (measured on one run each).
 #
 #      Steps gated on CURB_FULL_GATES, in the corpus job:
@@ -50,8 +54,10 @@ permissions:
 #          This is the primary correctness claim, held at its floor on the
 #          default path. It must not be conditional.
 #
-# The weekly run is a strict superset of a push-to-main run. A published release is also full, so the gates have
-# run on the commit being released, and the release job publishes nothing until every one of them has passed.
+# The weekly run is a superset of a push-to-main run, osx-arm64 aside. A published release runs no tests or gates of
+# its own: main-green waits for main's push run on the released commit and fails unless it passed, and every release
+# job needs it, so nothing is built, packed or pushed for a commit main has not proven. That push run does not set
+# CURB_FULL_GATES; the full gates are the weekly run's, or a workflow_dispatch on main before releasing.
 #
 # Every job that needs the corpus gets it from `./build.sh clonecorpus`, so where it comes from is decided in
 # one place (materialiseCorpus in build/scripts/Targets.fs). It is generated, by tools/Nullean.Curb.CorpusGenerator:
@@ -68,26 +74,45 @@ permissions:
 env:
   CURB_FULL_GATES: >-
     ${{ github.event_name == 'schedule'
-     || github.event_name == 'workflow_dispatch'
-     || github.event_name == 'release' }}
+     || github.event_name == 'workflow_dispatch' }}
 
 jobs:
+
+  # ── Release gate ────────────────────────────────────────────────────────────
+  # A release ships a commit main has already proven: wait for main's push run of ci.yml on the released commit and
+  # stop unless it passed. Every job that runs on a release needs this one, directly or through another.
+  main-green:
+    if: github.event_name == 'release'
+    name: main is green
+    runs-on: ubuntu-latest
+    timeout-minutes: 70
+    permissions:
+      actions: read # read main's ci.yml runs
+    steps:
+      - uses: nullean/.github/actions/require-green-main@f9eb30d28e48b3f6b8ff1f4e7dae1d2b7b2d544b # v1.6.0
 
   # ── AOT pack matrix ─────────────────────────────────────────────────────────
   # Native AOT can only compile for the OS/arch it runs on, so each leg compiles
   # its own RID, smoke-tests the binary, and packs the per-RID tool package.
   #
-  # On pull requests, only the linux-x64 leg runs. All five run on push, tags,
-  # weekly, and workflow_dispatch — wherever packages are produced or the full
-  # surface is exercised.
+  # On pull requests, only the linux-x64 leg runs. All five run on a push to main
+  # and on a release, where packages are produced; the weekly run and
+  # workflow_dispatch run the four that need no macOS runner. On a release the
+  # matrix waits for main-green, and osx-arm64 is the one macOS job it runs.
   aot-pack:
+    needs: main-green
+    # main-green is skipped on everything but a release, which would skip this job too without a status function.
+    if: ${{ !cancelled() && (github.event_name != 'release' || needs.main-green.result == 'success') }}
     timeout-minutes: 20
     strategy:
       fail-fast: false   # a preempted arm runner must not cancel the whole matrix
       matrix:
-        include: ${{ fromJSON(github.event_name == 'pull_request'
-          && '[{"rid":"linux-x64","runner":"ubuntu-latest"}]'
-          || '[{"rid":"linux-x64","runner":"ubuntu-latest"},{"rid":"linux-arm64","runner":"ubuntu-24.04-arm"},{"rid":"win-x64","runner":"windows-latest"},{"rid":"win-arm64","runner":"windows-11-arm"},{"rid":"osx-arm64","runner":"macos-latest"}]') }}
+        include: ${{ fromJSON(
+          (github.event_name == 'pull_request'
+            && '[{"rid":"linux-x64","runner":"ubuntu-latest"}]')
+          || ((github.event_name == 'push' || github.event_name == 'release')
+            && '[{"rid":"linux-x64","runner":"ubuntu-latest"},{"rid":"linux-arm64","runner":"ubuntu-24.04-arm"},{"rid":"win-x64","runner":"windows-latest"},{"rid":"win-arm64","runner":"windows-11-arm"},{"rid":"osx-arm64","runner":"macos-latest"}]')
+          || '[{"rid":"linux-x64","runner":"ubuntu-latest"},{"rid":"linux-arm64","runner":"ubuntu-24.04-arm"},{"rid":"win-x64","runner":"windows-latest"},{"rid":"win-arm64","runner":"windows-11-arm"}]') }}
 
     runs-on: ${{ matrix.runner }}
     name: AOT pack (${{ matrix.rid }})
@@ -163,6 +188,7 @@ jobs:
   # dropped tokens, welded identifiers, indentation drift, non-idempotent output.
   # Until this ran in CI it gated nothing.
   corpus:
+    if: github.event_name != 'release' # a release relies on main's run of it (main-green)
     runs-on: ubuntu-latest
     name: Corpus and conformance
     # The two slow full gates have jobs of their own below, so this one takes about as long on every trigger.
@@ -408,10 +434,11 @@ jobs:
   # changes has to be named in build/conformance-divergences.json with a reason, and an entry that no longer
   # reproduces fails too. 27 are documented today, mostly markup Curb does not format yet (#88).
   #
-  # Not a job the release waits for. The engine is a prerelease package on Microsoft's public dnceng feed
-  # (tools/Nullean.Curb.RazorOracle/nuget.config); if that feed drops the pinned version this job fails loudly,
-  # and a release should not be held hostage to it. Once `dotnet format whitespace` formats Razor, this calls it.
+  # The engine is a prerelease package on Microsoft's public dnceng feed (tools/Nullean.Curb.RazorOracle/nuget.config);
+  # if that feed drops the pinned version this job fails loudly. It does not run on a release, but it is part of main's
+  # push run, which main-green requires to have passed. Once `dotnet format whitespace` formats Razor, this calls it.
   razor-oracle:
+    if: github.event_name != 'release'
     runs-on: ubuntu-latest
     name: Razor expectations against the Razor engine
     timeout-minutes: 15
@@ -435,7 +462,7 @@ jobs:
         run: ./build.sh verifyrazorexpectations -s
 
   cleanup-conformance:
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || github.event_name == 'release'
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     name: Cleaning a real solution leaves it building
     timeout-minutes: 20
@@ -475,7 +502,7 @@ jobs:
   # four shards. Each shard dumps the suite itself and checks the cases whose test name hashes to it; the
   # four together cover every case exactly once (see verifyExpectationsIde0055 in Targets.fs).
   ide0055:
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || github.event_name == 'release'
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     name: IDE0055 under a real build (shard ${{ matrix.shard }}/4)
     timeout-minutes: 30
@@ -505,10 +532,16 @@ jobs:
         run: ./build.sh verifyexpectationside0055 -s --shard ${{ matrix.shard }}/4
 
   # ── Managed build / test / pack (and the canary on a branch push) ───────────
+  # On a release it only builds, packs and validates for the release job: the self-format check and the tests ran in
+  # main's push run on this commit, which main-green requires to have passed.
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    needs: aot-pack
+    needs: [main-green, aot-pack]
+    # main-green is skipped on everything but a release, which would skip this job too without a status function.
+    if: >-
+      ${{ !cancelled() && needs.aot-pack.result == 'success'
+        && (github.event_name != 'release' || needs.main-green.result == 'success') }}
     permissions:
       contents: write   # create GitHub release
       packages: write   # push to GitHub Packages
@@ -534,15 +567,18 @@ jobs:
 
       # Curb formats its own source: the build above produced the CLI this checks with, from this commit.
       - name: Curb formats its own source
+        if: github.event_name != 'release'
         run: dotnet run --project src/Nullean.Curb.Cli -c Release --no-build -- check src tools tests
 
       # The tests that run the real Fantomas, through its daemon and its command line, skip where it is not
       # restored. Here it is, from the fixture manifest that pins the version they expect, and they fail
       # rather than skip when CI=true.
       - name: Restore the Fantomas the F# tests run against
+        if: github.event_name != 'release'
         run: dotnet tool restore --tool-manifest tests/Nullean.Curb.Tests/Cli/FSharp/Fixture/dotnet-tools.json
 
       - name: Test
+        if: github.event_name != 'release'
         run: ./build.sh test -s
 
       - name: Generate managed packages
@@ -607,14 +643,13 @@ jobs:
 
   # ── Release ─────────────────────────────────────────────────────────────────
   # Publishing the release-drafter draft creates the tag and runs this workflow on it; the packages go out
-  # only once every gate has passed. Publishing used to hang off `build` alone, so 0.9.0 and 0.10.0 both went
-  # out while a corpus gate was still running and then failed. Needing the gate jobs also skips this job if
-  # any of them is skipped, which on a release none is: CURB_FULL_GATES is true.
+  # only once main-green has seen main's push run on the released commit pass. 0.9.0 and 0.10.0 both went out
+  # while a corpus gate was still running and then failed; the gates now finish on main before a release starts.
   release:
     if: github.event_name == 'release'
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    needs: [build, corpus, cleanup-conformance, ide0055]
+    needs: [main-green, build]
     permissions:
       contents: write   # attach the binaries and append the public API changes to the release
       packages: write   # push the container image
@@ -732,12 +767,13 @@ jobs:
 
   # Static analysis of these workflows (nullean/.github).
   zizmor:
-    uses: nullean/.github/.github/workflows/zizmor.yml@d850ce6eee9efa9f81b410d15fcd480409518d19 # v1.5.0
+    uses: nullean/.github/.github/workflows/zizmor.yml@e21d5f59405aa7078e51825cd4c407191e28562f # v1.6.1
     permissions:
       contents: read
 
   # The docs build as docs.yml publishes it, without publishing, so a PR proves the build and post-build steps.
   docs:
+    if: github.event_name != 'release'
     runs-on: ubuntu-latest
     permissions:
       contents: read
