@@ -415,4 +415,74 @@ public class EmptyBlockStyleTests : FormattingTest
 		csharp_preserve_single_line_blocks = false
 		csharp_empty_block_style = multiline
 		""");
+
+	// A trailing comment on the initializer already ends the line; the joined pair then goes below it at the
+	// constructor's column, where dotnet format puts it, not a level in with the initializer (issue #330).
+	[Test]
+	public Task Together_same_line_puts_a_body_after_an_initializers_comment_at_the_members_column() => Formats(
+		"""
+		public class C : B
+		{
+		    public C(int x) : base(x) // note
+		    {
+		    }
+
+		    public C(string message, System.Exception inner)
+		        : base(message,
+		            inner) // note
+		    {
+		    }
+
+		    void M() // note
+		    {
+		    }
+		}
+		""",
+		"""
+		public class C : B
+		{
+		    public C(int x) : base(x) // note
+		    { }
+
+		    public C(string message, System.Exception inner)
+		        : base(message,
+		            inner) // note
+		    { }
+
+		    void M() // note
+		    { }
+		}
+		""",
+		editorConfig: "csharp_empty_block_style = together_same_line");
+
+	[Test]
+	public Task Together_same_line_puts_a_body_after_an_initializers_comment_at_the_members_column_under_a_width() => Formats(
+		"""
+		public class C : B
+		{
+		    public C(int x) : base(x) // note
+		    {
+		    }
+
+		    public C(int x, int y)
+		        : this(x,
+		            y) // note
+		    {
+		    }
+		}
+		""",
+		"""
+		public class C : B
+		{
+		    public C(int x) : base(x) // note
+		    { }
+
+		    public C(int x, int y) : this(x, y) // note
+		    { }
+		}
+		""",
+		editorConfig: """
+		max_line_length = 120
+		csharp_empty_block_style = together_same_line
+		""");
 }
