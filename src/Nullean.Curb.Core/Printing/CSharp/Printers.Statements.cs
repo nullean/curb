@@ -1249,8 +1249,7 @@ internal static partial class Printers
 
 		PrintAttributeLists(node.AttributeLists, context);
 		PrintModifiers(node.Modifiers, context);
-		Node.Print(node.ReturnType, context);
-		arena.Synthetic(SyntheticText.Space);
+		DeclarationType(node.ReturnType, context);
 		TokenPrinter.Print(node.Identifier, context);
 
 		if (node.TypeParameterList is not null)

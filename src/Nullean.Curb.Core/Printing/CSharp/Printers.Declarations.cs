@@ -70,8 +70,7 @@ internal static partial class Printers
 		var variables = node.Variables;
 		var register = BrokeBetweenDeclarators(variables, context) ? ClaimLinesAsWritten(node, context) : -1;
 
-		Node.Print(node.Type, context);
-		context.Arena.Synthetic(SyntheticText.Space);
+		DeclarationType(node.Type, context);
 
 		// The broken lines sit inside a level of indent, which an aligned line ignores. It is where they go
 		// when Curb moved the declaration's first line, which leaves the register no source line to measure.
@@ -266,8 +265,7 @@ internal static partial class Printers
 
 		PrintAttributeLists(node.AttributeLists, context);
 		PrintModifiers(node.Modifiers, context);
-		Node.Print(node.Type, context);
-		arena.Synthetic(SyntheticText.Space);
+		DeclarationType(node.Type, context);
 
 		if (node.ExplicitInterfaceSpecifier is not null)
 			Tokens(node.ExplicitInterfaceSpecifier, context);
@@ -407,8 +405,7 @@ internal static partial class Printers
 		PrintModifiers(node.Modifiers, context);
 		TokenPrinter.Print(node.EventKeyword, context);
 		arena.Synthetic(SyntheticText.Space);
-		Node.Print(node.Type, context);
-		arena.Synthetic(SyntheticText.Space);
+		DeclarationType(node.Type, context);
 
 		if (node.ExplicitInterfaceSpecifier is not null)
 			Tokens(node.ExplicitInterfaceSpecifier, context);

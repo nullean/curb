@@ -564,4 +564,87 @@ public class MethodTests : FormattingTest
 		}
 		""",
 		editorConfig: "max_line_length = 120");
+
+	// Issue #363: each attribute section the author put on a line of its own stays there, as the line below the
+	// last one does (#257). Only a parameter's first line moves with the method; dotnet format leaves the
+	// lines inside a parameter at the column the author gave them.
+	[Test]
+	public Task Stacked_attribute_sections_stay_on_their_own_lines() => Formats(
+		"""
+		using System;
+
+		public class C
+		{
+		      public void M(
+		          [Obsolete]
+		          [CLSCompliant(false)]
+		          string s,
+		          [Obsolete][CLSCompliant(false)]
+		            [Obsolete]
+		          int i)
+		      {
+		            Action<int> a = (
+		                [Obsolete]
+		                [CLSCompliant(false)] int x) => { };
+		      }
+
+		    public void N([Obsolete]
+		                  [CLSCompliant(false)] string s, [Obsolete]
+		        int i)
+		    {
+		    }
+		}
+		""",
+		"""
+		using System;
+
+		public class C
+		{
+		    public void M(
+		        [Obsolete]
+		          [CLSCompliant(false)]
+		          string s,
+		        [Obsolete][CLSCompliant(false)]
+		            [Obsolete]
+		          int i)
+		    {
+		        Action<int> a = (
+		            [Obsolete]
+		                [CLSCompliant(false)] int x) =>
+		        { };
+		    }
+
+		    public void N([Obsolete]
+		                  [CLSCompliant(false)] string s, [Obsolete]
+		        int i)
+		    {
+		    }
+		}
+		""");
+
+	[Test]
+	public Task Stacked_attribute_sections_are_joined_under_a_width() => Formats(
+		"""
+		using System;
+
+		public class C
+		{
+		    public void M(
+		        [Obsolete]
+		        [CLSCompliant(false)]
+		        string s)
+		    {
+		    }
+		}
+		""",
+		"""
+		using System;
+
+		public class C
+		{
+		    public void M([Obsolete][CLSCompliant(false)] string s)
+		    { }
+		}
+		""",
+		editorConfig: "max_line_length = 120");
 }
