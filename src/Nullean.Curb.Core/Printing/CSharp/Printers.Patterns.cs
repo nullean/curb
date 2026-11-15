@@ -126,7 +126,9 @@ internal static partial class Printers
 	/// True for the exact shape RecursivePattern defers its leading brace-line to: a property-only
 	/// pattern right after `is`, `not`, `and`, `or` or a subpattern's colon, possibly as the first
 	/// alternative of an <c>and</c>/<c>or</c> chain, with nothing between that token and the brace in the
-	/// source. Author-broken input keeps the caller's forced line instead, matching every other pattern shape.
+	/// source. Author-broken input keeps the caller's forced line instead, matching every other pattern shape,
+	/// except a brace the author put below that token with no chain after it: that one is placed with what it
+	/// holds, at the line <see cref="PropertyBraceOwnerLine"/> names.
 	/// </summary>
 	/// <remarks>
 	/// The gap answers the same fits question as whether the property list wraps: dotnet format moves the
@@ -156,7 +158,67 @@ internal static partial class Printers
 			_ => default,
 		};
 
-		return before.RawKind != 0 && !context.AuthorBroke(before.Span.End, pattern.SpanStart);
+		if (before.RawKind == 0)
+			return false;
+
+		return !context.AuthorBroke(before.Span.End, pattern.SpanStart) ||
+			(child == pattern && BraceOnOwnLine(BraceStyle.ObjectCollectionArrayInitializers, context));
+	}
+
+	/// <summary>
+	/// Claims a register holding the indent of the line dotnet format places a property pattern's braces
+	/// from, and returns it with the offset to read it at, or -1 where its braces follow the ambient indent.
+	/// The caller owes <see cref="PrintContext.ExitContinuation"/>.
+	/// </summary>
+	/// <remarks>
+	/// dotnet format puts a brace on a line of its own at the indent of the line holding the first token of
+	/// whatever holds the pattern: the <c>is</c> expression, the <c>or</c> chain, the arm or the case label.
+	/// That holds however deep the scope printing it, so in a lambda argument or a broken chain the braces
+	/// sat a level right of where dotnet format put them back (issue #367). A condition on its <c>if</c> or
+	/// <c>while</c> keyword's line adds a level. Deterministic layout never keeps a condition there once a
+	/// brace inside it breaks, so <see cref="PrintContext.AuthorJoined"/> answers it in both modes.
+	/// </remarks>
+	private static int PropertyBraceOwnerLine(RecursivePatternSyntax node, PrintContext context, out int offset)
+	{
+		offset = 0;
+		if (node.Parent is null || !BraceOnOwnLine(BraceStyle.ObjectCollectionArrayInitializers, context))
+			return -1;
+
+		// A pattern that starts what holds it has nothing above its brace to measure from.
+		var owner = node.Parent.GetFirstToken();
+		if (owner == node.PropertyPatternClause!.OpenBraceToken)
+			return -1;
+
+		if (OnConditionKeywordLine(owner, context))
+			offset = context.LevelColumns;
+		return OwnerLineAnchor(owner, context);
+	}
+
+	/// <summary>
+	/// Whether <paramref name="token"/> is in an <c>if</c> or <c>while</c> condition, on the line that
+	/// statement starts.
+	/// </summary>
+	private static bool OnConditionKeywordLine(SyntaxToken token, PrintContext context)
+	{
+		for (var node = token.Parent; node is not null; node = node.Parent)
+		{
+			switch (node)
+			{
+				case IfStatementSyntax ifStatement when ifStatement.Condition.Span.Contains(token.Span):
+					// `else if` starts its line with the `else`.
+					return context.AuthorJoined(ifStatement.IfKeyword.Span.End, token.SpanStart) &&
+						!(ifStatement.Parent is ElseClauseSyntax elseClause && context.AuthorJoined(
+							elseClause.ElseKeyword.Span.End,
+							ifStatement.IfKeyword.SpanStart
+						));
+				case WhileStatementSyntax whileStatement when whileStatement.Condition.Span.Contains(token.Span):
+					return context.AuthorJoined(whileStatement.WhileKeyword.Span.End, token.SpanStart);
+				case StatementSyntax:
+					return false;
+			}
+		}
+
+		return false;
 	}
 
 	/// <summary>Breaks ahead of a positional subpattern the author put on a line of its own.</summary>
@@ -257,15 +319,27 @@ internal static partial class Printers
 				var asWritten = SpansLines(property, context);
 				var subpatterns = property.Subpatterns;
 				var rewritesComma = RewritesTrailingComma(subpatterns, property.CloseBraceToken, context);
+				var ownerOffset = 0;
+				var ownerLine = ownsLeadingGap ? PropertyBraceOwnerLine(node, context, out ownerOffset) : -1;
+				var braceBroken = context.AuthorBroke(property.OpenBraceToken.GetPreviousToken().Span.End, property.OpenBraceToken.SpanStart);
+
+				// A bare pattern's brace the author put on a line of its own keeps that line outside the group,
+				// so `is` / `{ A: 1 }` is not opened out by it.
+				var bareBraceBroken = ownsLeadingGap && !hasPrecedingContent && braceBroken;
+				if (bareBraceBroken)
+				{
+					using (ownerLine >= 0 ? arena.AlignedIndent(ownerLine, ownerOffset) : default)
+						BeforeOpenBrace(BraceStyle.ObjectCollectionArrayInitializers, context);
+				}
 
 				using (arena.Group())
+				using (ownerLine >= 0 ? arena.AlignedIndent(ownerLine, ownerOffset) : default)
 				{
 					// dotnet format places this brace by the initializer flag of csharp_new_line_before_open_brace,
 					// and only once the braces span lines: `Version { Major: 1,` / `Minor: 2 }` opens out fully.
-					if (ownsLeadingGap)
+					if (ownsLeadingGap && !bareBraceBroken)
 					{
-						var beforeBrace = property.OpenBraceToken.GetPreviousToken().Span.End;
-						if (asWritten && context.AuthorBroke(beforeBrace, property.OpenBraceToken.SpanStart))
+						if (asWritten && braceBroken)
 							BeforeOpenBrace(BraceStyle.ObjectCollectionArrayInitializers, context);
 						else
 							BeforeOpenBraceWhenBroken(BraceStyle.ObjectCollectionArrayInitializers, context);
@@ -313,6 +387,9 @@ internal static partial class Printers
 					TokenPrinter.Print(property.CloseBraceToken, context);
 				}
 
+				if (ownerLine >= 0)
+					context.ExitContinuation();
+
 				// Just inside the braces, which open out with the group: dotnet format moves both edges of
 				// `{ Major: 1,` / `Minor: 2 }` onto lines of their own, as it does an initializer's.
 				void InsideBrace(int from, int to)
@@ -327,6 +404,9 @@ internal static partial class Printers
 			{
 				// `Version` / `{` / `}` — an empty pattern the author opened out stays opened out, with its
 				// brace placed by the same flag as a populated one's.
+				var ownerOffset = 0;
+				var ownerLine = hasPrecedingContent ? PropertyBraceOwnerLine(node, context, out ownerOffset) : -1;
+				var ownerScope = ownerLine >= 0 ? arena.AlignedIndent(ownerLine, ownerOffset) : default;
 				if (hasPrecedingContent)
 				{
 					if (context.AuthorBroke(property.OpenBraceToken.GetPreviousToken().Span.End, property.OpenBraceToken.SpanStart))
@@ -360,6 +440,9 @@ internal static partial class Printers
 					arena.Synthetic(SyntheticText.Space);
 
 				TokenPrinter.PrintWithoutLeadingTrivia(property.CloseBraceToken, context);
+				ownerScope.Dispose();
+				if (ownerLine >= 0)
+					context.ExitContinuation();
 			}
 		}
 
