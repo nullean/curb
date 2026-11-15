@@ -694,10 +694,6 @@ internal static partial class Printers
 		var arena = context.Arena;
 
 		TokenPrinter.Print(node.TryKeyword, context);
-		// Same reasoning as catch and finally, below: dotnet format is lazy about an empty try block
-		// too, in both directions, so an unconditional `{ }` is the cleaner default here as well. The
-		// one exception is csharp_preserve_single_line_statements = false, under which dotnet format
-		// does move it off the keyword; PrintStatementBody honours that for a try but not a clause.
 		PrintClauseBody(node.Block, node.TryKeyword.Span.End, context);
 
 		foreach (var catchClause in node.Catches)
@@ -734,9 +730,6 @@ internal static partial class Printers
 				TokenPrinter.Print(catchClause.Filter.CloseParenToken, context);
 			}
 
-			// An empty catch always prints as `catch { }`, whatever csharp_preserve_single_line_blocks
-			// says and whatever the source had — see PrintStatementBody's alwaysJoinsEmpty. A non-empty
-			// body is unaffected: it follows the block's own rule, same as any other braced construct.
 			var headerEnd = catchClause.Filter?.CloseParenToken.Span.End ?? catchClause.Declaration?.CloseParenToken.Span.End ?? catchClause
 				.CatchKeyword
 				.Span
@@ -749,7 +742,6 @@ internal static partial class Printers
 
 		BeforeContinuation(context.Options.NewLineBeforeFinally, followsABrace: true, context);
 		TokenPrinter.Print(node.Finally.FinallyKeyword, context);
-		// Same reasoning as catch, above.
 		PrintClauseBody(node.Finally.Block, node.Finally.FinallyKeyword.Span.End, context);
 	}
 
@@ -760,8 +752,10 @@ internal static partial class Printers
 	/// format, and Curb moved each brace below its keyword, leaving <c>{ Run(); }</c> on a line of its own
 	/// (issue #235). With <c>csharp_preserve_single_line_statements = false</c> only the <c>try</c> block moves
 	/// down: dotnet format leaves a <c>catch</c> or <c>finally</c> block on its keyword's line whatever either
-	/// preserve option says, which is <see cref="HeaderJoinSurvives"/>'s rule. An empty block keeps the
-	/// <c>{ }</c> rule <see cref="PrintStatementBody"/> gives it.
+	/// preserve option says, which is <see cref="HeaderJoinSurvives"/>'s rule. An empty block written whole on
+	/// its keyword's line keeps the <c>{ }</c> rule <see cref="PrintStatementBody"/> gives it, and so does every
+	/// empty block at a width. With no width, one the author broke is laid out like any other body, as dotnet
+	/// format leaves it: <c>catch</c> then <c>{</c> then <c>}</c> came back as <c>catch { }</c> (issue #364).
 	/// </remarks>
 	private static void PrintClauseBody(BlockSyntax block, int headerEnd, PrintContext context)
 	{
@@ -773,7 +767,7 @@ internal static partial class Printers
 			return;
 		}
 
-		PrintStatementBody(block, BraceStyle.ControlBlocks, context, alwaysJoinsEmpty: true);
+		PrintStatementBody(block, BraceStyle.ControlBlocks, context, alwaysJoinsEmpty: !context.AuthorBroke(headerEnd, block.Span.End));
 	}
 
 	public static void UsingStatement(UsingStatementSyntax node, PrintContext context)

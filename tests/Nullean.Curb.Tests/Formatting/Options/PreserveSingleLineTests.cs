@@ -700,16 +700,17 @@ public class PreserveSingleLineTests : FormattingTest
 		    }
 		}
 		""",
-		// An empty try always collapses regardless of this option — Curb's one unconditional opinion,
-		// see StatementTests' "an empty try, catch or finally is always { }". What this case actually
-		// asserts is that catch still takes its own line rather than joining try's now-collapsed brace.
 		"""
 		public class C
 		{
 		    public void M()
 		    {
-		        try { }
-		        catch (Exception e) { }
+		        try
+		        {
+		        }
+		        catch (Exception e)
+		        {
+		        }
 		    }
 		}
 		""");
@@ -897,9 +898,8 @@ public class PreserveSingleLineTests : FormattingTest
 		editorConfig: "csharp_preserve_single_line_statements = false");
 
 	/// <summary>
-	/// An empty catch is Curb's one unconditional opinion in this family: <c>{ }</c> whatever these
-	/// options say. See <see href="https://github.com/nullean/curb/issues/25">issue #25</see> and
-	/// <c>Printers.Statements.JoinsClauseToBlock</c> for why.
+	/// An empty catch written on its keyword's line stays there whatever these options say, as dotnet
+	/// format leaves it. See <see href="https://github.com/nullean/curb/issues/25">issue #25</see>.
 	/// </summary>
 	[Test]
 	public Task An_empty_catch_stays_collapsed_when_everything_else_expands() => Formats(

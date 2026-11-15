@@ -184,8 +184,12 @@ public class SpacingTests : FormattingTest
 		{
 		    public void M()
 		    {
-		        try { }
-		        catch(Exception e) when(a) { }
+		        try
+		        {
+		        }
+		        catch(Exception e) when(a)
+		        {
+		        }
 		    }
 		}
 		""",
