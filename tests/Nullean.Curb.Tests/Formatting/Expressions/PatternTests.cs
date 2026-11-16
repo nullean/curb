@@ -736,6 +736,255 @@ public class PatternTests : FormattingTest
 		}
 		""");
 
+	// Issue #367: dotnet format puts a property pattern's braces at the indent of the line holding the
+	// first token of what holds the pattern, however deep the scope printing them. In a lambda argument
+	// that is the lambda's line, not a level in from it.
+	[Test]
+	public Task Property_pattern_braces_in_a_lambda_argument_stay_at_the_lambdas_line() => Unchanged(
+		"""
+		using System.Collections.Generic;
+		using System.Linq;
+
+		public class C
+		{
+		    public IEnumerable<object> M(IEnumerable<object> items) =>
+		        items
+		            .Where(item => item is string
+		            {
+		                Length: 1
+		                    or 2,
+		            } s && s != "x")
+		            .ToList();
+		}
+		""");
+
+	// The line is the one holding the `is` expression's first token, or that of the `or` chain, arm or
+	// case label the pattern belongs to, whether the brace follows a type or `is` itself. An `if` or
+	// `while` condition on its keyword's line adds a level; an `else if` does not.
+	[Test]
+	public Task Property_pattern_braces_go_to_the_line_holding_what_holds_the_pattern() => Formats(
+		"""
+		using System.Collections.Generic;
+		using System.Linq;
+
+		public class C
+		{
+		    public bool M(object item, IEnumerable<object> items)
+		    {
+		        Run(item is string
+		                {
+		                    Length: 1,
+		                } && true);
+		        if (true)
+		            Run(item is string
+		                    {
+		                        Length: 1,
+		                    });
+		        Run(1,
+		            x => true &&
+		                 x is string
+		            {
+		                Length: 1,
+		            });
+		        var z = item is
+		            string or string
+		        {
+		            Length: 1,
+		        };
+		        Run(x => x switch
+		        {
+		            string
+		                {
+		                    Length: 1,
+		                } => 1,
+		            _ => 0,
+		        } > 0);
+		        if (item is string
+		        {
+		            Length: 1,
+		        } && true)
+		        {
+		        }
+		        else if (item is string
+		            {
+		                Length: 2,
+		            })
+		        {
+		        }
+		        while (items.Any(x => x is string
+		        {
+		            Length: 1,
+		        } && true))
+		        {
+		        }
+		        while (item != null &&
+		               item is string
+		            {
+		                Length: 1,
+		            })
+		        {
+		        }
+		        switch (item)
+		        {
+		            case string
+		                {
+		                    Length: 1,
+		                } when true:
+		                break;
+		        }
+		        Run(x => x is
+		                {
+		                    Length: 1,
+		                } && true);
+		        Run(x => x is string { Length: 1 } and
+		                {
+		                    Length: 1,
+		                } && true);
+		        Run(x => x is string
+		                {
+		                } && true);
+		        Run(x => x is
+		                { Length: 1 } && true);
+		        return item is string
+		            {
+		                Length: 1,
+		            } && true;
+		    }
+
+		    void Run(object o) { }
+		    void Run(int i, object o) { }
+		}
+		""",
+		"""
+		using System.Collections.Generic;
+		using System.Linq;
+
+		public class C
+		{
+		    public bool M(object item, IEnumerable<object> items)
+		    {
+		        Run(item is string
+		        {
+		            Length: 1,
+		        } && true);
+		        if (true)
+		            Run(item is string
+		            {
+		                Length: 1,
+		            });
+		        Run(1,
+		            x => true &&
+		                 x is string
+		                 {
+		                     Length: 1,
+		                 });
+		        var z = item is
+		            string or string
+		            {
+		                Length: 1,
+		            };
+		        Run(x => x switch
+		        {
+		            string
+		            {
+		                Length: 1,
+		            } => 1,
+		            _ => 0,
+		        } > 0);
+		        if (item is string
+		            {
+		                Length: 1,
+		            } && true)
+		        {
+		        }
+		        else if (item is string
+		        {
+		            Length: 2,
+		        })
+		        {
+		        }
+		        while (items.Any(x => x is string
+		            {
+		                Length: 1,
+		            } && true))
+		        {
+		        }
+		        while (item != null &&
+		               item is string
+		               {
+		                   Length: 1,
+		               })
+		        {
+		        }
+		        switch (item)
+		        {
+		            case string
+		            {
+		                Length: 1,
+		            } when true:
+		                break;
+		        }
+		        Run(x => x is
+		        {
+		            Length: 1,
+		        } && true);
+		        Run(x => x is string { Length: 1 } and
+		        {
+		            Length: 1,
+		        } && true);
+		        Run(x => x is string
+		        {
+		        } && true);
+		        Run(x => x is
+		        { Length: 1 } && true);
+		        return item is string
+		        {
+		            Length: 1,
+		        } && true;
+		    }
+
+		    void Run(object o) { }
+		    void Run(int i, object o) { }
+		}
+		""");
+
+	// With a width the argument breaks onto a line of its own, and the braces stay at that line.
+	[Test]
+	public Task Property_pattern_braces_in_a_broken_argument_sit_at_the_arguments_line() => Formats(
+		"""
+		public class C
+		{
+		    public void N(object item)
+		    {
+		        Run(item is string { Length: 1 or 2, Chars: 3 } && item != null);
+		        Run(x => x is string { Length: 1 or 2, Chars: 3 } && x != null);
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void N(object item)
+		    {
+		        Run(
+		            item is string
+		            {
+		                Length: 1 or 2,
+		                Chars: 3
+		            } && item != null
+		        );
+		        Run(
+		            x => x is string
+		            {
+		                Length: 1 or 2,
+		                Chars: 3
+		            } && x != null
+		        );
+		    }
+		}
+		""",
+		editorConfig: "max_line_length = 50");
+
 	// ---- preservation: a pattern's continuation lines keep the author's offset ----------------------
 
 	// Issue #206: the exception. A subpattern line that starts with a property pattern's brace goes one
