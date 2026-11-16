@@ -42,6 +42,10 @@ internal static class CleanupRun
 	/// Run <c>style</c> and <c>analyzers</c> as two invocations instead of one bare <c>dotnet format</c>,
 	/// from <c>--no-whitespace</c>.
 	/// </param>
+	/// <param name="forwardTool">
+	/// Starts <c>dotnet format</c> with a working directory and arguments, and returns its exit code. Absent
+	/// means the real process; tests hand in one that rewrites a file instead.
+	/// </param>
 	public static int Execute(
 		IFileSystem fileSystem,
 		string target,
@@ -49,7 +53,8 @@ internal static class CleanupRun
 		string[]? logs = null,
 		string[]? explicitFiles = null,
 		bool forward = false,
-		bool separateWhitespace = false
+		bool separateWhitespace = false,
+		Func<string, IReadOnlyList<string>, int>? forwardTool = null
 	)
 	{
 		logs = logs is { Length: > 0 } ? logs : Discover(fileSystem, target);
@@ -324,7 +329,27 @@ internal static class CleanupRun
 		var forwardFailed = false;
 		if (forward)
 		{
-			forwardFailed = Forward(fileSystem.Path.GetFullPath(target), [.. notOurs, .. unfixed], stopwatch.ElapsedMilliseconds, write, separateWhitespace);
+			var root = fileSystem.Path.GetFullPath(target);
+			forwardFailed = Forward(
+				root,
+				[.. notOurs, .. unfixed],
+				stopwatch.ElapsedMilliseconds,
+				write,
+				separateWhitespace,
+				forwardTool ?? Run,
+				out var touched
+			);
+
+			// dotnet format knows nothing of Curb's layout, and a fix removes or adds text: a line that was
+			// long enough to break can be short enough to join afterwards (#372). Put what it was handed back
+			// in Curb's layout, so `curb check` agrees with the files `cleanup --forward` ends on.
+			if (write && touched is not null)
+			{
+				var scope = touched.Length > 0 ? $"{touched.Length} file(s)" : "the target";
+				Console.WriteLine($"  formatting {scope} dotnet format was handed, so they end in Curb's layout");
+				if (FormattingRun.Execute(fileSystem, root, write: true, explicitFiles: touched.Length > 0 ? touched : explicitFiles).ExitCode != 0)
+					forwardFailed = true;
+			}
 		}
 
 		if (failed > 0 || forwardFailed)
@@ -351,9 +376,22 @@ internal static class CleanupRun
 	/// two would each pay for their own workspace load; <c>--no-whitespace</c> asks for the split instead.
 	/// </para>
 	/// </remarks>
-	/// <returns>True when a forwarded invocation failed.</returns>
-	private static bool Forward(string target, IReadOnlyList<CleanupDiagnostic> remainder, long ourMilliseconds, bool write, bool separateWhitespace)
+	/// <returns>
+	/// True when a forwarded invocation failed. <c>touched</c> is the files a write run handed to
+	/// <c>dotnet format</c> as full paths, empty when an invocation was not scoped to files, and null when
+	/// nothing was forwarded.
+	/// </returns>
+	private static bool Forward(
+		string target,
+		IReadOnlyList<CleanupDiagnostic> remainder,
+		long ourMilliseconds,
+		bool write,
+		bool separateWhitespace,
+		Func<string, IReadOnlyList<string>, int> run,
+		out string[]? touched
+	)
 	{
+		touched = null;
 		var plan = ForwardPlan.For(remainder, target, separateWhitespace);
 
 		if (plan.Withheld.Count > 0)
@@ -374,6 +412,9 @@ internal static class CleanupRun
 		if (plan.Invocations.Count == 0)
 			return false;
 
+		var handed = new SortedSet<string>(StringComparer.Ordinal);
+		var unscoped = false;
+
 		var failed = false;
 		var forwardedMilliseconds = 0L;
 
@@ -392,7 +433,11 @@ internal static class CleanupRun
 			Console.WriteLine($"  forwarding {invocation.RuleIds.Count} rule(s) in {scope} " + $"to `{command}`: {string.Join(' ', invocation.RuleIds)}");
 
 			var start = Stopwatch.StartNew();
-			var exitCode = Run(target, arguments);
+			var exitCode = run(target, arguments);
+			if (invocation.Files.Count == 0)
+				unscoped = true;
+			foreach (var file in invocation.Files)
+				handed.Add(Path.GetFullPath(file, target));
 			start.Stop();
 			forwardedMilliseconds += start.ElapsedMilliseconds;
 
@@ -415,6 +460,7 @@ internal static class CleanupRun
 			)
 		);
 
+		touched = unscoped ? [] : [.. handed];
 		return failed;
 	}
 
