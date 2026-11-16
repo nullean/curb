@@ -138,7 +138,7 @@ internal sealed class CurbCommands
 	/// <param name="check">Report what would be fixed, change nothing.</param>
 	/// <param name="forward">
 	/// Hand what Curb cannot fix to <c>dotnet format</c>, scoped to the reported rules and files, and
-	/// report both timings.
+	/// report both timings. Then formats the files it handed over, so they end in Curb's layout.
 	/// </param>
 	/// <param name="noWhitespace">
 	/// With <paramref name="forward"/>, run <c>dotnet format style</c> and <c>dotnet format analyzers</c>

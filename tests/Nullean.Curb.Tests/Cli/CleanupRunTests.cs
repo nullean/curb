@@ -431,4 +431,55 @@ public class CleanupRunTests
 			}
 			""";
 	}
+
+	// #372: dotnet format rewrites a file without knowing Curb's layout, and a fix that shortens a line leaves it
+	// broken where Curb would join it. `--forward` ends by formatting what it handed over.
+	[Test]
+	public async Task Forwarding_ends_with_the_files_it_handed_over_in_curbs_layout()
+	{
+		var fs = Repo("root = true\n\n[*.cs]\nindent_style = tab\nmax_line_length = 140\n");
+
+		const string source = "internal static class C\n{\n\tprivate static string Scrub(string text) => Regex.Replace(text, \"a\", \"{id}\");\n}\n";
+		const string afterFix = "internal static class C\n{\n\tprivate static string Scrub(string text) =>\n\t\tMyRegex.Replace(text, \"{id}\");\n}\n";
+
+		fs.AddFile($"{Root}/C.cs", new MockFileData(source));
+		AddLog(fs, "net10.0", Sarif(source, "warning", [("SYSLIB1045", "Regex.Replace")], "C.cs"));
+		fs.File.SetLastWriteTimeUtc($"{Root}/C.cs", DateTime.UtcNow);
+
+		var invoked = 0;
+		var exitCode = CleanupRun.Execute(
+			fs,
+			Root,
+			write: true,
+			forward: true,
+			forwardTool: (_, _) =>
+			{
+				invoked++;
+				fs.File.WriteAllText($"{Root}/C.cs", afterFix);
+				return 0;
+			}
+		);
+
+		invoked.Should().BeGreaterThan(0, "the diagnostic is one dotnet format is handed");
+		exitCode.Should().Be(0);
+		fs.File.ReadAllText($"{Root}/C.cs").Should().Contain("Scrub(string text) => MyRegex.Replace(text, \"{id}\");");
+
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task A_check_run_forwards_without_formatting_anything()
+	{
+		var fs = Repo("root = true\n\n[*.cs]\nindent_style = tab\n");
+		const string source = "internal static class C\n{\n\tprivate static string Scrub(string text) =>\n\t\tRegex.Replace(text, \"a\", \"{id}\");\n}\n";
+		fs.AddFile($"{Root}/C.cs", new MockFileData(source));
+		AddLog(fs, "net10.0", Sarif(source, "warning", [("SYSLIB1045", "Regex.Replace")], "C.cs"));
+		fs.File.SetLastWriteTimeUtc($"{Root}/C.cs", DateTime.UtcNow);
+
+		CleanupRun.Execute(fs, Root, write: false, forward: true, forwardTool: (_, _) => 0);
+
+		fs.File.ReadAllText($"{Root}/C.cs").Should().Be(source, "--check changes nothing, the formatter included");
+
+		await Task.CompletedTask;
+	}
 }
