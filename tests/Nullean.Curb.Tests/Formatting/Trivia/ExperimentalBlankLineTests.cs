@@ -48,7 +48,8 @@ public class ExperimentalBlankLineTests : FormattingTest
 		        Call();
 		    }
 		}
-		""");
+		""",
+		editorConfig: LegacyBlankLines);
 
 	[Test]
 	public Task IDE2002_no_blank_line_between_consecutive_braces() => Formats(
@@ -76,7 +77,8 @@ public class ExperimentalBlankLineTests : FormattingTest
 		        }
 		    }
 		}
-		""");
+		""",
+		editorConfig: LegacyBlankLines);
 
 	[Test]
 	public Task IDE2004_no_blank_line_after_a_constructor_initializer_colon() => Formats(

@@ -1085,12 +1085,12 @@ public readonly record struct FormatOptions
 
 	/// <summary>
 	/// <c>csharp_keep_blank_lines_in_declarations</c>: how many consecutive blank lines survive
-	/// between members. One by default, which is the collapsing Curb has always done.
+	/// between members. Every one by default, as <c>dotnet format</c> keeps them; set 1 to collapse a run.
 	/// </summary>
-	public int KeepBlankLinesInDeclarations { get; init; } = 1;
+	public int KeepBlankLinesInDeclarations { get; init; } = int.MaxValue;
 
 	/// <summary><c>csharp_keep_blank_lines_in_code</c>, the same between statements.</summary>
-	public int KeepBlankLinesInCode { get; init; } = 1;
+	public int KeepBlankLinesInCode { get; init; } = int.MaxValue;
 
 	/// <summary>
 	/// <c>csharp_blank_lines_around_invocable</c>: how many blank lines a method or constructor is
@@ -1249,22 +1249,22 @@ public readonly record struct FormatOptions
 	/// <summary>
 	/// <c>csharp_remove_blank_lines_near_braces_in_declarations</c>: whether the exact-zero force
 	/// <see cref="BlankLinesInsideType"/>/<see cref="BlankLinesInsideNamespace"/> apply by default
-	/// actually runs. True by default, matching jb — set false to fall back to floor-and-cap
-	/// preservation of whatever the author wrote there instead (the same shape every other member in
-	/// the family uses), rather than stripping it unconditionally.
+	/// actually runs. False by default, as <c>dotnet format</c> leaves a blank line there; set true, matching jb, to force the
+	/// exact count instead of floor-and-cap preservation of whatever the author wrote.
 	/// </summary>
-	public bool RemoveBlankLinesNearBracesInDeclarations { get; init; } = true;
+	public bool RemoveBlankLinesNearBracesInDeclarations { get; init; } = false;
 
 	/// <summary>
 	/// <c>csharp_remove_blank_lines_near_braces_in_code</c>: the same, for the gap between a block's
-	/// opening brace and its first statement. True by default, matching jb — measured as a genuine
+	/// opening brace and its first statement. False by default, as <c>dotnet format</c> leaves them (#368); true
+	/// matches jb — measured as a genuine
 	/// default-behaviour gap, not merely a jb opinion: a blank line directly under an opening brace
 	/// reads as accidental rather than deliberate, the identical reasoning that already changed
 	/// <see cref="BlankLinesInsideType"/>'s own default this same family of changes. Curb previously
 	/// preserved it here (while already stripping the symmetric gap before the closing brace), an
 	/// inconsistency this closes.
 	/// </summary>
-	public bool RemoveBlankLinesNearBracesInCode { get; init; } = true;
+	public bool RemoveBlankLinesNearBracesInCode { get; init; } = false;
 
 	// csharp_blank_lines_after_start_comment and csharp_blank_lines_between_using_groups are not
 	// implemented. The first measured as *not* controlled by the key at all in a direct jb check — a

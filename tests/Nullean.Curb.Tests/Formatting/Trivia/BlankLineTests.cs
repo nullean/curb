@@ -48,7 +48,8 @@ public class BlankLineTests : FormattingTest
 
 		    public int Second;
 		}
-		""");
+		""",
+		editorConfig: LegacyBlankLines);
 
 	[Test]
 	public Task Members_with_no_blank_line_stay_adjacent() => Unchanged(
@@ -61,7 +62,7 @@ public class BlankLineTests : FormattingTest
 		""");
 
 	[Test]
-	public Task A_blank_line_after_an_opening_brace_is_dropped() => Formats(
+	public Task A_blank_line_after_an_opening_brace_is_dropped_when_asked() => Formats(
 		// csharp_blank_lines_inside_type defaults to zero and is forced rather than merely floored
 		// (see BlankLineOptionTests), so — unlike most of this family — the author's blank line here
 		// does not survive by default; a blank line directly under an opening brace reads as
@@ -78,10 +79,11 @@ public class BlankLineTests : FormattingTest
 		{
 		    public int Value;
 		}
-		""");
+		""",
+		editorConfig: LegacyBlankLines);
 
 	[Test]
-	public Task A_blank_line_before_a_closing_brace_is_dropped() => Formats(
+	public Task A_blank_line_before_a_closing_brace_is_dropped_when_asked() => Formats(
 		"""
 		public class C
 		{
@@ -97,7 +99,8 @@ public class BlankLineTests : FormattingTest
 		{
 		    public int Value;
 		}
-		""");
+		""",
+		editorConfig: LegacyBlankLines);
 
 	[Test]
 	public Task A_blank_line_between_statements_is_kept() => Unchanged(
@@ -138,7 +141,8 @@ public class BlankLineTests : FormattingTest
 		        Second();
 		    }
 		}
-		""");
+		""",
+		editorConfig: LegacyBlankLines);
 
 	[Test]
 	public Task A_blank_line_between_using_directives_is_kept() => Unchanged(
@@ -160,7 +164,7 @@ public class BlankLineTests : FormattingTest
 		""");
 
 	[Test]
-	public Task Leading_blank_lines_in_a_file_are_dropped() => Formats(
+	public Task Leading_blank_lines_in_a_file_are_dropped_when_asked() => Formats(
 		"""
 
 
@@ -169,7 +173,8 @@ public class BlankLineTests : FormattingTest
 		// Same shape: dotnet format keeps them, never adds them, and leaves the trimmed file alone.
 		"""
 		using System;
-		""");
+		""",
+		editorConfig: LegacyBlankLines);
 
 	[Test]
 	public Task Trailing_blank_lines_collapse_to_the_final_newline() => Formats(
@@ -314,7 +319,8 @@ public class BlankLineTests : FormattingTest
 
 		    private void Use(int a, int b) { }
 		}
-		""");
+		""",
+		editorConfig: LegacyBlankLines);
 
 	[Test]
 	public Task A_blank_line_after_a_commented_list_member_is_kept() => Unchanged(
