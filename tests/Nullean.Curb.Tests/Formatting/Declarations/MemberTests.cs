@@ -651,4 +651,119 @@ public class MemberTests : FormattingTest
 		    public int P() => 1;
 		}
 		""");
+
+	// Issue #365: a break the author put between a member's type and its name stays, at the column they gave
+	// the name, moved as far as the type's line moved. So does one in a local declaration or local function.
+	[Test]
+	public Task A_break_between_a_type_and_its_name_is_kept() => Formats(
+		"""
+		using System.Collections.Generic;
+
+		public class C
+		{
+		    private static IEnumerable<(string Name, int Value)>
+		        Find() =>
+		        new List<(string, int)>();
+
+		      public static IEnumerable<int>
+		          Many(int a,
+		               int b)
+		      {
+		            int
+		                x = 1;
+
+		            IEnumerable<int>
+		                Local() => null;
+		      }
+
+		    public int // the count
+		        Count => 1;
+
+		    public int
+		        this[int i] => i;
+
+		    public static C
+		        operator +(C a, C b) => a;
+
+		    public int
+		        Field;
+
+		    public event System.Action
+		        Changed;
+
+		    public delegate int
+		        D();
+		}
+		""",
+		"""
+		using System.Collections.Generic;
+
+		public class C
+		{
+		    private static IEnumerable<(string Name, int Value)>
+		        Find() =>
+		        new List<(string, int)>();
+
+		    public static IEnumerable<int>
+		        Many(int a,
+		             int b)
+		    {
+		        int
+		            x = 1;
+
+		        IEnumerable<int>
+		            Local() => null;
+		    }
+
+		    public int // the count
+		        Count => 1;
+
+		    public int
+		        this[int i] => i;
+
+		    public static C
+		        operator +(C a, C b) => a;
+
+		    public int
+		        Field;
+
+		    public event System.Action
+		        Changed;
+
+		    public delegate int
+		        D();
+		}
+		""");
+
+	[Test]
+	public Task A_type_and_its_name_are_joined_under_a_width() => Formats(
+		"""
+		using System.Collections.Generic;
+
+		public class C
+		{
+		    private static IEnumerable<(string Name, int Value)>
+		        Find() =>
+		        new List<(string, int)>();
+
+		    public int
+		        Count => 1;
+
+		    public int
+		        Field;
+		}
+		""",
+		"""
+		using System.Collections.Generic;
+
+		public class C
+		{
+		    private static IEnumerable<(string Name, int Value)> Find() => new List<(string, int)>();
+
+		    public int Count => 1;
+
+		    public int Field;
+		}
+		""",
+		editorConfig: "max_line_length = 120");
 }

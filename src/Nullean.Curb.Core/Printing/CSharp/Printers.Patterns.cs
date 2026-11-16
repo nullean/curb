@@ -507,9 +507,26 @@ internal static partial class Printers
 
 	public static void ParenthesizedPattern(ParenthesizedPatternSyntax node, PrintContext context)
 	{
+		// A break the author put just inside the parentheses stays at the offset they gave the line, as a
+		// parenthesized expression's does. Curb joined it (issue #366).
+		var afterOpen = context.AuthorBroke(node.OpenParenToken.Span.End, node.Pattern.SpanStart);
+		var beforeClose = context.AuthorBroke(node.Pattern.Span.End, node.CloseParenToken.SpanStart);
+		var anchor = EnterPatternContinuation(afterOpen || beforeClose, context);
+
 		TokenPrinter.Print(node.OpenParenToken, context);
-		Node.Print(node.Pattern, context);
+		if (afterOpen)
+		{
+			GapBeforePattern(node.OpenParenToken, node.Pattern, anchor, joinsBraceUnderNone: false, context);
+			using (context.Arena.AlignedIndent(anchor, context.SourceIndent(node.Pattern.SpanStart)))
+				Node.Print(node.Pattern, context);
+		}
+		else
+			Node.Print(node.Pattern, context);
+
+		if (beforeClose)
+			ContinuationLine(node.CloseParenToken, anchor, context);
 		TokenPrinter.Print(node.CloseParenToken, context);
+		ExitPatternContinuation(anchor, context);
 	}
 
 	public static void DeclarationExpression(DeclarationExpressionSyntax node, PrintContext context)

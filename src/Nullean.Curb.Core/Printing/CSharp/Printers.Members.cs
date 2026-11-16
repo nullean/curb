@@ -104,8 +104,7 @@ internal static partial class Printers
 
 		PrintAttributeLists(node.AttributeLists, context);
 		PrintModifiers(node.Modifiers, context);
-		Node.Print(node.ReturnType, context);
-		arena.Synthetic(SyntheticText.Space);
+		DeclarationType(node.ReturnType, context);
 		TokenPrinter.Print(node.OperatorKeyword, context);
 		arena.Synthetic(SyntheticText.Space);
 
@@ -184,8 +183,7 @@ internal static partial class Printers
 
 		PrintAttributeLists(node.AttributeLists, context);
 		PrintModifiers(node.Modifiers, context);
-		Node.Print(node.Type, context);
-		arena.Synthetic(SyntheticText.Space);
+		DeclarationType(node.Type, context);
 
 		if (node.ExplicitInterfaceSpecifier is not null)
 			Tokens(node.ExplicitInterfaceSpecifier, context);
@@ -492,8 +490,7 @@ internal static partial class Printers
 		PrintModifiers(node.Modifiers, context);
 		TokenPrinter.Print(node.DelegateKeyword, context);
 		arena.Synthetic(SyntheticText.Space);
-		Node.Print(node.ReturnType, context);
-		arena.Synthetic(SyntheticText.Space);
+		DeclarationType(node.ReturnType, context);
 		TokenPrinter.Print(node.Identifier, context);
 
 		if (node.TypeParameterList is not null)

@@ -568,8 +568,7 @@ internal static partial class Printers
 
 		PrintAttributeLists(node.AttributeLists, context);
 		PrintModifiers(node.Modifiers, context);
-		Node.Print(node.ReturnType, context);
-		arena.Synthetic(SyntheticText.Space);
+		DeclarationType(node.ReturnType, context);
 
 		if (node.ExplicitInterfaceSpecifier is not null)
 			Tokens(node.ExplicitInterfaceSpecifier, context);
@@ -1071,35 +1070,66 @@ internal static partial class Printers
 	}
 
 	/// <summary>
-	/// A parameter's attributes, with the rest of the parameter on the line below them where the author
-	/// put it there, at the column they gave it. Returns the register that cost, or -1.
+	/// A parameter's attributes, each section and the rest of the parameter on a line of its own where the
+	/// author put it there, at the column they gave it. Returns the register that cost, or -1.
 	/// </summary>
 	/// <remarks>
-	/// The column moves only as far as the attributes' line moved, as dotnet format moves it. Joining the
-	/// two lengthened a line the author had wrapped on purpose. The caller owes
-	/// <see cref="PrintContext.ExitContinuation"/> for a register it was given.
+	/// Joining them lengthened a line the author had wrapped on purpose (issues #257, #363). Those lines do not
+	/// move with the parameter's first line: dotnet format leaves them at their own column, however far that
+	/// line moved. The caller owes <see cref="PrintContext.ExitContinuation"/> for a register it was given.
 	/// </remarks>
 	private static int AttributesAsWritten(SyntaxList<AttributeListSyntax> attributeLists, PrintContext context)
 	{
 		if (attributeLists.Count == 0)
 			return -1;
 
-		var last = attributeLists[^1].GetLastToken();
-		var rest = last.GetNextToken();
-		if (!context.AuthorBroke(last.Span.End, rest.SpanStart))
+		var first = attributeLists[0];
+		var rest = attributeLists[^1].GetLastToken().GetNextToken();
+		if (!context.AuthorBroke(first.Span.End, rest.SpanStart))
 		{
 			PrintInlineAttributeLists(attributeLists, context);
 			return -1;
 		}
 
-		foreach (var attributeList in attributeLists)
-			Node.Print(attributeList, context);
+		var register = context.EnterContinuation();
+		context.Arena.SourceColumnAnchor(register);
+		Node.Print(first, context);
+		for (var i = 1; i < attributeLists.Count; i++)
+		{
+			// Sections that share a line stay glued, as PrintInlineAttributeLists glues them.
+			LineAsWritten(attributeLists[i - 1].Span.End, attributeLists[i].GetFirstToken(), register, context);
+			Node.Print(attributeLists[i], context);
+		}
 
-		// Captured once the attributes are written, so it measures their line rather than the one below.
+		if (!LineAsWritten(attributeLists[^1].Span.End, rest, register, context))
+			context.Arena.Synthetic(SyntheticText.Space);
+		return register;
+	}
+
+	/// <summary>
+	/// A declaration's type and the space after it, or the line the author broke there, at the column they
+	/// gave what follows, moved as far as the type's line moved.
+	/// </summary>
+	/// <remarks>
+	/// dotnet format leaves a break between a member's type and its name alone, and Curb joined it
+	/// (issue #365). The register is captured before the type, as a trailing comment after it leaves no
+	/// line open to measure. Under deterministic layout nothing is broken as written, so this is the space.
+	/// </remarks>
+	private static void DeclarationType(TypeSyntax type, PrintContext context)
+	{
+		var next = type.GetLastToken().GetNextToken();
+		if (!context.AuthorBroke(type.Span.End, next.SpanStart))
+		{
+			Node.Print(type, context);
+			context.Arena.Synthetic(SyntheticText.Space);
+			return;
+		}
+
 		var register = context.EnterContinuation();
 		context.Arena.LineShiftAnchor(register);
-		ContinuationLine(rest, register, context);
-		return register;
+		Node.Print(type, context);
+		ContinuationLine(next, register, context);
+		context.ExitContinuation();
 	}
 
 	public static void Block(BlockSyntax node, PrintContext context)

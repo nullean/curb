@@ -1345,4 +1345,84 @@ public class PatternTests : FormattingTest
 		}
 		""",
 		editorConfig: "max_line_length = 40\ncsharp_trailing_comma_in_multiline_lists = true");
+
+	// Issue #366: a break just inside a parenthesized pattern's parentheses stays at the offset the author gave
+	// the line, moved as far as the line the pattern starts on moved, as a parenthesized expression's does.
+	[Test]
+	public Task A_break_inside_a_parenthesized_pattern_is_kept() => Formats(
+		"""
+		public class C
+		{
+		    public bool M(int code, object o)
+		    {
+		        if (code is not (
+		            1
+		            or 2))
+		        {
+		            return false;
+		        }
+
+		          if (code is (1
+		              or 2
+		              ))
+		          {
+		          }
+
+		        return o is not (
+		                string
+		                or null
+		            );
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public bool M(int code, object o)
+		    {
+		        if (code is not (
+		            1
+		            or 2))
+		        {
+		            return false;
+		        }
+
+		        if (code is (1
+		            or 2
+		            ))
+		        {
+		        }
+
+		        return o is not (
+		                string
+		                or null
+		            );
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_parenthesized_pattern_is_joined_under_a_width() => Formats(
+		"""
+		public class C
+		{
+		    public bool M(int code)
+		    {
+		        return code is not (
+		            1
+		            or 2
+		            );
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public bool M(int code)
+		    {
+		        return code is not (1 or 2);
+		    }
+		}
+		""",
+		editorConfig: "max_line_length = 120");
 }
