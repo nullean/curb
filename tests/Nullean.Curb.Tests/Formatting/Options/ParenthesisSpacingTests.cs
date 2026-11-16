@@ -164,8 +164,12 @@ public class ParenthesisSpacingTests : FormattingTest
 		        }
 		        while ( a );
 
-		        try { }
-		        catch ( Exception e ) when ( a ) { }
+		        try
+		        {
+		        }
+		        catch ( Exception e ) when ( a )
+		        {
+		        }
 		    }
 		}
 		""",

@@ -206,180 +206,54 @@ public class StatementTests : FormattingTest
 		}
 		""");
 
-	// ---- an empty try, catch or finally is always `{ }` --------------------------------------
+	// ---- an empty try, catch or finally ------------------------------------------------------
 
 	/// <summary>
-	/// Curb's one unconditional opinion in this family: an empty <c>try</c>/<c>catch</c>/<c>finally</c>
-	/// is always <c>{ }</c>, whatever the source had and whatever the preserve options say. Unlike a
-	/// non-empty clause (below), this is <em>not</em> matching dotnet format — dotnet format is lazy
-	/// about all three in every direction, so there is nothing of its to match, and <c>{ }</c> reads
-	/// better than the alternative either way. The one exception is an empty <c>try</c> under
-	/// <c>csharp_preserve_single_line_statements = false</c>, which dotnet format does split — see
-	/// <see cref="An_empty_try_stays_off_its_keyword_when_statements_are_not_preserved"/>.
-	/// See <see href="https://github.com/nullean/curb/issues/25">issue #25</see>.
+	/// With no width, an empty <c>try</c>/<c>catch</c>/<c>finally</c> block is laid out as the author wrote it, as
+	/// dotnet format leaves it: opened out stays opened out, and <c>{ }</c> on a line of its own stays there. Curb
+	/// joined both to their keyword as <c>{ }</c> (issue #364). With a width, the block is always <c>{ }</c> on its
+	/// keyword's line, which dotnet format keeps too.
 	/// </summary>
 	[Test]
-	public Task An_empty_try_the_author_expanded_still_collapses() => Formats(
-		"""
-		public class C
-		{
-		    public void M()
-		    {
-		        try
-		        {
-		        }
-		        finally
-		        {
-		            Cleanup();
-		        }
-		    }
-		}
-		""",
+	public Task Empty_try_catch_and_finally_blocks_the_author_opened_out_stay_opened_out() => Unchanged(OpenedOutEmptyClauses);
+
+	[Test]
+	public Task Empty_try_catch_and_finally_blocks_join_their_keyword_at_a_width() => Formats(
+		OpenedOutEmptyClauses,
 		"""
 		public class C
 		{
 		    public void M()
 		    {
 		        try { }
-		        finally
-		        {
-		            Cleanup();
-		        }
-		    }
-		}
-		""");
-
-	// dotnet format moves `try { }` apart with statements off but leaves `catch { }` and `finally { }`.
-	[Test]
-	public Task An_empty_try_stays_off_its_keyword_when_statements_are_not_preserved() => Formats(
-		"""
-		public class C
-		{
-		    public void M()
-		    {
+		        finally { }
 		        try
 		        {
+		            Call();
 		        }
-		        catch
-		        {
-		        }
-		    }
-		}
-		""",
-		"""
-		public class C
-		{
-		    public void M()
-		    {
-		        try
-		        {
-		        }
+		        catch (IOException ex) when (ex.HResult != 0) { }
+		        catch (Exception e) { }
 		        catch { }
-		    }
-		}
-		""",
-		editorConfig: "csharp_preserve_single_line_statements = false");
-
-	[Test]
-	public Task An_empty_catch_the_author_expanded_still_collapses() => Formats(
-		"""
-		public class C
-		{
-		    public void M()
-		    {
-		        try
-		        {
-		            Call();
-		        }
-		        catch
-		        {
-		        }
-		    }
-		}
-		""",
-		"""
-		public class C
-		{
-		    public void M()
-		    {
-		        try
-		        {
-		            Call();
-		        }
-		        catch { }
-		    }
-		}
-		""");
-
-	[Test]
-	public Task An_empty_finally_the_author_expanded_still_collapses() => Formats(
-		"""
-		public class C
-		{
-		    public void M()
-		    {
-		        try
-		        {
-		            Call();
-		        }
-		        finally
-		        {
-		        }
-		    }
-		}
-		""",
-		"""
-		public class C
-		{
-		    public void M()
-		    {
-		        try
-		        {
-		            Call();
-		        }
+		        finally { }
+		        try { }
+		        catch (Exception e) { }
 		        finally { }
 		    }
 		}
-		""");
-
-	[Test]
-	public Task An_empty_catch_with_a_declaration_still_collapses() => Formats(
-		"""
-		public class C
-		{
-		    public void M()
-		    {
-		        try
-		        {
-		            Call();
-		        }
-		        catch (Exception e)
-		        {
-		        }
-		    }
-		}
 		""",
-		"""
+		editorConfig: "max_line_length = 120");
+
+	private const string OpenedOutEmptyClauses = """
 		public class C
 		{
 		    public void M()
 		    {
 		        try
 		        {
-		            Call();
 		        }
-		        catch (Exception e) { }
-		    }
-		}
-		""");
-
-	[Test]
-	public Task An_empty_catch_with_a_declaration_and_filter_still_collapses() => Formats(
-		"""
-		public class C
-		{
-		    public void M()
-		    {
+		        finally
+		        {
+		        }
 		        try
 		        {
 		            Call();
@@ -387,6 +261,37 @@ public class StatementTests : FormattingTest
 		        catch (IOException ex) when (ex.HResult != 0)
 		        {
 		        }
+		        catch (Exception e)
+		        {
+		        }
+		        catch
+		        {
+		        }
+		        finally
+		        {
+		        }
+		        try
+		        { }
+		        catch (Exception e)
+		        { }
+		        finally
+		        { }
+		    }
+		}
+		""";
+
+	// dotnet format opens out a `{ }` on a line of its own under csharp_preserve_single_line_blocks = false.
+	[Test]
+	public Task An_empty_clause_block_below_its_keyword_opens_out_when_blocks_are_not_preserved() => Formats(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        try
+		        { }
+		        catch
+		        { }
 		    }
 		}
 		""",
@@ -397,13 +302,80 @@ public class StatementTests : FormattingTest
 		    {
 		        try
 		        {
-		            Call();
 		        }
-		        catch (IOException ex) when (ex.HResult != 0) { }
+		        catch
+		        {
+		        }
+		    }
+		}
+		""",
+		editorConfig: "csharp_preserve_single_line_blocks = false");
+
+	// An empty block opened on its keyword's line takes its brace down, as a non-empty one does.
+	[Test]
+	public Task An_empty_clause_block_opened_on_its_keyword_line_moves_its_brace_down() => Formats(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        try {
+		        }
+		        catch (Exception e) {
+		        }
+		        finally {
+		        }
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        try
+		        {
+		        }
+		        catch (Exception e)
+		        {
+		        }
+		        finally
+		        {
+		        }
 		    }
 		}
 		""");
 
+	// dotnet format moves `try { }` off its keyword with statements off but leaves `catch { }` and `finally { }`.
+	[Test]
+	public Task An_empty_try_stays_off_its_keyword_when_statements_are_not_preserved() => Formats(
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        try { }
+		        catch { }
+		        finally { }
+		    }
+		}
+		""",
+		"""
+		public class C
+		{
+		    public void M()
+		    {
+		        try
+		        { }
+		        catch { }
+		        finally { }
+		    }
+		}
+		""",
+		editorConfig: "csharp_preserve_single_line_statements = false");
+
+	// One the author wrote on its keyword's line stays there even with both preserve options off, as dotnet
+	// format leaves it (issue #25).
 	[Test]
 	public Task An_empty_catch_stays_collapsed_with_both_preserve_options_off() => Unchanged(
 		"""
@@ -416,6 +388,7 @@ public class StatementTests : FormattingTest
 		            Call();
 		        }
 		        catch { }
+		        finally { }
 		    }
 		}
 		""",
@@ -423,9 +396,6 @@ public class StatementTests : FormattingTest
 		csharp_preserve_single_line_blocks = false
 		csharp_preserve_single_line_statements = false
 		""");
-
-	// A non-empty catch or finally is untouched by this: PrintStatementBody's alwaysJoinsEmpty is
-	// ignored once the block is not empty, so behaviour there is exactly what it was before.
 
 	// ---- local declarations -------------------------------------------------------------------
 
