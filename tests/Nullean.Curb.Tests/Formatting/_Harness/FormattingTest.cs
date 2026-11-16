@@ -27,6 +27,14 @@ namespace Nullean.Curb.Tests.Formatting;
 public abstract class FormattingTest
 {
 	/// <summary>
+	/// The blank-line settings Curb defaulted to before it agreed with <c>dotnet format</c> and kept what the author wrote:
+	/// collapse a run to one, and drop a blank line directly inside a brace. For the tests of those behaviours.
+	/// </summary>
+	protected const string LegacyBlankLines =
+		"csharp_keep_blank_lines_in_declarations = 1\ncsharp_keep_blank_lines_in_code = 1\n" +
+		"csharp_remove_blank_lines_near_braces_in_declarations = true\ncsharp_remove_blank_lines_near_braces_in_code = true";
+
+	/// <summary>
 	/// Asserts that <paramref name="source"/> formats to <paramref name="expected"/>, ignoring the
 	/// trailing newline.
 	/// </summary>

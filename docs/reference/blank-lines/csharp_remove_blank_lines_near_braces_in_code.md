@@ -55,6 +55,7 @@ namespace N;
 
 public class Widget
 {
+
     private int _x;
 
     public void Run()
@@ -101,6 +102,7 @@ namespace N;
 
 public class Widget
 {
+
     private int _x;
 
     public void Run()

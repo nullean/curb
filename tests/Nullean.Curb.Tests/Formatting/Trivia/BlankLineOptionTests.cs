@@ -12,8 +12,9 @@ namespace Nullean.Curb.Tests.Formatting.Trivia;
 /// time.
 /// </para>
 /// <para>
-/// The defaults reproduce exactly what Curb did before they existed — a cap of one and no minimum —
-/// so no repository moves by adopting a version that has them.
+/// The defaults keep every blank line the author wrote, as <c>dotnet format</c> does, and add none beyond the
+/// minimums below. The collapsing Curb did before (a cap of one, nothing kept directly inside a brace) is
+/// opted into with the keys these tests set through <see cref="FormattingTest.LegacyBlankLines"/>.
 /// </para>
 /// </remarks>
 public class BlankLineOptionTests : FormattingTest
@@ -41,8 +42,33 @@ public class BlankLineOptionTests : FormattingTest
 
 	// ---- the defaults -----------------------------------------------------------------------------
 
+	// #368: dotnet format removes and collapses no blank line, so with none of these keys set Curb keeps all of
+	// them, the ones at the start of a file and just inside braces included.
 	[Test]
-	public Task A_run_of_blank_lines_collapses_to_one_by_default() => Formats(
+	public Task Every_blank_line_the_author_wrote_is_kept_by_default() => Unchanged(
+		"""
+
+		namespace N;
+
+		public class C
+		{
+
+		    public void M()
+		    {
+
+		        var x = 1;
+
+
+
+		        var y = x;
+
+		    }
+
+		}
+		""");
+
+	[Test]
+	public Task A_run_of_blank_lines_collapses_to_one_when_asked() => Formats(
 		Source,
 		"""
 		public class C
@@ -60,7 +86,8 @@ public class BlankLineOptionTests : FormattingTest
 		    {
 		    }
 		}
-		""");
+		""",
+		editorConfig: LegacyBlankLines);
 
 	// ---- keeping more, or fewer -------------------------------------------------------------------
 
@@ -85,7 +112,7 @@ public class BlankLineOptionTests : FormattingTest
 		    }
 		}
 		""",
-		editorConfig: "csharp_keep_blank_lines_in_declarations = 2");
+		editorConfig: LegacyBlankLines + "\ncsharp_keep_blank_lines_in_declarations = 2");
 
 	[Test]
 	public Task Code_can_keep_none() => Formats(
@@ -106,7 +133,7 @@ public class BlankLineOptionTests : FormattingTest
 		    }
 		}
 		""",
-		editorConfig: "csharp_keep_blank_lines_in_code = 0");
+		editorConfig: LegacyBlankLines + "\ncsharp_keep_blank_lines_in_code = 0");
 
 	// ---- asking for lines the author did not write --------------------------------------------------
 
@@ -132,7 +159,7 @@ public class BlankLineOptionTests : FormattingTest
 		    }
 		}
 		""",
-		editorConfig: "csharp_blank_lines_around_invocable = 1");
+		editorConfig: LegacyBlankLines + "\ncsharp_blank_lines_around_invocable = 1");
 
 	[Test]
 	public Task A_minimum_never_exceeds_the_cap() => Formats(
@@ -157,7 +184,7 @@ public class BlankLineOptionTests : FormattingTest
 		    }
 		}
 		""",
-		editorConfig: "csharp_blank_lines_around_invocable = 2\ncsharp_keep_blank_lines_in_declarations = 1");
+		editorConfig: LegacyBlankLines + "\ncsharp_blank_lines_around_invocable = 2\ncsharp_keep_blank_lines_in_declarations = 1");
 
 	[Test]
 	public Task Fields_types_and_properties_have_their_own_settings() => Formats(
@@ -199,7 +226,7 @@ public class BlankLineOptionTests : FormattingTest
 		    private int _a;
 		}
 		""",
-		editorConfig: "csharp_blank_lines_inside_type = 1");
+		editorConfig: LegacyBlankLines + "\ncsharp_blank_lines_inside_type = 1");
 
 	[Test]
 	public Task Types_have_their_own_setting() => Unchanged(
@@ -521,9 +548,9 @@ public class BlankLineOptionTests : FormattingTest
 	// ---- removing blank lines directly under an opening brace ---------------------------------------
 
 	[Test]
-	public Task A_blank_line_under_a_block_s_opening_brace_is_removed_by_default() => Formats(
-		// csharp_remove_blank_lines_near_braces_in_code defaults to true, matching jb: a blank line an
-		// author left directly under `{` reads as accidental rather than deliberate.
+	public Task A_blank_line_under_a_block_s_opening_brace_is_removed_when_asked() => Formats(
+		// csharp_remove_blank_lines_near_braces_in_code = true, the jb setting: a blank line an author left
+		// directly under `{` reads as accidental rather than deliberate. Off by default, like dotnet format.
 		"""
 		public class C
 		{
@@ -542,7 +569,8 @@ public class BlankLineOptionTests : FormattingTest
 		        Call();
 		    }
 		}
-		""");
+		""",
+		editorConfig: LegacyBlankLines);
 
 	[Test]
 	public Task A_block_can_keep_its_blank_line_under_the_opening_brace() => Unchanged(

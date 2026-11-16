@@ -653,7 +653,7 @@ public class CommentTests : FormattingTest
 		}
 		""",
 		"public class C\n{ // opener\n  // legacy\n\tpublic int First;\n}",
-		editorConfig: "indent_style = tab\ntab_width = 4\nindent_size = 4");
+		editorConfig: LegacyBlankLines + "\nindent_style = tab\ntab_width = 4\nindent_size = 4");
 
 	[Test]
 	public Task A_tab_indented_comment_under_a_trailing_comment_aligns_under_it() => Formats(

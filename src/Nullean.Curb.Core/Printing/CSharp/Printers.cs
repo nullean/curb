@@ -25,6 +25,7 @@ internal static partial class Printers
 		var previousEnd = -1;
 
 		PrintFileHeader(node, context);
+		KeepBlankLinesAtStartOfFile(node, context);
 
 		// Source order is externs, then usings, then assembly-level attributes, then members.
 		// Emitting the attributes first reorders the file, which the content verifier rightly
@@ -550,6 +551,16 @@ internal static partial class Printers
 					);
 				}
 				TokenPrinter.PrintLeadingTrivia(node.CloseBraceToken, context, trailingBreak: false);
+			}
+			else if (!context.Options.RemoveBlankLinesNearBracesInDeclarations && previousEnd >= 0)
+			{
+				// A blank line the author left above the closing brace, when nothing is asked to remove it.
+				var kept = context.DeclarationSeparation(previousEnd, node.CloseBraceToken.SpanStart);
+				if (kept > 0)
+				{
+					arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
+					context.BlankLines(kept);
+				}
 			}
 		}
 
@@ -1199,7 +1210,11 @@ internal static partial class Printers
 						// The statement-level minimum is skipped, not merely floored to it, when a comment
 						// sits in front — see NextStartsWithComment for why forcing one in there is unsafe
 						// regardless of what the comment turns out to be.
-						var minimum = NextStartsWithComment(statementFirstToken) ? 0 : StatementSeparationMinimum(previousStatement, statement, context);
+						// Nothing is forced under the opening brace either: a minimum is about the gap to a neighbouring
+						// statement, and there is none, so only the author's own blank line (capped) survives there.
+						var minimum = previousStatement is null || NextStartsWithComment(statementFirstToken)
+							? 0
+							: StatementSeparationMinimum(previousStatement, statement, context);
 						context.BlankLines(context.CodeSeparation(previousEnd, start, minimum));
 					}
 				}
@@ -1221,6 +1236,16 @@ internal static partial class Printers
 						arena.HardLine();
 				}
 				TokenPrinter.PrintLeadingTrivia(node.CloseBraceToken, context, trailingBreak: false);
+			}
+			else if (!context.Options.RemoveBlankLinesNearBracesInCode && previousStatement is not null)
+			{
+				// A blank line the author left above the closing brace, when nothing is asked to remove it.
+				var kept = context.CodeSeparation(previousEnd, node.CloseBraceToken.SpanStart);
+				if (kept > 0)
+				{
+					arena.HardLine(DocFlags.OnlyIfNotAtLineStart);
+					context.BlankLines(kept);
+				}
 			}
 		}
 
@@ -3014,6 +3039,34 @@ internal static partial class Printers
 	/// the next run finds no directives at the top to defer to: leaving the header alone on this run
 	/// meant the next one rewrote it.
 	/// </remarks>
+	/// <summary>
+	/// The blank lines a file opens with, kept as dotnet format keeps them (#368) unless
+	/// <c>csharp_remove_blank_lines_near_braces_in_declarations</c> asks for them gone. Only when nothing else
+	/// owns that trivia: a header template, the using organiser, a comment or a directive.
+	/// </summary>
+	private static void KeepBlankLinesAtStartOfFile(CompilationUnitSyntax node, PrintContext context)
+	{
+		if (context.Options.RemoveBlankLinesNearBracesInDeclarations || context.Options.FileHeaderTemplate is not null)
+			return;
+
+		var first = node.GetFirstToken(includeZeroWidth: true);
+		if (first.IsKind(SyntaxKind.EndOfFileToken) || UsingOrganiserOwnsLeadingTrivia(node, first, context))
+			return;
+
+		var blank = 0;
+		foreach (var trivia in first.LeadingTrivia)
+		{
+			if (trivia.IsKind(SyntaxKind.EndOfLineTrivia))
+				blank++;
+			else if (!trivia.IsKind(SyntaxKind.WhitespaceTrivia))
+				return;
+		}
+
+		blank = Math.Min(blank, context.Options.KeepBlankLinesInDeclarations);
+		if (blank > 0)
+			context.BlankLines(blank);
+	}
+
 	private static bool UsingOrganiserOwnsLeadingTrivia(CompilationUnitSyntax node, SyntaxToken first, PrintContext context)
 	{
 		if (node.Usings.Count == 0 || first != node.Usings[0].GetFirstToken(includeZeroWidth: true))

@@ -59,6 +59,7 @@ public class Widget
 
     public void Run()
     {
+
         int a = 1;
         Console.WriteLine(a);
     }
@@ -106,6 +107,7 @@ public class Widget
 
     public void Run()
     {
+
         int a = 1;
         Console.WriteLine(a);
     }
