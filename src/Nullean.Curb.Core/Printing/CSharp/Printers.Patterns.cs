@@ -687,7 +687,13 @@ internal static partial class Printers
 		// A last element that is a block lambda ends its line: dotnet format moves the `)` after its `}` to a
 		// line of its own at the enclosing statement's indent, whatever the layout or the author's column for
 		// it, as it moves a ternary's `:` (issue #299). An argument list's `)` it leaves after the `}`.
-		if (arguments.Count > 0 && EndsBelowItsStart(arguments[^1].Expression, context) && !TokenPrinter.HasLeadingContent(node.CloseParenToken))
+		//
+		// Not for a tuple that is itself an element of a collection or array initializer: it starts its own line,
+		// and dotnet format leaves its `)` after the `}` wherever the author had it (issue #377).
+		if (
+			arguments.Count > 0 && node.Parent is not InitializerExpressionSyntax && EndsBelowItsStart(arguments[^1].Expression, context) &&
+			!TokenPrinter.HasLeadingContent(node.CloseParenToken)
+		)
 			LineAfterBlock(node, context);
 		else if (anchor >= 0 && arguments.Count > 0 && context.AuthorBroke(arguments[^1].Span.End, node.CloseParenToken.SpanStart))
 			ContinuationLine(node.CloseParenToken, anchor, context);

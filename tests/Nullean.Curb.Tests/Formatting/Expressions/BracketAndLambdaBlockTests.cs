@@ -1147,6 +1147,77 @@ public class BracketAndLambdaBlockTests : FormattingTest
 		""",
 		editorConfig: "csharp_empty_block_style = together_same_line");
 
+	// Issue #377: a tuple that is itself an element of a collection or array initializer starts its own line,
+	// and dotnet format leaves its `)` after the `}`. An indexer-keyed element still moves it, to that line's indent.
+
+	[Test]
+	public Task A_tuple_that_is_an_initializer_element_keeps_its_paren_after_the_block_lambda() => Unchanged(
+		"""
+		using System;
+		using System.Collections.Generic;
+
+		public class C
+		{
+		    public void M()
+		    {
+		        var list = new List<(Type, Action)>
+		        {
+		            (typeof(C), () =>
+		            {
+		                M();
+		            }),
+		        };
+		        var array = new (int, Action)[]
+		        {
+		            (1, () =>
+		            {
+		                M();
+		            }),
+		        };
+		    }
+		}
+		""");
+
+	[Test]
+	public Task A_keyed_initializer_element_puts_the_tuples_paren_at_its_own_line() => Formats(
+		"""
+		using System;
+		using System.Collections.Generic;
+
+		public class C
+		{
+		    public void M()
+		    {
+		        var map = new Dictionary<int, (int, Action)>
+		        {
+		            [1] = (1, () =>
+		            {
+		                M();
+		            }),
+		        };
+		    }
+		}
+		""",
+		"""
+		using System;
+		using System.Collections.Generic;
+
+		public class C
+		{
+		    public void M()
+		    {
+		        var map = new Dictionary<int, (int, Action)>
+		        {
+		            [1] = (1, () =>
+		            {
+		                M();
+		            }
+		            ),
+		        };
+		    }
+		}
+		""");
+
 	// Issue #299: a tuple whose last element is a block lambda gets its `)` on a line of its own, at the
 	// indent of the line the enclosing statement, lambda or member starts on, as the ternary's `:` above.
 
