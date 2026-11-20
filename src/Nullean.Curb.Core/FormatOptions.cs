@@ -597,8 +597,8 @@ public readonly record struct FormatOptions
 	/// <see cref="BraceRequirement.AsWritten"/> unless the key says otherwise, so a repository that
 	/// never mentioned it is untouched. <c>false</c> also maps to that: Roslyn reads it as "prefer no
 	/// braces" and will take them off, but removing a brace pair can change what a name means — a
-	/// declaration inside the block stops being scoped to it — and adding braces cannot. Curb only
-	/// adds.
+	/// declaration inside the block stops being scoped to it. Curb only adds braces, and skips bodies
+	/// where conditional compilation could make that change unsafe.
 	/// </para>
 	/// <para>
 	/// When braces are added the body is expanded onto its own lines even if the author had it on the

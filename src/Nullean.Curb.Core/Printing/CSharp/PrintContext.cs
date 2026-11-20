@@ -14,11 +14,13 @@ namespace Nullean.Curb.Printing.CSharp;
 /// copying it would be both wasteful and wrong. The options it holds are a struct and are read
 /// through helpers, never poked at directly by a printer.
 /// </remarks>
-internal sealed class PrintContext(DocArena arena, SourceText text, string source, FormatOptions options)
+internal sealed class PrintContext(DocArena arena, CSharpSource parsed, string source, FormatOptions options)
 {
 	public DocArena Arena { get; } = arena;
 
-	public SourceText Text { get; } = text;
+	public SourceText Text { get; } = parsed.Text;
+
+	public bool HasDirectives { get; } = parsed.Root.ContainsDirectives;
 
 	/// <summary>The string <see cref="Text"/> was made from, for reading a run of it as a span.</summary>
 	/// <remarks>Indexing <see cref="SourceText"/> is a virtual call per character.</remarks>

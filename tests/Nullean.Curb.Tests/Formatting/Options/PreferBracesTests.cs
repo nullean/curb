@@ -13,7 +13,7 @@ namespace Nullean.Curb.Tests.Formatting.Options;
 /// <para>
 /// Off unless the key says otherwise, and <c>false</c> also does nothing. Roslyn reads <c>false</c> as
 /// "take the braces off", but removing a brace pair can change what a name means — a declaration
-/// inside the block stops being scoped to it — while adding braces cannot. Curb only adds.
+/// inside the block stops being scoped to it. Curb only adds braces where the body is safe to wrap.
 /// </para>
 /// <para>
 /// This is the first rule that <em>inserts</em> tokens rather than moving or permuting them, so the

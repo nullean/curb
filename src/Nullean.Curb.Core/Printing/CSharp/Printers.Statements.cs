@@ -1,6 +1,7 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Text;
 using Nullean.Curb.Documents;
 using Nullean.Curb.Options;
 
@@ -143,13 +144,44 @@ internal static partial class Printers
 		if (statement is BlockSyntax)
 			return false;
 
-		return context.Options.PreferBraces switch
+		var requested = context.Options.PreferBraces switch
 		{
 			BraceRequirement.Always => true,
 			BraceRequirement.WhenMultiline => !context.AuthorJoined(statement.SpanStart, statement.Span.End),
 			BraceRequirement.AsWritten => false,
 			_ => false,
 		};
+		return requested && (!context.HasDirectives || CanInsertBraces(statement));
+	}
+
+	private static bool CanInsertBraces(StatementSyntax statement)
+	{
+		if (statement.Parent is { ContainsDirectives: true } owner)
+		{
+			// The opener comes before the body's leading trivia. A conditional in the header
+			// or body can change which construct owns the body or leave one brace inactive.
+			var span = TextSpan.FromBounds(owner.SpanStart, statement.FullSpan.End);
+			foreach (var trivia in owner.DescendantTrivia(span, static node => node.ContainsDirectives))
+			{
+				if (
+					trivia.Kind() is SyntaxKind.IfDirectiveTrivia or SyntaxKind.ElifDirectiveTrivia or SyntaxKind.ElseDirectiveTrivia or SyntaxKind.EndIfDirectiveTrivia
+				)
+					return false;
+			}
+		}
+
+		// A trailing inactive branch can supply an else for an unmatched if inside the body.
+		// Putting a closing brace before the branch would cut off that if from its else.
+		var last = statement.GetLastToken();
+		for (var node = last.Parent; node is not null && node.Span.End == last.Span.End; node = node.Parent)
+		{
+			if (node is IfStatementSyntax { Else: null })
+				return !last.GetNextToken(includeZeroWidth: true).LeadingTrivia.Any(SyntaxKind.DisabledTextTrivia);
+			if (node == statement)
+				break;
+		}
+
+		return true;
 	}
 
 	/// <summary>
