@@ -18,9 +18,17 @@ public class CorpusGeneratorTests
 
 	private static readonly (string TestCase, string Source, string Settings)[] Cases =
 	[
-		("SpacingTests.Binary_operators", "class C { int M(int a,int b) => a+b; }", "csharp_space_around_binary_operators = before_and_after"),
+		(
+			"SpacingTests.Binary_operators",
+			"class C { int M(int a,int b) => a+b; }",
+			"csharp_space_around_binary_operators = before_and_after\ncsharp_keep_existing_linebreaks = false"
+		),
 		("BraceTests.Allman", "class C\n{\n    void M() { if (true) { } }\n}", ""),
-		("BraceTests.Allman", "namespace N { class D { void M() { } } }", "csharp_new_line_before_open_brace = none"),
+		(
+			"BraceTests.Allman",
+			"namespace N { class D { void M() { } } }",
+			"csharp_new_line_before_open_brace = none\ncsharp_keep_existing_linebreaks = true"
+		),
 		("CommentTests.Trailing", "class E\n{\n    int x; // the x\n}", ""),
 	];
 
@@ -85,6 +93,18 @@ public class CorpusGeneratorTests
 		var shared = first.Keys.Intersect(second.Keys).Where(k => k.EndsWith(".cs", StringComparison.Ordinal)).ToList();
 		var differing = shared.Count(k => !first[k].AsSpan().SequenceEqual(second[k]));
 		differing.Should().BeGreaterThan(shared.Count / 2, "a seed is supposed to decide the layout of most files");
+		await Task.CompletedTask;
+	}
+
+	[Test]
+	public async Task Snippet_settings_keep_explicit_preservation_at_every_width()
+	{
+		var corpus = Generate(1, Dump([0, 2]));
+		var preserving = File.ReadAllText(Path.Combine(corpus, "snippets", "BraceTests", ".editorconfig"));
+		var deterministic = File.ReadAllText(Path.Combine(corpus, "snippets", "SpacingTests", ".editorconfig"));
+
+		preserving.Should().Contain("csharp_keep_existing_linebreaks = true");
+		deterministic.Should().NotContain("csharp_keep_existing_linebreaks");
 		await Task.CompletedTask;
 	}
 

@@ -536,6 +536,7 @@ public class InitializerTests : FormattingTest
 		}
 		""",
 		"""
+		csharp_keep_existing_linebreaks = true
 		csharp_new_line_before_open_brace = all
 		csharp_new_line_before_members_in_object_initializers = true
 		csharp_preserve_single_line_blocks = false
@@ -592,6 +593,7 @@ public class InitializerTests : FormattingTest
 		}
 		""",
 		"""
+		csharp_keep_existing_linebreaks = true
 		csharp_new_line_before_members_in_object_initializers = false
 		csharp_preserve_single_line_blocks = false
 		csharp_preserve_single_line_statements = true
@@ -628,6 +630,7 @@ public class InitializerTests : FormattingTest
 		}
 		""",
 		"""
+		csharp_keep_existing_linebreaks = true
 		csharp_preserve_single_line_blocks = false
 		csharp_preserve_single_line_statements = false
 		""");
@@ -651,6 +654,7 @@ public class InitializerTests : FormattingTest
 		}
 		""",
 		"""
+		csharp_keep_existing_linebreaks = true
 		csharp_preserve_single_line_blocks = false
 		csharp_preserve_single_line_statements = false
 		csharp_style_expression_bodied_methods = when_on_single_line

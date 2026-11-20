@@ -43,12 +43,6 @@ public sealed record GeneratorReport(
 /// </summary>
 public static class CorpusGenerator
 {
-	/// <summary>
-	/// Keys left out of a snippet's own settings. Without a width the binder refuses deterministic layout (CURB1007),
-	/// and the conformance gate takes every width away; the file would then be refused rather than formatted.
-	/// </summary>
-	private static readonly string[] DroppedSnippetKeys = ["csharp_keep_existing_linebreaks", "root"];
-
 	public static GeneratorReport Generate(GeneratorOptions options)
 	{
 		var root = Path.GetFullPath(options.Output);
@@ -394,7 +388,7 @@ public static class CorpusGenerator
 					.Split('\n')
 					.Select(l => l.Trim())
 					.Where(l => l.Length > 0 && !l.StartsWith('[') && l.Contains('='))
-					.Where(l => !DroppedSnippetKeys.Any(k => l.StartsWith(k, StringComparison.OrdinalIgnoreCase)))
+					.Where(IncludeSnippetSetting)
 					.ToList();
 				if (settings.Count == 0)
 				{
@@ -415,6 +409,19 @@ public static class CorpusGenerator
 		}
 
 		return written;
+	}
+
+	private static bool IncludeSnippetSetting(string setting)
+	{
+		var separator = setting.IndexOf('=');
+		var key = setting.AsSpan(0, separator).Trim();
+		if (key.Equals("root", StringComparison.OrdinalIgnoreCase))
+			return false;
+
+		// Preservation works at every width. The no-width conformance run would refuse an explicit
+		// request for deterministic layout (CURB1007).
+		return !key.Equals("csharp_keep_existing_linebreaks", StringComparison.OrdinalIgnoreCase)
+			|| setting.AsSpan(separator + 1).Trim().Equals("true", StringComparison.OrdinalIgnoreCase);
 	}
 
 	private static string Hash(string text) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(text)));
