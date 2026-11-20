@@ -513,12 +513,15 @@ internal static partial class Printers
 				case ExpressionSyntax when current.Parent is InitializerExpressionSyntax:
 					return current.SpanStart;
 				case MemberDeclarationSyntax member:
-					return member.AttributeLists.Count == 0 ? member.SpanStart : member.AttributeLists[^1].GetLastToken().GetNextToken().SpanStart;
+					return StartAfterAttributes(member);
 			}
 		}
 
 		return -1;
 	}
+
+	private static int StartAfterAttributes(MemberDeclarationSyntax member) =>
+		member.AttributeLists.Count == 0 ? member.SpanStart : member.AttributeLists[^1].GetLastToken().GetNextToken().SpanStart;
 
 	/// <summary>
 	/// True for a lambda or anonymous method whose block prints opened out, the same question
@@ -731,6 +734,7 @@ internal static partial class Printers
 		var arena = context.Arena;
 
 		var spansLines = SpansLines(node, context);
+		var isWith = node.IsKind(SyntaxKind.WithInitializerExpression);
 		// The key reaches object initializers only, `new Dictionary { [1] = 2 }` included: dotnet format
 		// leaves a collection or array initializer's elements where the author put them however it is set
 		// (issue #215).
@@ -742,7 +746,7 @@ internal static partial class Printers
 		// A `with` expression's members go one per line whatever the key says: it reaches object
 		// initializers only, and dotnet format opens a `with` that spans lines out regardless (issue #214).
 		// Only its members: where its brace goes is the key's, as before.
-		var membersOnePerLine = oneMemberPerLine || node.IsKind(SyntaxKind.WithInitializerExpression);
+		var membersOnePerLine = oneMemberPerLine || isWith;
 		var asWritten = !membersOnePerLine && spansLines;
 
 		// The option says one member per line *when the initializer is opened out*, not that it must
@@ -751,7 +755,7 @@ internal static partial class Printers
 		// `new Thing { X = 1 }` and `new { P = 1 }` every one of them on its line. Curb exploded all
 		// four, which on roslyn — where both keys are set — was the single largest source of churn,
 		// and produced things like a `new[]` at one indent with its brace at another.
-		var openItOut = membersOnePerLine && spansLines;
+		var openItOut = membersOnePerLine && (spansLines || (isWith && ExpandsWithInitializer(node, context)));
 
 		// An array or collection initializer the author broke keeps exactly their breaks, as a
 		// collection expression does. dotnet format leaves both as written, where it opens out an
@@ -831,10 +835,10 @@ internal static partial class Printers
 		// settling. Where the author put the brace is fixed, so it is that which decides.
 		var ownerSpansLines = leadingLine && node.Parent is not null && (ownerBroke || context.AuthorBroke(node.Parent.SpanStart, node.SpanStart));
 
-		// The creation spans lines and the initializer does not: `new List<int>` / `{ 1, 2 }`. dotnet
-		// format leaves the members on the brace's line, so the brace's break goes outside the group.
-		// Inside, it broke the group and opened the members out one per line (issue #136).
-		var ownerBrokeAlone = ownerSpansLines && !spansLines && elementBrace < 0;
+		// The creation spans lines and the initializer stays compact: `new List<int>` / `{ 1, 2 }`.
+		// The brace's break goes outside the group so it leaves the members on the brace's line
+		// (issue #136).
+		var ownerBrokeAlone = ownerSpansLines && !spansLines && !openItOut && elementBrace < 0;
 
 		// Outside the group below, because it has to resolve against the owner's break rather than this
 		// initializer's — see BeforeOpenBraceWhenOwnerBroke. This is the deterministic half of the
@@ -1002,11 +1006,10 @@ internal static partial class Printers
 				using (arena.IndentIf(context.Options.IndentBraces))
 					arena.HardLine(DocFlags.Reindent);
 			}
-			else if (context.AuthorBroke(node.OpenBraceToken.Span.End, node.CloseBraceToken.SpanStart))
+			else if (openItOut || context.AuthorBroke(node.OpenBraceToken.Span.End, node.CloseBraceToken.SpanStart))
 			{
-				// `new C` / `{` / `}`: an empty initializer the author opened out stays opened out, as dotnet
-				// format leaves it. Joined to `{ }`, dotnet format opened it out again under
-				// csharp_preserve_single_line_blocks = false (issue #356).
+				// Keep a break the author put inside an empty initializer (issue #356), or emit one when
+				// the wrapping options open out an empty `with` initializer (issue #379).
 				using (arena.IndentIf(context.Options.IndentBraces))
 					InsideBrace(node.OpenBraceToken.Span.End, node.CloseBraceToken, closeRegister);
 			}
@@ -1075,6 +1078,44 @@ internal static partial class Printers
 
 			return int.MinValue;
 		}
+	}
+
+	private static bool ExpandsWithInitializer(InitializerExpressionSyntax node, PrintContext context)
+	{
+		if (!context.Options.KeepExistingLinebreaks || context.Options.PreserveSingleLineBlocks)
+			return false;
+
+		// Roslyn removes the brace pair's single-line protection when blocks are off. A containing
+		// single-line statement can still protect it, as can a compact declaration, lambda or switch arm.
+		for (var owner = node.Parent?.Parent; owner is not null; owner = owner.Parent)
+		{
+			// A converted return will belong to an expression body. Check the declaration's header
+			// and the carried statement, whose lines will meet at the new arrow.
+			if (ReferenceEquals(owner, context.ConvertedStatement) && owner.Parent is BlockSyntax { Parent: { } declaration } body)
+			{
+				var headerStart = declaration is MemberDeclarationSyntax member ? StartAfterAttributes(member) : declaration.SpanStart;
+				var headerEnd = body.OpenBraceToken.GetPreviousToken();
+				return SpansLines(owner, context) || context.AuthorBroke(headerStart, headerEnd.Span.End) || EndsWithLineComment(headerEnd);
+			}
+
+			// Curb opens an enclosing block on this pass, so none of its ancestors will stay on one line.
+			if (owner is BlockSyntax)
+				return true;
+
+			var start = owner switch
+			{
+				BasePropertyDeclarationSyntax { AccessorList: not null } => -1,
+				MemberDeclarationSyntax member => StartAfterAttributes(member),
+				AccessorDeclarationSyntax or AnonymousFunctionExpressionSyntax => owner.SpanStart,
+				SwitchExpressionArmSyntax or IsPatternExpressionSyntax or ObjectCreationExpressionSyntax { Initializer: not null } => owner.SpanStart,
+				StatementSyntax when context.Options.PreserveSingleLineStatements => owner.SpanStart,
+				_ => -1,
+			};
+			if (start >= 0 && context.AuthorJoined(start, owner.Span.End))
+				return false;
+		}
+
+		return true;
 	}
 
 	/// <summary>

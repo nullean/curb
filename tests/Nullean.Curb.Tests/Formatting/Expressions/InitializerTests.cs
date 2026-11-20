@@ -489,6 +489,173 @@ public class InitializerTests : FormattingTest
 		}
 		""");
 
+	[Test]
+	public Task With_initializers_expand_when_single_line_wrapping_is_disabled() => Formats(
+		"""
+		record Person(string Name, int Age);
+
+		static class Example
+		{
+		    public static Person Rename(Person person)
+		    {
+		        var renamed = person with { Name = "Sam", Age = 1 };
+		        return renamed with { Name = "Alex" };
+		    }
+
+		    public static Person Copy(Person person) { return person with { }; }
+
+		    public static Person RenameInline(Person person) => person with { Name = "Sam" };
+		}
+		""",
+		"""
+		record Person(string Name, int Age);
+
+		static class Example
+		{
+		    public static Person Rename(Person person)
+		    {
+		        var renamed = person with
+		        {
+		            Name = "Sam",
+		            Age = 1
+		        };
+		        return renamed with
+		        {
+		            Name = "Alex"
+		        };
+		    }
+
+		    public static Person Copy(Person person)
+		    {
+		        return person with
+		        {
+		        };
+		    }
+
+		    public static Person RenameInline(Person person) => person with { Name = "Sam" };
+		}
+		""",
+		"""
+		csharp_new_line_before_open_brace = all
+		csharp_new_line_before_members_in_object_initializers = true
+		csharp_preserve_single_line_blocks = false
+		csharp_preserve_single_line_statements = false
+		""");
+
+	[Test]
+	[Arguments(true, false)]
+	[Arguments(false, true)]
+	public Task Either_single_line_option_keeps_a_with_initializer_inline(bool preserveBlocks, bool preserveStatements) => Unchanged(
+		"""
+		record Person(string Name);
+
+		class Example
+		{
+		    Person Rename(Person person)
+		    {
+		        return person with { Name = "Sam" };
+		    }
+		}
+		""",
+		$"""
+		csharp_preserve_single_line_blocks = {preserveBlocks}
+		csharp_preserve_single_line_statements = {preserveStatements}
+		""");
+
+	[Test]
+	public Task With_members_expand_after_a_break_before_the_brace_even_when_statements_are_preserved() => Formats(
+		"""
+		record Person(string Name, int Age);
+
+		class Example
+		{
+		    Person Rename(Person person)
+		    {
+		        return person with
+		        { Name = "Sam", Age = 1 };
+		    }
+		}
+		""",
+		"""
+		record Person(string Name, int Age);
+
+		class Example
+		{
+		    Person Rename(Person person)
+		    {
+		        return person with
+		        {
+		            Name = "Sam",
+		            Age = 1
+		        };
+		    }
+		}
+		""",
+		"""
+		csharp_new_line_before_members_in_object_initializers = false
+		csharp_preserve_single_line_blocks = false
+		csharp_preserve_single_line_statements = true
+		""");
+
+	[Test]
+	public Task With_initializers_expand_on_the_same_pass_as_their_containing_blocks() => Formats(
+		"""
+		record Person(string Name);
+
+		class Example
+		{
+		    Person Copy { get; } = new Person("Sam") with { };
+		    System.Func<Person> Factory() => () => { return new Person("Sam") with { }; };
+		}
+		""",
+		"""
+		record Person(string Name);
+
+		class Example
+		{
+		    Person Copy
+		    {
+		        get;
+		    } = new Person("Sam") with
+		    {
+		    };
+		    System.Func<Person> Factory() => () =>
+		    {
+		        return new Person("Sam") with
+		        {
+		        };
+		    };
+		}
+		""",
+		"""
+		csharp_preserve_single_line_blocks = false
+		csharp_preserve_single_line_statements = false
+		""");
+
+	[Test]
+	public Task With_initializer_stays_inline_in_a_converted_single_line_expression_body() => Formats(
+		"""
+		record Person(string Name);
+
+		class Example
+		{
+		    Person Copy(Person person) { return person with { }; }
+		}
+		""",
+		"""
+		record Person(string Name);
+
+		class Example
+		{
+		    Person Copy(Person person) => person with { };
+		}
+		""",
+		"""
+		csharp_preserve_single_line_blocks = false
+		csharp_preserve_single_line_statements = false
+		csharp_style_expression_bodied_methods = when_on_single_line
+		""");
+
 	// Issue #214: dotnet format opens a `with` initializer that spans lines out one member per line even
 	// with csharp_new_line_before_members_in_object_initializers off: the key reaches object initializers
 	// only. One on a single line stays there.
