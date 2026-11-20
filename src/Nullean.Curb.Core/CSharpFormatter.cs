@@ -78,7 +78,7 @@ public sealed class CSharpFormatter : IDisposable
 		_arena.Reset(source.Length);
 		_output.Reset(source.Length + 64);
 
-		var context = new PrintContext(_arena, parsed.Text, source, options)
+		var context = new PrintContext(_arena, parsed, source, options)
 		{
 			FileName = fileName,
 			ExpandUnhandled = expandUnhandled,
@@ -185,7 +185,7 @@ public sealed class CSharpFormatter : IDisposable
 			return $"# does not parse: {errors[0].GetMessage(System.Globalization.CultureInfo.InvariantCulture)}";
 
 		_arena.Reset(source.Length);
-		Node.Print(parsed.Root, new PrintContext(_arena, parsed.Text, source, options));
+		Node.Print(parsed.Root, new PrintContext(_arena, parsed, source, options));
 		return DocDumper.Dump<CSharpLayout>(_arena, source);
 	}
 }
