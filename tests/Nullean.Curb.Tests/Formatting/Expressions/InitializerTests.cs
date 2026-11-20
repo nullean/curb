@@ -660,6 +660,176 @@ public class InitializerTests : FormattingTest
 		csharp_style_expression_bodied_methods = when_on_single_line
 		""");
 
+	[Test]
+	public Task With_initializer_in_an_object_member_stays_compact_when_the_object_wraps() =>
+		Formats(
+			"""
+		record R(int X, int Y);
+
+		class C
+		{
+		    R Item;
+
+		    C Copy(R p)
+		    {
+		        return new C { Item = p with { X = 10, Y = 20 } };
+		    }
+		}
+		""",
+			"""
+		record R(int X, int Y);
+
+		class C
+		{
+		    R Item;
+
+		    C Copy(R p)
+		    {
+		        return new C
+		        {
+		            Item = p with { X = 10, Y = 20 }
+		        };
+		    }
+		}
+		""",
+			"""
+		max_line_length = 50
+		csharp_keep_existing_linebreaks = true
+		csharp_preserve_single_line_blocks = false
+		csharp_preserve_single_line_statements = false
+		"""
+		);
+
+	[Test]
+	public Task With_initializers_stay_compact_inside_array_and_collection_elements() =>
+		Unchanged(
+			"""
+		record R(int X, int Y);
+
+		class C
+		{
+		    R[] CopyArray(R p)
+		    {
+		        return new[] { p with { X = 10, Y = 20 } };
+		    }
+
+		    R[] CopyCollection(R p)
+		    {
+		        return [
+		            p with { X = 10, Y = 20 }
+		        ];
+		    }
+		}
+		""",
+			"""
+		csharp_keep_existing_linebreaks = true
+		csharp_preserve_single_line_blocks = false
+		csharp_preserve_single_line_statements = false
+		"""
+		);
+
+	[Test]
+	public Task With_initializer_in_a_compact_case_guard_stays_on_the_label_line() =>
+		Unchanged(
+			"""
+		record R(int X, int Y);
+
+		class C
+		{
+		    R Copy(R p)
+		    {
+		        switch (p)
+		        {
+		            case { } when p with { X = 10, Y = 20 } != null: return p;
+		        }
+		        return p;
+		    }
+		}
+		""",
+			"""
+		csharp_keep_existing_linebreaks = true
+		csharp_preserve_single_line_blocks = false
+		csharp_preserve_single_line_statements = true
+		"""
+		);
+
+	[Test]
+	public Task With_initializer_in_a_switch_receiver_expands_on_the_first_pass() =>
+		Formats(
+			"""
+		record R(int X, int Y);
+
+		class C
+		{
+		    bool Check(R p)
+		    {
+		        return p with { X = 10, Y = 20 } switch { _ => true };
+		    }
+		}
+		""",
+			"""
+		record R(int X, int Y);
+
+		class C
+		{
+		    bool Check(R p)
+		    {
+		        return p with
+		        {
+		            X = 10,
+		            Y = 20
+		        } switch
+		        {
+		            _ => true
+		        };
+		    }
+		}
+		""",
+			"""
+		csharp_keep_existing_linebreaks = true
+		csharp_preserve_single_line_blocks = false
+		csharp_preserve_single_line_statements = true
+		"""
+		);
+
+	[Test]
+	public Task With_initializer_in_a_condition_indents_from_the_header_with_same_line_braces() =>
+		Formats(
+			"""
+		record R(int X, int Y);
+
+		class C {
+		    R Copy(R p) {
+		        if (p with { X = 10, Y = 20 } != null) {
+		            return p;
+		        }
+		        return p;
+		    }
+		}
+		""",
+			"""
+		record R(int X, int Y);
+
+		class C {
+		    R Copy(R p) {
+		        if (p with {
+		            X = 10,
+		            Y = 20
+		        } != null) {
+		            return p;
+		        }
+		        return p;
+		    }
+		}
+		""",
+			"""
+		csharp_keep_existing_linebreaks = true
+		csharp_new_line_before_open_brace = none
+		csharp_preserve_single_line_blocks = false
+		csharp_preserve_single_line_statements = false
+		"""
+		);
+
 	// Issue #214: dotnet format opens a `with` initializer that spans lines out one member per line even
 	// with csharp_new_line_before_members_in_object_initializers off: the key reaches object initializers
 	// only. One on a single line stays there.

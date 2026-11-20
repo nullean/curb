@@ -857,7 +857,9 @@ internal static partial class Printers
 		var braceBelowOwner = leadingLine && elementBrace < 0 && BraceOnOwnLine(BraceStyle.ObjectCollectionArrayInitializers, context) &&
 			(ownerBrokeAlone || !exactly ||
 				(!(exactly && ownerSpansLines) && (openItOut || ownerSpansLines || (asWritten && context.AuthorBroke(node.SpanStart, node.Parent!.SpanStart)))));
-		var ownerLine = braceBelowOwner ? OwnerLineAnchor(node.Parent!.GetFirstToken(), context) : -1;
+		// A with initializer's members follow the receiver's line even when the brace stays inline.
+		var anchorToOwner = braceBelowOwner || (isWith && openItOut && leadingLine && elementBrace < 0);
+		var ownerLine = anchorToOwner ? OwnerLineAnchor(node.Parent!.GetFirstToken(), context) : -1;
 
 		using (ownerLine >= 0 ? arena.AlignedIndent(ownerLine, 0) : default)
 		{
@@ -1089,6 +1091,10 @@ internal static partial class Printers
 		// single-line statement can still protect it, as can a compact declaration, lambda or switch arm.
 		for (var owner = node.Parent?.Parent; owner is not null; owner = owner.Parent)
 		{
+			// Roslyn preserves the layout of collection elements, even when the collection spans lines.
+			if (owner.Kind() is SyntaxKind.CollectionExpression or SyntaxKind.ArrayInitializerExpression or SyntaxKind.CollectionInitializerExpression)
+				return false;
+
 			// A converted return will belong to an expression body. Check the declaration's header
 			// and the carried statement, whose lines will meet at the new arrow.
 			if (ReferenceEquals(owner, context.ConvertedStatement) && owner.Parent is BlockSyntax { Parent: { } declaration } body)
@@ -1098,8 +1104,8 @@ internal static partial class Printers
 				return SpansLines(owner, context) || context.AuthorBroke(headerStart, headerEnd.Span.End) || EndsWithLineComment(headerEnd);
 			}
 
-			// Curb opens an enclosing block on this pass, so none of its ancestors will stay on one line.
-			if (owner is BlockSyntax)
+			// Curb opens these on this pass, so none of their ancestors will stay on one line.
+			if (owner is BlockSyntax or SwitchExpressionSyntax)
 				return true;
 
 			var start = owner switch
@@ -1107,7 +1113,10 @@ internal static partial class Printers
 				BasePropertyDeclarationSyntax { AccessorList: not null } => -1,
 				MemberDeclarationSyntax member => StartAfterAttributes(member),
 				AccessorDeclarationSyntax or AnonymousFunctionExpressionSyntax => owner.SpanStart,
-				SwitchExpressionArmSyntax or IsPatternExpressionSyntax or ObjectCreationExpressionSyntax { Initializer: not null } => owner.SpanStart,
+				SwitchExpressionArmSyntax or CasePatternSwitchLabelSyntax or IsPatternExpressionSyntax => owner.SpanStart,
+				// Roslyn protects both the explicit creation and each of its initializer's members.
+				ObjectCreationExpressionSyntax { Initializer: not null } => owner.SpanStart,
+				ExpressionSyntax { Parent: InitializerExpressionSyntax { Parent: ObjectCreationExpressionSyntax } } => owner.SpanStart,
 				StatementSyntax when context.Options.PreserveSingleLineStatements => owner.SpanStart,
 				_ => -1,
 			};
