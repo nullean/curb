@@ -101,7 +101,7 @@ jobs:
       - run: git fetch --prune --tags
         shell: bash
 
-      - uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
+      - uses: jdx/mise-action@236a21c3b91f5db6d4e174b348674a0f0caac06d # v5.2.9
         with:
           cache: false # this workflow publishes what these jobs build; never restore a cache a PR could have written
         env:
@@ -173,7 +173,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
+      - uses: jdx/mise-action@236a21c3b91f5db6d4e174b348674a0f0caac06d # v5.2.9
         with:
           cache: false # this workflow publishes what these jobs build; never restore a cache a PR could have written
         env:
@@ -421,7 +421,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
+      - uses: jdx/mise-action@236a21c3b91f5db6d4e174b348674a0f0caac06d # v5.2.9
         with:
           cache: false # this workflow publishes what these jobs build; never restore a cache a PR could have written
         env:
@@ -445,7 +445,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
+      - uses: jdx/mise-action@236a21c3b91f5db6d4e174b348674a0f0caac06d # v5.2.9
         with:
           cache: false # this workflow publishes what these jobs build; never restore a cache a PR could have written
         env:
@@ -489,7 +489,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
+      - uses: jdx/mise-action@236a21c3b91f5db6d4e174b348674a0f0caac06d # v5.2.9
         with:
           cache: false # this workflow publishes what these jobs build; never restore a cache a PR could have written
         env:
@@ -523,7 +523,7 @@ jobs:
       # MinVer derives the version from tags, so the full tag list must be present.
       - run: git fetch --prune --tags
 
-      - uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
+      - uses: jdx/mise-action@236a21c3b91f5db6d4e174b348674a0f0caac06d # v5.2.9
         with:
           cache: false # this workflow publishes what these jobs build; never restore a cache a PR could have written
         env:
@@ -629,7 +629,7 @@ jobs:
       # MinVer derives the version from tags, so the full tag list must be present.
       - run: git fetch --prune --tags
 
-      - uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
+      - uses: jdx/mise-action@236a21c3b91f5db6d4e174b348674a0f0caac06d # v5.2.9
         with:
           cache: false # a release never restores a cache PR builds could have written
         env:
@@ -732,7 +732,7 @@ jobs:
 
   # Static analysis of these workflows (nullean/.github).
   zizmor:
-    uses: nullean/.github/.github/workflows/zizmor.yml@d850ce6eee9efa9f81b410d15fcd480409518d19 # v1.5.0
+    uses: nullean/.github/.github/workflows/zizmor.yml@e21d5f59405aa7078e51825cd4c407191e28562f # v1.6.1
     permissions:
       contents: read
 
@@ -747,7 +747,7 @@ jobs:
           persist-credentials: false
 
       - name: Build documentation
-        uses: elastic/docs-builder@b9a0947ff47feb910cb073400f0de44cde41ca17 # 1.75.0
+        uses: elastic/docs-builder@5ac22c7cebc84d83f13cb41fb9bfa15679506edf # 1.78.0
         env:
           FEATURE_NAVIGATION_PREVIEW: true
 
