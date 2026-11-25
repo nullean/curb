@@ -17,7 +17,7 @@
       "rollForward": false
     },
     "assembly-differ": {
-      "version": "0.18.2",
+      "version": "1.2.0",
       "commands": [
         "assembly-differ"
       ],
