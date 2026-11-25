@@ -30,7 +30,7 @@ jobs:
 
       # The design-system layout is behind a feature flag, read from the environment only.
       - name: Build documentation
-        uses: elastic/docs-builder@b9a0947ff47feb910cb073400f0de44cde41ca17 # 1.75.0
+        uses: elastic/docs-builder@5ac22c7cebc84d83f13cb41fb9bfa15679506edf # 1.78.0
         env:
           FEATURE_NAVIGATION_PREVIEW: true
 
