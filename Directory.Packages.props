@@ -68,8 +68,8 @@
     <!-- Build script dependencies -->
     <!-- under Central Package Management the F# SDK adds no implicit FSharp.Core; the build references it itself -->
     <PackageVersion Include="FSharp.Core" Version="11.0.101" />
-    <!-- brings Nullean.Make, and Proc.Fs 0.21 with Proc -->
-    <PackageVersion Include="Nullean.Make.Fs" Version="0.30.0" />
+    <!-- brings Runna, and Proc.Fs 0.22 with Proc -->
+    <PackageVersion Include="Runna.Fs" Version="0.2.1" />
     <!-- referenced directly because the build's own commands are Proc.Fs `sh` lines, and the gates that run
          commands in parallel (verifycleanupexpectations, xmlsafety) need Cmd.quiet (0.18.0+) to collect a
          command's output without printing any of it -->

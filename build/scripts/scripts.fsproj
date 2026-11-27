@@ -2,7 +2,7 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net11.0</TargetFramework>
-    <!-- Nullean.Make.Fs reads the target descriptions from the /// comments on the Target cases in CommandLine.fs -->
+    <!-- Runna.Fs reads the target descriptions from the /// comments on the Target cases in CommandLine.fs -->
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <IsPackable>false</IsPackable>
     <Nullable>disable</Nullable>
@@ -10,7 +10,7 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="FSharp.Core" />
-    <PackageReference Include="Nullean.Make.Fs" />
+    <PackageReference Include="Runna.Fs" />
     <PackageReference Include="Proc.Fs" />
   </ItemGroup>
   <ItemGroup>

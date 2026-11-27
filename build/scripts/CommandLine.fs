@@ -1,10 +1,10 @@
 module CommandLine
 
-open Nullean.Make.Fs
+open Nullean.Runna.Fs
 
 /// The build's targets; `./build.sh --help` lists them with these descriptions.
 ///
-/// Make.Fs names a target after its case, kebab-cased at each capital, so the multi-word names CI, mise.toml
+/// Runna.Fs names a target after its case, kebab-cased at each capital, so the multi-word names CI, mise.toml
 /// and the docs call (`clonecorpus`, `verifyexpectationside0055`, ...) are spelled here with one capital.
 type Target =
     /// clean known output locations
@@ -60,11 +60,11 @@ type Target =
     /// publishes the CLI's native-AOT build as a container image (--push to push it to ghcr.io)
     | Publishcontainers
 
-let app = MakeApp<Target>("./build.sh", None)
+let app = RunnaApp<Target>("./build.sh", None)
 
 // The spellings are the ones the Argu build accepted (Argu dropped the case's capitals rather than hyphenating
 // them), because those are what CI passes: `--maxallocationratio`, `--corpussource`, `--corpussize`, `--noserve`.
-// `-s` (`--single-target`) belongs to Make.Fs itself, and is a switch that takes no value.
+// `-s` (`--single-target`) belongs to Runna.Fs itself, and is a switch that takes no value.
 
 let corpus = app.Option<string option>("--corpus", desc = "path to a checkout (or a directory of checkouts for compare)", defaultValue = None)
 let minimum = app.Option<float option>("--minimum", desc = "fail if conformance falls below this percentage", defaultValue = None)
