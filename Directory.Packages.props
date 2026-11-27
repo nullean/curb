@@ -21,17 +21,17 @@
          and is always ahead — SDK 10.0.400 carries 5.900.26.38015, which is not on nuget and
          structurally never will be. Matching it is deliberately not attempted; see docs/cleanup.md
          for why that rules out hosting the SDK's own code style analysers. -->
-    <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="[5.9.0]" />
+    <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="[5.12.0]" />
     <!-- 0.18.0 fixes a static, process-wide cache collision (editorconfig/editorconfig-core-net#64,
          found while diagnosing nullean/curb#65): EditorConfigFileCache is now private per
          EditorConfigParser instance by default, so CurbEditorConfig no longer needs its own
          workaround cache — see CurbEditorConfig.cs. -->
     <PackageVersion Include="editorconfig" Version="0.18.0" />
-    <PackageVersion Include="System.IO.Abstractions" Version="23.0.0" />
+    <PackageVersion Include="System.IO.Abstractions" Version="23.0.1" />
     <!-- 0.18.0 fixes handler exit codes (nullean/argh#65), an illink crash under TreatWarningsAsErrors
          (nullean/argh#67), and drops a ~1 MB System.Text.Json dependency (nullean/argh#66). Reference
          Nullean.Argh, not Nullean.Argh.Hosting — see Nullean.Curb.Cli.csproj. -->
-    <PackageVersion Include="Nullean.Argh" Version="0.30.0" />
+    <PackageVersion Include="Nullean.Argh" Version="0.30.1" />
 
     <!-- Fingerprints the file content and the resolved options behind the `cache` flag. XxHash128 rather
          than SHA-256 out of System.Security.Cryptography, and the reason is native AOT rather than speed:
@@ -49,9 +49,9 @@
   <ItemGroup>
     <!-- Test dependencies -->
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.12.0" />
-    <PackageVersion Include="TUnit" Version="1.83.8" />
+    <PackageVersion Include="TUnit" Version="1.86.6" />
     <PackageVersion Include="AwesomeAssertions" Version="9.6.0" />
-    <PackageVersion Include="System.IO.Abstractions.TestingHelpers" Version="23.0.0" />
+    <PackageVersion Include="System.IO.Abstractions.TestingHelpers" Version="23.0.1" />
     <PackageVersion Include="GitHubActionsTestLogger" Version="3.0.5" />
     <!-- Formatting tests carry their expected output inline as raw strings, so a readable diff on
          failure matters more than a snapshot library. Verify was referenced and never used. -->
