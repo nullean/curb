@@ -957,27 +957,26 @@ let private normalisePreprocessed (text: string) =
 
 /// Runs one `dotnet msbuild` and returns its stdout, or the reason it failed.
 let private runMsbuild (project: string) (arguments: string list) =
-    let exitCode, output, error =
-        shell {
-            use! _ = inDir (Path.GetDirectoryName project)
-            // Evaluation only: no restore, no build, and no node reuse leaking state between the two passes.
-            use! _ = withEnv [ "MSBUILDDISABLENODEREUSE", "1"; "DOTNET_CLI_TELEMETRY_OPTOUT", "1" ]
-            return!
-                sh $"dotnet msbuild {project} -nologo {arguments}"
-                |> Cmd.quiet
-                |> Cmd.result
-                |> Cmd.mapCapture (fun r ->
-                    let text error = r.ConsoleOut |> Seq.filter (fun l -> l.Error = error) |> Seq.map (fun l -> l.Line) |> String.concat "\n"
-                    r.ExitCode.Value, text false, text true)
-        }
-    if exitCode = 0 then Ok output
-    else
-        let reason =
-            (output + "\n" + error).Split('\n')
-            |> Array.map (fun l -> l.Trim())
-            |> Array.tryFind (fun l -> l.Contains "error")
-            |> Option.defaultValue (sprintf "exit code %d" exitCode)
-        Error reason
+    steps {
+        use! _ = inDir (Path.GetDirectoryName project)
+        // Evaluation only: no restore, no build, and no node reuse leaking state between the two passes.
+        use! _ = withEnv [ "MSBUILDDISABLENODEREUSE", "1"; "DOTNET_CLI_TELEMETRY_OPTOUT", "1" ]
+        let! exitCode, output, error =
+            sh $"dotnet msbuild {project} -nologo {arguments}"
+            |> Cmd.quiet
+            |> Cmd.result
+            |> Cmd.mapCapture (fun r ->
+                let text error = r.ConsoleOut |> Seq.filter (fun l -> l.Error = error) |> Seq.map (fun l -> l.Line) |> String.concat "\n"
+                r.ExitCode.Value, text false, text true)
+        if exitCode = 0 then return Ok output
+        else
+            let reason =
+                (output + "\n" + error).Split('\n')
+                |> Array.map (fun l -> l.Trim())
+                |> Array.tryFind (fun l -> l.Contains "error")
+                |> Option.defaultValue (sprintf "exit code %d" exitCode)
+            return Error reason
+    }
 
 /// Evaluates one project: MSBuild's JSON for the properties and items above, and the preprocessed
 /// project with every import inlined, normalised. Or the reason it would not evaluate.
@@ -987,17 +986,21 @@ let private evaluateProject (work: string) (project: string) =
     let timestamps = Text.RegularExpressions.Regex(@"^\s*""(ModifiedTime|CreatedTime|AccessedTime)"": .*$\n?", Text.RegularExpressions.RegexOptions.Multiline)
     let properties = xmlSafetyProperties |> List.map (sprintf "-getProperty:%s")
     let items = xmlSafetyItems |> List.map (sprintf "-getItem:%s")
-    match runMsbuild project (properties @ items) with
-    | Error reason -> Error reason
-    | Ok json when not (json.TrimStart().StartsWith "{") -> Error "MSBuild did not answer with JSON"
-    | Ok json ->
-        let preprocessed = Path.Combine(Path.GetTempPath(), sprintf "curb-xmlsafety-%s.xml" (Guid.NewGuid().ToString "N"))
-        try
-            match runMsbuild project [ sprintf "-preprocess:%s" preprocessed ] with
-            | Error reason -> Error ("preprocess: " + reason)
-            | Ok _ -> Ok(timestamps.Replace(json, ""), normalisePreprocessed (File.ReadAllText preprocessed))
-        finally
-            if File.Exists preprocessed then File.Delete preprocessed
+    steps {
+        let! evaluated = runMsbuild project (properties @ items)
+        match evaluated with
+        | Error reason -> return Error reason
+        | Ok json when not (json.TrimStart().StartsWith "{") -> return Error "MSBuild did not answer with JSON"
+        | Ok json ->
+            let preprocessed = Path.Combine(Path.GetTempPath(), sprintf "curb-xmlsafety-%s.xml" (Guid.NewGuid().ToString "N"))
+            try
+                let! expanded = runMsbuild project [ sprintf "-preprocess:%s" preprocessed ]
+                match expanded with
+                | Error reason -> return Error ("preprocess: " + reason)
+                | Ok _ -> return Ok(timestamps.Replace(json, ""), normalisePreprocessed (File.ReadAllText preprocessed))
+            finally
+                if File.Exists preprocessed then File.Delete preprocessed
+    }
 
 /// Proves formatting project files is safe the only way that counts: MSBuild reads them the same.
 ///
@@ -1027,7 +1030,12 @@ let xmlSafety () =
     if projects.Length = 0 then failwith "no projects found to evaluate"
 
     printfn "evaluating %d project(s) before formatting" projects.Length
-    let before = projects |> Array.Parallel.map (fun p -> p, evaluateProject work p)
+    // At most one MSBuild per processor, as in the other concurrent targets below. Results come back in the order of `projects`.
+    let before =
+        shell {
+            let! results = concurrentlyAtMost Environment.ProcessorCount [ for p in projects -> steps { let! r = evaluateProject work p in return p, r } ]
+            return Array.ofList results
+        }
     let evaluated = before |> Array.choose (fun (p, r) -> match r with Ok v -> Some(p, v) | Error _ -> None)
     let skipped = before |> Array.choose (fun (p, r) -> match r with Error reason -> Some(p, reason) | Ok _ -> None)
 
@@ -1049,7 +1057,13 @@ let xmlSafety () =
     let formatted = run "format" |> xmlLine
 
     printfn "evaluating %d project(s) after formatting" evaluated.Length
-    let after = evaluated |> Array.Parallel.map (fun (p, (json, preprocessed)) -> p, json, preprocessed, evaluateProject work p)
+    let after =
+        shell {
+            let! results =
+                concurrentlyAtMost Environment.ProcessorCount
+                    [ for (p, (json, preprocessed)) in evaluated -> steps { let! r = evaluateProject work p in return p, json, preprocessed, r } ]
+            return Array.ofList results
+        }
     let jsonDiffers = after |> Array.filter (fun (_, json, _, r) -> match r with Ok (j, _) -> j <> json | Error _ -> true)
     let preprocessDiffers = after |> Array.filter (fun (_, _, pre, r) -> match r with Ok (_, p) -> p <> pre | Error _ -> true)
 
@@ -1650,22 +1664,23 @@ and verifyCleanupExpectations () =
 
         // --verify-no-changes reports rather than rewrites, so the exit code alone says whether Case.cs
         // (Z) is already a fixed point — no before/after diff needed, unlike the whitespace side.
-        let exitCode, output =
-            sh $"dotnet format style {d} --verify-no-changes --severity info --diagnostics {ruleIds}" |> quietly |> Cmd.get
-
-        {| Directory = d; TestCase = testCase; StaysFixedPoint = (exitCode = 0); Output = output |}
+        steps {
+            let! exitCode, output =
+                sh $"dotnet format style {d} --verify-no-changes --severity info --diagnostics {ruleIds}" |> quietly
+            return {| Directory = d; TestCase = testCase; StaysFixedPoint = (exitCode = 0); Output = output |}
+        }
 
     // Concurrently, and bounded the way verifyExpectationsIde0055 bounds its builds: one `dotnet format`
-    // per processor. Each case reads and writes only its own directory (see the props file above). Each
-    // result, its captured output included, lands at its case's index and is printed from there, so the
-    // log reads exactly as a sequential run's did rather than as interleaved lines from several cases. 35
-    // cases one at a time were 109-222 s of a corpus job on every push.
-    let results = Array.zeroCreate cases.Length
-    System.Threading.Tasks.Parallel.For(
-        0, cases.Length,
-        System.Threading.Tasks.ParallelOptions(MaxDegreeOfParallelism = Environment.ProcessorCount),
-        fun i -> Array.set results i (check cases[i]))
-    |> ignore
+    // per processor (`concurrentlyAtMost`). Each case reads and writes only its own directory (see the props
+    // file above). `concurrentlyAtMost` returns the results in the order of the cases, and each one's captured
+    // output is printed from there, so the log reads exactly as a sequential run's did rather than as
+    // interleaved lines from several cases. 35 cases one at a time were 109-222 s of a corpus job on every push.
+    // The files of every case are written first, one after the other; only the `dotnet format` runs overlap.
+    let results =
+        shell {
+            let! results = concurrentlyAtMost Environment.ProcessorCount [ for d in cases -> check d ]
+            return Array.ofList results
+        }
     for r in results do
         if r.Output.Length > 0 then printfn "%s" r.Output
 
@@ -2104,9 +2119,9 @@ and verifyExpectationsJb () =
 /// ever be silenced by another case's content, because no two cases are ever compiled together.
 ///
 /// Slower for it — measured ~0.6s per case even with a warm build server, ~9 minutes for the full dump
-/// run sequentially — so this runs with bounded parallelism (Parallel.ForEach, capped at
+/// run sequentially — so this runs with bounded parallelism (`concurrentlyAtMost`, capped at
 /// Environment.ProcessorCount; Array.Parallel.map's own default degree was enough concurrent `dotnet
-/// build` processes to make ProcNet's stdout/stderr readers time out outright) rather than
+/// build` processes to make the readers of their stdout/stderr time out outright) rather than
 /// Array.Parallel.map's uncapped default, landing at 5-8 minutes depending on the machine. No stubbing
 /// needed either: alone, a case's own fictitious types/attributes are ordinary CS0103/CS0246 body-level
 /// noise the same way an undefined local already is, confirmed directly earlier — they do not stop that
@@ -2207,7 +2222,7 @@ and verifyExpectationsIde0055 () =
         //
         // -maxcpucount:1: each of these is a one-file project, with nothing for MSBuild's own internal
         // multi-node build to parallelise — left at its default, hundreds of these run concurrently
-        // (below) each also fanning out its own worker nodes, and ProcNet's stdout/stderr readers
+        // (below) each also fanning out its own worker nodes, and the readers of their stdout/stderr
         // started timing out under the combined load. One node per case, many cases at once instead.
         let properties =
             [ "-p:EnforceCodeStyleInBuild=true"
@@ -2218,22 +2233,22 @@ and verifyExpectationsIde0055 () =
               // between otherwise-identical runs under this much concurrent build load; a fresh
               // compiler process per case does not.
               "-p:UseSharedCompilation=false" ]
-        let _, output = sh $"dotnet build {caseDir} -tl:off --nologo -maxcpucount:1 {properties}" |> captured |> Cmd.get
-        d, ide0055Pattern.IsMatch output
+        steps {
+            let! _, output = sh $"dotnet build {caseDir} -tl:off --nologo -maxcpucount:1 {properties}" |> captured
+            return d, ide0055Pattern.IsMatch output
+        }
 
     printfn "building %d isolated case project(s)..." cases.Length
-    // A bounded degree rather than Array.Parallel.map's default (~2x processor count): that default was
-    // enough concurrently-running `dotnet build` processes to starve ProcNet's own stdout/stderr reader
+    // A bounded degree (`concurrentlyAtMost`) rather than Array.Parallel.map's default (~2x processor count): that default was
+    // enough concurrently-running `dotnet build` processes to starve the readers of their stdout/stderr
     // threads, which started timing out outright rather than just running slowly. Matches processor
     // count instead — measured directly (10 cases, 8-way: ~2.1s; sequential: ~6.1s) as the point past
     // which more concurrency stopped buying anything on this machine.
-    let results = System.Collections.Concurrent.ConcurrentBag<string * bool>()
-    System.Threading.Tasks.Parallel.ForEach(
-        cases,
-        System.Threading.Tasks.ParallelOptions(MaxDegreeOfParallelism = Environment.ProcessorCount),
-        fun d -> results.Add(buildOne d))
-    |> ignore
-    let results = results.ToArray()
+    let results =
+        shell {
+            let! results = concurrentlyAtMost Environment.ProcessorCount [ for d in cases -> buildOne d ]
+            return Array.ofList results
+        }
 
     // Only this shard's entries: one whose test runs in another shard is that shard's to call stale.
     let divergences = loadDivergences "ide0055" |> Map.filter (fun case _ -> inShard case)
